@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540" role="img" aria-label="Baú">
+<title>Baú</title>
+<style>
+  .bg    { fill:#1b1d21 }
+  .panel { fill:#2b2f36; stroke:#7d8794; stroke-width:2 }
+  .panel2{ fill:#232830; stroke:#5c6672; stroke-width:1.5 }
+  .slot  { fill:#3a4049; stroke:#6f7885; stroke-width:1 }
+  .slotA { fill:#4a5460; stroke:#cfd6e0; stroke-width:2 }
+  .btn   { fill:#3d4450; stroke:#8b94a3; stroke-width:1.5 }
+  .btnA  { fill:#4d5a75; stroke:#cfd6e0; stroke-width:2 }
+  .t     { fill:#e6eaf0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:12px }
+  .tc    { fill:#e6eaf0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:12px;
+           text-anchor:middle }
+  .ts    { fill:#98a2b3; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px }
+  .tsc   { fill:#98a2b3; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px;
+           text-anchor:middle }
+  .th    { fill:#ffd166; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:15px;
+           text-anchor:middle }
+  .tt    { fill:#7dd3a0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:11px }
+  .dim   { fill:#000; opacity:.45 }
+  .heart { fill:#dc4040 }
+  .hung  { fill:#c68a45 }
+  .xp    { fill:#7fc94b }
+  .guide { stroke:#5c6672; stroke-width:1; stroke-dasharray:4 3; fill:none }
+  .note  { fill:#ffd166; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px }
+</style>
+<rect class="bg" width="960" height="540"/>
+<text class="th" x="480.0" y="26">09 — Baú / Baú Duplo</text>
+<rect class="panel" x="110" y="80" width="330" height="331" rx="2"/>
+<text class="t" x="126" y="104">Baú (27)</text>
+<rect class="slot" x="130" y="120" width="48" height="48" rx="1"/>
+<rect class="slot" x="181" y="120" width="48" height="48" rx="1"/>
+<rect class="slot" x="232" y="120" width="48" height="48" rx="1"/>
+<rect class="slot" x="283" y="120" width="48" height="48" rx="1"/>
+<rect class="slot" x="334" y="120" width="48" height="48" rx="1"/>
+<rect class="slot" x="385" y="120" width="48" height="48" rx="1"/>
+<rect class="slot" x="130" y="171" width="48" height="48" rx="1"/>
+<rect class="slot" x="181" y="171" width="48" height="48" rx="1"/>
+<rect class="slot" x="232" y="171" width="48" height="48" rx="1"/>
+<rect class="slot" x="283" y="171" width="48" height="48" rx="1"/>
+<rect class="slot" x="334" y="171" width="48" height="48" rx="1"/>
+<rect class="slot" x="385" y="171" width="48" height="48" rx="1"/>
+<rect class="slot" x="130" y="222" width="48" height="48" rx="1"/>
+<rect class="slot" x="181" y="222" width="48" height="48" rx="1"/>
+<rect class="slot" x="232" y="222" width="48" height="48" rx="1"/>
+<rect class="slot" x="283" y="222" width="48" height="48" rx="1"/>
+<rect class="slot" x="334" y="222" width="48" height="48" rx="1"/>
+<rect class="slot" x="385" y="222" width="48" height="48" rx="1"/>
+<rect class="slot" x="130" y="285" width="48" height="48" rx="1"/>
+<rect class="slot" x="181" y="285" width="48" height="48" rx="1"/>
+<rect class="slot" x="232" y="285" width="48" height="48" rx="1"/>
+<rect class="slot" x="283" y="285" width="48" height="48" rx="1"/>
+<rect class="slot" x="334" y="285" width="48" height="48" rx="1"/>
+<rect class="slot" x="385" y="285" width="48" height="48" rx="1"/>
+<rect class="slot" x="130" y="336" width="48" height="48" rx="1"/>
+<rect class="slot" x="181" y="336" width="48" height="48" rx="1"/>
+<rect class="slot" x="232" y="336" width="48" height="48" rx="1"/>
+<rect class="slot" x="283" y="336" width="48" height="48" rx="1"/>
+<rect class="slot" x="334" y="336" width="48" height="48" rx="1"/>
+<rect class="slot" x="385" y="336" width="48" height="48" rx="1"/>
+<rect class="slot" x="130" y="387" width="48" height="48" rx="1"/>
+<rect class="slot" x="181" y="387" width="48" height="48" rx="1"/>
+<rect class="slot" x="232" y="387" width="48" height="48" rx="1"/>
+<rect class="slot" x="283" y="387" width="48" height="48" rx="1"/>
+<rect class="slot" x="334" y="387" width="48" height="48" rx="1"/>
+<rect class="slot" x="385" y="387" width="48" height="48" rx="1"/>
+<text class="ts" x="130" y="279">inventário</text>
+<rect class="slot" x="130" y="445" width="48" height="48" rx="1"/>
+<rect class="slot" x="181" y="445" width="48" height="48" rx="1"/>
+<rect class="slot" x="232" y="445" width="48" height="48" rx="1"/>
+<rect class="slot" x="283" y="445" width="48" height="48" rx="1"/>
+<rect class="slot" x="334" y="445" width="48" height="48" rx="1"/>
+<rect class="slot" x="385" y="445" width="48" height="48" rx="1"/>
+<text class="ts" x="130" y="439">hotbar</text>
+<rect class="panel" x="520" y="80" width="330" height="472" rx="2"/>
+<text class="t" x="536" y="104">Baú Duplo (54)</text>
+<rect class="slot" x="540" y="120" width="48" height="48" rx="1"/>
+<rect class="slot" x="591" y="120" width="48" height="48" rx="1"/>
+<rect class="slot" x="642" y="120" width="48" height="48" rx="1"/>
+<rect class="slot" x="693" y="120" width="48" height="48" rx="1"/>
+<rect class="slot" x="744" y="120" width="48" height="48" rx="1"/>
+<rect class="slot" x="795" y="120" width="48" height="48" rx="1"/>
+<rect class="slot" x="540" y="171" width="48" height="48" rx="1"/>
+<rect class="slot" x="591" y="171" width="48" height="48" rx="1"/>
+<rect class="slot" x="642" y="171" width="48" height="48" rx="1"/>
+<rect class="slot" x="693" y="171" width="48" height="48" rx="1"/>
+<rect class="slot" x="744" y="171" width="48" height="48" rx="1"/>
+<rect class="slot" x="795" y="171" width="48" height="48" rx="1"/>
+<rect class="slot" x="540" y="222" width="48" height="48" rx="1"/>
+<rect class="slot" x="591" y="222" width="48" height="48" rx="1"/>
+<rect class="slot" x="642" y="222" width="48" height="48" rx="1"/>
+<rect class="slot" x="693" y="222" width="48" height="48" rx="1"/>
+<rect class="slot" x="744" y="222" width="48" height="48" rx="1"/>
+<rect class="slot" x="795" y="222" width="48" height="48" rx="1"/>
+<rect class="slot" x="540" y="273" width="48" height="48" rx="1"/>
+<rect class="slot" x="591" y="273" width="48" height="48" rx="1"/>
+<rect class="slot" x="642" y="273" width="48" height="48" rx="1"/>
+<rect class="slot" x="693" y="273" width="48" height="48" rx="1"/>
+<rect class="slot" x="744" y="273" width="48" height="48" rx="1"/>
+<rect class="slot" x="795" y="273" width="48" height="48" rx="1"/>
+<rect class="slot" x="540" y="324" width="48" height="48" rx="1"/>
+<rect class="slot" x="591" y="324" width="48" height="48" rx="1"/>
+<rect class="slot" x="642" y="324" width="48" height="48" rx="1"/>
+<rect class="slot" x="693" y="324" width="48" height="48" rx="1"/>
+<rect class="slot" x="744" y="324" width="48" height="48" rx="1"/>
+<rect class="slot" x="795" y="324" width="48" height="48" rx="1"/>
+<rect class="slot" x="540" y="375" width="48" height="48" rx="1"/>
+<rect class="slot" x="591" y="375" width="48" height="48" rx="1"/>
+<rect class="slot" x="642" y="375" width="48" height="48" rx="1"/>
+<rect class="slot" x="693" y="375" width="48" height="48" rx="1"/>
+<rect class="slot" x="744" y="375" width="48" height="48" rx="1"/>
+<rect class="slot" x="795" y="375" width="48" height="48" rx="1"/>
+<rect class="slot" x="540" y="438" width="48" height="48" rx="1"/>
+<rect class="slot" x="591" y="438" width="48" height="48" rx="1"/>
+<rect class="slot" x="642" y="438" width="48" height="48" rx="1"/>
+<rect class="slot" x="693" y="438" width="48" height="48" rx="1"/>
+<rect class="slot" x="744" y="438" width="48" height="48" rx="1"/>
+<rect class="slot" x="795" y="438" width="48" height="48" rx="1"/>
+<rect class="slot" x="540" y="489" width="48" height="48" rx="1"/>
+<rect class="slot" x="591" y="489" width="48" height="48" rx="1"/>
+<rect class="slot" x="642" y="489" width="48" height="48" rx="1"/>
+<rect class="slot" x="693" y="489" width="48" height="48" rx="1"/>
+<rect class="slot" x="744" y="489" width="48" height="48" rx="1"/>
+<rect class="slot" x="795" y="489" width="48" height="48" rx="1"/>
+<rect class="slot" x="540" y="540" width="48" height="48" rx="1"/>
+<rect class="slot" x="591" y="540" width="48" height="48" rx="1"/>
+<rect class="slot" x="642" y="540" width="48" height="48" rx="1"/>
+<rect class="slot" x="693" y="540" width="48" height="48" rx="1"/>
+<rect class="slot" x="744" y="540" width="48" height="48" rx="1"/>
+<rect class="slot" x="795" y="540" width="48" height="48" rx="1"/>
+<text class="ts" x="540" y="432">inventário</text>
+<rect class="slot" x="540" y="598" width="48" height="48" rx="1"/>
+<rect class="slot" x="591" y="598" width="48" height="48" rx="1"/>
+<rect class="slot" x="642" y="598" width="48" height="48" rx="1"/>
+<rect class="slot" x="693" y="598" width="48" height="48" rx="1"/>
+<rect class="slot" x="744" y="598" width="48" height="48" rx="1"/>
+<rect class="slot" x="795" y="598" width="48" height="48" rx="1"/>
+<text class="ts" x="540" y="592">hotbar</text>
+<text class="ts" x="110" y="512">baús adjacentes viram um duplo · animação de tampa + som ao abrir</text>
+<text class="note" x="110" y="528">(grade mostrada em 6 colunas por espaço no diagrama; na UI real são 9)</text>
+
+</svg>

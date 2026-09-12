@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540" role="img" aria-label="Opções de vídeo">
+<title>Opções de vídeo</title>
+<style>
+  .bg    { fill:#1b1d21 }
+  .panel { fill:#2b2f36; stroke:#7d8794; stroke-width:2 }
+  .panel2{ fill:#232830; stroke:#5c6672; stroke-width:1.5 }
+  .slot  { fill:#3a4049; stroke:#6f7885; stroke-width:1 }
+  .slotA { fill:#4a5460; stroke:#cfd6e0; stroke-width:2 }
+  .btn   { fill:#3d4450; stroke:#8b94a3; stroke-width:1.5 }
+  .btnA  { fill:#4d5a75; stroke:#cfd6e0; stroke-width:2 }
+  .t     { fill:#e6eaf0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:12px }
+  .tc    { fill:#e6eaf0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:12px;
+           text-anchor:middle }
+  .ts    { fill:#98a2b3; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px }
+  .tsc   { fill:#98a2b3; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px;
+           text-anchor:middle }
+  .th    { fill:#ffd166; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:15px;
+           text-anchor:middle }
+  .tt    { fill:#7dd3a0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:11px }
+  .dim   { fill:#000; opacity:.45 }
+  .heart { fill:#dc4040 }
+  .hung  { fill:#c68a45 }
+  .xp    { fill:#7fc94b }
+  .guide { stroke:#5c6672; stroke-width:1; stroke-dasharray:4 3; fill:none }
+  .note  { fill:#ffd166; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px }
+</style>
+<rect class="bg" width="960" height="540"/>
+<text class="th" x="480.0" y="26">11 — Opções ▸ Vídeo</text>
+<text class="tsc" x="480.0" y="44">lista rolável de 2 colunas</text>
+<rect class="btn" x="90" y="80" width="380" height="32" rx="2"/>
+<text class="t" x="102" y="101">Distância de Renderização</text>
+<text class="ts" x="458" y="101">|====----| 6 chunks</text>
+<rect class="btn" x="490" y="80" width="380" height="32" rx="2"/>
+<text class="t" x="502" y="101">Distância de Simulação</text>
+<text class="ts" x="858" y="101">|===-----| 4</text>
+<rect class="btn" x="90" y="124" width="380" height="32" rx="2"/>
+<text class="t" x="102" y="145">Escala de Renderização</text>
+<text class="ts" x="458" y="145">|=======-| 90%</text>
+<rect class="btn" x="490" y="124" width="380" height="32" rx="2"/>
+<text class="t" x="502" y="145">FPS Máximo</text>
+<text class="ts" x="858" y="145">&lt; 60 &gt;</text>
+<rect class="btn" x="90" y="168" width="380" height="32" rx="2"/>
+<text class="t" x="102" y="189">VSync</text>
+<text class="ts" x="458" y="189">[ ON ]</text>
+<rect class="btn" x="490" y="168" width="380" height="32" rx="2"/>
+<text class="t" x="502" y="189">Gráficos</text>
+<text class="ts" x="858" y="189">&lt; Rápido &gt;</text>
+<rect class="btn" x="90" y="212" width="380" height="32" rx="2"/>
+<text class="t" x="102" y="233">Iluminação Suave</text>
+<text class="ts" x="458" y="233">[ ON ]</text>
+<rect class="btn" x="490" y="212" width="380" height="32" rx="2"/>
+<text class="t" x="502" y="233">Nuvens</text>
+<text class="ts" x="858" y="233">&lt; Off &gt;</text>
+<rect class="btn" x="90" y="256" width="380" height="32" rx="2"/>
+<text class="t" x="102" y="277">Partículas</text>
+<text class="ts" x="458" y="277">&lt; Reduzido &gt;</text>
+<rect class="btn" x="490" y="256" width="380" height="32" rx="2"/>
+<text class="t" x="502" y="277">Sombras de Entidade</text>
+<text class="ts" x="858" y="277">[ OFF ]</text>
+<rect class="btn" x="90" y="300" width="380" height="32" rx="2"/>
+<text class="t" x="102" y="321">Brilho</text>
+<text class="ts" x="458" y="321">|====----| 50%</text>
+<rect class="btn" x="490" y="300" width="380" height="32" rx="2"/>
+<text class="t" x="502" y="321">FOV</text>
+<text class="ts" x="858" y="321">|=====---| 70</text>
+<rect class="btn" x="90" y="344" width="380" height="32" rx="2"/>
+<text class="t" x="102" y="365">Escala da GUI</text>
+<text class="ts" x="458" y="365">&lt; Auto (3) &gt;</text>
+<rect class="btn" x="490" y="344" width="380" height="32" rx="2"/>
+<text class="t" x="502" y="365">Mostrar FPS</text>
+<text class="ts" x="858" y="365">[ ON ]</text>
+<rect class="btnA" x="380" y="400" width="200" height="32" rx="2"/>
+<text class="tc" x="480.0" y="420.0">Concluído</text>
+<text class="ts" x="90" y="456">submenus: Vídeo · Controles · Som · Idioma · Acessibilidade</text>
+<text class="ts" x="90" y="474">no mobile aparece também: Controles de Toque ▸ Editar layout dos botões</text>
+<text class="note" x="90" y="492">presets automáticos por tier, sempre sobrescrevíveis pelo jogador</text>
+
+</svg>

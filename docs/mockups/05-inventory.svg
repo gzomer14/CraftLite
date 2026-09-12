@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540" role="img" aria-label="Inventário de sobrevivência">
+<title>Inventário de sobrevivência</title>
+<style>
+  .bg    { fill:#1b1d21 }
+  .panel { fill:#2b2f36; stroke:#7d8794; stroke-width:2 }
+  .panel2{ fill:#232830; stroke:#5c6672; stroke-width:1.5 }
+  .slot  { fill:#3a4049; stroke:#6f7885; stroke-width:1 }
+  .slotA { fill:#4a5460; stroke:#cfd6e0; stroke-width:2 }
+  .btn   { fill:#3d4450; stroke:#8b94a3; stroke-width:1.5 }
+  .btnA  { fill:#4d5a75; stroke:#cfd6e0; stroke-width:2 }
+  .t     { fill:#e6eaf0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:12px }
+  .tc    { fill:#e6eaf0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:12px;
+           text-anchor:middle }
+  .ts    { fill:#98a2b3; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px }
+  .tsc   { fill:#98a2b3; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px;
+           text-anchor:middle }
+  .th    { fill:#ffd166; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:15px;
+           text-anchor:middle }
+  .tt    { fill:#7dd3a0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:11px }
+  .dim   { fill:#000; opacity:.45 }
+  .heart { fill:#dc4040 }
+  .hung  { fill:#c68a45 }
+  .xp    { fill:#7fc94b }
+  .guide { stroke:#5c6672; stroke-width:1; stroke-dasharray:4 3; fill:none }
+  .note  { fill:#ffd166; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px }
+</style>
+<rect class="bg" width="960" height="540"/>
+<text class="th" x="480.0" y="26">05 — Inventário (Sobrevivência)</text>
+<text class="tsc" x="480.0" y="44">painel 176x166 px de GUI — 46 slots no total</text>
+<rect class="panel" x="240" y="62" width="480" height="430" rx="2"/>
+<text class="t" x="256" y="86">Inventário</text>
+<rect class="slot" x="260" y="102" width="30" height="30" rx="1"/>
+<rect class="slot" x="260" y="136" width="30" height="30" rx="1"/>
+<rect class="slot" x="260" y="170" width="30" height="30" rx="1"/>
+<rect class="slot" x="260" y="204" width="30" height="30" rx="1"/>
+<text class="ts" x="260" y="96">armadura</text>
+<text class="ts" x="256" y="252">off-hand</text>
+<rect class="slot" x="260" y="258" width="30" height="30" rx="1"/>
+<rect class="panel2" x="310" y="102" width="100" height="160" rx="2"/>
+<text class="tsc" x="360" y="186">boneco 3D</text>
+<text class="tsc" x="360" y="202">segue o cursor</text>
+<rect class="slot" x="490" y="122" width="30" height="30" rx="1"/>
+<rect class="slot" x="524" y="122" width="30" height="30" rx="1"/>
+<rect class="slot" x="490" y="156" width="30" height="30" rx="1"/>
+<rect class="slot" x="524" y="156" width="30" height="30" rx="1"/>
+<text class="ts" x="490" y="116">craft 2x2</text>
+<text class="tc" x="562" y="170">→</text>
+<rect class="slotA" x="580" y="138" width="34" height="34" rx="2"/>
+<text class="tsc" x="597" y="122">saída</text>
+<rect class="slot" x="264" y="306" width="44" height="44" rx="1"/>
+<rect class="slot" x="311" y="306" width="44" height="44" rx="1"/>
+<rect class="slot" x="358" y="306" width="44" height="44" rx="1"/>
+<rect class="slot" x="405" y="306" width="44" height="44" rx="1"/>
+<rect class="slot" x="452" y="306" width="44" height="44" rx="1"/>
+<rect class="slot" x="499" y="306" width="44" height="44" rx="1"/>
+<rect class="slot" x="546" y="306" width="44" height="44" rx="1"/>
+<rect class="slot" x="593" y="306" width="44" height="44" rx="1"/>
+<rect class="slot" x="640" y="306" width="44" height="44" rx="1"/>
+<rect class="slot" x="264" y="353" width="44" height="44" rx="1"/>
+<rect class="slot" x="311" y="353" width="44" height="44" rx="1"/>
+<rect class="slot" x="358" y="353" width="44" height="44" rx="1"/>
+<rect class="slot" x="405" y="353" width="44" height="44" rx="1"/>
+<rect class="slot" x="452" y="353" width="44" height="44" rx="1"/>
+<rect class="slot" x="499" y="353" width="44" height="44" rx="1"/>
+<rect class="slot" x="546" y="353" width="44" height="44" rx="1"/>
+<rect class="slot" x="593" y="353" width="44" height="44" rx="1"/>
+<rect class="slot" x="640" y="353" width="44" height="44" rx="1"/>
+<rect class="slot" x="264" y="400" width="44" height="44" rx="1"/>
+<rect class="slot" x="311" y="400" width="44" height="44" rx="1"/>
+<rect class="slot" x="358" y="400" width="44" height="44" rx="1"/>
+<rect class="slot" x="405" y="400" width="44" height="44" rx="1"/>
+<rect class="slot" x="452" y="400" width="44" height="44" rx="1"/>
+<rect class="slot" x="499" y="400" width="44" height="44" rx="1"/>
+<rect class="slot" x="546" y="400" width="44" height="44" rx="1"/>
+<rect class="slot" x="593" y="400" width="44" height="44" rx="1"/>
+<rect class="slot" x="640" y="400" width="44" height="44" rx="1"/>
+<text class="ts" x="264" y="300">27 slots principais (9x3)</text>
+<rect class="slot" x="264" y="450" width="44" height="44" rx="1"/>
+<rect class="slot" x="311" y="450" width="44" height="44" rx="1"/>
+<rect class="slot" x="358" y="450" width="44" height="44" rx="1"/>
+<rect class="slot" x="405" y="450" width="44" height="44" rx="1"/>
+<rect class="slot" x="452" y="450" width="44" height="44" rx="1"/>
+<rect class="slot" x="499" y="450" width="44" height="44" rx="1"/>
+<rect class="slot" x="546" y="450" width="44" height="44" rx="1"/>
+<rect class="slot" x="593" y="450" width="44" height="44" rx="1"/>
+<rect class="slot" x="640" y="450" width="44" height="44" rx="1"/>
+<text class="ts" x="264" y="444">hotbar (9)</text>
+<rect class="btn" x="110" y="102" width="120" height="28" rx="2"/>
+<text class="tc" x="170.0" y="120.0">📖 receitas</text>
+<text class="ts" x="110" y="154">livro de receitas:</text>
+<text class="ts" x="110" y="172">abas: Tudo/Construção/</text>
+<text class="ts" x="110" y="187">Equipamento/Diversos/</text>
+<text class="ts" x="110" y="202">Redstone + busca.</text>
+<text class="ts" x="110" y="217">Clicar preenche a grade.</text>
+<text class="tt" x="730" y="120">interações de slot:</text>
+<text class="ts" x="730" y="142">• clique esq: pega stack</text>
+<text class="ts" x="730" y="159">• clique dir: pega metade</text>
+<text class="ts" x="730" y="176">• shift+clique: move tudo</text>
+<text class="ts" x="730" y="193">• arrastar esq: distribui</text>
+<text class="ts" x="730" y="210">• arrastar dir: 1 por slot</text>
+<text class="ts" x="730" y="227">• duplo clique: junta iguais</text>
+<text class="ts" x="730" y="244">• 1-9: troca com hotbar</text>
+<text class="ts" x="730" y="261">• Q / Ctrl+Q: joga fora</text>
+
+</svg>

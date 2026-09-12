@@ -1,0 +1,484 @@
+/**
+ * Pipeline de chunks (doc 02 §5.4).
+ *
+ * `EMPTY → GENERATING → GENERATED → MESHING → READY`, com fila de prioridade
+ * por distância² ao jogador e bônus para quem está no frustum. Máximo de
+ * `2 × nWorkers` requisições em voo, e orçamento duro de tempo por frame para
+ * aplicar os resultados.
+ *
+ * A regra que mais importa em T0: **carregar devagar é melhor que travar.**
+ */
+
+import { ChunkColumn, ChunkState, SECTIONS_PER_COLUMN, chunkKey } from './chunk';
+import { extractNeighborhood, NB_VOLUME } from './neighborhood';
+import type { World } from './world';
+import type {
+  GenResponse, MeshResponse, SerializedSection, WorkerRequest, WorkerResponse,
+} from '../workers/protocol';
+
+/** Resultado de `dispatchMesh`. Números, não string, para não alocar no pump. */
+const MESH_SENT = 0;
+/** Falta vizinho: continua na fila e tenta de novo no próximo frame. */
+const MESH_DEFERRED = 1;
+/** A coluna saiu do mundo: o job não tem mais destino e é descartado. */
+const MESH_DROPPED = 2;
+
+/** Um pedido na fila, com a prioridade já calculada. */
+interface PendingJob {
+  cx: number;
+  cz: number;
+  /** −1 = geração da coluna; 0..7 = meshing daquela section. */
+  sy: number;
+  priority: number;
+}
+
+export interface MeshResult {
+  cx: number;
+  cz: number;
+  sy: number;
+  response: MeshResponse;
+}
+
+export interface PipelineStats {
+  loaded: number;
+  queued: number;
+  generating: number;
+  meshing: number;
+  /** Média móvel do tempo de geração e de meshing, em ms. */
+  genMs: number;
+  meshMs: number;
+}
+
+/** Interface mínima de worker que o pipeline usa — permite injetar um duplo. */
+export interface WorkerLike {
+  postMessage(message: unknown, transfer?: Transferable[]): void;
+  terminate(): void;
+  onmessage: ((event: { data: WorkerResponse }) => void) | null;
+}
+
+export interface PipelineOptions {
+  workers: number;
+  renderDistance: number;
+  packed: boolean;
+  /** Fábrica de worker. O padrão cria o worker real; os testes injetam um duplo. */
+  createWorker?: (index: number) => WorkerLike;
+}
+
+export class ChunkPipeline {
+  private readonly world: World;
+  private readonly pool: WorkerLike[] = [];
+  /** Quantos pedidos cada worker tem em voo — usado para o round-robin. */
+  private readonly inFlight: number[] = [];
+  private readonly maxInFlight: number;
+
+  private readonly genQueue: PendingJob[] = [];
+  private readonly meshQueue: PendingJob[] = [];
+  private readonly queuedKeys = new Set<number>();
+  private readonly generating = new Set<number>();
+  private readonly meshing = new Set<number>();
+
+  /** Buffers de vizinhança reciclados (buffer ring do doc 02 §5.5). */
+  private readonly blockPool: Uint16Array[] = [];
+  private readonly lightPool: Uint8Array[] = [];
+
+  /** Resultados prontos, aguardando upload dentro do orçamento do frame. */
+  private readonly readyMeshes: MeshResult[] = [];
+
+  /**
+   * Jobs de meshing que esperam um vizinho chegar. Reaproveitado entre frames:
+   * o `pump` esvazia no fim, então nunca aloca no caminho quente.
+   */
+  private readonly deferredMeshes: PendingJob[] = [];
+
+  renderDistance: number;
+  private centerX = 0;
+  private centerZ = 0;
+  private readonly packed: boolean;
+
+  readonly stats: PipelineStats = {
+    loaded: 0, queued: 0, generating: 0, meshing: 0, genMs: 0, meshMs: 0,
+  };
+
+  constructor(world: World, options: PipelineOptions) {
+    this.world = world;
+    this.renderDistance = options.renderDistance;
+    this.packed = options.packed;
+    this.maxInFlight = options.workers * 2;
+
+    const create = options.createWorker ?? defaultWorkerFactory;
+    for (let i = 0; i < options.workers; i++) {
+      const worker = create(i);
+      worker.onmessage = (event) => this.onWorkerMessage(event.data);
+      worker.postMessage({ type: 'init', seed: world.seed, packed: this.packed } as WorkerRequest);
+      this.pool.push(worker);
+      this.inFlight.push(0);
+    }
+  }
+
+  /**
+   * Troca a distância de render **em jogo** (opção de vídeo do doc 08).
+   *
+   * Não basta escrever no campo: `setCenter` sai cedo quando o centro não
+   * mudou, então sem reenfileirar aqui o anel novo só apareceria quando o
+   * jogador trocasse de chunk — e diminuindo, o excedente ficaria carregado.
+   */
+  setRenderDistance(distance: number): void {
+    if (distance === this.renderDistance || distance < 1) return;
+    this.renderDistance = distance;
+    this.enqueueRing();
+    this.unloadFarChunks();
+  }
+
+  /** Recentra o pipeline na posição do jogador e reordena as filas. */
+  setCenter(x: number, z: number): void {
+    const cx = Math.floor(x / 16);
+    const cz = Math.floor(z / 16);
+    if (cx === this.centerX && cz === this.centerZ && this.queuedKeys.size > 0) return;
+    this.centerX = cx;
+    this.centerZ = cz;
+    this.enqueueRing();
+    this.unloadFarChunks();
+  }
+
+  /** Enfileira toda coluna faltante dentro do render distance. */
+  private enqueueRing(): void {
+    const rd = this.renderDistance;
+    for (let dz = -rd; dz <= rd; dz++) {
+      for (let dx = -rd; dx <= rd; dx++) {
+        if (dx * dx + dz * dz > rd * rd + rd) continue; // círculo, não quadrado
+        const cx = this.centerX + dx;
+        const cz = this.centerZ + dz;
+        const key = chunkKey(cx, cz);
+        if (this.world.getChunk(cx, cz) !== undefined) continue;
+        if (this.generating.has(key) || this.queuedKeys.has(key)) continue;
+        this.queuedKeys.add(key);
+        this.genQueue.push({ cx, cz, sy: -1, priority: dx * dx + dz * dz });
+      }
+    }
+    // Mais perto primeiro. Ordenar aqui é barato: só acontece ao trocar de chunk.
+    this.genQueue.sort(byPriority);
+  }
+
+  /** Descarrega o que saiu do alcance, com histerese de 2 chunks. */
+  private unloadFarChunks(): void {
+    const limit = (this.renderDistance + 2) * (this.renderDistance + 2);
+    const doomed: ChunkColumn[] = [];
+    this.world.forEachChunk((chunk) => {
+      const dx = chunk.cx - this.centerX;
+      const dz = chunk.cz - this.centerZ;
+      if (dx * dx + dz * dz > limit) doomed.push(chunk);
+    });
+    for (const chunk of doomed) {
+      this.world.removeChunk(chunk.cx, chunk.cz);
+      this.onChunkUnloaded?.(chunk);
+    }
+  }
+
+  /**
+   * Progresso do anel para o overlay (doc 02 §6): quantas colunas o anel pede
+   * e quantas já estão no mundo. Escreve em `out` para não alocar.
+   *
+   * `world.chunkCount` **não** serve aqui: ele conta também o halo de
+   * histerese de 2 chunks que `unloadFarChunks` ainda não descartou, e num
+   * anel de 69 colunas ele passa de 100 sem que nada esteja errado.
+   *
+   * Varre o anel inteiro, então só chame com o overlay aberto.
+   */
+  ringProgress(out: { loaded: number; total: number }): void {
+    const rd = this.renderDistance;
+    let loaded = 0;
+    let total = 0;
+    for (let dz = -rd; dz <= rd; dz++) {
+      for (let dx = -rd; dx <= rd; dx++) {
+        if (dx * dx + dz * dz > rd * rd + rd) continue;
+        total++;
+        if (this.world.getChunk(this.centerX + dx, this.centerZ + dz) !== undefined) loaded++;
+      }
+    }
+    out.loaded = loaded;
+    out.total = total;
+  }
+
+  /** Chamado quando uma coluna sai de alcance — o renderer libera os VBOs. */
+  onChunkUnloaded: ((chunk: ChunkColumn) => void) | null = null;
+  /** Chamado quando uma coluna nova chega do worker, antes do meshing. */
+  onChunkLoaded: ((chunk: ChunkColumn) => void) | null = null;
+  /**
+   * Consultado **antes** de gerar: se o chunk já foi modificado alguma vez, ele
+   * vem do save em vez de ser recriado da seed (doc 11 §2). Devolver `null`
+   * manda gerar normalmente.
+   */
+  loadSaved: ((cx: number, cz: number) => Promise<ChunkColumn | null>) | null = null;
+
+  /**
+   * Despacha trabalho para os workers. Chamado uma vez por frame, antes do
+   * render, e limitado por `maxInFlight` para não encher a fila de mensagens.
+   */
+  pump(): void {
+    let busy = 0;
+    for (let i = 0; i < this.inFlight.length; i++) busy += this.inFlight[i];
+
+    // Meshing tem prioridade sobre geração: um chunk gerado e não meshado é
+    // memória parada que o jogador não vê.
+    //
+    // O job que não pode ser meshado agora (falta vizinho) **não** volta para
+    // `meshQueue` aqui dentro: espera em `deferredMeshes` e só retorna ao fim
+    // do laço. Devolver na hora fazia o `while` reexaminar o mesmo job para
+    // sempre sem nunca gastar uma vaga de `busy` — travamento total da aba,
+    // não queda de FPS (bug de campo 2026-09-12, "ao sair voando o jogo
+    // trava"). `scan` limita o laço a uma passada por job e garante o término
+    // mesmo que alguém reintroduza o reenfileiramento lá dentro.
+    const deferred = this.deferredMeshes;
+    let scan = this.meshQueue.length;
+    while (busy < this.maxInFlight && scan > 0 && this.meshQueue.length > 0) {
+      scan--;
+      const job = this.meshQueue.shift() as PendingJob;
+      const outcome = this.dispatchMesh(job);
+      if (outcome === MESH_SENT) busy++;
+      else if (outcome === MESH_DEFERRED) deferred.push(job);
+    }
+    for (let i = 0; i < deferred.length; i++) this.meshQueue.push(deferred[i]);
+    deferred.length = 0;
+    while (busy < this.maxInFlight && this.genQueue.length > 0) {
+      const job = this.genQueue.shift() as PendingJob;
+      this.dispatchGen(job);
+      busy++;
+    }
+
+    this.stats.queued = this.genQueue.length + this.meshQueue.length;
+    this.stats.generating = this.generating.size;
+    this.stats.meshing = this.meshing.size;
+    this.stats.loaded = this.world.chunkCount;
+  }
+
+  private dispatchGen(job: PendingJob): void {
+    const key = chunkKey(job.cx, job.cz);
+    this.queuedKeys.delete(key);
+    this.generating.add(key);
+
+    if (this.loadSaved === null) {
+      this.send({ type: 'gen', cx: job.cx, cz: job.cz });
+      return;
+    }
+
+    // Caminho do save: não passa pelo worker, então não entra na conta de
+    // `inFlight` — quem devolve o crédito é a resposta do worker, que aqui não
+    // existe.
+    void this.loadSaved(job.cx, job.cz).then((saved) => {
+      if (saved === null) {
+        this.send({ type: 'gen', cx: job.cx, cz: job.cz });
+        return;
+      }
+      this.generating.delete(key);
+      this.acceptChunk(saved);
+    }).catch(() => {
+      this.send({ type: 'gen', cx: job.cx, cz: job.cz });
+    });
+  }
+
+  /**
+   * Só despacha se os 8 vizinhos existem — senão a borda sai errada.
+   *
+   * Nunca mexe na fila: quem decide o destino do job é o `pump`.
+   */
+  private dispatchMesh(job: PendingJob): number {
+    // Voar rápido descarrega o que ficou para trás, e o job enfileirado pode
+    // já não ter coluna nenhuma. Insistir nele seria esperar para sempre; se a
+    // coluna voltar, `acceptChunk` reenfileira o meshing dela.
+    if (this.world.getChunk(job.cx, job.cz) === undefined) return MESH_DROPPED;
+    // Checagem barata (9 consultas) antes de tomar buffer do pool.
+    if (!this.hasAllNeighbors(job.cx, job.cz)) return MESH_DEFERRED;
+
+    const blocks = this.blockPool.pop() ?? new Uint16Array(NB_VOLUME);
+    const light = this.lightPool.pop() ?? new Uint8Array(NB_VOLUME);
+
+    if (!extractNeighborhood(this.world, job.cx, job.cz, job.sy, blocks, light)) {
+      this.blockPool.push(blocks);
+      this.lightPool.push(light);
+      return MESH_DEFERRED;
+    }
+
+    this.meshing.add(meshKey(job.cx, job.cz, job.sy));
+    this.send({ type: 'mesh', cx: job.cx, cz: job.cz, sy: job.sy, blocks, light },
+      [blocks.buffer, light.buffer]);
+    return MESH_SENT;
+  }
+
+  /** Round-robin pelo worker menos ocupado. */
+  private send(message: WorkerRequest, transfer: Transferable[] = []): void {
+    let best = 0;
+    for (let i = 1; i < this.inFlight.length; i++) {
+      if (this.inFlight[i] < this.inFlight[best]) best = i;
+    }
+    this.inFlight[best]++;
+    this.pool[best].postMessage(message, transfer);
+  }
+
+  private onWorkerMessage(response: WorkerResponse): void {
+    // Descobre de qual worker veio pelo contador — a contagem exata não importa,
+    // só o balanceamento, então decrementa o maior.
+    let best = 0;
+    for (let i = 1; i < this.inFlight.length; i++) {
+      if (this.inFlight[i] > this.inFlight[best]) best = i;
+    }
+    if (this.inFlight[best] > 0) this.inFlight[best]--;
+
+    if (response.type === 'gen') this.onGenerated(response);
+    else this.onMeshed(response);
+  }
+
+  private onGenerated(response: GenResponse): void {
+    const key = chunkKey(response.cx, response.cz);
+    this.generating.delete(key);
+    this.stats.genMs += (response.ms - this.stats.genMs) * 0.1;
+
+    const chunk = new ChunkColumn(response.cx, response.cz);
+    for (let i = 0; i < response.sections.length; i++) {
+      applySection(chunk, i, response.sections[i]);
+    }
+    chunk.heightMap.set(response.heightMap);
+    chunk.biomeMap.set(response.biomeMap);
+    this.acceptChunk(chunk);
+  }
+
+  /** Entra com a coluna no mundo, venha ela do worker ou do save. */
+  private acceptChunk(chunk: ChunkColumn): void {
+    // Fora de alcance enquanto carregava: descarta em vez de guardar lixo.
+    const dx = chunk.cx - this.centerX;
+    const dz = chunk.cz - this.centerZ;
+    if (dx * dx + dz * dz > (this.renderDistance + 2) ** 2) return;
+
+    chunk.state = ChunkState.Generated;
+    this.world.addChunk(chunk);
+    // Quem escuta popula o chunk com bichos (doc 07 §4) e agenda o save.
+    this.onChunkLoaded?.(chunk);
+
+    // A chegada deste chunk destrava o meshing dele e o dos 8 vizinhos.
+    this.enqueueMeshAround(chunk.cx, chunk.cz);
+  }
+
+  /** Enfileira meshing da coluna e revisita as vizinhas que estavam bloqueadas. */
+  private enqueueMeshAround(cx: number, cz: number): void {
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const column = this.world.getChunk(cx + dx, cz + dz);
+        if (column === undefined || column.state !== ChunkState.Generated) continue;
+        if (!this.hasAllNeighbors(cx + dx, cz + dz)) continue;
+        column.state = ChunkState.Meshing;
+        const priority = (cx + dx - this.centerX) ** 2 + (cz + dz - this.centerZ) ** 2;
+        for (let sy = 0; sy < SECTIONS_PER_COLUMN; sy++) {
+          if (column.sections[sy].isEmpty && !this.sectionBordersSolid(column, sy)) continue;
+          this.meshQueue.push({ cx: cx + dx, cz: cz + dz, sy, priority });
+        }
+      }
+    }
+    this.meshQueue.sort(byPriority);
+  }
+
+  /** Uma section vazia entre duas cheias ainda precisa das faces dos vizinhos. */
+  private sectionBordersSolid(column: ChunkColumn, sy: number): boolean {
+    const below = sy > 0 && !column.sections[sy - 1].isEmpty;
+    const above = sy + 1 < SECTIONS_PER_COLUMN && !column.sections[sy + 1].isEmpty;
+    return below || above;
+  }
+
+  private hasAllNeighbors(cx: number, cz: number): boolean {
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (this.world.getChunk(cx + dx, cz + dz) === undefined) return false;
+      }
+    }
+    return true;
+  }
+
+  private onMeshed(response: MeshResponse): void {
+    this.meshing.delete(meshKey(response.cx, response.cz, response.sy));
+    this.stats.meshMs += (response.ms - this.stats.meshMs) * 0.1;
+
+    // Recicla os buffers de vizinhança que o worker devolveu.
+    this.blockPool.push(response.blocks);
+    this.lightPool.push(response.light);
+
+    const column = this.world.getChunk(response.cx, response.cz);
+    if (column === undefined) return; // descarregou enquanto meshava
+    column.state = ChunkState.Ready;
+
+    this.readyMeshes.push({
+      cx: response.cx, cz: response.cz, sy: response.sy, response,
+    });
+  }
+
+  /**
+   * Entrega meshes prontos ao chamador dentro de um orçamento de tempo.
+   * O upload de VBO é o único trabalho de GPU que roda no main thread, e o
+   * doc 02 §2 dá 2 ms para ele.
+   */
+  drainReady(budgetMs: number, apply: (result: MeshResult) => void): number {
+    if (this.readyMeshes.length === 0) return 0;
+    const deadline = performance.now() + budgetMs;
+    let applied = 0;
+    while (this.readyMeshes.length > 0) {
+      apply(this.readyMeshes.shift() as MeshResult);
+      applied++;
+      if (performance.now() >= deadline) break;
+    }
+    return applied;
+  }
+
+  /** Reenfileira sections marcadas como sujas por `world.setBlock`. */
+  enqueueDirty(): void {
+    if (this.world.dirtyCount === 0) return;
+    const n = this.world.takeDirtySections(DIRTY_SCRATCH);
+    for (let i = 0; i < n; i++) {
+      const packedKey = DIRTY_SCRATCH[i];
+      const sy = packedKey % SECTIONS_PER_COLUMN;
+      const columnKey = (packedKey - sy) / SECTIONS_PER_COLUMN;
+      const cz = signed22(columnKey % 0x400000);
+      const cx = signed22((columnKey - (columnKey % 0x400000)) / 0x400000);
+      if (this.world.getChunk(cx, cz) === undefined) continue;
+      this.meshQueue.push({
+        cx, cz, sy,
+        priority: (cx - this.centerX) ** 2 + (cz - this.centerZ) ** 2,
+      });
+    }
+  }
+
+  dispose(): void {
+    for (const worker of this.pool) worker.terminate();
+    this.pool.length = 0;
+  }
+}
+
+/** Cria o worker real. Fica isolado para que os testes não precisem de bundler. */
+function defaultWorkerFactory(index: number): WorkerLike {
+  return new Worker(new URL('../workers/chunk.worker.ts', import.meta.url), {
+    type: 'module',
+    name: `chunk-${index}`,
+  }) as unknown as WorkerLike;
+}
+
+function byPriority(a: PendingJob, b: PendingJob): number {
+  return a.priority - b.priority;
+}
+
+function meshKey(cx: number, cz: number, sy: number): number {
+  return chunkKey(cx, cz) * SECTIONS_PER_COLUMN + sy;
+}
+
+/** Desfaz o empacotamento de 22 bits com sinal usado por `chunkKey`. */
+function signed22(value: number): number {
+  return value >= 0x200000 ? value - 0x400000 : value;
+}
+
+function applySection(chunk: ChunkColumn, index: number, data: SerializedSection): void {
+  const section = chunk.sections[index];
+  section.bits = data.bits;
+  section.paletteLen = data.paletteLen;
+  section.palette = data.palette;
+  section.data = data.data;
+  section.nonAirCount = data.nonAirCount;
+  section.skyLight = data.skyLight;
+  section.blockLight = data.blockLight;
+}
+
+const DIRTY_SCRATCH: number[] = [];

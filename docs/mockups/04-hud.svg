@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540" role="img" aria-label="HUD em jogo">
+<title>HUD em jogo</title>
+<style>
+  .bg    { fill:#1b1d21 }
+  .panel { fill:#2b2f36; stroke:#7d8794; stroke-width:2 }
+  .panel2{ fill:#232830; stroke:#5c6672; stroke-width:1.5 }
+  .slot  { fill:#3a4049; stroke:#6f7885; stroke-width:1 }
+  .slotA { fill:#4a5460; stroke:#cfd6e0; stroke-width:2 }
+  .btn   { fill:#3d4450; stroke:#8b94a3; stroke-width:1.5 }
+  .btnA  { fill:#4d5a75; stroke:#cfd6e0; stroke-width:2 }
+  .t     { fill:#e6eaf0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:12px }
+  .tc    { fill:#e6eaf0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:12px;
+           text-anchor:middle }
+  .ts    { fill:#98a2b3; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px }
+  .tsc   { fill:#98a2b3; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px;
+           text-anchor:middle }
+  .th    { fill:#ffd166; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:15px;
+           text-anchor:middle }
+  .tt    { fill:#7dd3a0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:11px }
+  .dim   { fill:#000; opacity:.45 }
+  .heart { fill:#dc4040 }
+  .hung  { fill:#c68a45 }
+  .xp    { fill:#7fc94b }
+  .guide { stroke:#5c6672; stroke-width:1; stroke-dasharray:4 3; fill:none }
+  .note  { fill:#ffd166; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px }
+</style>
+<rect class="bg" width="960" height="540"/>
+<text class="th" x="480.0" y="26">04 — HUD em Jogo</text>
+<text class="tsc" x="480.0" y="44">tudo position:fixed, pointer-events:none</text>
+<rect class="panel2" x="60" y="60" width="840" height="450" rx="2"/>
+<line x1="471" y1="270" x2="489" y2="270" stroke="#e6eaf0" stroke-width="2"/><line x1="480" y1="261" x2="480" y2="279" stroke="#e6eaf0" stroke-width="2"/>
+<text class="note" x="500" y="274">← crosshair 9x9, blend difference</text>
+<circle class="heart" cx="300" cy="398" r="7"/>
+<rect class="hung" x="545" y="391" width="14" height="14" rx="3"/>
+<circle class="heart" cx="318" cy="398" r="7"/>
+<rect class="hung" x="563" y="391" width="14" height="14" rx="3"/>
+<circle class="heart" cx="336" cy="398" r="7"/>
+<rect class="hung" x="581" y="391" width="14" height="14" rx="3"/>
+<circle class="heart" cx="354" cy="398" r="7"/>
+<rect class="hung" x="599" y="391" width="14" height="14" rx="3"/>
+<circle class="heart" cx="372" cy="398" r="7"/>
+<rect class="hung" x="617" y="391" width="14" height="14" rx="3"/>
+<circle class="heart" cx="390" cy="398" r="7"/>
+<rect class="hung" x="635" y="391" width="14" height="14" rx="3"/>
+<circle class="heart" cx="408" cy="398" r="7"/>
+<rect class="hung" x="653" y="391" width="14" height="14" rx="3"/>
+<circle class="heart" cx="426" cy="398" r="7"/>
+<rect class="hung" x="671" y="391" width="14" height="14" rx="3"/>
+<circle class="heart" cx="444" cy="398" r="7"/>
+<rect class="hung" x="689" y="391" width="14" height="14" rx="3"/>
+<circle class="heart" cx="462" cy="398" r="7"/>
+<rect class="hung" x="707" y="391" width="14" height="14" rx="3"/>
+<text class="ts" x="200" y="402">vida</text>
+<text class="ts" x="760" y="402">fome</text>
+<rect class="panel2" x="300" y="416" width="360" height="10" rx="2"/>
+<rect class="xp" x="300" y="416" width="200" height="10" rx="0"/>
+<text class="tsc" x="474" y="412">12</text>
+<text class="note" x="676" y="424">← barra de XP 182px de GUI + nível</text>
+<rect class="slot" x="300" y="436" width="38" height="38" rx="1"/>
+<rect class="slot" x="340" y="436" width="38" height="38" rx="1"/>
+<rect class="slot" x="380" y="436" width="38" height="38" rx="1"/>
+<rect class="slot" x="420" y="436" width="38" height="38" rx="1"/>
+<rect class="slot" x="460" y="436" width="38" height="38" rx="1"/>
+<rect class="slot" x="500" y="436" width="38" height="38" rx="1"/>
+<rect class="slot" x="540" y="436" width="38" height="38" rx="1"/>
+<rect class="slot" x="580" y="436" width="38" height="38" rx="1"/>
+<rect class="slot" x="620" y="436" width="38" height="38" rx="1"/>
+<rect class="slotA" x="418" y="434" width="42" height="42" rx="2"/>
+<text class="tsc" x="480" y="494">hotbar 9 slots — teclas 1-9 / roda do mouse</text>
+<text class="ts" x="76" y="84">chat / logs (10 linhas, fade 10s)</text>
+<rect class="panel" x="740" y="70" width="150" height="44" rx="2"/>
+<text class="tc" x="815" y="96">toast conquista</text>
+<text class="ts" x="760" y="496">autosave ⟳</text>
+<text class="note" x="300" y="378">← armadura aqui, se &gt; 0; bolhas de ar acima da fome</text>
+
+</svg>

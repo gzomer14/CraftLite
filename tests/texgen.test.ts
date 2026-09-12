@@ -1,0 +1,235 @@
+/**
+ * O motor de textura precisa ser determinístico: as texturas são "assets" e
+ * têm que sair iguais em qualquer máquina e sessão.
+ */
+import { describe, expect, it } from 'vitest';
+import {
+  TEX_SIZE, alphaMask, bricks, dither, oreBlobs, renderRecipe, speckle, tintBy,
+} from '../src/render/texgen';
+import { TEXTURES } from '../src/data/textures';
+import { BLOCK_BY_NAME } from '../src/data/blocks';
+
+const SIZE = TEX_SIZE * TEX_SIZE * 4;
+const noResolve = (): Uint8ClampedArray => new Uint8ClampedArray(SIZE);
+
+describe('renderRecipe', () => {
+  it('devolve um buffer RGBA de 16×16', () => {
+    const out = renderRecipe({ base: [10, 20, 30], noise: 'flat' }, 1, noResolve);
+    expect(out.length).toBe(SIZE);
+  });
+
+  it('é determinístico para a mesma seed', () => {
+    const recipe = { base: [125, 125, 125] as const, noise: 'value' as const, scale: 4, variance: 0.2 };
+    const a = renderRecipe(recipe, 777, noResolve);
+    const b = renderRecipe(recipe, 777, noResolve);
+    expect(Array.from(a)).toEqual(Array.from(b));
+  });
+
+  it('seeds diferentes geram texturas diferentes', () => {
+    const recipe = { base: [125, 125, 125] as const, noise: 'value' as const, scale: 4, variance: 0.3 };
+    const a = renderRecipe(recipe, 1, noResolve);
+    const b = renderRecipe(recipe, 2, noResolve);
+    expect(Array.from(a)).not.toEqual(Array.from(b));
+  });
+
+  it('noise flat com variance 0 dá cor sólida', () => {
+    const out = renderRecipe({ base: [40, 80, 120], noise: 'flat', variance: 0 }, 5, noResolve);
+    for (let i = 0; i < SIZE; i += 4) {
+      expect(out[i]).toBe(40);
+      expect(out[i + 1]).toBe(80);
+      expect(out[i + 2]).toBe(120);
+      expect(out[i + 3]).toBe(255);
+    }
+  });
+
+  it('alpha da receita chega no canal A', () => {
+    const out = renderRecipe({ base: [1, 2, 3], noise: 'flat', alpha: 0.5 }, 5, noResolve);
+    expect(out[3]).toBe(128);
+  });
+
+  it('inherit copia a textura de origem antes das ops', () => {
+    const base = new Uint8ClampedArray(SIZE).fill(200);
+    const out = renderRecipe({ inherit: 'x' }, 5, () => base);
+    expect(out[0]).toBe(200);
+    // e não é o mesmo buffer — mutar o resultado não pode sujar o cache
+    out[0] = 1;
+    expect(base[0]).toBe(200);
+  });
+});
+
+describe('operadores', () => {
+  const solid = (v: number): { data: Uint8ClampedArray; seed: number } => ({
+    data: new Uint8ClampedArray(SIZE).fill(v),
+    seed: 42,
+  });
+
+  it('tintBy escurece proporcionalmente', () => {
+    const c = solid(200);
+    tintBy(0.5)(c);
+    expect(c.data[0]).toBe(100);
+  });
+
+  it('alphaMask "frame" deixa só a borda opaca', () => {
+    const c = solid(255);
+    alphaMask('frame')(c);
+    const at = (x: number, y: number): number => c.data[((y * TEX_SIZE + x) << 2) + 3];
+    expect(at(0, 0)).toBe(255);
+    expect(at(15, 15)).toBe(255);
+    expect(at(8, 8)).toBe(0);
+  });
+
+  it('speckle muda alguns pixels e preserva outros', () => {
+    const c = solid(120);
+    speckle([0, 0, 0], 0.2, 1)(c);
+    let changed = 0;
+    for (let i = 0; i < SIZE; i += 4) if (c.data[i] !== 120) changed++;
+    expect(changed).toBeGreaterThan(10);
+    expect(changed).toBeLessThan(TEX_SIZE * TEX_SIZE);
+  });
+
+  it('bricks desenha as linhas de argamassa', () => {
+    const c = solid(180);
+    bricks(8, 8, [10, 10, 10])(c);
+    expect(c.data[0]).toBe(10); // y=0 é linha de argamassa
+  });
+
+  it('oreBlobs cria pixels claros e um contorno escuro', () => {
+    const c = solid(125);
+    oreBlobs([94, 225, 224], 5)(c);
+    let bright = 0;
+    let dark = 0;
+    for (let i = 0; i < SIZE; i += 4) {
+      if (c.data[i + 2] > 180) bright++;
+      if (c.data[i + 2] < 120) dark++;
+    }
+    expect(bright).toBeGreaterThan(0);
+    expect(dark).toBeGreaterThan(0);
+  });
+
+  it('dither não estoura o intervalo de bytes', () => {
+    const c = solid(250);
+    dither(0.5)(c);
+    for (let i = 0; i < SIZE; i++) {
+      expect(c.data[i]).toBeGreaterThanOrEqual(0);
+      expect(c.data[i]).toBeLessThanOrEqual(255);
+    }
+  });
+});
+
+describe('tabela de texturas', () => {
+  it('toda receita renderiza sem erro e gera pixels visíveis', () => {
+    const cache = new Map<string, Uint8ClampedArray>();
+    const seedOf = (name: string): number => {
+      let h = 0x811c9dc5;
+      for (let i = 0; i < name.length; i++) h = Math.imul(h ^ name.charCodeAt(i), 0x01000193) >>> 0;
+      return h >>> 0;
+    };
+    const resolve = (name: string): Uint8ClampedArray => {
+      const hit = cache.get(name);
+      if (hit !== undefined) return hit;
+      const data = renderRecipe(TEXTURES[name], seedOf(name), resolve);
+      cache.set(name, data);
+      return data;
+    };
+
+    for (const name of Object.keys(TEXTURES)) {
+      const data = resolve(name);
+      expect(data.length, name).toBe(SIZE);
+      let opaque = 0;
+      for (let i = 3; i < SIZE; i += 4) if (data[i] > 0) opaque++;
+      expect(opaque, `${name} ficou totalmente transparente`).toBeGreaterThan(0);
+    }
+  });
+
+  it('todo `inherit` aponta para uma textura existente', () => {
+    for (const [name, recipe] of Object.entries(TEXTURES)) {
+      if (recipe.inherit === undefined) continue;
+      expect(TEXTURES[recipe.inherit], `${name} herda de ${recipe.inherit}`).toBeDefined();
+    }
+  });
+
+  it('inclui a textura de fallback', () => {
+    expect(TEXTURES['block/missing']).toBeDefined();
+  });
+});
+
+/**
+ * Legibilidade (doc 13 §2.2).
+ *
+ * Os blocos "construídos" já foram todos `inherit` do material de origem com
+ * um `tintBy(0.9x)` por cima: baú, bancada, fornalha e estante eram tábua ou
+ * pedregulho um pouco mais escuros, e cama e TNT apontavam **para a mesma
+ * camada** de lã e de tábua. Na prática só dava para diferenciar pelo tooltip.
+ *
+ * O critério é a diferença média por pixel contra o material de origem. Como
+ * régua, tábuas de carvalho contra tábuas de bétula — um par que se distingue
+ * sem esforço — dá 48. Abaixo de 15 o jogador não separa os dois em jogo.
+ */
+describe('legibilidade das texturas', () => {
+  const cache = new Map<string, Uint8ClampedArray>();
+  const seedOf = (name: string): number => {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < name.length; i++) h = Math.imul(h ^ name.charCodeAt(i), 0x01000193) >>> 0;
+    return h >>> 0;
+  };
+  const build = (name: string): Uint8ClampedArray => {
+    const hit = cache.get(name);
+    if (hit !== undefined) return hit;
+    const data = renderRecipe(TEXTURES[name], seedOf(name), build);
+    cache.set(name, data);
+    return data;
+  };
+  /** Diferença média por pixel entre duas texturas, em [0, 255]. */
+  const distance = (a: string, b: string): number => {
+    const pa = build(a);
+    const pb = build(b);
+    let total = 0;
+    for (let i = 0; i < pa.length; i += 4) {
+      total += (Math.abs(pa[i] - pb[i])
+        + Math.abs(pa[i + 1] - pb[i + 1])
+        + Math.abs(pa[i + 2] - pb[i + 2])) / 3;
+    }
+    return total / (TEX_SIZE * TEX_SIZE);
+  };
+
+  /** Mínimo para o jogador separar os dois sem ler o tooltip. */
+  const LEGIBLE = 22;
+
+  const pairs: readonly [string, string][] = [
+    ['block/oak_planks', 'block/chest_side'],
+    ['block/oak_planks', 'block/chest_top'],
+    ['block/oak_planks', 'block/crafting_table_side'],
+    ['block/oak_planks', 'block/crafting_table_top'],
+    ['block/oak_planks', 'block/bookshelf'],
+    ['block/oak_planks', 'block/oak_door'],
+    ['block/oak_planks', 'block/tnt_side'],
+    ['block/chest_side', 'block/crafting_table_side'],
+    ['block/cobblestone', 'block/furnace_side'],
+    ['block/wool_white', 'block/bed_top'],
+  ];
+
+  it('a régua bate: carvalho e bétula são bem distintos', () => {
+    expect(distance('block/oak_planks', 'block/birch_planks')).toBeGreaterThan(40);
+  });
+
+  for (const [a, b] of pairs) {
+    it(`${a} e ${b} se distinguem`, () => {
+      expect(distance(a, b)).toBeGreaterThan(LEGIBLE);
+    });
+  }
+
+  it('nenhuma face visível de bloco construído é a camada crua de outro bloco', () => {
+    // Cama era `block/wool_white` e TNT era `block/oak_planks`, literalmente a
+    // mesma camada do atlas — zero de diferença, por construção. A face de
+    // baixo fica de fora: o fundo da bancada é tábua mesmo, e ninguém o vê.
+    for (const name of ['bed', 'tnt', 'oak_door', 'chest', 'crafting_table', 'furnace']) {
+      const def = BLOCK_BY_NAME.get(name);
+      expect(def, name).toBeDefined();
+      const tex = def!.tex;
+      const visible = typeof tex === 'string' ? [tex] : [tex.top, tex.side];
+      for (const layer of visible) {
+        expect(layer, `${name} mostra ${layer}`).toMatch(new RegExp(`^block/${name}`));
+      }
+    }
+  });
+});

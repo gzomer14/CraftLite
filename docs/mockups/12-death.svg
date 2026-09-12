@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540" role="img" aria-label="Tela de morte">
+<title>Tela de morte</title>
+<style>
+  .bg    { fill:#1b1d21 }
+  .panel { fill:#2b2f36; stroke:#7d8794; stroke-width:2 }
+  .panel2{ fill:#232830; stroke:#5c6672; stroke-width:1.5 }
+  .slot  { fill:#3a4049; stroke:#6f7885; stroke-width:1 }
+  .slotA { fill:#4a5460; stroke:#cfd6e0; stroke-width:2 }
+  .btn   { fill:#3d4450; stroke:#8b94a3; stroke-width:1.5 }
+  .btnA  { fill:#4d5a75; stroke:#cfd6e0; stroke-width:2 }
+  .t     { fill:#e6eaf0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:12px }
+  .tc    { fill:#e6eaf0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:12px;
+           text-anchor:middle }
+  .ts    { fill:#98a2b3; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px }
+  .tsc   { fill:#98a2b3; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px;
+           text-anchor:middle }
+  .th    { fill:#ffd166; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:15px;
+           text-anchor:middle }
+  .tt    { fill:#7dd3a0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:11px }
+  .dim   { fill:#000; opacity:.45 }
+  .heart { fill:#dc4040 }
+  .hung  { fill:#c68a45 }
+  .xp    { fill:#7fc94b }
+  .guide { stroke:#5c6672; stroke-width:1; stroke-dasharray:4 3; fill:none }
+  .note  { fill:#ffd166; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px }
+</style>
+<rect class="bg" width="960" height="540"/>
+<text class="th" x="480.0" y="26">12 — Tela de Morte</text>
+<rect class="panel2" x="60" y="60" width="840" height="450" rx="2"/>
+<rect x="60" y="60" width="840" height="450" fill="#5a0000" opacity="0.55"/>
+<text class="th" x="480.0" y="200">Você morreu!</text>
+<text class="tc" x="480.0" y="236">Você caiu de um lugar alto</text>
+<text class="tsc" x="480.0" y="262">Pontuação: 143</text>
+<rect class="btnA" x="380" y="300" width="200" height="32" rx="2"/>
+<text class="tc" x="480.0" y="320.0">Reaparecer</text>
+<rect class="btn" x="380" y="346" width="200" height="32" rx="2"/>
+<text class="tc" x="480.0" y="366.0">Sair do Mundo</text>
+<text class="ts" x="120" y="470">Sobrevivência: inventário todo dropa no local da morte; XP parcialmente perdido.</text>
+
+</svg>

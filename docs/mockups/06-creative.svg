@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540" role="img" aria-label="Inventário criativo">
+<title>Inventário criativo</title>
+<style>
+  .bg    { fill:#1b1d21 }
+  .panel { fill:#2b2f36; stroke:#7d8794; stroke-width:2 }
+  .panel2{ fill:#232830; stroke:#5c6672; stroke-width:1.5 }
+  .slot  { fill:#3a4049; stroke:#6f7885; stroke-width:1 }
+  .slotA { fill:#4a5460; stroke:#cfd6e0; stroke-width:2 }
+  .btn   { fill:#3d4450; stroke:#8b94a3; stroke-width:1.5 }
+  .btnA  { fill:#4d5a75; stroke:#cfd6e0; stroke-width:2 }
+  .t     { fill:#e6eaf0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:12px }
+  .tc    { fill:#e6eaf0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:12px;
+           text-anchor:middle }
+  .ts    { fill:#98a2b3; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px }
+  .tsc   { fill:#98a2b3; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px;
+           text-anchor:middle }
+  .th    { fill:#ffd166; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:15px;
+           text-anchor:middle }
+  .tt    { fill:#7dd3a0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:11px }
+  .dim   { fill:#000; opacity:.45 }
+  .heart { fill:#dc4040 }
+  .hung  { fill:#c68a45 }
+  .xp    { fill:#7fc94b }
+  .guide { stroke:#5c6672; stroke-width:1; stroke-dasharray:4 3; fill:none }
+  .note  { fill:#ffd166; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px }
+</style>
+<rect class="bg" width="960" height="540"/>
+<text class="th" x="480.0" y="26">06 — Inventário Criativo</text>
+<rect class="btnA" x="200" y="58" width="58" height="26" rx="2"/>
+<text class="tsc" x="229" y="76">Constr</text>
+<rect class="btn" x="262" y="58" width="58" height="26" rx="2"/>
+<text class="tsc" x="291" y="76">Decor</text>
+<rect class="btn" x="324" y="58" width="58" height="26" rx="2"/>
+<text class="tsc" x="353" y="76">Redst</text>
+<rect class="btn" x="386" y="58" width="58" height="26" rx="2"/>
+<text class="tsc" x="415" y="76">Transp</text>
+<rect class="btn" x="448" y="58" width="58" height="26" rx="2"/>
+<text class="tsc" x="477" y="76">Div</text>
+<rect class="btn" x="510" y="58" width="58" height="26" rx="2"/>
+<text class="tsc" x="539" y="76">Comida</text>
+<rect class="btn" x="572" y="58" width="58" height="26" rx="2"/>
+<text class="tsc" x="601" y="76">Ferram</text>
+<rect class="btn" x="634" y="58" width="58" height="26" rx="2"/>
+<text class="tsc" x="663" y="76">Combate</text>
+<rect class="btn" x="696" y="58" width="58" height="26" rx="2"/>
+<text class="tsc" x="725" y="76">Busca</text>
+<rect class="panel" x="200" y="84" width="560" height="400" rx="2"/>
+<rect class="panel2" x="216" y="96" width="460" height="26" rx="2"/>
+<text class="ts" x="226" y="114">🔍 buscar item...</text>
+<rect class="slot" x="216" y="134" width="50" height="50" rx="1"/>
+<rect class="slot" x="269" y="134" width="50" height="50" rx="1"/>
+<rect class="slot" x="322" y="134" width="50" height="50" rx="1"/>
+<rect class="slot" x="375" y="134" width="50" height="50" rx="1"/>
+<rect class="slot" x="428" y="134" width="50" height="50" rx="1"/>
+<rect class="slot" x="481" y="134" width="50" height="50" rx="1"/>
+<rect class="slot" x="534" y="134" width="50" height="50" rx="1"/>
+<rect class="slot" x="587" y="134" width="50" height="50" rx="1"/>
+<rect class="slot" x="640" y="134" width="50" height="50" rx="1"/>
+<rect class="slot" x="216" y="187" width="50" height="50" rx="1"/>
+<rect class="slot" x="269" y="187" width="50" height="50" rx="1"/>
+<rect class="slot" x="322" y="187" width="50" height="50" rx="1"/>
+<rect class="slot" x="375" y="187" width="50" height="50" rx="1"/>
+<rect class="slot" x="428" y="187" width="50" height="50" rx="1"/>
+<rect class="slot" x="481" y="187" width="50" height="50" rx="1"/>
+<rect class="slot" x="534" y="187" width="50" height="50" rx="1"/>
+<rect class="slot" x="587" y="187" width="50" height="50" rx="1"/>
+<rect class="slot" x="640" y="187" width="50" height="50" rx="1"/>
+<rect class="slot" x="216" y="240" width="50" height="50" rx="1"/>
+<rect class="slot" x="269" y="240" width="50" height="50" rx="1"/>
+<rect class="slot" x="322" y="240" width="50" height="50" rx="1"/>
+<rect class="slot" x="375" y="240" width="50" height="50" rx="1"/>
+<rect class="slot" x="428" y="240" width="50" height="50" rx="1"/>
+<rect class="slot" x="481" y="240" width="50" height="50" rx="1"/>
+<rect class="slot" x="534" y="240" width="50" height="50" rx="1"/>
+<rect class="slot" x="587" y="240" width="50" height="50" rx="1"/>
+<rect class="slot" x="640" y="240" width="50" height="50" rx="1"/>
+<rect class="slot" x="216" y="293" width="50" height="50" rx="1"/>
+<rect class="slot" x="269" y="293" width="50" height="50" rx="1"/>
+<rect class="slot" x="322" y="293" width="50" height="50" rx="1"/>
+<rect class="slot" x="375" y="293" width="50" height="50" rx="1"/>
+<rect class="slot" x="428" y="293" width="50" height="50" rx="1"/>
+<rect class="slot" x="481" y="293" width="50" height="50" rx="1"/>
+<rect class="slot" x="534" y="293" width="50" height="50" rx="1"/>
+<rect class="slot" x="587" y="293" width="50" height="50" rx="1"/>
+<rect class="slot" x="640" y="293" width="50" height="50" rx="1"/>
+<rect class="slot" x="216" y="346" width="50" height="50" rx="1"/>
+<rect class="slot" x="269" y="346" width="50" height="50" rx="1"/>
+<rect class="slot" x="322" y="346" width="50" height="50" rx="1"/>
+<rect class="slot" x="375" y="346" width="50" height="50" rx="1"/>
+<rect class="slot" x="428" y="346" width="50" height="50" rx="1"/>
+<rect class="slot" x="481" y="346" width="50" height="50" rx="1"/>
+<rect class="slot" x="534" y="346" width="50" height="50" rx="1"/>
+<rect class="slot" x="587" y="346" width="50" height="50" rx="1"/>
+<rect class="slot" x="640" y="346" width="50" height="50" rx="1"/>
+<rect class="panel2" x="700" y="134" width="12" height="262" rx="2"/>
+<rect class="btn" x="700" y="134" width="12" height="90" rx="2"/>
+<text class="note" x="720" y="180">← scrollbar</text>
+<rect class="slot" x="216" y="404" width="50" height="50" rx="1"/>
+<rect class="slot" x="269" y="404" width="50" height="50" rx="1"/>
+<rect class="slot" x="322" y="404" width="50" height="50" rx="1"/>
+<rect class="slot" x="375" y="404" width="50" height="50" rx="1"/>
+<rect class="slot" x="428" y="404" width="50" height="50" rx="1"/>
+<rect class="slot" x="481" y="404" width="50" height="50" rx="1"/>
+<rect class="slot" x="534" y="404" width="50" height="50" rx="1"/>
+<rect class="slot" x="587" y="404" width="50" height="50" rx="1"/>
+<rect class="slot" x="640" y="404" width="50" height="50" rx="1"/>
+<text class="ts" x="216" y="398">hotbar</text>
+<rect class="btn" x="200" y="494" width="180" height="26" rx="2"/>
+<text class="tsc" x="290" y="512">Inventário 💾</text>
+<rect class="btn" x="390" y="494" width="180" height="26" rx="2"/>
+<text class="tsc" x="480" y="512">Salvar hotbar ⭐</text>
+<rect class="btn" x="580" y="494" width="180" height="26" rx="2"/>
+<text class="tsc" x="670" y="512">Lixeira 🗑</text>
+<text class="ts" x="200" y="520">grade 9x5 = 45 por página · pegar = cópia infinita · arrastar p/ grade = deletar</text>
+
+</svg>

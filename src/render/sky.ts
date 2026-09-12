@@ -1,0 +1,138 @@
+/**
+ * Passe de céu e as cores derivadas dele.
+ *
+ * A cor do fog **é** a cor do céu no horizonte — se as duas divergem, o terreno
+ * distante aparece recortado contra o céu, que é o artefato mais óbvio de um
+ * renderer de voxels mal calibrado.
+ *
+ * Paleta do doc 03 §8: dia `#78A7FF` → pôr do sol `#FC9A54` → noite `#0A0A18`.
+ */
+
+import { createProgram, uniformLocations, type GlContext } from './gl';
+import { SKY_FS_100, SKY_FS_300, SKY_VS_100, SKY_VS_300 } from './shaders/sky.glsl';
+import { TICKS_PER_DAY } from '../game/daynight';
+import { createMat4, invert, multiply, type Mat4 } from '../core/math';
+
+const UNIFORMS = ['uInvViewProj', 'uZenith', 'uHorizon', 'uSunDir', 'uDayFactor'] as const;
+
+/** Marcos de cor: [fração do dia, zênite, horizonte]. */
+const KEYS: readonly (readonly [number, number, number, number, number, number, number])[] = [
+  //  t     zênite R,G,B           horizonte R,G,B
+  [0.00, 0.22, 0.44, 0.90, 0.47, 0.65, 1.00], // amanhecer pleno
+  [0.48, 0.25, 0.47, 0.92, 0.55, 0.72, 1.00], // meio-dia
+  [0.52, 0.30, 0.36, 0.68, 0.99, 0.60, 0.33], // pôr do sol
+  [0.58, 0.06, 0.08, 0.22, 0.35, 0.20, 0.28], // crepúsculo
+  [0.72, 0.04, 0.04, 0.09, 0.05, 0.05, 0.12], // noite
+  [0.92, 0.04, 0.04, 0.09, 0.05, 0.05, 0.12], // noite
+  [0.97, 0.18, 0.24, 0.55, 0.92, 0.55, 0.40], // aurora
+  [1.00, 0.22, 0.44, 0.90, 0.47, 0.65, 1.00],
+];
+
+/** Cinza-chumbo para onde o céu e o fog puxam na chuva (doc 03 §8). */
+const RAIN_COLOR: readonly [number, number, number] = [0.28, 0.30, 0.34];
+
+export class SkyPass {
+  private readonly ctx: GlContext;
+  private readonly program: WebGLProgram;
+  private readonly uniforms: Record<(typeof UNIFORMS)[number], WebGLUniformLocation | null>;
+  private readonly quad: WebGLBuffer;
+  private readonly invViewProj: Mat4 = createMat4();
+
+  /** Cores do frame, lidas pelo passe de terreno para casar o fog. */
+  readonly zenith = new Float32Array(3);
+  readonly horizon = new Float32Array(3);
+  readonly sunDir = new Float32Array(3);
+
+  constructor(ctx: GlContext) {
+    this.ctx = ctx;
+    const use300 = ctx.gl2 !== null;
+    this.program = createProgram(
+      ctx.gl, use300 ? SKY_VS_300 : SKY_VS_100, use300 ? SKY_FS_300 : SKY_FS_100, 'sky',
+    );
+    this.uniforms = uniformLocations(ctx.gl, this.program, UNIFORMS);
+
+    const quad = ctx.gl.createBuffer();
+    if (quad === null) throw new Error('Falha ao criar o quad de céu.');
+    this.quad = quad;
+    ctx.gl.bindBuffer(ctx.gl.ARRAY_BUFFER, quad);
+    ctx.gl.bufferData(
+      ctx.gl.ARRAY_BUFFER,
+      new Float32Array([-1, -1, 3, -1, -1, 3]), // triângulo que cobre a tela
+      ctx.gl.STATIC_DRAW,
+    );
+  }
+
+  /** Atualiza as cores para o tick do dia atual. */
+  update(dayTime: number): void {
+    const t = (dayTime / TICKS_PER_DAY) % 1;
+    let i = 0;
+    while (i < KEYS.length - 1 && KEYS[i + 1][0] < t) i++;
+    const a = KEYS[i];
+    const b = KEYS[Math.min(i + 1, KEYS.length - 1)];
+    const span = b[0] - a[0];
+    const f = span <= 0 ? 0 : (t - a[0]) / span;
+
+    for (let c = 0; c < 3; c++) {
+      this.zenith[c] = a[1 + c] + (b[1 + c] - a[1 + c]) * f;
+      this.horizon[c] = a[4 + c] + (b[4 + c] - a[4 + c]) * f;
+    }
+
+    // O sol nasce no leste e se põe no oeste, orbitando o eixo X do mundo.
+    const angle = (t - 0.25) * Math.PI * 2;
+    this.sunDir[0] = 0;
+    this.sunDir[1] = -Math.cos(angle);
+    this.sunDir[2] = Math.sin(angle);
+    const len = Math.hypot(this.sunDir[0], this.sunDir[1], this.sunDir[2]) || 1;
+    this.sunDir[0] /= len; this.sunDir[1] /= len; this.sunDir[2] /= len;
+  }
+
+  /**
+   * Puxa céu e horizonte para o cinza da chuva (doc 03 §8).
+   *
+   * Chamado **depois** de `update`, sobre as cores do ciclo: assim a
+   * tempestade ao pôr do sol continua alaranjada, só que apagada.
+   */
+  applyRain(amount: number): void {
+    if (amount <= 0) return;
+    const t = Math.min(1, amount);
+    for (let c = 0; c < 3; c++) {
+      this.zenith[c] += (RAIN_COLOR[c] - this.zenith[c]) * t;
+      this.horizon[c] += (RAIN_COLOR[c] - this.horizon[c]) * t;
+    }
+  }
+
+  /** Desenha o céu. Precisa da inversa da view-projection para o raio por pixel. */
+  render(viewProj: Mat4, dayFactor: number): void {
+    const gl = this.ctx.gl;
+    if (!invert(this.invViewProj, viewProj)) return;
+
+    gl.useProgram(this.program);
+    gl.depthMask(false);
+    gl.disable(gl.DEPTH_TEST);
+    gl.disable(gl.CULL_FACE);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.quad);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+    gl.uniformMatrix4fv(this.uniforms.uInvViewProj, false, this.invViewProj);
+    gl.uniform3fv(this.uniforms.uZenith, this.zenith);
+    gl.uniform3fv(this.uniforms.uHorizon, this.horizon);
+    gl.uniform3fv(this.uniforms.uSunDir, this.sunDir);
+    gl.uniform1f(this.uniforms.uDayFactor, dayFactor);
+
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+    gl.enable(gl.DEPTH_TEST);
+    gl.enable(gl.CULL_FACE);
+    gl.depthMask(true);
+  }
+
+  dispose(): void {
+    this.ctx.gl.deleteBuffer(this.quad);
+    this.ctx.gl.deleteProgram(this.program);
+  }
+}
+
+/** Multiplicação exposta para testes de reconstrução do raio. */
+export { multiply as multiplyMat4 };

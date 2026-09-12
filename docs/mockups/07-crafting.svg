@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540" role="img" aria-label="Bancada de trabalho">
+<title>Bancada de trabalho</title>
+<style>
+  .bg    { fill:#1b1d21 }
+  .panel { fill:#2b2f36; stroke:#7d8794; stroke-width:2 }
+  .panel2{ fill:#232830; stroke:#5c6672; stroke-width:1.5 }
+  .slot  { fill:#3a4049; stroke:#6f7885; stroke-width:1 }
+  .slotA { fill:#4a5460; stroke:#cfd6e0; stroke-width:2 }
+  .btn   { fill:#3d4450; stroke:#8b94a3; stroke-width:1.5 }
+  .btnA  { fill:#4d5a75; stroke:#cfd6e0; stroke-width:2 }
+  .t     { fill:#e6eaf0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:12px }
+  .tc    { fill:#e6eaf0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:12px;
+           text-anchor:middle }
+  .ts    { fill:#98a2b3; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px }
+  .tsc   { fill:#98a2b3; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px;
+           text-anchor:middle }
+  .th    { fill:#ffd166; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:15px;
+           text-anchor:middle }
+  .tt    { fill:#7dd3a0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:11px }
+  .dim   { fill:#000; opacity:.45 }
+  .heart { fill:#dc4040 }
+  .hung  { fill:#c68a45 }
+  .xp    { fill:#7fc94b }
+  .guide { stroke:#5c6672; stroke-width:1; stroke-dasharray:4 3; fill:none }
+  .note  { fill:#ffd166; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px }
+</style>
+<rect class="bg" width="960" height="540"/>
+<text class="th" x="480.0" y="26">07 — Bancada de Trabalho</text>
+<text class="tsc" x="480.0" y="44">grade 3x3 — receitas com deslocamento e espelhamento horizontal</text>
+<rect class="panel" x="260" y="62" width="440" height="420" rx="2"/>
+<text class="t" x="276" y="86">Criação</text>
+<rect class="slot" x="300" y="108" width="44" height="44" rx="1"/>
+<rect class="slot" x="348" y="108" width="44" height="44" rx="1"/>
+<rect class="slot" x="396" y="108" width="44" height="44" rx="1"/>
+<rect class="slot" x="300" y="156" width="44" height="44" rx="1"/>
+<rect class="slot" x="348" y="156" width="44" height="44" rx="1"/>
+<rect class="slot" x="396" y="156" width="44" height="44" rx="1"/>
+<rect class="slot" x="300" y="204" width="44" height="44" rx="1"/>
+<rect class="slot" x="348" y="204" width="44" height="44" rx="1"/>
+<rect class="slot" x="396" y="204" width="44" height="44" rx="1"/>
+<text class="ts" x="300" y="102">3x3</text>
+<text class="tc" x="470" y="178">→</text>
+<rect class="slotA" x="500" y="154" width="48" height="48" rx="2"/>
+<text class="tsc" x="524" y="138">resultado</text>
+<rect class="btn" x="580" y="108" width="100" height="26" rx="2"/>
+<text class="tc" x="630.0" y="125.0">📖</text>
+<rect class="slot" x="280" y="272" width="44" height="44" rx="1"/>
+<rect class="slot" x="327" y="272" width="44" height="44" rx="1"/>
+<rect class="slot" x="374" y="272" width="44" height="44" rx="1"/>
+<rect class="slot" x="421" y="272" width="44" height="44" rx="1"/>
+<rect class="slot" x="468" y="272" width="44" height="44" rx="1"/>
+<rect class="slot" x="515" y="272" width="44" height="44" rx="1"/>
+<rect class="slot" x="562" y="272" width="44" height="44" rx="1"/>
+<rect class="slot" x="609" y="272" width="44" height="44" rx="1"/>
+<rect class="slot" x="656" y="272" width="44" height="44" rx="1"/>
+<rect class="slot" x="280" y="319" width="44" height="44" rx="1"/>
+<rect class="slot" x="327" y="319" width="44" height="44" rx="1"/>
+<rect class="slot" x="374" y="319" width="44" height="44" rx="1"/>
+<rect class="slot" x="421" y="319" width="44" height="44" rx="1"/>
+<rect class="slot" x="468" y="319" width="44" height="44" rx="1"/>
+<rect class="slot" x="515" y="319" width="44" height="44" rx="1"/>
+<rect class="slot" x="562" y="319" width="44" height="44" rx="1"/>
+<rect class="slot" x="609" y="319" width="44" height="44" rx="1"/>
+<rect class="slot" x="656" y="319" width="44" height="44" rx="1"/>
+<rect class="slot" x="280" y="366" width="44" height="44" rx="1"/>
+<rect class="slot" x="327" y="366" width="44" height="44" rx="1"/>
+<rect class="slot" x="374" y="366" width="44" height="44" rx="1"/>
+<rect class="slot" x="421" y="366" width="44" height="44" rx="1"/>
+<rect class="slot" x="468" y="366" width="44" height="44" rx="1"/>
+<rect class="slot" x="515" y="366" width="44" height="44" rx="1"/>
+<rect class="slot" x="562" y="366" width="44" height="44" rx="1"/>
+<rect class="slot" x="609" y="366" width="44" height="44" rx="1"/>
+<rect class="slot" x="656" y="366" width="44" height="44" rx="1"/>
+<text class="ts" x="280" y="266">inventário</text>
+<rect class="slot" x="280" y="414" width="44" height="44" rx="1"/>
+<rect class="slot" x="327" y="414" width="44" height="44" rx="1"/>
+<rect class="slot" x="374" y="414" width="44" height="44" rx="1"/>
+<rect class="slot" x="421" y="414" width="44" height="44" rx="1"/>
+<rect class="slot" x="468" y="414" width="44" height="44" rx="1"/>
+<rect class="slot" x="515" y="414" width="44" height="44" rx="1"/>
+<rect class="slot" x="562" y="414" width="44" height="44" rx="1"/>
+<rect class="slot" x="609" y="414" width="44" height="44" rx="1"/>
+<rect class="slot" x="656" y="414" width="44" height="44" rx="1"/>
+<text class="ts" x="280" y="408">hotbar</text>
+<text class="tt" x="720" y="140">matching:</text>
+<text class="ts" x="720" y="162">1. bbox mínimo dos slots</text>
+<text class="ts" x="720" y="179">2. compara com o pattern</text>
+<text class="ts" x="720" y="196">3. tenta espelhado (h)</text>
+<text class="ts" x="720" y="213">4. shapeless: multiset</text>
+<text class="ts" x="720" y="230"></text>
+<text class="ts" x="720" y="247">shift+clique no resultado</text>
+<text class="ts" x="720" y="264">= craft em lote</text>
+
+</svg>

@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540" role="img" aria-label="Tela de título">
+<title>Tela de título</title>
+<style>
+  .bg    { fill:#1b1d21 }
+  .panel { fill:#2b2f36; stroke:#7d8794; stroke-width:2 }
+  .panel2{ fill:#232830; stroke:#5c6672; stroke-width:1.5 }
+  .slot  { fill:#3a4049; stroke:#6f7885; stroke-width:1 }
+  .slotA { fill:#4a5460; stroke:#cfd6e0; stroke-width:2 }
+  .btn   { fill:#3d4450; stroke:#8b94a3; stroke-width:1.5 }
+  .btnA  { fill:#4d5a75; stroke:#cfd6e0; stroke-width:2 }
+  .t     { fill:#e6eaf0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:12px }
+  .tc    { fill:#e6eaf0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:12px;
+           text-anchor:middle }
+  .ts    { fill:#98a2b3; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px }
+  .tsc   { fill:#98a2b3; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px;
+           text-anchor:middle }
+  .th    { fill:#ffd166; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:15px;
+           text-anchor:middle }
+  .tt    { fill:#7dd3a0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:11px }
+  .dim   { fill:#000; opacity:.45 }
+  .heart { fill:#dc4040 }
+  .hung  { fill:#c68a45 }
+  .xp    { fill:#7fc94b }
+  .guide { stroke:#5c6672; stroke-width:1; stroke-dasharray:4 3; fill:none }
+  .note  { fill:#ffd166; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px }
+</style>
+<rect class="bg" width="960" height="540"/>
+<text class="th" x="480.0" y="26">01 — Tela de Título</text>
+<text class="tsc" x="480.0" y="44">fundo: panorama 3D girando (T0: imagem estática com pan)</text>
+<rect class="panel2" x="60" y="60" width="840" height="450" rx="2"/>
+<text class="tc" x="480.0" y="130">[ LOGO DO JOGO — arte original ]</text>
+<g transform="rotate(-20 640 150)"><text class="note" x="640" y="150">frase aleatória!</text>
+</g>
+<rect class="btnA" x="380" y="190" width="200" height="32" rx="2"/>
+<text class="tc" x="480.0" y="210.0">Um Jogador</text>
+<rect class="btn" x="380" y="236" width="200" height="32" rx="2"/>
+<text class="tc" x="480.0" y="256.0">Multijogador  (bloqueado no MVP)</text>
+<rect class="btn" x="380" y="282" width="200" height="32" rx="2"/>
+<text class="tc" x="480.0" y="302.0">Opções...</text>
+<rect class="btn" x="380" y="328" width="96" height="32" rx="2"/>
+<text class="tc" x="428.0" y="348.0">Idioma</text>
+<rect class="btn" x="484" y="328" width="96" height="32" rx="2"/>
+<text class="tc" x="532.0" y="348.0">Sair</text>
+<text class="ts" x="72" y="500">v0.1.0</text>
+<text class="ts" x="760" y="500">projeto independente</text>
+<text class="note" x="600" y="206">← foco inicial do teclado</text>
+<text class="note" x="600" y="344">← botões 200x20 px de GUI</text>
+
+</svg>

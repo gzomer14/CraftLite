@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540" role="img" aria-label="Pipeline de chunk">
+<title>Pipeline de chunk</title>
+<style>
+  .bg    { fill:#1b1d21 }
+  .panel { fill:#2b2f36; stroke:#7d8794; stroke-width:2 }
+  .panel2{ fill:#232830; stroke:#5c6672; stroke-width:1.5 }
+  .slot  { fill:#3a4049; stroke:#6f7885; stroke-width:1 }
+  .slotA { fill:#4a5460; stroke:#cfd6e0; stroke-width:2 }
+  .btn   { fill:#3d4450; stroke:#8b94a3; stroke-width:1.5 }
+  .btnA  { fill:#4d5a75; stroke:#cfd6e0; stroke-width:2 }
+  .t     { fill:#e6eaf0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:12px }
+  .tc    { fill:#e6eaf0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:12px;
+           text-anchor:middle }
+  .ts    { fill:#98a2b3; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px }
+  .tsc   { fill:#98a2b3; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px;
+           text-anchor:middle }
+  .th    { fill:#ffd166; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:15px;
+           text-anchor:middle }
+  .tt    { fill:#7dd3a0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:11px }
+  .dim   { fill:#000; opacity:.45 }
+  .heart { fill:#dc4040 }
+  .hung  { fill:#c68a45 }
+  .xp    { fill:#7fc94b }
+  .guide { stroke:#5c6672; stroke-width:1; stroke-dasharray:4 3; fill:none }
+  .note  { fill:#ffd166; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px }
+</style>
+<rect class="bg" width="960" height="540"/>
+<text class="th" x="480.0" y="26">14 — Pipeline de Chunk (referência de arquitetura)</text>
+<rect class="btn" x="40" y="120" width="112" height="44" rx="2"/>
+<text class="tc" x="96" y="147">EMPTY</text>
+<text class="tc" x="162" y="147">→</text>
+<rect class="btn" x="170" y="120" width="112" height="44" rx="2"/>
+<text class="tc" x="226" y="147">GENERATING</text>
+<text class="tc" x="292" y="147">→</text>
+<rect class="btn" x="300" y="120" width="112" height="44" rx="2"/>
+<text class="tc" x="356" y="147">GENERATED</text>
+<text class="tc" x="422" y="147">→</text>
+<rect class="btn" x="430" y="120" width="112" height="44" rx="2"/>
+<text class="tc" x="486" y="147">LIGHTING</text>
+<text class="tc" x="552" y="147">→</text>
+<rect class="btn" x="560" y="120" width="112" height="44" rx="2"/>
+<text class="tc" x="616" y="147">LIT</text>
+<text class="tc" x="682" y="147">→</text>
+<rect class="btn" x="690" y="120" width="112" height="44" rx="2"/>
+<text class="tc" x="746" y="147">MESHING</text>
+<text class="tc" x="812" y="147">→</text>
+<rect class="btnA" x="820" y="120" width="112" height="44" rx="2"/>
+<text class="tc" x="876" y="147">READY</text>
+<text class="tt" x="40" y="96">estados</text>
+<rect class="panel2" x="40" y="210" width="880" height="52" rx="2"/>
+<text class="tt" x="56" y="232">main thread</text>
+<text class="ts" x="56" y="250">input · tick 20Hz · física · UI · render · upload de VBO (≤2ms/frame)</text>
+<rect class="panel2" x="40" y="280" width="880" height="52" rx="2"/>
+<text class="tt" x="56" y="302">gen.worker</text>
+<text class="ts" x="56" y="320">ruído → terreno → cavernas → minérios → decoração</text>
+<rect class="panel2" x="40" y="350" width="880" height="52" rx="2"/>
+<text class="tt" x="56" y="372">mesh.worker</text>
+<text class="ts" x="56" y="390">greedy meshing binário + AO + separação opaco/transparente</text>
+<text class="note" x="40" y="440">toda transferência usa postMessage(buf, [buf]) — zero cópia</text>
+<text class="ts" x="40" y="460">meshing recebe a section + 1 camada de borda dos 6 vizinhos = 18³ voxels</text>
+<text class="ts" x="40" y="480">fila de prioridade por distância² ao jogador, com bônus para o frustum</text>
+<text class="ts" x="40" y="500">máx. 2×nWorkers chunks em voo · 1 anel de chunks por segundo no tier T0</text>
+
+</svg>

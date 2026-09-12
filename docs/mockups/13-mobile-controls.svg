@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540" role="img" aria-label="Controles de toque">
+<title>Controles de toque</title>
+<style>
+  .bg    { fill:#1b1d21 }
+  .panel { fill:#2b2f36; stroke:#7d8794; stroke-width:2 }
+  .panel2{ fill:#232830; stroke:#5c6672; stroke-width:1.5 }
+  .slot  { fill:#3a4049; stroke:#6f7885; stroke-width:1 }
+  .slotA { fill:#4a5460; stroke:#cfd6e0; stroke-width:2 }
+  .btn   { fill:#3d4450; stroke:#8b94a3; stroke-width:1.5 }
+  .btnA  { fill:#4d5a75; stroke:#cfd6e0; stroke-width:2 }
+  .t     { fill:#e6eaf0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:12px }
+  .tc    { fill:#e6eaf0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:12px;
+           text-anchor:middle }
+  .ts    { fill:#98a2b3; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px }
+  .tsc   { fill:#98a2b3; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px;
+           text-anchor:middle }
+  .th    { fill:#ffd166; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:15px;
+           text-anchor:middle }
+  .tt    { fill:#7dd3a0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:11px }
+  .dim   { fill:#000; opacity:.45 }
+  .heart { fill:#dc4040 }
+  .hung  { fill:#c68a45 }
+  .xp    { fill:#7fc94b }
+  .guide { stroke:#5c6672; stroke-width:1; stroke-dasharray:4 3; fill:none }
+  .note  { fill:#ffd166; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px }
+</style>
+<rect class="bg" width="960" height="540"/>
+<text class="th" x="480.0" y="26">13 — Controles de Toque (landscape)</text>
+<text class="tsc" x="480.0" y="44">alvos &gt;= 44x44 px CSS reais · Pointer Events + multitoque por pointerId</text>
+<rect class="panel2" x="40" y="60" width="880" height="440" rx="2"/>
+<circle class="heart" cx="70" cy="86" r="6"/>
+<rect class="hung" x="64" y="104" width="12" height="12" rx="3"/>
+<circle class="heart" cx="86" cy="86" r="6"/>
+<rect class="hung" x="80" y="104" width="12" height="12" rx="3"/>
+<circle class="heart" cx="102" cy="86" r="6"/>
+<rect class="hung" x="96" y="104" width="12" height="12" rx="3"/>
+<circle class="heart" cx="118" cy="86" r="6"/>
+<rect class="hung" x="112" y="104" width="12" height="12" rx="3"/>
+<circle class="heart" cx="134" cy="86" r="6"/>
+<rect class="hung" x="128" y="104" width="12" height="12" rx="3"/>
+<circle class="heart" cx="150" cy="86" r="6"/>
+<rect class="hung" x="144" y="104" width="12" height="12" rx="3"/>
+<circle class="heart" cx="166" cy="86" r="6"/>
+<rect class="hung" x="160" y="104" width="12" height="12" rx="3"/>
+<circle class="heart" cx="182" cy="86" r="6"/>
+<rect class="hung" x="176" y="104" width="12" height="12" rx="3"/>
+<circle class="heart" cx="198" cy="86" r="6"/>
+<rect class="hung" x="192" y="104" width="12" height="12" rx="3"/>
+<circle class="heart" cx="214" cy="86" r="6"/>
+<rect class="hung" x="208" y="104" width="12" height="12" rx="3"/>
+<rect class="btn" x="856" y="72" width="48" height="48" rx="2"/>
+<text class="tc" x="880" y="102">⏸</text>
+<circle cx="480" cy="270" r="4" fill="#e6eaf0"/>
+<text class="tsc" x="480" y="250">ponto (o dedo é que mira, no Modo A)</text>
+<circle cx="180" cy="330" r="66" fill="none" stroke="#8b94a3" stroke-width="2"/>
+<circle cx="196" cy="316" r="26" class="btn"/>
+<text class="tsc" x="180" y="418">joystick flutuante</text>
+<text class="tsc" x="180" y="434">surge onde o dedo tocar</text>
+<text class="tsc" x="180" y="450">empurrar 300ms = correr</text>
+<rect class="guide" x="40" y="60" width="440" height="440"/>
+<rect class="guide" x="480" y="60" width="440" height="440"/>
+<text class="note" x="120" y="78">ZONA MOVIMENTO</text>
+<text class="note" x="560" y="78">ZONA CÂMERA + INTERAÇÃO</text>
+<rect class="btn" x="830" y="200" width="74" height="56" rx="2"/>
+<text class="tsc" x="867" y="232">▲ pular</text>
+<rect class="btn" x="830" y="268" width="74" height="56" rx="2"/>
+<text class="tsc" x="867" y="300">⬇ agachar</text>
+<rect class="btn" x="830" y="336" width="74" height="56" rx="2"/>
+<text class="tsc" x="867" y="368">⬆ voar</text>
+<rect class="btn" x="560" y="366" width="74" height="56" rx="2"/>
+<text class="tc" x="597" y="398">⛏</text>
+<text class="tsc" x="597" y="434">só no Modo B</text>
+<rect class="btn" x="740" y="366" width="62" height="56" rx="2"/>
+<text class="tc" x="771" y="398">🎒</text>
+<rect class="slot" x="280" y="448" width="40" height="40" rx="1"/>
+<rect class="slot" x="323" y="448" width="40" height="40" rx="1"/>
+<rect class="slot" x="366" y="448" width="40" height="40" rx="1"/>
+<rect class="slot" x="409" y="448" width="40" height="40" rx="1"/>
+<rect class="slot" x="452" y="448" width="40" height="40" rx="1"/>
+<rect class="slot" x="495" y="448" width="40" height="40" rx="1"/>
+<rect class="slot" x="538" y="448" width="40" height="40" rx="1"/>
+<rect class="slot" x="581" y="448" width="40" height="40" rx="1"/>
+<rect class="slot" x="624" y="448" width="40" height="40" rx="1"/>
+<text class="tsc" x="480" y="500">hotbar: tocar seleciona · arrastar rola os slots</text>
+
+</svg>

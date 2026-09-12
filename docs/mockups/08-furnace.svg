@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540" role="img" aria-label="Fornalha">
+<title>Fornalha</title>
+<style>
+  .bg    { fill:#1b1d21 }
+  .panel { fill:#2b2f36; stroke:#7d8794; stroke-width:2 }
+  .panel2{ fill:#232830; stroke:#5c6672; stroke-width:1.5 }
+  .slot  { fill:#3a4049; stroke:#6f7885; stroke-width:1 }
+  .slotA { fill:#4a5460; stroke:#cfd6e0; stroke-width:2 }
+  .btn   { fill:#3d4450; stroke:#8b94a3; stroke-width:1.5 }
+  .btnA  { fill:#4d5a75; stroke:#cfd6e0; stroke-width:2 }
+  .t     { fill:#e6eaf0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:12px }
+  .tc    { fill:#e6eaf0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:12px;
+           text-anchor:middle }
+  .ts    { fill:#98a2b3; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px }
+  .tsc   { fill:#98a2b3; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px;
+           text-anchor:middle }
+  .th    { fill:#ffd166; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:15px;
+           text-anchor:middle }
+  .tt    { fill:#7dd3a0; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:11px }
+  .dim   { fill:#000; opacity:.45 }
+  .heart { fill:#dc4040 }
+  .hung  { fill:#c68a45 }
+  .xp    { fill:#7fc94b }
+  .guide { stroke:#5c6672; stroke-width:1; stroke-dasharray:4 3; fill:none }
+  .note  { fill:#ffd166; font-family:ui-monospace,'DejaVu Sans Mono',monospace; font-size:10px }
+</style>
+<rect class="bg" width="960" height="540"/>
+<text class="th" x="480.0" y="26">08 — Fornalha</text>
+<rect class="panel" x="260" y="62" width="440" height="420" rx="2"/>
+<text class="t" x="276" y="86">Fornalha</text>
+<rect class="slot" x="340" y="112" width="44" height="44" rx="2"/>
+<text class="tsc" x="362" y="104">entrada</text>
+<rect class="slot" x="340" y="202" width="44" height="44" rx="2"/>
+<text class="tsc" x="362" y="262">combustível</text>
+<path d="M356 196 l6 -18 l6 18 z" fill="#ffb347"/>
+<text class="ts" x="410" y="190">🔥 altura ∝ queima restante (0-13px)</text>
+<rect class="panel2" x="440" y="158" width="88" height="16" rx="2"/>
+<rect class="xp" x="440" y="158" width="52" height="16" rx="0"/>
+<text class="tsc" x="484" y="150">progresso 0-22px</text>
+<rect class="slotA" x="560" y="148" width="52" height="52" rx="2"/>
+<text class="tsc" x="586" y="218">saída</text>
+<rect class="slot" x="280" y="278" width="44" height="44" rx="1"/>
+<rect class="slot" x="327" y="278" width="44" height="44" rx="1"/>
+<rect class="slot" x="374" y="278" width="44" height="44" rx="1"/>
+<rect class="slot" x="421" y="278" width="44" height="44" rx="1"/>
+<rect class="slot" x="468" y="278" width="44" height="44" rx="1"/>
+<rect class="slot" x="515" y="278" width="44" height="44" rx="1"/>
+<rect class="slot" x="562" y="278" width="44" height="44" rx="1"/>
+<rect class="slot" x="609" y="278" width="44" height="44" rx="1"/>
+<rect class="slot" x="656" y="278" width="44" height="44" rx="1"/>
+<rect class="slot" x="280" y="325" width="44" height="44" rx="1"/>
+<rect class="slot" x="327" y="325" width="44" height="44" rx="1"/>
+<rect class="slot" x="374" y="325" width="44" height="44" rx="1"/>
+<rect class="slot" x="421" y="325" width="44" height="44" rx="1"/>
+<rect class="slot" x="468" y="325" width="44" height="44" rx="1"/>
+<rect class="slot" x="515" y="325" width="44" height="44" rx="1"/>
+<rect class="slot" x="562" y="325" width="44" height="44" rx="1"/>
+<rect class="slot" x="609" y="325" width="44" height="44" rx="1"/>
+<rect class="slot" x="656" y="325" width="44" height="44" rx="1"/>
+<rect class="slot" x="280" y="372" width="44" height="44" rx="1"/>
+<rect class="slot" x="327" y="372" width="44" height="44" rx="1"/>
+<rect class="slot" x="374" y="372" width="44" height="44" rx="1"/>
+<rect class="slot" x="421" y="372" width="44" height="44" rx="1"/>
+<rect class="slot" x="468" y="372" width="44" height="44" rx="1"/>
+<rect class="slot" x="515" y="372" width="44" height="44" rx="1"/>
+<rect class="slot" x="562" y="372" width="44" height="44" rx="1"/>
+<rect class="slot" x="609" y="372" width="44" height="44" rx="1"/>
+<rect class="slot" x="656" y="372" width="44" height="44" rx="1"/>
+<text class="ts" x="280" y="272">inventário</text>
+<rect class="slot" x="280" y="420" width="44" height="44" rx="1"/>
+<rect class="slot" x="327" y="420" width="44" height="44" rx="1"/>
+<rect class="slot" x="374" y="420" width="44" height="44" rx="1"/>
+<rect class="slot" x="421" y="420" width="44" height="44" rx="1"/>
+<rect class="slot" x="468" y="420" width="44" height="44" rx="1"/>
+<rect class="slot" x="515" y="420" width="44" height="44" rx="1"/>
+<rect class="slot" x="562" y="420" width="44" height="44" rx="1"/>
+<rect class="slot" x="609" y="420" width="44" height="44" rx="1"/>
+<rect class="slot" x="656" y="420" width="44" height="44" rx="1"/>
+<text class="ts" x="280" y="414">hotbar</text>
+<text class="ts" x="730" y="160">1 item = 200 ticks (10s)</text>
+<text class="ts" x="730" y="178">continua queimando com</text>
+<text class="ts" x="730" y="196">a tela fechada, enquanto</text>
+<text class="ts" x="730" y="214">o chunk estiver carregado</text>
+
+</svg>

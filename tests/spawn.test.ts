@@ -6,6 +6,7 @@
  * cap, e um chunk novo às vezes já vem com bichos.
  */
 import { describe, expect, it } from 'vitest';
+import { Rng } from '../src/core/rng';
 import { ChunkColumn } from '../src/world/chunk';
 import { World } from '../src/world/world';
 import { Mobs } from '../src/entity/mobs';
@@ -59,7 +60,22 @@ function build(
     onArrow: () => { /* nada */ },
   }, 256);
   const spawner = new MobSpawner(world, mobs, capsForTier(maxMobs), simulationDistance);
+  mobs.random = seeded();
+  spawner.random = seeded(77);
   return { mobs, spawner };
+}
+
+/**
+ * Aleatório determinístico para os testes de mob (doc 15 §6, 2026-09-13).
+ *
+ * `Mobs`, `MobStore` e `MobSpawner` sorteiam yaw de nascimento, cooldown de
+ * passeio, drops, despawn e teleporte. Com `Math.random` a suíte completa
+ * falhava de vez em quando **sem reproduzir isolada** — o tipo de teste que
+ * acaba ignorado. Semear aqui torna cada arquivo reproduzível.
+ */
+function seeded(seed = 20260913): () => number {
+  const rng = new Rng(seed);
+  return () => rng.nextFloat();
 }
 
 describe('caps por tier', () => {

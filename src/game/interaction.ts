@@ -8,9 +8,10 @@
  */
 
 import { defOf, makeState, stateBitsOf, AIR, type BlockDef } from '../data/blocks';
+import { MOUNT_CEILING, MOUNT_FLOOR, PISTON_STEP } from '../world/mesh/shapes';
 import { EFFICIENCY } from '../data/enchants';
 import { efficiencyBonus, levelOf } from './enchanting';
-import { stackTool, type ItemStack, type ToolSpec } from '../data/items';
+import { itemDef, stackTool, type ItemStack, type ToolSpec } from '../data/items';
 import { createAabb, isSpaceBlocked, setAabbFromBase } from '../world/physics';
 import { raycast, type RayHit } from '../world/raycast';
 import type { Player } from '../entity/player';
@@ -223,7 +224,10 @@ export class Interaction {
     // Não deixar o jogador se emparedar dentro de si mesmo.
     if (this.intersectsPlayer(px, py, pz)) return false;
 
-    const state = makeState(blockId, this.stateForPlacement(blockId, target));
+    const bits = this.stateForPlacement(blockId, target);
+    if (!this.hasSupport(blockId, bits, px, py, pz)) return false;
+
+    const state = makeState(blockId, bits);
     if (!this.world.setBlock(px, py, pz, state, 'player')) return false;
 
     this.lighting.onBlockChanged(px, py, pz, AIR, state);
@@ -265,7 +269,30 @@ export class Interaction {
     if (shape === 'stairs' || shape === 'fence_gate' || shape === 'door' || shape === 'sign') {
       return facingFromYaw(this.player.yaw);
     }
+    // --- redstone (M7) ---------------------------------------------------
+    if (shape === 'lever' || shape === 'button') {
+      // Encaixa na superfície clicada: o apoio fica do lado oposto à normal.
+      return mountFromNormal(hit.nx, hit.ny, hit.nz);
+    }
+    if (shape === 'repeater') return facing4FromLook(this.player.yaw);
+    if (shape === 'piston') return facing6FromLook(this.player.yaw, this.player.pitch);
     return 0;
+  }
+
+  /**
+   * true se o bloco tem o apoio que a tabela exige (doc 04 §3).
+   *
+   * Sem isto, pó e placa colocados no ar cairiam no tick seguinte — a checagem
+   * de `world/redstone.ts` existe para o apoio que **some depois**, não para
+   * deixar o jogador colocar errado de primeira.
+   */
+  private hasSupport(blockId: number, bits: number, x: number, y: number, z: number): boolean {
+    const def = defOf(makeState(blockId));
+    if (def.support === 'none') return true;
+    let step: readonly [number, number, number] = PISTON_STEP[5];
+    if (def.support === 'mount') step = PISTON_STEP[mountIndexOf(bits & 7)];
+    const support = defOf(this.world.getBlock(x + step[0], y + step[1], z + step[2]));
+    return support.opaque && support.solid;
   }
 
   private intersectsPlayer(x: number, y: number, z: number): boolean {
@@ -282,10 +309,16 @@ function aabbOverlap(a: Float32Array, b: Float32Array): boolean {
     && a[2] < b[5] && a[5] > b[2];
 }
 
-/** Itens de bloco têm `itemId === blockId` (ver doc 05 e `data/items.ts`). */
+/**
+ * Bloco que o item coloca.
+ *
+ * Quase sempre é o de mesmo id — a tabela de itens gera um item por bloco —,
+ * mas `placesBlock` existe para os casos em que não é: o pó de redstone é um
+ * item de material que coloca `redstone_wire`.
+ */
 function blockIdForItem(itemId: number): number | undefined {
-  const def = defOf(makeState(itemId));
-  return def.id === itemId && itemId !== AIR ? itemId : undefined;
+  const places = itemDef(itemId)?.placesBlock;
+  return places !== undefined && places !== AIR ? places : undefined;
 }
 
 /**
@@ -300,6 +333,50 @@ export function facingFromYaw(yaw: number): number {
   const dz = Math.cos(yaw);
   if (Math.abs(dx) > Math.abs(dz)) return dx > 0 ? 0 : 1;
   return dz > 0 ? 2 : 3;
+}
+
+/**
+ * Encaixe (`MOUNT_*`) correspondente à face clicada: o apoio de uma alavanca ou
+ * de um botão fica sempre do lado oposto à normal do acerto.
+ */
+export function mountFromNormal(nx: number, ny: number, nz: number): number {
+  if (ny > 0) return MOUNT_FLOOR;
+  if (ny < 0) return MOUNT_CEILING;
+  if (nx > 0) return 1;
+  if (nx < 0) return 0;
+  if (nz > 0) return 3;
+  return 2;
+}
+
+/** Índice em `PISTON_STEP` da direção em que fica o apoio de um encaixe. */
+function mountIndexOf(mount: number): number {
+  if (mount === MOUNT_FLOOR) return 5;
+  if (mount === MOUNT_CEILING) return 4;
+  return mount & 3;
+}
+
+/**
+ * Direção do olhar nos bits de `FACING_STEP`, apontando para **longe** de quem
+ * coloca — é o que o repetidor precisa: a saída sai na direção em que se olha.
+ *
+ * Difere de `facingFromYaw` de propósito: lá o bloco fica *de frente* para o
+ * jogador, aqui ele aponta *para onde o jogador aponta*.
+ */
+export function facing4FromLook(yaw: number): number {
+  const dx = Math.sin(yaw);
+  const dz = Math.cos(yaw);
+  if (Math.abs(dx) > Math.abs(dz)) return dx > 0 ? 0 : 1;
+  return dz > 0 ? 2 : 3;
+}
+
+/**
+ * Idem com os seis eixos, na ordem de `PISTON_STEP`. Olhar bem para cima ou
+ * bem para baixo (mais de ~45°) coloca o pistão na vertical.
+ */
+export function facing6FromLook(yaw: number, pitch: number): number {
+  const dy = -Math.sin(pitch);
+  if (Math.abs(dy) > 0.7071) return dy > 0 ? 4 : 5;
+  return facing4FromLook(yaw);
 }
 
 /**

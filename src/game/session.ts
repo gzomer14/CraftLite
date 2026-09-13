@@ -37,14 +37,21 @@ import { EXHAUSTION, Survival } from './survival';
 import { ItemEntities } from '../entity/itementity';
 import { XpOrbs } from '../entity/xporb';
 import { Mobs } from '../entity/mobs';
-import { Projectiles } from '../entity/projectile';
+import { FIREBALL_FLAGS, Projectiles } from '../entity/projectile';
 import { BOAT_SEAT_HEIGHT, Boats } from '../entity/boat';
+import { CART_SEAT_HEIGHT, Minecarts } from '../entity/minecart';
+import { Rails } from '../world/rails';
 import { forwardFrom, createVec3 } from '../core/math';
 import { MobSpawner, capsForTier } from '../entity/spawn';
 import { Player } from '../entity/player';
 import { plantSeed, tillSoil } from './farming';
 import { Fluids } from '../world/fluids';
 import { Growth } from '../world/growth';
+import { Redstone } from '../world/redstone';
+import { Travel } from './travel';
+import { extinguishPortal, ignitePortal, isPortalBlock } from './portal';
+import { isRail } from '../world/rails';
+import { DIM_OVERWORLD } from '../data/dimensions';
 import { Lighting } from '../world/lighting';
 import { WORLD_HEIGHT, type ChunkColumn } from '../world/chunk';
 import type { World } from '../world/world';
@@ -59,6 +66,10 @@ const LAPIS = ITEM_BY_NAME.get('lapis_lazuli')?.id ?? -1;
 
 /** Raio em que a flecha e a explosão acertam o jogador. */
 const HIT_RADIUS = 0.7;
+/** Velocidade da bola de fogo, em blocos por tick: lenta o bastante para desviar. */
+const FIREBALL_SPEED = 0.45;
+/** Força da explosão da bola de fogo: quebra ponte, não some com a base. */
+const FIREBALL_POWER = 1.6;
 
 /** Item da flecha, resolvido uma vez. */
 const ARROW = ITEM_BY_NAME.get('arrow')?.id ?? -1;
@@ -73,6 +84,8 @@ const SHIELD_REDUCTION = 0.75;
 const CREATIVE_ATTACK_DAMAGE = 1000;
 /** Alcance para montar num barco. */
 const BOAT_MOUNT_RANGE = 2.5;
+/** Alcance para montar num carrinho — menor: ele é menor que o barco. */
+const CART_MOUNT_RANGE = 1.8;
 /** Direção de mira reusada — nada de vetor novo por disparo. */
 const AIM = createVec3();
 
@@ -92,6 +105,19 @@ interface MobSpawnerBlock {
   cooldown: number;
 }
 
+/**
+ * Um veículo serializado (M7). `dir` só existe no carrinho: o barco anda para
+ * onde o yaw aponta, o carrinho anda ao longo do trilho.
+ */
+export interface VehicleRecord {
+  kind: 'boat' | 'minecart';
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
+  dir?: number;
+}
+
 /** O que o jogador tem aberto no momento. */
 export type OpenScreen = 'none' | 'inventory' | 'crafting' | 'furnace' | 'chest' | 'enchanting';
 
@@ -107,6 +133,11 @@ export interface SessionEvents {
   onHurt?: (amount: number) => void;
   /** Conquista desbloqueada — toast no canto (doc 08 §3.4). */
   onAchievement?: (title: string, description: string) => void;
+  /**
+   * A dimensão vai mudar (M7): quem ouve troca pipeline, save e céu. Chamado
+   * **antes** de o mundo novo ter chunk nenhum.
+   */
+  onDimensionChange?: (dimension: number) => void;
 }
 
 export interface SessionOptions {
@@ -128,12 +159,16 @@ export class Session {
   readonly spawner: MobSpawner;
   readonly projectiles = new Projectiles();
   readonly boats = new Boats();
+  readonly carts: Minecarts;
   readonly dayNight = new DayNight();
   readonly weather = new Weather();
   readonly achievements = new Achievements();
   readonly lighting: Lighting;
   readonly fluids: Fluids;
   readonly growth: Growth;
+  readonly redstone: Redstone;
+  readonly rails: Rails;
+  readonly travel: Travel;
   readonly interaction: Interaction;
   readonly recipes = new RecipeBook();
 
@@ -150,6 +185,8 @@ export class Session {
   private bowCharge = 0;
   /** Índice do barco que o jogador pilota, ou −1. */
   private riding = -1;
+  /** Índice do carrinho que o jogador pilota, ou −1. Nunca os dois ao mesmo tempo. */
+  private ridingCart = -1;
 
   openScreen: OpenScreen = 'none';
   openContainer: ContainerView | null = null;
@@ -181,6 +218,43 @@ export class Session {
       onCropBroken: (x, y, z, state) => { this.spawnDrops(x, y, z, state); },
       onGrown: () => { /* silencioso: uma roça inteira crescendo seria barulho */ },
     });
+    // O circuito precisa avisar a luz (lâmpada e tocha mudam de emissão) e
+    // dropar o que perdeu o apoio, como faz o crescimento.
+    this.redstone = new Redstone(world, {
+      onChanged: (x, y, z, previous, state) => {
+        this.lighting.onBlockChanged(x, y, z, previous, state);
+      },
+      onBroken: (x, y, z, state) => { this.spawnDrops(x, y, z, state); },
+      onSound: (name, x, y, z) => { this.events.onSound?.(name, x, y, z); },
+    });
+    this.rails = new Rails(world, {
+      onBroken: (x, y, z, state) => { this.spawnDrops(x, y, z, state); },
+    });
+    /*
+     * O detector é o caminho de volta do carrinho para o circuito: ele escreve
+     * o bit de energizado do trilho, e o `Redstone` lê isso como emissor. Os
+     * dois sistemas compartilham o voxel sem se atropelar porque cada um mexe
+     * só nos seus bits (forma nos 0..3, energia no 4).
+     */
+    this.carts = new Minecarts({
+      onDetector: (x, y, z, occupied) => {
+        this.rails.setPowered(x, y, z, occupied);
+        this.events.onSound?.('block/click', x, y, z);
+      },
+    });
+    this.travel = new Travel(world, {
+      // A travessia entra pelo mesmo caminho que o save e o renascimento.
+      onDimensionChange: (dimension) => { this.enterDimension(dimension); },
+      onArrive: (x, y, z) => {
+        this.player.setPosition(x, y, z);
+        this.player.vx = 0; this.player.vy = 0; this.player.vz = 0;
+        this.player.fallDistance = 0;
+        this.achievements.event(
+          this.world.dimension === DIM_OVERWORLD ? 'return_overworld' : 'enter_nether',
+        );
+      },
+      onMessage: (text) => this.events.onMessage?.(text),
+    });
     this.interaction = new Interaction(world, player, this.lighting);
     this.benchGrid = new Container('chest', 9, 0, 0, 0);
 
@@ -197,6 +271,11 @@ export class Session {
     };
 
     this.growth.attach();
+    this.redstone.attach();
+    this.rails.attach();
+    this.fluids.onEvaporate = (x, y, z) => {
+      this.events.onSound?.('block/evaporate', x, y, z);
+    };
     this.wireInventory();
     this.wireInteraction();
     this.wireSurvival();
@@ -244,6 +323,7 @@ export class Session {
       this.spawnBlockXp(x, y, z, state);
       this.removeContainerAt(x, y, z);
       this.fluids.scheduleAround(x, y, z);
+      this.breakPortalAround(x, y, z);
       this.damageTool();
     };
     this.interaction.onBlockPlaced = (x, y, z, state) => {
@@ -295,9 +375,13 @@ export class Session {
       },
       onArrow: (
         x: number, y: number, z: number,
-        dx: number, dy: number, dz: number, damage: number,
+        dx: number, dy: number, dz: number, damage: number, fireball = false,
       ) => {
-        this.projectiles.spawn(x, y, z, dx, dy, dz, damage, false);
+        this.projectiles.spawn(
+          x, y, z, dx, dy, dz, damage, false,
+          fireball ? FIREBALL_SPEED : 1.2,
+          fireball ? FIREBALL_FLAGS : 0,
+        );
       },
     };
   }
@@ -329,6 +413,7 @@ export class Session {
     this.projectiles.onImpactSound = (x, y, z) => {
       this.events.onSound?.('player/arrow', x, y, z);
     };
+    this.projectiles.onExplode = (x, y, z) => { this.explodeAt(x, y, z, FIREBALL_POWER); };
   }
 
   // --- tick ----------------------------------------------------------------
@@ -359,12 +444,33 @@ export class Session {
     this.items.tick(this.world, this.player.x, this.player.y, this.player.z);
     this.orbs.tick(this.world, this.player.x, this.player.y, this.player.z);
     this.boats.tick(this.world);
+    this.carts.tick(this.world);
+    this.rails.tick();
     this.syncRider();
     this.fluids.tick();
     this.growth.tick();
+    this.tickRedstone();
+    this.travel.tick(this.player.x, this.player.y, this.player.z);
     this.tickFurnaces();
     this.tickSpawners();
     this.tickMobs();
+  }
+
+  /**
+   * Circuito: primeiro quem pisa em placa, depois a fila de atualizações.
+   *
+   * A varredura de placas é do jogador e dos mobs — é O(mobs), sem registro de
+   * posições, porque uma placa só interessa quando alguém está em cima dela.
+   */
+  private tickRedstone(): void {
+    this.redstone.beginPlateScan();
+    this.redstone.markEntity(this.player.x, this.player.y, this.player.z);
+    const store = this.mobs.store;
+    for (let i = 0; i < store.active; i++) {
+      this.redstone.markEntity(store.x[i], store.y[i], store.z[i]);
+    }
+    this.redstone.endPlateScan();
+    this.redstone.tick();
   }
 
   /** Mobs, spawn e flechas. Sai cedo no criativo? Não: o mundo continua vivo. */
@@ -472,6 +578,23 @@ export class Session {
     return true;
   }
 
+  /**
+   * Entra numa dimensão sem portal: usado pelo save ao restaurar o mundo e pelo
+   * renascimento. Quem troca pipeline, save e céu é quem ouve o evento.
+   */
+  enterDimension(dimension: number): void {
+    if (dimension === this.world.dimension) return;
+    /*
+     * O evento vem **antes** da limpeza de propósito: quem ouve precisa ler
+     * baús e veículos que ainda são desta dimensão para gravá-los. Invertendo a
+     * ordem, o save encontraria as listas já vazias — e todo baú do Nether
+     * sumiria ao voltar para casa.
+     */
+    this.events.onDimensionChange?.(dimension);
+    this.clearForDimension();
+    this.world.dimension = dimension;
+  }
+
   /** Clique direito: abre contêiner, ara, planta ou come; senão, coloca bloco. */
   useHeld(): boolean {
     // Montar num barco vence tudo: o barco fica no chão e a mira acerta o
@@ -479,13 +602,18 @@ export class Session {
     if (this.tryRide()) return true;
     const target = this.interaction.state.target;
     if (target !== null && this.tryBed(target.x, target.y, target.z)) return true;
+    // Alavanca, botão e repetidor respondem antes da porta: os três são
+    // mecanismos de clique, e a porta é a única que também abre na mão.
+    if (target !== null && this.redstone.use(target.x, target.y, target.z)) return true;
     if (target !== null && this.tryToggle(target.x, target.y, target.z)) return true;
     if (target !== null && this.openContainerAt(target.x, target.y, target.z)) return true;
+    if (this.tryPlaceMinecart()) return true;
     if (this.tryPlaceBoat()) return true;
     if (this.tryCharge()) return true;
     // Roça antes de comer: cenoura e batata são semente e comida ao mesmo
     // tempo, e mirando a terra arada o que se quer é plantar.
     if (target !== null && this.tryFarm(target.x, target.y, target.z)) return true;
+    if (target !== null && this.tryIgnite(target)) return true;
     if (this.tryEat()) return true;
 
     if (this.interaction.tryPlace(this.inventory.held)) {
@@ -813,6 +941,74 @@ export class Session {
   }
 
   /** Segurar o botão come, se o item for comida e houver fome. */
+  /**
+   * Isqueiro na obsidiana: acende o portal (M7).
+   *
+   * O bloco aceso é o **ar da face clicada**, não a obsidiana — é assim que o
+   * jogador acende pela moldura, de fora, como no gênero. Falhar não gasta
+   * durabilidade: acender o nada não desgasta nada.
+   */
+  private tryIgnite(target: { x: number; y: number; z: number; nx: number; ny: number; nz: number }): boolean {
+    const held = this.inventory.held;
+    if (held === null || itemDef(held.item)?.lights !== true) return false;
+
+    const x = target.x + target.nx;
+    const y = target.y + target.ny;
+    const z = target.z + target.nz;
+    const area = ignitePortal(this.world, x, y, z);
+    if (area === null) return false;
+
+    this.lighting.onBlockChanged(x, y, z, AIR, this.world.getBlock(x, y, z));
+    this.events.onSound?.('block/portal', x, y, z);
+    if (this.player.mode === 'survival') {
+      const def = itemDef(held.item);
+      if (def?.durability !== undefined) this.inventory.damageHeld(1, def.durability);
+    }
+    this.achievements.event('light_portal');
+    return true;
+  }
+
+  /**
+   * Esvazia o que é da dimensão que está sendo deixada.
+   *
+   * Mob, item no chão, orbe, barco, flecha e contêiner vivem em coordenadas —
+   * e as coordenadas do outro lado são de outro mundo. Inventário, vida, XP e
+   * conquistas são do **jogador** e atravessam com ele.
+   */
+  private clearForDimension(): void {
+    this.mobs.clear();
+    this.items.clear();
+    this.orbs.clear();
+    this.projectiles.clear();
+    this.boats.clear();
+    this.carts.clear();
+    this.riding = -1;
+    this.ridingCart = -1;
+    this.containers.clear();
+    this.spawners.clear();
+    this.closeScreen();
+  }
+
+  /**
+   * Quebrar um pedaço da moldura apaga o portal inteiro (M7).
+   *
+   * Vale para a obsidiana **e** para o próprio bloco de portal: nos dois casos
+   * o que sobraria seria um retângulo roxo furado, que continuaria teleportando.
+   */
+  private breakPortalAround(x: number, y: number, z: number): void {
+    for (let d = 0; d < 6; d++) {
+      const step = PORTAL_NEIGHBORS[d];
+      const nx = x + step[0];
+      const ny = y + step[1];
+      const nz = z + step[2];
+      if (!isPortalBlock(this.world.getBlock(nx, ny, nz))) continue;
+      extinguishPortal(this.world, nx, ny, nz);
+      this.lighting.onBlockChanged(nx, ny, nz, 0, AIR);
+      this.events.onSound?.('block/portal', nx, ny, nz);
+      return;
+    }
+  }
+
   private tryEat(): boolean {
     const stack = this.inventory.held;
     if (stack === null) return false;
@@ -917,10 +1113,24 @@ export class Session {
     return true;
   }
 
-  /** Monta no barco mais próximo, ou desce do que está pilotando. */
+  /**
+   * Monta no veículo mais próximo, ou desce do que está pilotando.
+   *
+   * O carrinho vem antes do barco porque um carrinho parado num trilho dentro
+   * d'água é o único caso em que os dois disputam, e ali quem manda é o trilho.
+   */
   private tryRide(): boolean {
-    if (this.riding >= 0) {
+    if (this.isRiding) {
       this.riding = -1;
+      this.ridingCart = -1;
+      return true;
+    }
+    const cart = this.carts.findNear(
+      this.player.x, this.player.y, this.player.z, CART_MOUNT_RANGE,
+    );
+    if (cart >= 0) {
+      this.ridingCart = cart;
+      this.achievements.event('minecart');
       return true;
     }
     const index = this.boats.findNear(
@@ -933,20 +1143,71 @@ export class Session {
   }
 
   get isRiding(): boolean {
-    return this.riding >= 0;
+    return this.riding >= 0 || this.ridingCart >= 0;
   }
 
   /**
-   * Rema o barco com o eixo de movimento do jogador.
+   * Pilota o veículo com o eixo de movimento do jogador.
    * Chamado por `main.ts` no lugar do tick de física do jogador.
    */
-  driveBoat(forward: number): void {
+  driveVehicle(forward: number): void {
+    if (this.ridingCart >= 0) {
+      this.carts.drive(this.ridingCart, forward, this.player.yaw);
+      return;
+    }
     if (this.riding < 0) return;
     this.boats.drive(this.riding, forward, this.player.yaw);
   }
 
-  /** Cola o jogador no barco que ele pilota, e o solta se o barco sumiu. */
+  /**
+   * Barcos e carrinhos da dimensão atual, para o save (M7).
+   *
+   * Barco e carrinho **não eram salvos** desde que existem: sair do mundo e
+   * voltar sumia com os dois. O trilho ficava; o carrinho em cima dele, não.
+   */
+  vehicleSnapshot(): VehicleRecord[] {
+    const out: VehicleRecord[] = [];
+    for (let i = 0; i < this.boats.active; i++) {
+      out.push({
+        kind: 'boat',
+        x: this.boats.x[i], y: this.boats.y[i], z: this.boats.z[i],
+        yaw: this.boats.yaw[i],
+      });
+    }
+    for (let i = 0; i < this.carts.active; i++) {
+      out.push({
+        kind: 'minecart',
+        x: this.carts.x[i], y: this.carts.y[i], z: this.carts.z[i],
+        yaw: this.carts.yaw[i], dir: this.carts.dir[i],
+      });
+    }
+    return out;
+  }
+
+  /** Recoloca os veículos que vieram do save. Substitui o que houver. */
+  restoreVehicles(records: readonly VehicleRecord[]): void {
+    this.boats.clear();
+    this.carts.clear();
+    this.riding = -1;
+    this.ridingCart = -1;
+    for (const record of records) {
+      if (record.kind === 'minecart') this.carts.spawn(record.x, record.y, record.z, record.dir ?? 0);
+      else this.boats.spawn(record.x, record.y, record.z, record.yaw);
+    }
+  }
+
+  /** Cola o jogador no veículo que ele pilota, e o solta se o veículo sumiu. */
   private syncRider(): void {
+    if (this.ridingCart >= 0) {
+      if (this.ridingCart >= this.carts.active) { this.ridingCart = -1; return; }
+      this.player.setPosition(
+        this.carts.x[this.ridingCart],
+        this.carts.y[this.ridingCart] + CART_SEAT_HEIGHT,
+        this.carts.z[this.ridingCart],
+      );
+      this.player.fallDistance = 0;
+      return;
+    }
     if (this.riding < 0) return;
     if (this.riding >= this.boats.active) { this.riding = -1; return; }
     this.player.setPosition(
@@ -955,6 +1216,27 @@ export class Session {
       this.boats.z[this.riding],
     );
     this.player.fallDistance = 0;
+  }
+
+  /**
+   * Coloca o carrinho no trilho mirado.
+   *
+   * Só em trilho: um carrinho no chão não anda e não tem como ser recolhido de
+   * volta sem uma regra a mais. Falhar não consome o item.
+   */
+  private tryPlaceMinecart(): boolean {
+    const held = this.inventory.held;
+    if (held === null || itemDef(held.item)?.placesMinecart !== true) return false;
+    const target = this.interaction.state.target;
+    if (target === null) return false;
+    if (!isRail(this.world.getBlock(target.x, target.y, target.z))) return false;
+
+    const x = target.x + 0.5;
+    const z = target.z + 0.5;
+    if (this.carts.spawn(x, target.y, z) < 0) return false;
+    if (this.player.mode === 'survival') this.inventory.consumeHeld();
+    this.events.onSound?.('block/click', x, target.y, z);
+    return true;
   }
 
   get eatProgress(): number {
@@ -1253,6 +1535,13 @@ export class Session {
    */
   respawn(spawnX: number, spawnZ: number): void {
     this.survival.respawn();
+    /*
+     * Morrer fora da superfície devolve o jogador **à superfície**, não ao
+     * ponto de renascimento com o Nether ainda carregado: a cama fica do outro
+     * lado, e renascer com as coordenadas de lá dentro daqui é cair num mar de
+     * lava. A troca de dimensão é a mesma do portal, sem portal.
+     */
+    this.enterDimension(DIM_OVERWORLD);
     const useBed = this.spawnY >= 0;
     const x = useBed ? this.spawnX : spawnX;
     const z = useBed ? this.spawnZ : spawnZ;
@@ -1271,6 +1560,8 @@ export class Session {
   onChunkLoaded(chunk: ChunkColumn): void {
     this.spawner.populateChunk(chunk);
     this.growth.scanChunk(chunk);
+    this.redstone.scanChunk(chunk);
+    this.rails.scanChunk(chunk);
     this.applyStructures(chunk);
   }
 
@@ -1409,4 +1700,9 @@ function positionKey(x: number, y: number, z: number): number {
 }
 
 /** Visão do jogador entregue aos mobs — reusada, nunca recriada por tick. */
+/** Os seis vizinhos, para a varredura de portal quebrado. */
+const PORTAL_NEIGHBORS: readonly (readonly [number, number, number])[] = [
+  [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1],
+];
+
 const PLAYER_VIEW = { x: 0, y: 0, z: 0, eyeY: 0, held: -1, alive: true };

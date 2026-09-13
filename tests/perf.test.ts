@@ -13,7 +13,11 @@ import { extractNeighborhood, NB_VOLUME } from '../src/world/neighborhood';
 import { GreedyMesher } from '../src/world/mesh/greedy';
 import { buildBlockTables } from '../src/world/mesh/blockinfo';
 import { buildLayerIndex } from '../src/render/layers';
-import { SEA_LEVEL } from '../src/world/chunk';
+import { ChunkColumn, SEA_LEVEL } from '../src/world/chunk';
+import { Redstone } from '../src/world/redstone';
+import { NetherNoise, generateNetherChunk } from '../src/world/gen/nether';
+import { BLOCK_BY_NAME, STONE, makeState } from '../src/data/blocks';
+import { MOUNT_FLOOR } from '../src/world/mesh/shapes';
 
 const SEED = 4242;
 const tables = buildBlockTables(buildLayerIndex());
@@ -37,6 +41,21 @@ describe('orçamento de performance', () => {
     }
     const ms = median(samples);
     console.log(`  geração: ${ms.toFixed(2)} ms/chunk (mediana de 20)`);
+    expect(ms).toBeLessThan(25);
+  });
+
+  it('gera um chunk do Nether em menos de 25 ms', () => {
+    const noise = new NetherNoise(SEED);
+    for (let i = 0; i < 3; i++) generateNetherChunk(SEED, noise, i, 0);
+
+    const samples: number[] = [];
+    for (let i = 0; i < 20; i++) {
+      const t0 = performance.now();
+      generateNetherChunk(SEED, noise, i, 200);
+      samples.push(performance.now() - t0);
+    }
+    const ms = median(samples);
+    console.log(`  Nether: ${ms.toFixed(2)} ms/chunk (mediana de 20)`);
     expect(ms).toBeLessThan(25);
   });
 
@@ -89,6 +108,49 @@ describe('orçamento de performance', () => {
     console.log(`  vizinhança: ${ms.toFixed(3)} ms/section (mediana de 50)`);
     // Roda no main thread a cada re-mesh: o orçamento do frame são 2 ms inteiros.
     expect(ms).toBeLessThan(2);
+  });
+
+  /**
+   * O circuito é a única coisa do jogo que pode reagir em cascata dentro de um
+   * tick. O limite é de **tick**, não de frame: 5 ms num orçamento de 50 ms de
+   * tick (20 Hz), com a mesma folga dos outros limites deste arquivo. O que ele
+   * pega é a regressão de ordem de grandeza — alguém trocar a fila incremental
+   * por varredura do mundo.
+   */
+  it('um anel de 64 blocos de pó liga e desliga em menos de 5 ms por tick', () => {
+    const world = new World(SEED);
+    for (let cz = -1; cz <= 1; cz++) {
+      for (let cx = -1; cx <= 1; cx++) {
+        const chunk = new ChunkColumn(cx, cz);
+        const stone = makeState(STONE);
+        for (let y = 0; y <= 63; y++) {
+          for (let z = 0; z < 16; z++) {
+            for (let x = 0; x < 16; x++) chunk.setBlock(x, y, z, stone);
+          }
+        }
+        chunk.recomputeHeightMap();
+        world.addChunk(chunk);
+      }
+    }
+
+    const redstone = new Redstone(world);
+    redstone.attach();
+    const wire = makeState(BLOCK_BY_NAME.get('redstone_wire')!.id);
+    const lever = BLOCK_BY_NAME.get('lever')!.id;
+    for (let x = 0; x < 64; x++) world.setBlock(x, 64, 0, wire, 'player');
+    world.setBlock(-1, 64, 0, makeState(lever, MOUNT_FLOOR), 'player');
+    redstone.tick();
+
+    const samples: number[] = [];
+    for (let i = 0; i < 20; i++) {
+      redstone.use(-1, 64, 0);
+      const t0 = performance.now();
+      redstone.tick();
+      samples.push(performance.now() - t0);
+    }
+    const ms = median(samples);
+    console.log(`  redstone: ${ms.toFixed(2)} ms/tick (fio de 64, mediana de 20)`);
+    expect(ms).toBeLessThan(5);
   });
 
   it('o greedy reduz os vértices de uma section típica a menos de 4000', () => {

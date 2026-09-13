@@ -6,6 +6,7 @@
  * hostil ficar hostil.
  */
 import { describe, expect, it } from 'vitest';
+import { Rng } from '../src/core/rng';
 import { ChunkColumn } from '../src/world/chunk';
 import { World } from '../src/world/world';
 import { Mobs, rayBoxDistance } from '../src/entity/mobs';
@@ -66,6 +67,7 @@ function harness(): { world: World; mobs: Mobs; log: Recorded } {
     onBreakBlock: (x, y, z) => log.broken.push([x, y, z]),
     onArrow: (x, y, z, dx, dy, dz, damage) => log.arrows.push([x, y, z, dx, dy, dz, damage]),
   });
+  mobs.random = seeded();
   // Noite: os hostis precisam disso para adquirir alvo de verdade.
   mobs.isDay = false;
   return { world, mobs, log };
@@ -83,9 +85,23 @@ const SLIME = MOB_BY_NAME.get('slime')!.id;
 const WOLF = MOB_BY_NAME.get('wolf')!.id;
 const ENDERMAN = MOB_BY_NAME.get('enderman')!.id;
 
+/**
+ * Aleatório determinístico para os testes de mob (doc 15 §6, 2026-09-13).
+ *
+ * `Mobs`, `MobStore` e `MobSpawner` sorteiam yaw de nascimento, cooldown de
+ * passeio, drops, despawn e teleporte. Com `Math.random` a suíte completa
+ * falhava de vez em quando **sem reproduzir isolada** — o tipo de teste que
+ * acaba ignorado. Semear aqui torna cada arquivo reproduzível.
+ */
+function seeded(seed = 20260913): () => number {
+  const rng = new Rng(seed);
+  return () => rng.nextFloat();
+}
+
 describe('tabela de mobs', () => {
-  it('tem os 12 mobs do MVP mais o aldeão, com modelo e skin válidos', () => {
-    expect(MOB_BY_NAME.size).toBe(13);
+  it('tem os 12 mobs do MVP, o aldeão e os dois do Nether, com modelo e skin válidos', () => {
+    // 12 do MVP + aldeão (M6) + porco zumbi e ghast (M7).
+    expect(MOB_BY_NAME.size).toBe(15);
     for (const name of MOB_BY_NAME.keys()) {
       const def = MOB_BY_NAME.get(name)!;
       expect(def.model.length).toBeGreaterThan(0);
@@ -363,6 +379,55 @@ describe('mira em mob', () => {
     expect(hit).toBe(1);
     // Fora do alcance de 4.5 não acerta ninguém.
     expect(mobs.pickTarget(8.5, GROUND_Y + 2, 8.5, -1, 0, 0, 4.5)).toBe(-1);
+  });
+});
+
+describe('determinismo', () => {
+  /**
+   * Regressão da dívida fechada em 2026-09-13: `Mobs`, `MobStore` e
+   * `MobSpawner` chamavam `Math.random()` direto, e a suíte completa falhava de
+   * vez em quando sem reproduzir isolada. Se alguém voltar a chamar o aleatório
+   * global em qualquer ponto do nascimento de um mob, este teste cai.
+   */
+  it('com o mesmo aleatório, dois mobs nascem exatamente iguais', () => {
+    const primeiro = harness();
+    primeiro.mobs.random = seeded(1234);
+    primeiro.mobs.spawn(ZOMBIE, 4, GROUND_Y + 1, 4);
+    primeiro.mobs.spawn(COW, 6, GROUND_Y + 1, 6);
+
+    const segundo = harness();
+    segundo.mobs.random = seeded(1234);
+    segundo.mobs.spawn(ZOMBIE, 4, GROUND_Y + 1, 4);
+    segundo.mobs.spawn(COW, 6, GROUND_Y + 1, 6);
+
+    for (let i = 0; i < 2; i++) {
+      expect(segundo.mobs.store.yaw[i]).toBe(primeiro.mobs.store.yaw[i]);
+      expect(segundo.mobs.store.wanderCooldown[i])
+        .toBe(primeiro.mobs.store.wanderCooldown[i]);
+    }
+  });
+
+  it('trocar o aleatório do `Mobs` troca o do store e o da IA junto', () => {
+    const { mobs } = harness();
+    const fonte = seeded(99);
+    mobs.random = fonte;
+    expect(mobs.random).toBe(fonte);
+    expect(mobs.store.random).toBe(fonte);
+  });
+
+  it('dois ticks completos com a mesma semente dão o mesmo estado', () => {
+    const posicoes: number[][] = [];
+    for (let run = 0; run < 2; run++) {
+      const h = harness();
+      h.mobs.random = seeded(7);
+      h.mobs.spawn(COW, 4, GROUND_Y + 1, 4);
+      h.mobs.spawn(COW, 6, GROUND_Y + 1, 6);
+      for (let t = 0; t < 40; t++) h.mobs.tick(playerAt(0, 0));
+      posicoes.push([
+        h.mobs.store.x[0], h.mobs.store.z[0], h.mobs.store.x[1], h.mobs.store.z[1],
+      ]);
+    }
+    expect(posicoes[1]).toEqual(posicoes[0]);
   });
 });
 

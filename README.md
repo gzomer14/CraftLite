@@ -4,7 +4,7 @@ Este repositório contém **a especificação completa** de um jogo de mundo abe
 navegador — um jogo de minerar-e-construir que roda em praticamente qualquer máquina, incluindo
 celulares antigos — e a **implementação em andamento**.
 
-**Estado atual: marcos M0 a M6 concluídos; M7 (extras) não iniciado.**
+**Estado atual: os oito marcos, de M0 a M7, estão concluídos — M0 a M6 validados no aparelho-alvo. Falta jogar o M7 no J7 Metal.**
 
 - **M0 — esqueleto:** Vite + TypeScript strict, renderer WebGL2 próprio com fallback WebGL1,
   detecção de tier, loop de 20 Hz com interpolação, gerador procedural de texturas alimentando um
@@ -41,8 +41,24 @@ celulares antigos — e a **implementação em andamento**.
   aldeões, e ravinas); **clima** (chuva e tempestade determinísticas pela seed, que escurecem o céu
   e deixam hostil nascer de dia) e **8 fases da lua**; **arco, escudo e barco**; e **conquistas**
   com toast no canto e lista no menu de pausa.
+- **M7 — extras:** **redstone** — pó com 15 níveis de energia, alavanca, botão,
+  placa de pressão, tocha inversora, repetidor com quatro atrasos, lâmpada, bloco de redstone e
+  pistão (comum e pegajoso, empurrando até 12 blocos). O circuito é uma fila incremental drenada
+  dentro do mesmo tick, com teto duro: o fio inteiro acende no tick em que a alavanca é puxada, e
+  um oscilador patológico custa um frame ruim, nunca uma trava. E o **Nether**: dimensão própria com
+  gerador de salões sobre um mar de lava, portal de obsidiana aceso com isqueiro, escala 1:8 que o
+  torna um atalho de viagem, save separado por dimensão, água que evapora, névoa vermelha sem ciclo
+  de dia, e dois mobs — o porco zumbi e o **ghast**, que voa e atira bola de fogo a 30 blocos. Só
+  uma dimensão fica carregada por vez: atravessar grava, descarrega e recarrega, porque num aparelho
+  de 2 GB manter as duas seria pagar o dobro por nada. E os **trilhos**: o trilho descobre a própria
+  forma olhando os vizinhos — reta, curva ou rampa —, o motorizado empurra quando energizado e freia
+  quando não, o detector vira fonte de redstone com carrinho em cima, e o **carrinho de mina** anda
+  preso à linha sem uma única consulta de colisão. E **import/export de mundos**: um arquivo `.clw`
+  com todas as dimensões, os baús e os veículos, que leva o mundo do celular para o computador sem
+  passar por servidor nenhum. O multijogador P2P **saiu do escopo** deste marco por decisão do
+  projeto.
 
-**148 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
+**171 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
 além de dois ícones de PWA de 6,7 KB, gerados por código.
 
 Validado em aparelho alvo (**Galaxy J7 Metal**, Android 7, 2 GB, Mali-T830) em 2026-09-12:
@@ -55,7 +71,7 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 948 testes (vitest)
+npm test           # 1130 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
 npm run icons      # regenera os ícones do PWA
@@ -108,7 +124,7 @@ Entregue este arquivo, junto com a pasta `docs/`, a quem for implementar do zero
 PROMPT.md               ← o prompt mestre
 src/
   main.ts                   bootstrap, detecção de device, wiring do loop
-  core/                     loop 20 Hz, math, noise, rng, tier, events
+  core/                     loop 20 Hz, math, noise, rng, tier, events, zip
   data/                     tabelas declarativas: blocos, biomas, texturas, mobs, modelos, skins
   world/                    chunks, mundo, pipeline, vizinhança, física, raycast, luz
     gen/terrain.ts          splines, biomas, cavernas, ravinas, minérios, luz do céu
@@ -118,21 +134,21 @@ src/
     mesh/shapes.ts          formas não-cubo como caixas (desenho e colisão)
   workers/                  protocolo tipado + worker de chunk
   render/                   gl, atlas, texgen, mesh, terrain, sky, selection, particles,
-                            entityatlas, skingen, mobrender
+                            entityatlas, skingen, mobrender, pack (resource pack do jogador)
   entity/                   jogador, itens no chão, orbes de XP, barcos, mobs (store, spawn,
                             projéteis), ai/
   game/                     sessão, inventário, crafting, contêineres, sobrevivência, drops,
                             combate, explosão, cama, dia/noite, agricultura, XP, encantamento,
                             clima, conquistas
   audio/                    síntese procedural, motor de vozes, música
-  save/                     IndexedDB, serialização de chunk, autosave
+  save/                     IndexedDB, serialização de chunk, autosave, arquivo `.clw`
   input/                    controls (camada única), keyboard, mouse, touch, gamepad
   ui/                       HUD, controles de toque, tela cheia/orientação, debug
-    screens/                título, mundos, opções, pausa, morte
+    screens/                título, mundos, opções, texturas, pausa, morte
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      948 testes, incluindo orçamento de performance e de luz
+tests/                      1130 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios

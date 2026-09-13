@@ -5,7 +5,9 @@
  * independente de quantos blocos diferentes ela tem.
  * WebGL1 → atlas 2D 256×256 (16×16 tiles) com padding para evitar bleeding.
  *
- * Nada é baixado: os pixels vêm do motor procedural (doc 13).
+ * Nada é baixado: os pixels vêm do motor procedural (doc 13). O único jeito de
+ * um pixel de fora entrar é o resource pack do próprio jogador — ver
+ * `render/pack.ts` e o `overrides` do construtor.
  */
 
 import { ANIMATED_OPS, TEXTURES } from '../data/textures';
@@ -50,12 +52,20 @@ export class Atlas {
    */
   private readonly pixelData: Uint8ClampedArray[];
 
-  constructor(ctx: GlContext) {
+  /**
+   * `overrides` é a arte do jogador (`render/pack.ts`), por nome de textura.
+   *
+   * Ela entra **antes** de qualquer coisa derivar dos pixels: mipmaps, média de
+   * cor para as partículas de quebra e a folha de sprites de item saem todas do
+   * que o pack trouxe, não do procedural. É por isso que o pack é lido no boot
+   * e não aplicado depois.
+   */
+  constructor(ctx: GlContext, overrides?: ReadonlyMap<string, Uint8ClampedArray>) {
     const t0 = performance.now();
     this.gl = ctx.gl;
     this.isArray = ctx.gl2 !== null;
 
-    const pixels = buildPixels(this.layers, this.layerIndex);
+    const pixels = buildPixels(this.layers, this.layerIndex, overrides);
     this.layerCount = pixels.length;
     this.averages = computeAverages(pixels);
     this.pixelData = pixels;
@@ -119,14 +129,20 @@ export class Atlas {
   }
 
   /**
-   * Substitui camadas por arte do próprio jogador (resource pack).
-   * O projeto não distribui nada — só aceita o que o jogador trouxer (doc 13 §7).
+   * Substitui camadas já na GPU por arte do jogador (doc 13 §7).
+   *
+   * **Só o nível 0.** O caminho normal do pack é o `overrides` do construtor,
+   * que refaz mipmap, média de cor e folha de sprites junto; este aqui é a
+   * troca ao vivo, e mip 1 e 2 continuam com o procedural — visível só a mais
+   * de ~30 blocos, e nada no jogo chama isto hoje. Existe porque o PROMPT.md
+   * §219 pede a função pelo nome.
    */
-  loadOverrides(map: Map<string, Uint8ClampedArray>): void {
+  loadOverrides(map: ReadonlyMap<string, Uint8ClampedArray>): void {
     const gl = this.gl;
     for (const [name, data] of map) {
       const entry = this.layers.get(name);
       if (entry === undefined || data.length !== TEX_SIZE * TEX_SIZE * 4) continue;
+      this.pixelData[entry.layer] = data;
       if (this.isArray) {
         const gl2 = gl as WebGL2RenderingContext;
         gl2.bindTexture(gl2.TEXTURE_2D_ARRAY, this.texture);
@@ -150,7 +166,10 @@ export class Atlas {
 // ---------------------------------------------------------------------------
 
 /** Gera todos os pixels seguindo a ordem de camadas do `LayerIndex`. */
-function buildPixels(out: Map<string, AtlasLayer>, index: LayerIndex): Uint8ClampedArray[] {
+function buildPixels(
+  out: Map<string, AtlasLayer>, index: LayerIndex,
+  overrides?: ReadonlyMap<string, Uint8ClampedArray>,
+): Uint8ClampedArray[] {
   const cache = new Map<string, Uint8ClampedArray>();
   const pixels: Uint8ClampedArray[] = [];
   const names = index.names;
@@ -174,7 +193,13 @@ function buildPixels(out: Map<string, AtlasLayer>, index: LayerIndex): Uint8Clam
 
   for (const name of names) {
     const recipe = TEXTURES[name];
-    const base = resolve(name);
+    // A arte do pack vence a receita — mas só na camada dela: uma textura que
+    // é gerada a partir de outra continua saindo do procedural, senão trocar a
+    // pedra mudaria o minério, o musgo e mais uma dúzia de blocos.
+    const custom = overrides?.get(name);
+    const base = custom !== undefined && custom.length === TEX_SIZE * TEX_SIZE * 4
+      ? custom
+      : resolve(name);
     const frames = recipe.frames ?? 1;
     const first = pixels.length;
 

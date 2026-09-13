@@ -17,6 +17,15 @@ export const STORE_PLAYERS = 'players';
 export const STORE_SETTINGS = 'settings';
 export const STORE_THUMBS = 'thumbs';
 
+/**
+ * Quantas dimensões o apagamento de mundo varre.
+ *
+ * É um teto, não a contagem real: `data/dimensions.ts` é a fonte da verdade, e
+ * varrer alguns prefixos a mais num `delete` custa nada. Importa que nunca seja
+ * **menor** que o número de dimensões, senão apagar um mundo deixa lixo.
+ */
+const MAX_DIMENSIONS = 8;
+
 export interface WorldMeta {
   id: string;
   name: string;
@@ -57,6 +66,11 @@ export interface PlayerSave {
    * nem de migração.
    */
   enchants?: number[];
+  /**
+   * Dimensão em que o jogador estava (M7). Ausente = superfície, que é o que
+   * todo save anterior ao M7 significa — sem migração.
+   */
+  dimension?: number;
   /** Experiência total acumulada (doc 06 §8). */
   xp?: number;
   /** Conquistas como máscara de bits (doc 08 §3.4). Ausente = nenhuma. */
@@ -179,6 +193,29 @@ export class SaveDatabase {
     return this.get<Uint8Array>(STORE_CHUNKS, chunkKeyFor(worldId, cx, cz));
   }
 
+  /**
+   * Todos os chunks gravados de uma dimensão (M7: exportar mundo).
+   *
+   * Usa a faixa de chaves `[dimId] .. [dimId, []]`, a mesma que `deleteWorld`
+   * usa para apagar — é o que o IndexedDB oferece de busca por prefixo sobre
+   * chave composta. A coordenada volta da própria chave, então nada precisa
+   * decodificar o chunk para saber onde ele fica.
+   */
+  async allChunks(dimensionId: string): Promise<{ cx: number; cz: number; data: Uint8Array }[]> {
+    const db = await this.open();
+    const store = db.transaction(STORE_CHUNKS, 'readonly').objectStore(STORE_CHUNKS);
+    const range = IDBKeyRange.bound([dimensionId], [dimensionId, []], false, false);
+    const keys = await wrap<IDBValidKey[]>(store.getAllKeys(range));
+    const values = await wrap<Uint8Array[]>(store.getAll(range));
+
+    const out: { cx: number; cz: number; data: Uint8Array }[] = [];
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i] as [string, number, number];
+      out.push({ cx: key[1], cz: key[2], data: values[i] });
+    }
+    return out;
+  }
+
   /** Apaga o mundo e tudo que pertence a ele. */
   async deleteWorld(worldId: string): Promise<void> {
     const db = await this.open();
@@ -187,8 +224,13 @@ export class SaveDatabase {
     );
     tx.objectStore(STORE_WORLDS).delete(worldId);
     tx.objectStore(STORE_THUMBS).delete(worldId);
-    // Chunks e jogadores usam chave composta por prefixo do worldId.
+    // Chunks e jogadores usam chave composta por prefixo do worldId. As outras
+    // dimensões têm prefixo próprio (`dimensionIdFor`) e saem junto — deixar o
+    // Nether para trás vazaria um mundo inteiro no banco a cada apagamento.
     deleteByPrefix(tx.objectStore(STORE_CHUNKS), worldId);
+    for (let dim = 1; dim < MAX_DIMENSIONS; dim++) {
+      deleteByPrefix(tx.objectStore(STORE_CHUNKS), dimensionIdFor(worldId, dim));
+    }
     deleteByPrefix(tx.objectStore(STORE_PLAYERS), worldId);
     await done(tx);
   }
@@ -215,7 +257,18 @@ export class SaveDatabase {
   }
 }
 
-/** Chave de chunk: `[worldId, cx, cz]` como array, que o IndexedDB ordena bem. */
+/**
+ * Identificador de armazenamento de uma dimensão do mundo (M7).
+ *
+ * O Overworld **continua sendo o `worldId` puro** — mundo salvo antes do M7
+ * abre sem migração nenhuma. As outras dimensões ganham sufixo, e
+ * `deleteWorld` apaga todas elas.
+ */
+export function dimensionIdFor(worldId: string, dimension: number): string {
+  return dimension === 0 ? worldId : `${worldId}#${dimension}`;
+}
+
+/** Chave de chunk: `[dimensionId, cx, cz]` como array, que o IndexedDB ordena bem. */
 export function chunkKeyFor(worldId: string, cx: number, cz: number): IDBValidKey {
   return [worldId, cx, cz];
 }
@@ -223,6 +276,9 @@ export function chunkKeyFor(worldId: string, cx: number, cz: number): IDBValidKe
 export function playerKeyFor(worldId: string, playerId: string): IDBValidKey {
   return [worldId, playerId];
 }
+
+/** Quantas dimensões um mundo pode ter, para quem precisa varrer todas. */
+export const DIMENSION_COUNT = MAX_DIMENSIONS;
 
 function deleteByPrefix(store: IDBObjectStore, prefix: string): void {
   // IDBKeyRange sobre array: tudo que começa com o worldId.

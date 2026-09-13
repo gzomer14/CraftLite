@@ -8,9 +8,10 @@
 
 import { BLOCKS, AIR, WATER, LAVA, texOf } from '../../data/blocks';
 import {
-  SHAPE_CARPET, SHAPE_CROSS, SHAPE_DOOR, SHAPE_FENCE, SHAPE_FENCE_GATE, SHAPE_FLAT,
-  SHAPE_LADDER, SHAPE_NONE, SHAPE_PAINTING, SHAPE_PANE, SHAPE_SIGN, SHAPE_SLAB, SHAPE_STAIRS,
-  SHAPE_TRAPDOOR,
+  SHAPE_BUTTON, SHAPE_CARPET, SHAPE_CROSS, SHAPE_DOOR, SHAPE_FENCE, SHAPE_FENCE_GATE, SHAPE_FLAT,
+  SHAPE_LADDER, SHAPE_LEVER, SHAPE_NONE, SHAPE_PAINTING, SHAPE_PANE, SHAPE_PISTON,
+  SHAPE_PISTON_HEAD, SHAPE_PLATE, SHAPE_RAIL, SHAPE_REPEATER, SHAPE_SIGN, SHAPE_SLAB,
+  SHAPE_STAIRS, SHAPE_TRAPDOOR,
 } from './shapes';
 import { layerOf, type LayerIndex } from '../../render/layers';
 import { TINT_FOLIAGE, TINT_GRASS, TINT_NONE, TINT_WATER } from '../../render/vertex';
@@ -26,9 +27,24 @@ export const CPLX_NONE = 0;
 export const CPLX_CROSS = 1;
 /** Lista de caixas vinda de `shapes.ts`: laje, escada, cerca, porta, placa… */
 export const CPLX_BOXES = 2;
+/**
+ * Um quad só, deitado ou inclinado: o trilho (M7).
+ *
+ * Vale a exceção porque o trilho é a **única** forma do jogo que precisa de um
+ * plano inclinado, e caixa alinhada aos eixos não representa rampa. De quebra,
+ * um quad custa 1/6 do que a caixa achatada custava.
+ */
+export const CPLX_RAIL = 3;
 
-/** Quantas idades cabem na tabela de textura por estado (doc 04 §2.5). */
-export const MAX_STAGES = 8;
+/**
+ * Quantas idades cabem na tabela de textura por estado (doc 04 §2.5).
+ *
+ * Eram 8 até o M6, quando a plantação era o único cliente. O pó de redstone
+ * tem 16 níveis de energia e precisa de 16 entradas — que **não** viram 16
+ * texturas: `dustStages()` repete nomes, e camada de atlas é resolvida por
+ * nome. O custo é 16 × 2 B por bloco na tabela plana, ~4 KB no total.
+ */
+export const MAX_STAGES = 16;
 
 /** Como cada `shape` da tabela de blocos é desenhada. */
 const COMPLEX_BY_SHAPE: Record<string, number> = {
@@ -46,6 +62,13 @@ const COMPLEX_BY_SHAPE: Record<string, number> = {
   ladder: CPLX_BOXES,
   sign: CPLX_BOXES,
   painting: CPLX_BOXES,
+  lever: CPLX_BOXES,
+  button: CPLX_BOXES,
+  plate: CPLX_BOXES,
+  repeater: CPLX_BOXES,
+  piston: CPLX_BOXES,
+  piston_head: CPLX_BOXES,
+  rail: CPLX_RAIL,
 };
 
 /** `SHAPE_*` de `shapes.ts` para cada `shape` da tabela de blocos. */
@@ -64,6 +87,13 @@ const SHAPE_ID_BY_NAME: Record<string, number> = {
   ladder: SHAPE_LADDER,
   sign: SHAPE_SIGN,
   painting: SHAPE_PAINTING,
+  lever: SHAPE_LEVER,
+  button: SHAPE_BUTTON,
+  plate: SHAPE_PLATE,
+  repeater: SHAPE_REPEATER,
+  piston: SHAPE_PISTON,
+  piston_head: SHAPE_PISTON_HEAD,
+  rail: SHAPE_RAIL,
 };
 
 export interface BlockTables {
@@ -153,8 +183,10 @@ export function buildBlockTables(index: LayerIndex): BlockTables {
       tables.renderLayer[id] = LAYER_OPAQUE;
     } else if (def.shape === 'cube') {
       tables.isCube[id] = 1;
-      // Folhas e vidro precisam de alpha test; o resto é opaco.
-      tables.renderLayer[id] = def.opaque ? LAYER_OPAQUE : LAYER_CUTOUT;
+      // Folhas e vidro precisam de alpha test; o portal, de mistura alfa;
+      // o resto é opaco.
+      if (def.translucent) tables.renderLayer[id] = LAYER_TRANSLUCENT;
+      else tables.renderLayer[id] = def.opaque ? LAYER_OPAQUE : LAYER_CUTOUT;
     } else if (tables.complex[id] !== CPLX_NONE) {
       // Laje, escada, cerca, porta e afins: geometria própria de caixas, no
       // mesmo passe recortado.
@@ -171,8 +203,9 @@ export function buildBlockTables(index: LayerIndex): BlockTables {
 /**
  * Camada de textura de um bloco levando o estado em conta.
  *
- * Só a plantação usa isto hoje: a idade escolhe a textura, o que evita gastar
- * um id de bloco por estágio de crescimento.
+ * Dois clientes: a plantação, cuja idade escolhe a textura, e o pó de redstone,
+ * cujo nível de energia escolhe o brilho. Nos dois casos evita gastar um id de
+ * bloco por estágio.
  */
 export function stageTexOf(tables: BlockTables, id: number, state: number): number {
   if (tables.hasStages[id] === 0) return tables.texSide[id];

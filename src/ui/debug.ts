@@ -42,6 +42,8 @@ export interface DebugSource {
   skyLight: number;
   /** Entidades vivas e trabalho de IA no último tick (doc 07 §3). */
   entities: { mobs: number; items: number; arrows: number; paths: number };
+  /** Posições de circuito reavaliadas no último tick (M7). */
+  redstone: number;
   /** Hora do dia, do ciclo dia/noite. */
   clock: string;
   /** Sons já sintetizados; 0 = áudio ainda não ligou. */
@@ -150,6 +152,8 @@ export class DebugOverlay {
     const e = src.entities;
     l[6] =
       `E: ${e.mobs} mobs, ${e.items} itens, ${e.arrows} flechas, ${e.paths} caminhos/tick` +
+      // Só aparece quando há circuito rodando: linha curta é linha lida.
+      (src.redstone > 0 ? `, ${src.redstone} redstone` : '') +
       `   ${src.clock}` + (src.sounds > 0 ? `   ${src.sounds} sons` : '');
     l[7] =
       `T: tick ${s.tickMs.toFixed(1)}ms  mesh-upload ${s.pumpMs.toFixed(1)}ms  ` +

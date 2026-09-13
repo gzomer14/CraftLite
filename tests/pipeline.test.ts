@@ -43,7 +43,7 @@ class FakeWorker implements WorkerLike {
       const chunk = generateChunk(this.seed, this.noise!, request.cx, request.cz);
       this.outbox.push({
         type: 'gen',
-        cx: request.cx, cz: request.cz,
+        cx: request.cx, cz: request.cz, dim: request.dim,
         sections: chunk.sections.map((s) => ({
           bits: s.bits, paletteLen: s.paletteLen, palette: s.palette, data: s.data,
           nonAirCount: s.nonAirCount,

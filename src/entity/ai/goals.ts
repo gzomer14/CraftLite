@@ -59,6 +59,12 @@ const WANDER_RADIUS = 10;
 const FUSE_TICKS = 30;
 /** Alcance de tiro do esqueleto, em blocos. */
 const SHOOT_RANGE = 15;
+/** Alcance de quem voa e atira (ghast): o dobro, e é o que o torna assustador. */
+const FLIGHT_SHOOT_RANGE = 30;
+/** Altura que o voador mantém sobre o alvo enquanto atira. */
+const FLIGHT_HOVER = 8;
+/** Faixa de altura que o passeio de um voador sorteia. */
+const FLIGHT_WANDER_HEIGHT = 12;
 /**
  * Ticks de arrombamento por ponto de dureza do bloco: a porta de carvalho tem
  * dureza 3, o que dá 12 s. É tempo de o jogador acordar e reagir — uma porta
@@ -148,9 +154,21 @@ export const GOALS: Record<GoalName, Goal> = {
     const def = mobDef(s.type[i]);
     if (s.hasTarget[i] === 0 || def.attack === undefined) return false;
     const distance = horizontalDistance(ctx, i);
-    if (distance > SHOOT_RANGE) return false;
+    // O ghast é a única ameaça que não precisa chegar perto: alcance dobrado.
+    const range = def.traits.flies === true ? FLIGHT_SHOOT_RANGE : SHOOT_RANGE;
+    if (distance > range) return false;
 
     faceTarget(ctx, i);
+
+    // Voador mantém altitude sobre o alvo em vez de recuar rasteiro.
+    if (def.traits.flies === true) {
+      s.setMoveTarget(i, s.x[i], ctx.playerY + FLIGHT_HOVER, s.z[i], 0.6);
+      if (s.attackCooldown[i] <= 0) {
+        s.attackCooldown[i] = def.attack.cooldownTicks;
+        ctx.shootArrow(i);
+      }
+      return true;
+    }
 
     if (distance < SHOOT_MIN) {
       // Recua na direção oposta ao jogador.
@@ -345,10 +363,13 @@ export const GOALS: Record<GoalName, Goal> = {
 
     const angle = ctx.random() * Math.PI * 2;
     const radius = ctx.random() * WANDER_RADIUS;
+    // Quem voa também escolhe altura; quem anda mantém a sua e sobe degrau.
+    const flying = mobDef(s.type[i]).traits.flies === true;
+    const dy = flying ? (ctx.random() - 0.5) * FLIGHT_WANDER_HEIGHT : 0;
     s.setMoveTarget(
       i,
       s.x[i] + Math.sin(angle) * radius,
-      s.y[i],
+      s.y[i] + dy,
       s.z[i] + Math.cos(angle) * radius,
       0.7,
     );

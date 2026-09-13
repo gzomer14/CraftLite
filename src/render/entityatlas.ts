@@ -23,9 +23,11 @@ export const SHADOW_LAYER = 'shadow';
 export const ARROW_LAYER = 'arrow';
 /** Camada do barco no atlas (M6). */
 export const BOAT_LAYER = 'boat';
+/** Camada do carrinho de mina (M7). */
+export const MINECART_LAYER = 'minecart';
 
 /** Camadas fora da tabela de mobs, mas com modelo e skin próprios. */
-const EXTRA_LAYERS: readonly string[] = [ARROW_LAYER, BOAT_LAYER];
+const EXTRA_LAYERS: readonly string[] = [ARROW_LAYER, BOAT_LAYER, MINECART_LAYER];
 
 export class EntityAtlas {
   readonly texture: WebGLTexture;
@@ -38,11 +40,19 @@ export class EntityAtlas {
   private readonly gl: AnyGL;
   private readonly layers = new Map<string, number>();
 
-  constructor(ctx: GlContext) {
+  /**
+   * `overrides` é a arte do jogador (`render/pack.ts`), por nome de skin. Ela
+   * entra **antes** do upload: nada é regerado nem reenviado depois.
+   */
+  constructor(ctx: GlContext, overrides?: ReadonlyMap<string, Uint8ClampedArray>) {
     const t0 = performance.now();
     this.gl = ctx.gl;
     this.isArray = ctx.gl2 !== null;
 
+    const custom = (name: string, generated: () => Uint8ClampedArray): Uint8ClampedArray => {
+      const art = overrides?.get(name);
+      return art !== undefined && art.length === SKIN_SIZE * SKIN_SIZE * 4 ? art : generated();
+    };
     const pixels: Uint8ClampedArray[] = [];
     // Uma camada por tipo de mob, na ordem da tabela: assim `layerOf` de um mob
     // é o próprio id dele, sem consulta.
@@ -50,26 +60,26 @@ export class EntityAtlas {
       const recipe = MOB_SKINS[mob.skin];
       const model = modelOf(mob.model);
       this.layers.set(mob.skin, pixels.length);
-      pixels.push(
+      pixels.push(custom(mob.skin, () => (
         recipe === undefined
           ? flatColor([220, 60, 200])
-          : generateSkin(model, recipe, seedOf(mob.skin)),
-      );
+          : generateSkin(model, recipe, seedOf(mob.skin))
+      )));
     }
 
     // Camadas que não são mob mas usam o mesmo batcher: flecha e barco.
     for (const name of EXTRA_LAYERS) {
       const recipe = MOB_SKINS[name];
       this.layers.set(name, pixels.length);
-      pixels.push(
+      pixels.push(custom(name, () => (
         recipe === undefined
           ? flatColor([210, 210, 205])
-          : generateSkin(modelOf(name), recipe, seedOf(name)),
-      );
+          : generateSkin(modelOf(name), recipe, seedOf(name))
+      )));
     }
 
     this.layers.set(SHADOW_LAYER, pixels.length);
-    pixels.push(shadowDisc());
+    pixels.push(custom(SHADOW_LAYER, shadowDisc));
 
     this.layerCount = pixels.length;
 
@@ -101,6 +111,20 @@ export class EntityAtlas {
   dispose(): void {
     this.gl.deleteTexture(this.texture);
   }
+}
+
+/**
+ * Toda camada que o atlas monta, na ordem em que ele as monta.
+ *
+ * Existe para o resource pack poder **validar um nome sem contexto GL** — a
+ * importação roda num menu, muito antes de haver atlas de entidade.
+ */
+export function entitySkinNames(): string[] {
+  const names: string[] = [];
+  for (const mob of MOBS) names.push(mob.skin);
+  for (const name of EXTRA_LAYERS) names.push(name);
+  names.push(SHADOW_LAYER);
+  return names;
 }
 
 /** Seed derivada do nome: a skin é igual em qualquer máquina e sessão. */

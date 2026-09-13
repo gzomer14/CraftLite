@@ -143,4 +143,30 @@ export const MOB_SKINS: Record<string, SkinRecipe> = {
       { kind: 'mouth', part: 'body', color: INK, y: 0.62, w: 2, h: 1 },
     ],
   },
+
+  // Carrinho (M7): ferro escurecido, sem cara nenhuma.
+  minecart: {
+    base: [136, 136, 144], noise: 0.1,
+    details: [{ kind: 'patch', part: 'floor', color: [104, 104, 112], count: 3, radius: 2 }],
+  },
+
+  // --- Nether (M7) --------------------------------------------------------
+  // O porco zumbi é o zumbi na paleta do porco: rosado apodrecido, não verde.
+  zombified_piglin: {
+    base: [148, 104, 106], noise: 0.12,
+    details: [
+      { kind: 'patch', part: 'body', color: [108, 132, 88], count: 5, radius: 2 },
+      { kind: 'eyes', part: 'head', color: INK, y: 0.4, size: 1, gap: 4 },
+      { kind: 'mouth', part: 'head', color: [92, 58, 60], y: 0.66, w: 4, h: 2 },
+    ],
+  },
+  // Branco pálido com a boca aberta: o ghast é reconhecido pela cara.
+  ghast: {
+    base: [234, 234, 236], noise: 0.08,
+    details: [
+      { kind: 'patch', part: 'body', color: [206, 206, 212], count: 3, radius: 3 },
+      { kind: 'eyes', part: 'body', color: INK, y: 0.38, size: 2, gap: 5 },
+      { kind: 'mouth', part: 'body', color: INK, y: 0.6, w: 6, h: 3 },
+    ],
+  },
 };

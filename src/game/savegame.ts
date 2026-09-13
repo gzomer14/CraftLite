@@ -18,10 +18,11 @@ import { computeChunkLight } from '../world/gen/terrain';
 import { Container, Furnace, type ContainerKind } from './container';
 import { INVENTORY_SIZE } from './inventory';
 import { TICKS_PER_DAY } from './daynight';
+import { DIM_OVERWORLD } from '../data/dimensions';
 import { AUTOSAVE_TICKS, type SaveManager } from '../save/savemanager';
 import type { PlayerSave, WorldMeta } from '../save/db';
 import type { Player } from '../entity/player';
-import type { Session } from './session';
+import type { Session, VehicleRecord } from './session';
 
 /** Id do jogador local. O multiplayer do M7 vai usar outros (doc 12). */
 export const LOCAL_PLAYER = 'local';
@@ -93,6 +94,41 @@ export class SaveGame {
    * Chunk pedido pelo pipeline: devolve o do disco (se foi modificado alguma
    * vez) ou `null` para o worker gerar da seed.
    */
+  /**
+   * Troca a dimensão do save (M7).
+   *
+   * **Síncrono no que importa:** o instantâneo de baús e veículos é tirado
+   * agora, antes de a `Session` limpar a lista, e só a gravação é adiada. Pela
+   * mesma razão a ordem é sagrada — gravar com a chave antiga, virar a chave,
+   * carregar com a nova.
+   */
+  switchDimension(dimension: number): void {
+    const tiles = this.session.tileEntities.map(tileFrom);
+    const vehicles = this.session.vehicleSnapshot();
+    void this.finishSwitch(dimension, tiles, vehicles);
+  }
+
+  private async finishSwitch(
+    dimension: number, tiles: readonly TileRecord[], vehicles: readonly VehicleRecord[],
+  ): Promise<void> {
+    try {
+      await this.manager.saveTiles(tiles);
+      await this.manager.saveVehicles(vehicles);
+      // Isto grava os chunks pendentes — ainda com a chave antiga — e vira.
+      await this.manager.setDimension(dimension);
+      await this.loadDimensionState();
+    } catch (error) {
+      this.options.onError?.(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  /** Traz baús e veículos da dimensão que acabou de entrar. */
+  private async loadDimensionState(): Promise<void> {
+    const tiles = await this.manager.loadTiles<TileRecord>();
+    for (const record of tiles) this.session.restoreContainer(containerFrom(record));
+    this.session.restoreVehicles(await this.manager.loadVehicles<VehicleRecord>());
+  }
+
   async loadChunk(cx: number, cz: number): Promise<ChunkColumn | null> {
     const chunk = await this.manager.loadChunk(cx, cz);
     if (chunk === null) return null;
@@ -152,6 +188,7 @@ export class SaveGame {
       hunger: this.session.survival.hunger,
       saturation: this.session.survival.saturation,
       selected: this.session.inventory.selected,
+      dimension: this.session.world.dimension,
       inventory,
       enchants,
       xp: this.session.xp.total,
@@ -164,6 +201,16 @@ export class SaveGame {
 
   /** Aplica um save de jogador ao estado vivo. */
   restore(saved: PlayerSave): void {
+    /*
+     * A dimensão vem **antes** da posição: sair do mundo dentro do Nether e
+     * voltar precisa recarregar o Nether, senão o jogador reaparece com as
+     * coordenadas de lá dentro da superfície — 8 vezes fora do lugar, e
+     * possivelmente dentro de pedra maciça.
+     */
+    const dimension = saved.dimension ?? DIM_OVERWORLD;
+    if (dimension !== this.session.world.dimension) {
+      this.session.enterDimension(dimension);
+    }
     this.player.setPosition(saved.x, saved.y, saved.z);
     this.player.yaw = saved.yaw;
     this.player.pitch = saved.pitch;
@@ -201,8 +248,7 @@ export class SaveGame {
 
   async load(): Promise<boolean> {
     const saved = await this.manager.loadPlayer(LOCAL_PLAYER);
-    const tiles = await this.manager.loadTiles<TileRecord>();
-    for (const record of tiles) this.session.restoreContainer(containerFrom(record));
+    await this.loadDimensionState();
 
     // `time` do save é o total desde o início do mundo; o tick do dia sai dele.
     this.session.dayNight.totalTicks = this.meta.time;
@@ -223,6 +269,7 @@ export class SaveGame {
       await this.manager.flush();
       await this.manager.savePlayer(this.snapshot());
       await this.manager.saveTiles(this.session.tileEntities.map(tileFrom));
+      await this.manager.saveVehicles(this.session.vehicleSnapshot());
       await this.manager.saveWorldMeta(this.meta);
     } catch (error) {
       this.options.onError?.(error instanceof Error ? error.message : String(error));

@@ -401,7 +401,7 @@ describe('viajar longe e voltar', () => {
       }
       column.recomputeHeightMap();
       this.outbox.push({
-        type: 'gen', cx: request.cx, cz: request.cz,
+        type: 'gen', cx: request.cx, cz: request.cz, dim: request.dim,
         sections: column.sections.map((section) => ({
           bits: section.bits, paletteLen: section.paletteLen, palette: section.palette,
           data: section.data, nonAirCount: section.nonAirCount,
@@ -646,5 +646,79 @@ describe('voltar ao mundo não teletransporta', () => {
     expect(trySpawn(empty, player, false)).toBe(false);
     // E não mexeu em ninguém enquanto esperava.
     expect(player.x).toBeCloseTo(20.5, 3);
+  });
+});
+
+describe('veículos e dimensão no save (M7)', () => {
+  /**
+   * Regressão de duas coisas que sumiam sozinhas:
+   *
+   * 1. **Barco e carrinho nunca foram salvos** desde que existem. Sair do mundo
+   *    e voltar sumia com os dois — o trilho ficava, o carrinho não.
+   * 2. **Baú do Nether sobrescrevia o da superfície.** A lista de tile entities
+   *    tinha uma chave só por mundo; atravessar o portal gravava a lista de lá
+   *    por cima da de cá, e o conteúdo de todo baú de casa ia junto.
+   */
+  it('barco e carrinho vão para o save e voltam dele', async () => {
+    const db = fakeDb();
+    const first = harness(db);
+    first.session.boats.spawn(1.5, GROUND_Y + 1, 2.5, 0.75);
+    first.session.carts.spawn(4.5, GROUND_Y + 1, 4.5, 2);
+    await first.save.saveAll();
+    await settleSaves();
+
+    const second = harness(db, first.meta);
+    await second.save.load();
+    expect(second.session.boats.active).toBe(1);
+    expect(second.session.carts.active).toBe(1);
+    expect(second.session.boats.x[0]).toBeCloseTo(1.5);
+    expect(second.session.carts.z[0]).toBeCloseTo(4.5);
+    expect(second.session.carts.dir[0]).toBe(2);
+  });
+
+  it('mundo sem veículo nenhum volta sem veículo, e não quebra', async () => {
+    const db = fakeDb();
+    const first = harness(db);
+    await first.save.saveAll();
+    await settleSaves();
+
+    const second = harness(db, first.meta);
+    await second.save.load();
+    expect(second.session.boats.active).toBe(0);
+    expect(second.session.carts.active).toBe(0);
+  });
+
+  it('cada dimensão tem a sua lista de baús e de veículos', async () => {
+    const db = fakeDb();
+    const { session, save } = harness(db);
+
+    // Um barco na superfície, gravado pelo caminho normal.
+    session.boats.spawn(1.5, GROUND_Y + 1, 1.5, 0);
+    await save.saveAll();
+    await settleSaves();
+
+    // Atravessa: o save grava o da superfície e passa a olhar o do Nether.
+    save.switchDimension(1);
+    session.enterDimension(1);
+    await settleSaves();
+    expect(session.boats.active).toBe(0);
+
+    // Um carrinho do lado de lá, e de volta para casa.
+    session.carts.spawn(9.5, GROUND_Y + 1, 9.5, 0);
+    save.switchDimension(0);
+    session.enterDimension(0);
+    await settleSaves();
+
+    // O barco da superfície voltou; o carrinho do Nether não veio junto.
+    expect(session.boats.active).toBe(1);
+    expect(session.carts.active).toBe(0);
+  });
+
+  it('a dimensão do jogador entra no instantâneo', () => {
+    const db = fakeDb();
+    const { session, save } = harness(db);
+    expect(save.snapshot().dimension).toBe(0);
+    session.enterDimension(1);
+    expect(save.snapshot().dimension).toBe(1);
   });
 });

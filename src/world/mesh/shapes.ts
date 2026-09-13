@@ -37,6 +37,71 @@ export const SHAPE_PANE = 10;
 export const SHAPE_LADDER = 11;
 export const SHAPE_SIGN = 12;
 export const SHAPE_PAINTING = 13;
+export const SHAPE_LEVER = 14;
+export const SHAPE_BUTTON = 15;
+export const SHAPE_PLATE = 16;
+export const SHAPE_REPEATER = 17;
+export const SHAPE_PISTON = 18;
+export const SHAPE_PISTON_HEAD = 19;
+export const SHAPE_RAIL = 20;
+
+/**
+ * Formas de trilho nos bits 0..3 do estado (M7), na codificação do gênero.
+ *
+ * 0..1 são as retas, 2..5 as rampas (o nome diz para onde **sobe**) e 6..9 as
+ * curvas (o nome diz quais dois lados a curva liga). Trilho motorizado e
+ * detector só usam 0..5: curva com máquina dentro não existe.
+ */
+export const RAIL_NS = 0;
+export const RAIL_EW = 1;
+export const RAIL_ASCEND_EAST = 2;
+export const RAIL_ASCEND_WEST = 3;
+export const RAIL_ASCEND_NORTH = 4;
+export const RAIL_ASCEND_SOUTH = 5;
+export const RAIL_CURVE_SE = 6;
+export const RAIL_CURVE_SW = 7;
+export const RAIL_CURVE_NW = 8;
+export const RAIL_CURVE_NE = 9;
+/** Bit de "energizado" do trilho motorizado e do detector. */
+export const RAIL_POWERED = 16;
+/** Primeira forma de rampa e primeira de curva, para as comparações de faixa. */
+export const RAIL_FIRST_SLOPE = RAIL_ASCEND_EAST;
+export const RAIL_FIRST_CURVE = RAIL_CURVE_SE;
+
+/** true se a forma é uma rampa. */
+export function railIsSlope(shape: number): boolean {
+  return shape >= RAIL_FIRST_SLOPE && shape < RAIL_FIRST_CURVE;
+}
+
+/** true se a forma é uma curva. */
+export function railIsCurve(shape: number): boolean {
+  return shape >= RAIL_FIRST_CURVE;
+}
+
+/**
+ * Os dois lados que uma forma de trilho liga, nos índices de `FACING_STEP`
+ * (0 = +X, 1 = −X, 2 = +Z, 3 = −Z). A rampa liga os dois lados do próprio eixo.
+ */
+export const RAIL_LINKS: readonly (readonly [number, number])[] = [
+  [2, 3], // NS
+  [0, 1], // EW
+  [0, 1], // sobe para +X
+  [0, 1], // sobe para −X
+  [2, 3], // sobe para −Z
+  [2, 3], // sobe para +Z
+  [2, 0], // curva +Z/+X
+  [2, 1], // curva +Z/−X
+  [3, 1], // curva −Z/−X
+  [3, 0], // curva −Z/+X
+];
+
+/** Direção para onde a rampa sobe, ou −1 se a forma é plana. */
+export function railSlopeDir(shape: number): number {
+  if (!railIsSlope(shape)) return -1;
+  // A ordem das rampas é +X, −X, −Z, +Z; a de `FACING_STEP` é +X, −X, +Z, −Z.
+  const order = [0, 1, 3, 2];
+  return order[shape - RAIL_FIRST_SLOPE];
+}
 
 /** Espessura de tudo que é "chapa": alçapão, porta, placa, quadro, escada de mão. */
 const THIN = 3 / 16;
@@ -66,7 +131,39 @@ export const SHAPE_BY_NAME: Readonly<Record<string, number>> = {
   ladder: SHAPE_LADDER,
   sign: SHAPE_SIGN,
   painting: SHAPE_PAINTING,
+  lever: SHAPE_LEVER,
+  button: SHAPE_BUTTON,
+  plate: SHAPE_PLATE,
+  repeater: SHAPE_REPEATER,
+  piston: SHAPE_PISTON,
+  piston_head: SHAPE_PISTON_HEAD,
+  rail: SHAPE_RAIL,
 };
+
+/**
+ * Encaixe de alavanca e botão, nos bits 0..2 do estado (M7).
+ *
+ * 0..3 = a parede em que está pendurado, nas direções de `FACING_STEP`;
+ * 4 = no chão; 5 = no teto. É a mesma codificação que `world/redstone.ts` usa
+ * para achar o bloco de apoio, e por isso vive aqui, ao lado da geometria que
+ * depende dela.
+ */
+export const MOUNT_FLOOR = 4;
+export const MOUNT_CEILING = 5;
+
+/**
+ * Direção do pistão nos bits 0..2: 0 = +X, 1 = −X, 2 = +Z, 3 = −Z, 4 = +Y,
+ * 5 = −Y. Os quatro primeiros coincidem com `FACING_STEP` de propósito.
+ */
+export const PISTON_STEP: readonly (readonly [number, number, number])[] = [
+  [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0], [0, -1, 0],
+];
+
+/** Encaixe cuja superfície fica na direção `dir` de `PISTON_STEP`. */
+export function mountForDir(dir: number): number {
+  if (dir < 4) return dir;
+  return dir === 4 ? MOUNT_CEILING : MOUNT_FLOOR;
+}
 
 /** Altura da colisão de cerca e portão fechado (doc 04 §3). */
 export const FENCE_COLLISION_HEIGHT = 1.5;
@@ -134,6 +231,23 @@ export function boxesFor(
       return sign(state, out);
     case SHAPE_PAINTING:
       return wallPlate(state & 3, out, 1 / 16, 15 / 16);
+    case SHAPE_LEVER:
+      return lever(state, out);
+    case SHAPE_BUTTON:
+      return button(state, out);
+    case SHAPE_PLATE:
+      // bit 0 = pisada: a chapa afunda meio pixel, o bastante para o olho ver.
+      return one(out, 0, 1 / 16, 0, 1 / 16, 15 / 16, (state & 1) !== 0 ? 0.5 / 16 : 1 / 16, 15 / 16);
+    case SHAPE_REPEATER:
+      return repeater(state, out);
+    case SHAPE_PISTON:
+      return piston(state, out);
+    case SHAPE_PISTON_HEAD:
+      return pistonHead(state, out);
+    case SHAPE_RAIL:
+      // O desenho é um quad só (ver `mesh/complex.ts`); a caixa existe para
+      // quem pergunta pela forma — hoje ninguém, porque trilho não colide.
+      return one(out, 0, 0, 0, 0, 1, FLAT_HEIGHT, 1);
     default:
       return 0;
   }
@@ -261,4 +375,106 @@ function wallPlate(facing: number, out: Float32Array, y0: number, y1: number): n
   if (facing === 1) return one(out, 0, 0, y0, 0, THIN, y1, 1);
   if (facing === 2) return one(out, 0, 0, y0, 1 - THIN, 1, y1, 1);
   return one(out, 0, 0, y0, 0, 1, y1, THIN);
+}
+
+// --- redstone (M7) ---------------------------------------------------------
+
+/**
+ * Caixa descrita no referencial da **superfície de encaixe**: `u` e `v` correm
+ * sobre a superfície, `w` é a distância a partir dela.
+ *
+ * É isso que permite alavanca e botão terem uma geometria só para os seis
+ * encaixes possíveis, em vez de seis blocos de código quase iguais.
+ */
+function mounted(
+  out: Float32Array, index: number, mount: number,
+  u0: number, v0: number, w0: number, u1: number, v1: number, w1: number,
+): number {
+  switch (mount) {
+    case 0: return one(out, index, 1 - w1, v0, u0, 1 - w0, v1, u1); // parede +X
+    case 1: return one(out, index, w0, v0, u0, w1, v1, u1);         // parede −X
+    case 2: return one(out, index, u0, v0, 1 - w1, u1, v1, 1 - w0); // parede +Z
+    case 3: return one(out, index, u0, v0, w0, u1, v1, w1);         // parede −Z
+    case MOUNT_CEILING: return one(out, index, u0, 1 - w1, v0, u1, 1 - w0, v1);
+    default: return one(out, index, u0, w0, v0, u1, w1, v1);        // chão
+  }
+}
+
+/**
+ * Alavanca: a base presa na superfície mais a haste, que muda de lado conforme
+ * ligada. Não há giro de 45° — dois estados e a haste pula de um lado ao outro,
+ * que é o que se enxerga a 16 px.
+ */
+function lever(state: number, out: Float32Array): number {
+  const mount = state & 7;
+  const on = (state & 8) !== 0;
+  let count = mounted(out, 0, mount, 5 / 16, 4 / 16, 0, 11 / 16, 12 / 16, 3 / 16);
+  const v0 = on ? 3 / 16 : 9 / 16;
+  count = mounted(out, count, mount, 7 / 16, v0, 2 / 16, 9 / 16, v0 + 4 / 16, 10 / 16);
+  return count;
+}
+
+/** Botão: uma pastilha na superfície, mais rasa quando apertada. */
+function button(state: number, out: Float32Array): number {
+  const mount = state & 7;
+  const depth = (state & 8) !== 0 ? 1 / 16 : 2 / 16;
+  return mounted(out, 0, mount, 5 / 16, 6 / 16, 0, 11 / 16, 10 / 16, depth);
+}
+
+/**
+ * Repetidor: a base achatada mais duas tochinhas. A de trás anda para longe da
+ * saída conforme o atraso (bits 2..3) — é assim que se lê o atraso sem HUD.
+ */
+function repeater(state: number, out: Float32Array): number {
+  let count = one(out, 0, 0, 0, 0, 1, 2 / 16, 1);
+  const facing = state & 3;
+  const delay = (state >> 2) & 3;
+  count = torchNub(out, count, facing, 3 / 16);
+  count = torchNub(out, count, facing, (7 + delay * 2) / 16);
+  return count;
+}
+
+/** Tochinha do repetidor a `back` blocos da face de saída. */
+function torchNub(
+  out: Float32Array, index: number, facing: number, back: number,
+): number {
+  const y0 = 2 / 16;
+  const y1 = 6 / 16;
+  const a = 7 / 16;
+  const b = 9 / 16;
+  if (facing === 0) return one(out, index, 1 - back - 2 / 16, y0, a, 1 - back, y1, b);
+  if (facing === 1) return one(out, index, back, y0, a, back + 2 / 16, y1, b);
+  if (facing === 2) return one(out, index, a, y0, 1 - back - 2 / 16, b, y1, 1 - back);
+  return one(out, index, a, y0, back, b, y1, back + 2 / 16);
+}
+
+/** Fundura do corpo do pistão medida a partir da face de trás. */
+const PISTON_BODY = 12 / 16;
+
+/**
+ * Pistão: corpo de 12/16 mais a placa da frente.
+ *
+ * **Desvio consciente:** a textura é a mesma nas seis faces, porque o formato de
+ * vértice não guarda rotação de textura (doc 01 §5.1). Quem diz para onde o
+ * pistão aponta é a geometria — a placa da frente é levemente mais estreita que
+ * o corpo, e o degrau entre as duas se vê de qualquer ângulo.
+ */
+function piston(state: number, out: Float32Array): number {
+  const dir = state & 7;
+  const extended = (state & 8) !== 0;
+  const mount = mountForDir(dir ^ 1);
+  let count = mounted(out, 0, mount, 0, 0, 0, 1, 1, PISTON_BODY);
+  if (!extended) {
+    count = mounted(out, count, mount, 1 / 16, 1 / 16, PISTON_BODY, 15 / 16, 15 / 16, 1);
+  }
+  return count;
+}
+
+/** Braço do pistão: a haste que sai do corpo mais a placa da ponta. */
+function pistonHead(state: number, out: Float32Array): number {
+  const dir = state & 7;
+  const mount = mountForDir(dir ^ 1);
+  let count = mounted(out, 0, mount, 6 / 16, 6 / 16, 0, 10 / 16, 10 / 16, PISTON_BODY);
+  count = mounted(out, count, mount, 0, 0, PISTON_BODY, 1, 1, 1);
+  return count;
 }

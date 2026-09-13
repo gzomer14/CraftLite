@@ -7,6 +7,7 @@
  * sistemas novos e o loop de sobrevivência que já existia.
  */
 import { describe, expect, it } from 'vitest';
+import { Rng } from '../src/core/rng';
 import { Session } from '../src/game/session';
 import { Player } from '../src/entity/player';
 import { World } from '../src/world/world';
@@ -22,6 +23,19 @@ const stone = makeState(BLOCK_BY_NAME.get('stone')!.id);
 const ZOMBIE = MOB_BY_NAME.get('zombie')!.id;
 const COW = MOB_BY_NAME.get('cow')!.id;
 const CREEPER = MOB_BY_NAME.get('creeper')!.id;
+
+/**
+ * Aleatório determinístico para os testes de mob (doc 15 §6, 2026-09-13).
+ *
+ * `Mobs`, `MobStore` e `MobSpawner` sorteiam yaw de nascimento, cooldown de
+ * passeio, drops, despawn e domesticação. Com `Math.random` a suíte completa
+ * falhava de vez em quando **sem reproduzir isolada** — o tipo de teste que
+ * acaba ignorado. Semear aqui torna cada arquivo reproduzível.
+ */
+function seeded(seed = 20260913): () => number {
+  const rng = new Rng(seed);
+  return () => rng.nextFloat();
+}
 
 function harness() {
   const world = new World(2026);
@@ -50,6 +64,9 @@ function harness() {
     onPickup: () => { /* nada */ },
     onSound: (name) => sounds.push(name),
   }, { maxMobs: 20, simulationDistance: 3 });
+  // Determinismo: ver `seeded` abaixo e doc 15 §6.
+  session.mobs.random = seeded();
+  session.spawner.random = seeded(77);
   // Meia-noite: é quando o marco acontece.
   session.dayNight.time = 18000;
   return { world, player, session, sounds };

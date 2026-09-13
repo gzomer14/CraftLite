@@ -8,6 +8,7 @@
  * escolher onde nascer (é `spawn.ts`) e desenhar (é `render/mobrender.ts`).
  */
 
+import { LAVA, blockIdOf } from '../data/blocks';
 import { ITEM_BY_NAME } from '../data/items';
 import { lootingBonus } from '../game/enchanting';
 import { MOBS, mobDef, type MobDef } from '../data/mobs';
@@ -40,6 +41,9 @@ const CREEPER_POWER_HARD = 4;
 const SPIDER_LIGHT_LIMIT = 11;
 /** Ticks de fogo ao pegar sol, e dano a cada 20 ticks. */
 const SUNLIGHT_FIRE_TICKS = 160;
+/** Dano de lava por meio segundo, e quanto tempo o mob continua queimando. */
+const LAVA_DAMAGE = 4;
+const LAVA_FIRE_TICKS = 100;
 /** Ticks de piscada vermelha ao levar dano. */
 const HURT_TICKS = 10;
 /** Força do empurrão que o mob dá no jogador. */
@@ -64,9 +68,10 @@ export interface MobEvents {
   onExplode(x: number, y: number, z: number, power: number): void;
   /** Um mob derrubou o bloco — hoje só o zumbi arrombando porta (doc 06 §10). */
   onBreakBlock(x: number, y: number, z: number): void;
+  /** `fireball` = bola de fogo do ghast: voa reto e explode onde parar. */
   onArrow(
     x: number, y: number, z: number,
-    dx: number, dy: number, dz: number, damage: number,
+    dx: number, dy: number, dz: number, damage: number, fireball?: boolean,
   ): void;
 }
 
@@ -106,6 +111,12 @@ export class Mobs {
   /** Caminhos calculados no último tick — o overlay de debug mostra isso. */
   pathsComputed = 0;
 
+  /**
+   * Aleatório do jogo, injetável (ver `MobStore.random`). Trocar aqui troca
+   * também o do `store` e o do contexto de IA: os três são a mesma fonte.
+   */
+  private rng: () => number = Math.random;
+
   private readonly ctx: AiContext;
   private readonly player: PlayerView = { x: 0, y: 0, z: 0, eyeY: 0, held: -1, alive: true };
   private tickCount = 0;
@@ -136,7 +147,7 @@ export class Mobs {
       skyLight: 15,
       blockLight: 0,
       isDay: true,
-      random: Math.random,
+      random: this.rng,
       hitPlayer: (i, damage) => this.hitPlayer(i, damage),
       shootArrow: (i) => this.shootArrow(i),
       explode: (i) => this.explodeMob(i),
@@ -145,6 +156,20 @@ export class Mobs {
       playSound: (i, kind) => this.emitSound(i, kind),
       breed: (i, partner) => this.breed(i, partner),
     };
+  }
+
+  /**
+   * Troca a fonte de aleatório de todo o subsistema. Os testes injetam um
+   * determinístico; o jogo fica com `Math.random`.
+   */
+  set random(fn: () => number) {
+    this.rng = fn;
+    this.store.random = fn;
+    this.ctx.random = fn;
+  }
+
+  get random(): () => number {
+    return this.rng;
   }
 
   get count(): number {
@@ -228,6 +253,17 @@ export class Mobs {
       s.fireTicks[i] = SUNLIGHT_FIRE_TICKS;
     }
 
+    /*
+     * Lava (M7). O traço `fireImmune` existia desde o M5 e **nenhum mob o
+     * declarava** — não havia como pegar fogo além do sol. O Nether é metade
+     * lava, e sem isto o ghast e o porco zumbi passeariam dentro dela junto com
+     * o zumbi que os seguiu pelo portal.
+     */
+    if (def.traits.fireImmune !== true && this.inLava(i)) {
+      s.fireTicks[i] = LAVA_FIRE_TICKS;
+      if (this.tickCount % 10 === 0) return this.damage(i, LAVA_DAMAGE, 'fire');
+    }
+
     if (s.fireTicks[i] > 0 && def.traits.fireImmune !== true) {
       s.fireTicks[i]--;
       if (s.fireTicks[i] % 20 === 0) return this.damage(i, 1, 'fire');
@@ -237,12 +273,20 @@ export class Mobs {
     return false;
   }
 
+  /** true se os pés do mob estão dentro de lava. */
+  private inLava(i: number): boolean {
+    const s = this.store;
+    return blockIdOf(this.world.getBlock(
+      Math.floor(s.x[i]), Math.floor(s.y[i] + 0.1), Math.floor(s.z[i]),
+    )) === LAVA;
+  }
+
   /** Sons ambientes esparsos — um mob silencioso não assusta. */
   private ambientSound(i: number): void {
     const s = this.store;
     if (s.age[i] % 20 !== 0) return;
     // ~1 vez a cada 20 s por mob: o suficiente para o ambiente, longe de irritar.
-    if (Math.random() > 0.05) return;
+    if (this.rng() > 0.05) return;
     this.emitSound(i, 'ambient');
   }
 
@@ -411,7 +455,9 @@ export class Mobs {
     const damage = def.attack === undefined
       ? 2
       : def.attack.damage[Math.min(2, Math.max(0, this.difficulty - 1))];
-    this.events.onArrow(ox, oy, oz, dx, dy, dz, damage);
+    // A bola de fogo voa reto: mirar acima compensaria uma queda que não há.
+    const fireball = def.traits.shootsFireball === true;
+    this.events.onArrow(ox, oy, oz, dx, fireball ? dy - distance * 0.08 : dy, dz, damage, fireball);
     this.emitSound(i, 'attack');
   }
 
@@ -469,7 +515,7 @@ export class Mobs {
       }
     }
     const xpSpread = def.xp[1] - def.xp[0];
-    const xp = def.xp[0] + (xpSpread > 0 ? Math.floor(Math.random() * (xpSpread + 1)) : 0);
+    const xp = def.xp[0] + (xpSpread > 0 ? Math.floor(this.rng() * (xpSpread + 1)) : 0);
     if (xp > 0 && !baby) this.events.onXp(xp, x, y, z);
 
     this.store.removeAt(i);
@@ -494,17 +540,17 @@ export class Mobs {
   private rollDrop(drop: Drop, x: number, y: number, z: number): void {
     const item = ITEM_BY_NAME.get(drop.item);
     if (item === undefined) return;
-    if (drop.chance !== undefined && Math.random() >= drop.chance) return;
+    if (drop.chance !== undefined && this.rng() >= drop.chance) return;
 
     let count: number;
     if (typeof drop.count === 'number') {
       count = drop.count;
     } else {
-      count = drop.count[0] + Math.floor(Math.random() * (drop.count[1] - drop.count[0] + 1));
+      count = drop.count[0] + Math.floor(this.rng() * (drop.count[1] - drop.count[0] + 1));
     }
     // Pilhagem só acrescenta ao que já saiu: um drop que falhou no sorteio de
     // chance continua não saindo.
-    if (count > 0) count += lootingBonus(this.looting, Math.random());
+    if (count > 0) count += lootingBonus(this.looting, this.rng());
     if (count <= 0) return;
     this.events.onDrop(item.id, count, x, y, z);
   }
@@ -528,8 +574,8 @@ export class Mobs {
     const s = this.store;
     const tall = Math.max(1, Math.ceil(s.height(i)));
     for (let attempt = 0; attempt < 8; attempt++) {
-      const x = Math.floor(s.x[i] + (Math.random() - 0.5) * 32);
-      const z = Math.floor(s.z[i] + (Math.random() - 0.5) * 32);
+      const x = Math.floor(s.x[i] + (this.rng() - 0.5) * 32);
+      const z = Math.floor(s.z[i] + (this.rng() - 0.5) * 32);
       const y = standHeight(this.world, x, Math.floor(s.y[i]) + 2, z, tall);
       if (y < 0) continue;
       s.x[i] = x + 0.5; s.y[i] = y; s.z[i] = z + 0.5;
@@ -553,7 +599,7 @@ export class Mobs {
     if (traits.tameItem === undefined || traits.tameItem !== itemName) return 'none';
     if (s.hasFlag(i, FLAG_TAMED)) return 'none';
 
-    if (Math.random() >= (traits.tameChance ?? 1 / 3)) {
+    if (this.rng() >= (traits.tameChance ?? 1 / 3)) {
       this.emitSound(i, 'hurt');
       return 'failed';
     }
@@ -617,7 +663,7 @@ export class Mobs {
       this.store.setFlag(baby, FLAG_PERSISTENT, true);
       this.emitSound(baby, 'ambient');
     }
-    this.events.onXp(1 + Math.floor(Math.random() * 7), x, y, z);
+    this.events.onXp(1 + Math.floor(this.rng() * 7), x, y, z);
   }
 
   /** Provoca um mob (usado quando o jogador olha para o enderman, por exemplo). */
@@ -642,7 +688,7 @@ export class Mobs {
       s.removeAt(i);
       return true;
     }
-    if (distanceSq > DESPAWN_SOFT * DESPAWN_SOFT && Math.random() < 1 / DESPAWN_CHANCE) {
+    if (distanceSq > DESPAWN_SOFT * DESPAWN_SOFT && this.rng() < 1 / DESPAWN_CHANCE) {
       s.removeAt(i);
       return true;
     }

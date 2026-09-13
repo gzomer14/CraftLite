@@ -7,7 +7,14 @@
  * entram no M4.
  */
 
-import { BLOCKS, type ToolKind } from './blocks';
+import { BLOCK_BY_NAME, BLOCKS, type ToolKind } from './blocks';
+
+/** Id de bloco por nome, para os itens que colocam um bloco de outro nome. */
+function blockIdByName(name: string): number {
+  const def = BLOCK_BY_NAME.get(name);
+  if (def === undefined) throw new Error(`Bloco desconhecido no item: ${name}`);
+  return def.id;
+}
 
 export interface ToolSpec {
   kind: ToolKind;
@@ -61,6 +68,10 @@ export interface ItemDef {
   chargeTicks?: number;
   /** blockId/entidade que o item coloca ao usar — o barco. */
   placesBoat?: boolean;
+  /** Coloca um carrinho no trilho mirado (M7). */
+  placesMinecart?: boolean;
+  /** Acende portal de obsidiana ao ser usado (isqueiro, M7). */
+  lights?: boolean;
 }
 
 /**
@@ -156,6 +167,8 @@ interface SimpleItem {
   maxStack?: number;
   food?: FoodSpec;
   fuel?: number;
+  /** Nome do bloco que o item coloca, quando não é o bloco de mesmo nome. */
+  places?: string;
 }
 
 const SIMPLE_ITEMS: SimpleItem[] = [
@@ -170,7 +183,9 @@ const SIMPLE_ITEMS: SimpleItem[] = [
   { name: 'gold_ingot', display: 'Barra de Ouro' },
   { name: 'diamond', display: 'Diamante' },
   { name: 'emerald', display: 'Esmeralda' },
-  { name: 'redstone', display: 'Pó de Redstone' },
+  // O pó é item de material **e** bloco: o `redstone_wire` é `itemless` e este
+  // item é quem o coloca (doc 14 — M7).
+  { name: 'redstone', display: 'Pó de Redstone', places: 'redstone_wire' },
   { name: 'lapis_lazuli', display: 'Lápis-lazúli' },
   { name: 'flint', display: 'Sílex' },
   { name: 'clay_ball', display: 'Bola de Argila' },
@@ -220,6 +235,7 @@ for (const item of SIMPLE_ITEMS) {
     maxStack: item.maxStack ?? 64,
     ...(item.food !== undefined ? { food: item.food } : {}),
     ...(item.fuel !== undefined ? { fuel: item.fuel } : {}),
+    ...(item.places !== undefined ? { placesBlock: blockIdByName(item.places) } : {}),
   });
 }
 
@@ -342,6 +358,46 @@ for (const item of FARM_ITEMS) {
     ...(item.food !== undefined ? { food: item.food } : {}),
   });
 }
+
+// --- apêndice do M7: Nether -------------------------------------------------
+// No fim da fila, como todo apêndice: id de item vai para o save.
+
+for (const item of [
+  { name: 'nether_quartz', display: 'Quartzo do Nether' },
+  { name: 'nether_brick', display: 'Tijolo do Nether' },
+] as const) {
+  register({
+    id: nextId++, name: item.name, display: item.display,
+    tex: `item/${item.name}`, maxStack: 64,
+  });
+}
+
+/**
+ * Isqueiro: a única forma de acender um portal.
+ *
+ * **Desvio consciente do gênero:** ele não põe fogo em bloco nenhum. Fogo que
+ * se espalha exigiria um sistema de propagação com orçamento próprio, e o que o
+ * M7 precisa dele é abrir o portal — o resto é escopo que o aparelho-alvo não
+ * pediu. A durabilidade é a da referência.
+ */
+register({
+  id: nextId++,
+  name: 'minecart',
+  display: 'Carrinho de Mina',
+  tex: 'item/minecart',
+  maxStack: 1,
+  placesMinecart: true,
+});
+
+register({
+  id: nextId++,
+  name: 'flint_and_steel',
+  display: 'Isqueiro',
+  tex: 'item/flint_and_steel',
+  maxStack: 1,
+  durability: 64,
+  lights: true,
+});
 
 export const ITEMS: readonly (ItemDef | undefined)[] = items;
 

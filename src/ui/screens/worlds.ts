@@ -9,7 +9,7 @@
  * a única ação irreversível do jogo inteiro.
  */
 
-import { menuButton, menuPanel, menuRoot, menuRow, textField } from './menu';
+import { menuButton, menuPanel, menuRoot, menuRow, messageOf, textField } from './menu';
 import type { WorldMeta } from '../../save/db';
 
 export interface WorldsCallbacks {
@@ -20,6 +20,10 @@ export interface WorldsCallbacks {
     name: string, seed: string, mode: 'survival' | 'creative', difficulty: 0 | 1 | 2 | 3,
   ) => Promise<WorldMeta>;
   remove: (meta: WorldMeta) => Promise<void>;
+  /** Empacota o mundo num arquivo para o jogador guardar (M7). */
+  exportWorld?: (meta: WorldMeta) => Promise<void>;
+  /** Lê um arquivo e cria o mundo a partir dele; devolve o nome importado. */
+  importWorld?: (file: File) => Promise<string>;
   back: () => void;
 }
 
@@ -28,6 +32,9 @@ export class WorldsScreen {
   private readonly list: HTMLDivElement;
   private readonly playButton: HTMLButtonElement;
   private readonly deleteButton: HTMLButtonElement;
+  private readonly exportButton: HTMLButtonElement;
+  private readonly fileInput: HTMLInputElement;
+  private readonly status: HTMLParagraphElement;
   private readonly createForm: HTMLDivElement;
   private readonly nameInput: HTMLInputElement;
   private readonly seedInput: HTMLInputElement;
@@ -51,6 +58,26 @@ export class WorldsScreen {
     this.deleteButton = menuButton('Apagar', () => void this.deleteSelected(), 'danger');
     const newButton = menuButton('Criar novo', () => this.toggleCreate(true));
     const back = menuButton('Voltar', () => this.callbacks.back());
+
+    /*
+     * Levar mundo daqui para lá (M7).
+     *
+     * O `<input type="file">` fica escondido e é acionado pelo botão: o
+     * seletor nativo do navegador é a única forma de ler arquivo do disco sem
+     * pedir permissão, e o dele é feio em toda plataforma.
+     */
+    this.exportButton = menuButton('Exportar', () => void this.exportSelected());
+    const importButton = menuButton('Importar', () => this.fileInput.click());
+    this.fileInput = document.createElement('input');
+    this.fileInput.type = 'file';
+    this.fileInput.accept = '.clw';
+    this.fileInput.hidden = true;
+    this.fileInput.addEventListener('change', () => void this.importPicked());
+
+    this.status = document.createElement('p');
+    this.status.className = 'menu-empty';
+    this.status.hidden = true;
+    this.status.setAttribute('role', 'status');
 
     this.createForm = document.createElement('div');
     this.createForm.className = 'menu-section';
@@ -88,6 +115,9 @@ export class WorldsScreen {
       this.list,
       menuRow(this.playButton, newButton),
       menuRow(this.deleteButton, back),
+      menuRow(this.exportButton, importButton),
+      this.status,
+      this.fileInput,
       this.createForm,
     );
     this.root.appendChild(panel);
@@ -168,6 +198,41 @@ export class WorldsScreen {
     const has = this.selected !== null;
     this.playButton.disabled = !has;
     this.deleteButton.disabled = !has;
+    this.exportButton.disabled = !has || this.callbacks.exportWorld === undefined;
+  }
+
+  /** Mensagem curta abaixo dos botões: é o retorno de exportar e importar. */
+  private setStatus(text: string): void {
+    this.status.textContent = text;
+    this.status.hidden = text === '';
+  }
+
+  private async exportSelected(): Promise<void> {
+    const world = this.worlds.find((w) => w.id === this.selected);
+    if (world === undefined || this.callbacks.exportWorld === undefined) return;
+    this.setStatus('Empacotando…');
+    try {
+      await this.callbacks.exportWorld(world);
+      this.setStatus(`"${world.name}" exportado.`);
+    } catch (error) {
+      this.setStatus(messageOf(error, 'Não deu para exportar.'));
+    }
+  }
+
+  private async importPicked(): Promise<void> {
+    const file = this.fileInput.files?.[0];
+    // Limpa já: sem isso, escolher o mesmo arquivo duas vezes não dispara nada.
+    this.fileInput.value = '';
+    if (file === undefined || this.callbacks.importWorld === undefined) return;
+
+    this.setStatus('Lendo o arquivo…');
+    try {
+      const name = await this.callbacks.importWorld(file);
+      this.setStatus(`"${name}" importado.`);
+      await this.refresh();
+    } catch (error) {
+      this.setStatus(messageOf(error, 'Não deu para importar.'));
+    }
   }
 
   private toggleCreate(open: boolean): void {
@@ -219,6 +284,7 @@ function labelled(label: string, control: HTMLElement): HTMLLabelElement {
   return wrapper;
 }
 
+/** Mensagem de erro legível, com um fallback para o que não é `Error`. */
 function formatDate(timestamp: number): string {
   if (timestamp <= 0) return 'nunca jogado';
   const date = new Date(timestamp);

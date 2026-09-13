@@ -5,6 +5,7 @@
  * bichos, não o terreno.
  */
 import { describe, expect, it } from 'vitest';
+import { Rng } from '../src/core/rng';
 import { ChunkColumn } from '../src/world/chunk';
 import { World } from '../src/world/world';
 import { BREED_COOLDOWN, GROW_TICKS, LOVE_TICKS, Mobs } from '../src/entity/mobs';
@@ -39,6 +40,19 @@ function flatWorld(): World {
   return world;
 }
 
+/**
+ * Aleatório determinístico para os testes de mob (doc 15 §6, 2026-09-13).
+ *
+ * `Mobs`, `MobStore` e `MobSpawner` sorteiam yaw de nascimento, cooldown de
+ * passeio, drops, despawn e teleporte. Com `Math.random` a suíte completa
+ * falhava de vez em quando **sem reproduzir isolada** — o tipo de teste que
+ * acaba ignorado. Semear aqui torna cada arquivo reproduzível.
+ */
+function seeded(seed = 20260913): () => number {
+  const rng = new Rng(seed);
+  return () => rng.nextFloat();
+}
+
 function harness(): { mobs: Mobs; xp: number[] } {
   const xp: number[] = [];
   const mobs = new Mobs(flatWorld(), {
@@ -50,6 +64,7 @@ function harness(): { mobs: Mobs; xp: number[] } {
     onBreakBlock: () => {},
     onArrow: () => {},
   }, 32);
+  mobs.random = seeded();
   return { mobs, xp };
 }
 
@@ -192,6 +207,7 @@ describe('filhote', () => {
       onBreakBlock: () => {},
       onArrow: () => {},
     }, 8);
+    mobs.random = seeded();
     const calf = mobs.spawn(COW, 2, GROUND_Y + 1, 2);
     mobs.store.makeBaby(calf, GROW_TICKS);
 

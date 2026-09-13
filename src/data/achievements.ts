@@ -136,6 +136,28 @@ const SPECS: readonly Omit<AchievementDef, 'id'>[] = [
     description: 'Uma estante — a mesa vai gostar.',
     trigger: 'obtain', target: 'bookshelf', parent: 'cow_tipper',
   },
+
+  // --- Nether (M7) --------------------------------------------------------
+  {
+    name: 'into_fire', display: 'Portal Aberto',
+    description: 'A moldura de obsidiana acendeu.',
+    trigger: 'event', target: 'light_portal',
+  },
+  {
+    name: 'nether', display: 'Do Outro Lado',
+    description: 'Você atravessou para o Nether.',
+    trigger: 'event', target: 'enter_nether', parent: 'into_fire',
+  },
+  {
+    name: 'return_home', display: 'De Volta',
+    description: 'E voltou inteiro para a superfície.',
+    trigger: 'event', target: 'return_overworld', parent: 'nether',
+  },
+  {
+    name: 'minecart_ride', display: 'Nos Trilhos',
+    description: 'O carrinho anda sozinho — basta ter para onde ir.',
+    trigger: 'event', target: 'minecart',
+  },
 ];
 
 export const ACHIEVEMENTS: readonly AchievementDef[] = SPECS.map((spec, id) => ({ ...spec, id }));
@@ -149,7 +171,13 @@ const EVENT_OBJECTIVES: Record<string, string> = {
   breed: 'faça dois animais se reproduzirem',
   sleep: 'durma numa cama',
   enchant: 'encante um item na mesa de encantamento',
-  sail: 'navegue de barco',
+  // A chave era `sail`, mas o gatilho que a sessão dispara é `boat` — com a
+  // chave errada o objetivo do barco saía como "faça algo novo" (M7).
+  boat: 'navegue de barco',
+  light_portal: 'acenda um portal de obsidiana com o isqueiro',
+  enter_nether: 'atravesse o portal para o Nether',
+  return_overworld: 'volte do Nether para a superfície',
+  minecart: 'entre num carrinho de mina',
 };
 
 /**

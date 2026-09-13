@@ -12,6 +12,441 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-13 · 10:31 → 11:12 · A arte do jogador, e o M7 fecha
+
+**Pedido:** *"Continue o desenvolvimento do resource pack"*.
+
+**Resultado:** **quinto e último item do M7** — o jogador pode trazer a própria arte. Com ele
+fecham o M7 e os **oito marcos do `PROMPT.md`**.
+
+### A regra do doc 13 continua inteira
+
+**Nenhum asset de terceiros entra no repositório.** Todo pixel que o jogo distribui continua saindo
+de `data/textures.ts`, `data/itemart.ts` e `data/mobskins.ts`, receitas que rodam no boot. Um pack
+é o caminho para quem quer a **própria** arte: um `.zip` que o jogador escolhe, que mora no banco
+dele e que nunca passa por servidor nem por `src/`. Nada no repositório mudou de licença.
+
+### O leitor de zip
+
+`core/zip.ts`, ~150 linhas, porque o doc 13 §7 pede um `.zip` e o projeto não tem dependência de
+runtime. Só a leitura interessa: não escrevemos zip, não tratamos ZIP64, não abrimos arquivo
+cifrado e não conferimos CRC — o PNG tem o dele.
+
+**A leitura é guiada pelo diretório central**, no fim do arquivo, não pelos cabeçalhos locais. É o
+que faz funcionar com zip gerado em streaming, cujo cabeçalho local traz tamanho zero e joga o
+valor real para depois dos dados. O cabeçalho local ainda é lido, mas só pelos **tamanhos de nome e
+extra**: alguns compactadores põem o campo de tempo estendido só num dos dois, e ler do lugar
+errado começa a descompressão alguns bytes fora.
+
+A descompressão é `DecompressionStream('deflate-raw')`, a mesma que `save/serialize.ts` usa nos
+chunks: zero bytes de bundle. Onde ela não existe, entra o que estiver guardado sem compressão e o
+jogador recebe a frase que explica o resto.
+
+### A convenção de nomes
+
+A do doc 13 §7, com uma folga: o caminho pode ter qualquer prefixo de pastas e valem os **dois
+últimos segmentos** — `block/stone.png` e `assets/qualquer/textures/block/stone.png` chegam no
+mesmo lugar. Três famílias, e a terceira é acréscimo nosso (o doc só nomeia as duas primeiras):
+
+| Família | Destino | Lado |
+|---|---|---|
+| `block/<textura>` | camada do atlas de blocos | 16 |
+| `item/<item>` | tile da folha de sprites | 16 |
+| `entity/<skin>` | camada do atlas de entidades | 64 |
+
+Imagem de outro tamanho é **reamostrada no import**, não no boot: o jogador paga uma vez e o que
+vai para o banco já está pronto para subir na GPU. A média é ponderada pelo alfa, como a dos
+mipmaps do atlas e pelo mesmo motivo — sem isso a borda de um vidro ganha um halo da cor de fundo
+do PNG. Nome sem correspondente no jogo é recusado e **contado**: a tela diz quantas imagens
+entraram e quantas ficaram de fora.
+
+### Onde o pack entra
+
+**No boot, antes de o atlas gerar um pixel.** Mipmap, média de cor das partículas de quebra e a
+folha de sprites de item derivam todos dos mesmos arrays; aplicar depois exigiria refazer os quatro
+mais as duas texturas de GPU que saem da folha. O `boot()` virou assíncrono e o banco subiu três
+linhas — ele ia abrir logo depois de qualquer jeito.
+
+O `Atlas` e o `EntityAtlas` ganharam um `overrides` no construtor, e `buildItemSheet` um mapa de
+arte por item. Detalhe de graça: um `item/<nome>.png` **dá sprite a item que não tinha nenhum**.
+
+### Aplicar recarrega, e quem aperta é o jogador
+
+Importar guarda o pacote e mostra o resultado; **o botão de recarregar é do jogador**. Assim ele lê
+"38 aceitas, 4 ignoradas" antes de a tela sumir, e um zip que só acertou 3 nomes de 300 não vira
+surpresa depois do boot. A tela é a **de título**, não a de opções: das opções se chega de dentro
+do jogo, pelo menu de pausa, e recarregar ali custaria o que se fez desde o último autosave.
+
+### Desvios conscientes
+
+- **Não escrevemos um decodificador de PNG.** `createImageBitmap`, com `Image` + URL de blob como
+  reserva para o WebView antigo, gasta 20 linhas em vez de 300 de bundle para repetir o que todo
+  navegador já faz.
+- **A arte do pack vale só na camada dela.** Textura gerada a partir de outra continua saindo do
+  procedural — senão trocar a pedra mudaria o minério, o musgo e mais uma dúzia de blocos.
+- **`Atlas.loadOverrides` continua trocando só o nível 0** de mipmap. O caminho do pack é o
+  construtor; a função existe porque o `PROMPT.md` §219 a pede pelo nome, e agora ao menos mantém
+  os pixels guardados em dia.
+
+### Arquivos
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `+` | `src/core/zip.ts` | leitor de ZIP guiado pelo diretório central, guardado e deflate |
+| `+` | `src/render/pack.ts` | convenção de nomes, reamostragem, persistência e decodificação de PNG |
+| `+` | `src/ui/screens/packs.ts` | tela do pacote: escolher, remover, contar e recarregar |
+| `+` | `tests/zip.test.ts` | 13 testes; os zips são montados byte a byte no próprio teste |
+| `+` | `tests/pack.test.ts` | 18 testes com decodificador injetado — sem DOM e sem imagem no repo |
+| `~` | `src/render/atlas.ts` | `overrides` no construtor, antes de mipmap e média de cor |
+| `~` | `src/render/entityatlas.ts` | `overrides` no construtor e `entitySkinNames()` para validar sem GL |
+| `~` | `src/render/itemsprites.ts` | `buildItemSheet` aceita arte por item e dá sprite a quem não tinha |
+| `~` | `src/ui/menuflow.ts` | instala, remove e consulta o pacote; `location.reload()` aplica |
+| `~` | `src/ui/screens/title.ts` | botão "Texturas" |
+| `~` | `src/ui/screens/menu.ts` | `messageOf` virou compartilhado entre as telas |
+| `~` | `src/ui/screens/worlds.ts` | usa o `messageOf` compartilhado |
+| `~` | `src/main.ts` | `boot()` assíncrono; banco e pacote antes do atlas |
+| `~` | `docs/15-status.md`, `docs/16-auditoria.md`, `README.md` | M7 fechado |
+
+**Portões:** 1130 testes (63 arquivos), lint limpo, build limpo, **170,7 KB gzip** de 350.
+
+---
+
+## 2026-09-13 · 10:12 → 10:26 · O mundo cabe num arquivo, e o carrinho para de sumir
+
+**Pedido:** *"Pode implementar o próximo ponto e já corrigir a questão do save"*.
+
+**Resultado:** quarto item do M7 fechado — **import/export de mundos** — e a persistência de
+veículo que estava na lista de pontas soltas. Falta **um** item para o M7 fechar: o resource pack.
+
+### O arquivo
+
+Responde à pergunta que o usuário fez em 2026-09-12 e que até hoje se respondia "não dá": levar um
+mundo do celular para o computador. Nada vai para servidor, então o transporte é um arquivo `.clw`.
+
+**O formato reaproveita o que já existe.** Cada chunk entra no arquivo exatamente como está no
+banco — já serializado e já comprimido por `save/serialize.ts`. Reserializar seria pagar duas vezes,
+e um mundo de 500 chunks em JSON com base64 ficaria três vezes maior. Meta, jogador, baús e veículos
+vão em JSON: é pouco, e assim um formato novo de baú não quebra o arquivo antigo.
+
+**O mundo importado sempre ganha id novo**, e o nome ganha sufixo quando já existe outro igual.
+Reaproveitar o id do arquivo sobrescreveria em silêncio um mundo que o jogador já tem — o pior
+resultado possível para uma função cujo ponto é não perder nada.
+
+`packArchive` e `unpackArchive` são puros: só mexem em bytes. É por isso que o formato é testado sem
+IndexedDB nenhum, incluindo os quatro modos de arquivo inválido — assinatura errada, curto,
+truncado e versão futura, cada um com a sua frase na tela.
+
+### O save que faltava
+
+Duas coisas que sumiam sozinhas, corrigidas juntas porque moram no mesmo lugar:
+
+1. **Barco e carrinho nunca foram salvos**, desde que existem. Sair do mundo e voltar sumia com os
+   dois — o trilho ficava, o carrinho em cima dele não.
+2. **O baú do Nether sobrescrevia o da superfície.** A lista de tile entities tinha uma chave por
+   **mundo**, não por dimensão; atravessar o portal gravava a lista de lá por cima da de cá, e o
+   conteúdo de todo baú de casa ia junto. Bug meu, do M7 desta manhã, achado ao escrever o save do
+   veículo — e o tipo de coisa que só apareceria semanas depois, sem ninguém saber ligar a causa.
+
+**A ordem virou regra explícita:** a `Session` dispara `onDimensionChange` **antes** de limpar as
+listas, e o `SaveGame` tira o instantâneo de forma síncrona dentro do evento — só a gravação é
+adiada. Invertida, o save encontraria tudo vazio. De quebra, a troca de dimensão virou **um caminho
+só**: portal, renascimento e restauração do save passam todos por `Session.enterDimension`.
+
+**Portões:** 1099 testes (eram 1076), lint limpo, build limpo, bundle 167,6 KB gzip de 350.
+
+### Arquivo de mundo (novo)
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `+` | `src/save/archive.ts` | Formato binário, `packArchive`/`unpackArchive` puros, `exportWorld`/`importWorld` sobre o banco, nome único e nome de arquivo |
+| `+` | `tests/archive.test.ts` | 19 testes: ida e volta, bytes do chunk, arquivo inválido nos quatro modos, e o caminho do banco |
+
+### Save
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/save/savemanager.ts` | Baús passam a ter chave **por dimensão**; `saveVehicles`/`loadVehicles` |
+| `~` | `src/save/db.ts` | `allChunks` por faixa de chave; `DIMENSION_COUNT` exportado |
+| `~` | `src/save/serialize.ts` | `ByteWriter`/`ByteReader` exportados — dois formatos binários, um jeito de escrever |
+| `~` | `src/game/savegame.ts` | `switchDimension` com instantâneo síncrono; veículos no `saveAll` e no `load` |
+| `~` | `src/game/session.ts` | `VehicleRecord`, `vehicleSnapshot`, `restoreVehicles`; evento antes da limpeza; caminho único de dimensão |
+| `~` | `src/main.ts` | Usa `switchDimension`; `world.dimension` passa a ser escrito só pela `Session` |
+
+### Interface
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/ui/screens/worlds.ts` | Botões Exportar e Importar, seletor de arquivo escondido e linha de status |
+| `~` | `src/ui/menuflow.ts` | Download por blob e leitura do arquivo escolhido |
+| `~` | `tests/savegame.test.ts` | 4 testes: veículo na ida e na volta, listas por dimensão, dimensão no instantâneo |
+| `~` | `docs/15-status.md` | §1, §2, §3 (import/export e save de veículo), §5, §6, data |
+
+---
+
+## 2026-09-13 · 09:50 → 10:12 · O trilho descobre a própria forma
+
+**Pedido:** *"Pode seguir"*.
+
+**Resultado:** terceiro item do M7 fechado — **trilhos e carrinho de mina**. Sobram dois:
+import/export de mundos e resource pack.
+
+O bloco `rail` existia desde o M6, porque a mina o usa. O que faltava era tudo que faz dele
+transporte.
+
+**O trilho não é colocado com uma forma: ele a descobre.** Olha os quatro vizinhos e decide — dois
+mandam (reta no mesmo eixo, curva em eixos diferentes), um define o eixo, nenhum mantém o que
+estava — e a rampa entra depois, sobre o eixo já decidido. É isso que faz "colocar trilho" ser um
+gesto só em vez de escolher entre dez peças.
+
+**A forma vai para o estado, não para o meshing.** A conexão da cerca é calculada na hora de
+desenhar, e nunca ocupou bit nenhum (doc 04 §2.5). A do trilho ocupa quatro, porque **o carrinho
+precisa dela**: cerca conectada é desenho, trilho conectado é física, e refazer a busca de vizinhos
+dentro do tick do carrinho seria pagá-la a cada movimento.
+
+**A física do carrinho é de trilho, não de corpo livre.** Ele guarda uma velocidade escalar e uma
+direção; a cada tick lê a forma do trilho, projeta a direção sobre o eixo dela, anda e **escreve** o
+eixo perpendicular no centro do bloco. Zero consultas de colisão, e o carrinho não sai da linha.
+
+**Dois sistemas no mesmo voxel.** `world/rails.ts` escreve os bits 0..3 (forma) e `world/redstone.ts`
+o bit 4 (energia); cada um preserva os bits do outro. Há teste de regressão para exatamente isso,
+porque é o tipo de coisa que quebra em silêncio seis meses depois.
+
+**A primeira exceção de mesher em sete marcos.** Toda forma não-cubo do jogo é uma lista de caixas
+alinhadas aos eixos — e caixa alinhada aos eixos não representa rampa. O trilho ganhou um caminho
+próprio, `CPLX_RAIL`, que emite **um quad só**, deitado ou inclinado. De quebra ficou mais barato:
+1 quad contra os 6 da caixa achatada que ele usava antes.
+
+**Desvio consciente:** o carrinho não tem acelerador. O olhar escolhe para que lado da linha ele vai
+e dá o empurrão inicial; quem sustenta a velocidade é o trilho motorizado. Um acelerador contínuo
+tornaria o motorizado decorativo — e ele é metade do conteúdo desta entrega.
+
+**Portões:** 1076 testes (eram 1047), lint limpo, build limpo, bundle 165,6 KB gzip de 350, atlas
+152 camadas de 256.
+
+### Trilhos (novo)
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `+` | `src/world/rails.ts` | Conexão automática: forma por vizinhança, rampa, queda sem apoio, bit de energia, varredura de chunk |
+| `+` | `src/entity/minecart.ts` | Carrinho: física de trilho, empurrão, freio, rampa, curva, detector e queda fora da linha |
+| `+` | `tests/rails.test.ts` | 28 testes: forma, rampa, curva, circuito, carrinho, detector e a sessão de ponta a ponta |
+
+### Motor e dados
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/world/mesh/shapes.ts` | `SHAPE_RAIL`, as dez formas `RAIL_*`, `RAIL_LINKS`, `railIsSlope`/`railIsCurve`/`railSlopeDir` |
+| `~` | `src/world/mesh/blockinfo.ts` · `complex.ts` | `CPLX_RAIL` e `emitRail`: um quad, deitado ou inclinado |
+| `~` | `src/world/redstone.ts` · `src/data/redstone.ts` | Papéis `rail` (segue a energia) e `detector` (emite quando ocupado) |
+| `~` | `src/data/blocks.ts` | Trilho passa a ter forma e textura por estado; trilho motorizado e detector (123–124) |
+| `~` | `src/data/textures.ts` | `railBed`/`railGlow` e 5 texturas: curva, motorizado (2) e detector (2) |
+| `~` | `src/data/items.ts` · `itemart.ts` · `recipes.ts` | Item do carrinho (`placesMinecart`), sprite e 3 receitas |
+| `~` | `src/data/mobmodels.ts` · `mobskins.ts` · `render/entityatlas.ts` | Modelo, skin e camada do carrinho |
+| `~` | `src/data/achievements.ts` | Conquista "Nos Trilhos" |
+| `~` | `src/game/session.ts` | `Rails` e `Minecarts` ligados; montar/descer generalizado dos dois veículos; `driveBoat` → `driveVehicle` |
+| `~` | `src/main.ts` | Desenha o carrinho no batcher dos mobs; chamada de pilotagem renomeada |
+| `~` | `tests/complexmesh.test.ts` | O trilho saiu da lista de caixas e ganhou teste próprio |
+| `~` | `docs/15-status.md` | §1, §2, §3 (trilhos), §5, §6, data |
+
+---
+
+## 2026-09-13 · 09:15 → 09:50 · Uma dimensão inteira, e uma dívida de cinco marcos
+
+**Pedido:** *"Pode seguir com os desenvolvimento"* e, no meio da sessão, *"Pode aproveitar para
+corrigir o seu achado mencionado anteriormente, para não deixar pontas soltas e débitos"*.
+
+**Resultado:** o segundo item do M7 fechado — **Nether completo** — mais a dívida do aleatório dos
+mobs, que era o achado da sessão anterior.
+
+### O Nether
+
+**A decisão que manda em tudo: só existe uma dimensão carregada por vez.** Num aparelho de 2 GB,
+manter o Overworld na memória enquanto o jogador está do outro lado dobraria voxel, luz e malha sem
+nada na tela para mostrar. Atravessar o portal grava o que está sujo, descarrega tudo e recarrega —
+e a ordem importa: o save precisa gravar as colunas que saem ainda com a chave da dimensão antiga.
+
+**O gerador nasceu duas vezes.** A primeira versão amostrava ruído 3D nos 32.768 voxels da coluna e
+custava **56 ms por chunk**, o dobro do orçamento do doc 02. A segunda usa uma grade esparsa de
+5×5×17 interpolada trilinearmente — a mesma técnica dos mapas 2D do Overworld — e varre a coluna
+**uma vez só**, com a forma num `Uint8Array` local em vez de três passadas com `getBlock`. Custa
+**3,8 ms**, menos que o gerador da superfície.
+
+**A travessia tem um estado que parecia dispensável e não era.** O pipeline é assíncrono: trocar de
+dimensão descarrega tudo e o terreno do outro lado leva alguns frames. A primeira versão punha o
+jogador no destino na hora, e ele caía pelo mundo vazio. O estado "carregando" segura a física até
+o chunk chegar, com tempo limite — destino que nunca carrega aborta a viagem em vez de largar o
+jogador no nada.
+
+**Compatibilidade de save sem migração:** a chave de chunk do Overworld continua sendo o `worldId`
+puro, e `PlayerSave.dimension` é opcional. Mundo salvo antes do M7 abre exatamente como abria.
+
+**Duas pontas que só aparecem jogando, fechadas antes de sair:** morrer no Nether devolve o jogador
+à superfície (renascer com as coordenadas de lá dentro daqui é cair num mar de lava), e sair do
+mundo dentro dele volta nele.
+
+**Uma dívida de cinco marcos, achada no caminho:** o traço `fireImmune` existia desde o M5 e
+**nenhum mob o declarava** — não havia como um mob pegar fogo além do sol. Agora lava machuca mob,
+e os dois do Nether são imunes. Sem isso o ghast passearia dentro da lava.
+
+### A dívida do aleatório
+
+`entity/mobs.ts`, `entity/mobstore.ts` e `entity/spawn.ts` chamavam `Math.random()` direto, ao
+contrário de `world/growth.ts`. O sintoma estava medido na sessão anterior: `tests/mobs.test.ts`
+falhava 2 vezes em ~14 execuções da suíte completa e nunca reproduzia isolado. Os três passaram a
+expor `random: () => number`, com `Mobs.random` propagando para o store e para o contexto de IA de
+uma vez; os quatro arquivos de teste que montam mobs semeiam um `Rng` de `core/rng.ts`. Entrou
+regressão que falha se alguém voltar a chamar o aleatório global. Doze execuções seguidas da suíte
+completa depois: verde.
+
+**Portões:** 1047 testes (eram 1003), lint limpo, build limpo, bundle 161,8 KB gzip de 350, atlas
+147 camadas de 256, Nether a 3,8 ms/chunk.
+
+### Dimensão (novo)
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `+` | `src/data/dimensions.ts` | Tabela: céu, luz ambiente, névoa, escala 1:8, evaporação, alcance de lava, teto |
+| `+` | `src/world/gen/nether.ts` | Gerador: grade esparsa de densidade, mar de lava, rocha-mãe, quartzo, magma, areia das almas, glowstone |
+| `+` | `src/game/portal.ts` | Moldura, ignição, apagamento, destino, busca de portal existente e construção da chegada |
+| `+` | `src/game/travel.ts` | Máquina de três estados da travessia, com espera de chunk e tempo limite |
+| `+` | `tests/nether.test.ts` | 40 testes: gerador, dimensões, portal, chegada, travessia, mobs e save por dimensão |
+
+### Motor
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/world/world.ts` | `dimension`, `dimensionDef` e `takeAllChunks` |
+| `~` | `src/world/pipeline.ts` | `setDimension`: descarrega, limpa filas e invalida o centro; `dim` em toda requisição |
+| `~` | `src/workers/protocol.ts` · `chunk.worker.ts` | `dim` na requisição e na resposta; ruído do Nether criado preguiçosamente |
+| `~` | `src/save/db.ts` · `savemanager.ts` · `game/savegame.ts` | Chave de chunk por dimensão (Overworld inalterado), `setDimension`, `PlayerSave.dimension` |
+| `~` | `src/render/renderer.ts` · `sky.ts` · `chunkrenderer.ts` | Céu e névoa por dimensão; `SkyPass.override`; `clear()` solta toda a malha da GPU |
+| `~` | `src/world/fluids.ts` | Água evapora onde a dimensão manda; alcance da lava vem da tabela |
+| `~` | `src/game/session.ts` | `Travel`, `enterDimension`, isqueiro, portal apagado ao quebrar, limpeza de entidades, renascimento na superfície |
+| `~` | `src/main.ts` | Troca de dimensão (pipeline, save, céu, malha) e física congelada durante a travessia |
+
+### Conteúdo
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/data/blocks.ts` | 6 blocos (117–122); campo `translucent` |
+| `~` | `src/data/textures.ts` · `itemart.ts` | 6 texturas de bloco e 3 sprites de item |
+| `~` | `src/data/items.ts` | Quartzo, tijolo do Nether e isqueiro (campo `lights`) |
+| `~` | `src/data/recipes.ts` · `smelting.ts` · `loot.ts` | Isqueiro, tijolos, netherrack → tijolo, drops de quartzo |
+| `~` | `src/data/mobs.ts` · `mobmodels.ts` · `mobskins.ts` | Porco zumbi e ghast; traços `flies`, `shootsFireball` e `modelScale`; `dimension` na regra de spawn |
+| `~` | `src/data/achievements.ts` | 3 conquistas do Nether; a chave `sail` do objetivo do barco estava errada (era `boat`) |
+| `~` | `src/audio/synth.ts` | Voz do ghast, som de portal e de evaporação |
+| `~` | `src/entity/projectile.ts` | Bandeiras: sem gravidade e explosivo — a bola de fogo é uma flecha com duas linhas |
+| `~` | `src/entity/mobstore.ts` · `ai/goals.ts` · `mobs.ts` | Física e IA de voo; alcance de tiro dobrado; dano de lava |
+| `~` | `src/entity/spawn.ts` | Spawn filtrado por dimensão, no sorteio e no peso |
+
+### Dívida do aleatório
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/entity/mobs.ts` · `mobstore.ts` · `spawn.ts` | `random` injetável nos três; `Mobs.random` propaga para store e IA |
+| `~` | `tests/mobs.test.ts` | Semente determinística no harness + 3 testes de regressão de determinismo |
+| `~` | `tests/spawn.test.ts` · `breeding.test.ts` · `nightlife.test.ts` | Semente determinística nos harnesses |
+
+### Testes e documentos
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `tests/perf.test.ts` | Orçamento do Nether: chunk em menos de 25 ms |
+| `~` | `tests/entityart.test.ts` · `pipeline.test.ts` · `savegame.test.ts` | Ajuste ao `dim` do protocolo e à contagem de mobs |
+| `~` | `docs/15-status.md` | §1, §2, §3 (Nether e dívida do aleatório), §5, §6, data |
+
+---
+
+## 2026-09-13 · 08:30 → 09:15 · O M7 começa por onde dá para brincar
+
+**Pedido:** *"Vamos seguir com o desenvolvimento do M7, porém sem desenvolver o multijogador por
+enquanto pois acredito que ele irá pesar muito o jogo e trazer muita complexidade por enquanto
+desnecessária"* — precedido da confirmação de campo que faltava: *"eu já havia feito os testes no
+dispositivo T0, tudo funcionando perfeitamente e sempre a 60 FPS sem problema"*.
+
+**Resultado:** duas coisas fechadas e uma aberta. Fechou a **dependência externa** que atravessava
+o projeto desde o M3 — não há mais pendência de marco anterior, M0 a M6 estão validados no
+aparelho-alvo. Fechou também o **primeiro item do M7**: redstone completo, do pó ao pistão
+pegajoso. E abriu o M7 de verdade, agora com quatro itens em vez de cinco: o multijogador P2P saiu
+de escopo por decisão do usuário, com o doc 12 continuando normativo e sem prazo.
+
+O redstone são 15 blocos novos (ids 102–116), um motor de circuito e uma tabela declarativa de
+papéis. As decisões que valem registro:
+
+**O modelo de energia cabe numa frase.** *Forte* é o que um emissor dedicado entrega ao bloco em
+que está encostado — e bloco com energia forte realimenta pó vizinho com 15, sem perda. *Fraca* é o
+que o pó entrega aos seis vizinhos: liga mecanismo, mas **não** realimenta pó. É essa distinção, e
+só ela, que impede o fio de atravessar parede e voltar a 15 do outro lado. Ficaram fora, de
+propósito: comparador, observador, tremonha, queima de tocha e energia quasi-conectada.
+
+**A fila é drenada dentro do mesmo tick.** Um fio de 60 blocos acende no tick em que a alavanca é
+puxada, que é o que o jogador espera — não uma casa por tick. O teto de 1024 atualizações é o que
+transforma um oscilador patológico num frame ruim em vez de numa aba travada. Medido:
+**0,88 ms/tick** com um fio de 64 blocos ligando e desligando.
+
+**Dois bugs de integração, achados antes de sair e cobertos por regressão:**
+
+1. **A porta não abria na mão.** Abrir uma porta dispara reavaliação da posição; o circuito via
+   energia zero e fechava a porta no mesmo tick — a porta simplesmente não abria. O bit 4 do estado
+   passou a guardar "aberta **por energia**", e a porta só se mexe quando a energia muda.
+2. **A placa de pressão não afundava.** A colisão pousa o pé um décimo de milésimo abaixo do topo
+   do bloco (`TOUCH_EPSILON`), e o `Math.floor` do Y caía no bloco de baixo.
+
+**Duas descobertas no caminho:** `placesBlock` existia na tabela de itens desde o M2 e **nunca
+tinha sido lido** por `game/interaction.ts`, que resolvia bloco por `itemId === blockId`; é ele que
+agora deixa o item `redstone` colocar `redstone_wire`. E `BlockDef` ganhou `support`, declarativo,
+que faz pó, placa, repetidor, alavanca e botão caírem como item ao perder o apoio — disponível para
+qualquer bloco futuro, não só os de circuito.
+
+**Teto de atlas revisto**, como o doc 15 §6 pedia desde 2026-09-12: 128 → 256 camadas no doc 02 §3.
+A linha antiga era arbitrária e travava em 127; o GLES 3.0 garante 256 em qualquer aparelho, e 256
+camadas custam 0,34 MB num alvo de 350 MB. Com as 14 texturas novas estamos em **141**.
+
+**Portões:** 1003 testes (eram 948), lint limpo, build limpo, bundle 155,8 KB gzip de 350, atlas
+141 camadas de 256.
+
+### Circuito (novo)
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `+` | `src/world/redstone.ts` | Motor do circuito: energia forte/fraca, fila por tick com teto, tocha, repetidor, pistão, placas e apoio |
+| `+` | `src/data/redstone.ts` | Tabela declarativa de papéis por bloco; porta/portão/alçapão entram pela forma, sem linha própria |
+| `+` | `tests/redstone.test.ts` | 40 testes: propagação, degrau, forte × fraca, os seis componentes, apoio e orçamento |
+
+### Dados e conteúdo
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/data/blocks.ts` | 15 blocos (102–116); `BlockShape` ganhou 6 formas; `SupportKind` novo; `dustStages()` |
+| `~` | `src/data/textures.ts` | 14 texturas procedurais; `dustCross()` e `dustTextures()` para os 4 níveis de brilho |
+| `~` | `src/data/items.ts` | `places` em `SimpleItem`: o item `redstone` coloca `redstone_wire` |
+| `~` | `src/data/recipes.ts` | 12 receitas, do pó à tocha, ao repetidor e ao pistão pegajoso |
+| `~` | `src/data/loot.ts` | Drops do pó, do lado apagado da tocha e da lâmpada, e do braço do pistão |
+| `~` | `src/audio/synth.ts` | `block/click` e `block/piston` |
+
+### Motor
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/world/mesh/shapes.ts` | 6 formas; `mounted()` resolve os 6 encaixes de alavanca e botão numa geometria só; `PISTON_STEP` e `mountForDir` |
+| `~` | `src/world/mesh/blockinfo.ts` | Formas novas nas duas tabelas; `MAX_STAGES` 8 → 16 (o pó tem 16 níveis) |
+| `~` | `src/game/interaction.ts` | `placesBlock` passa a valer; `hasSupport`; encaixe pela normal do clique; `facing4FromLook`/`facing6FromLook` |
+| `~` | `src/game/session.ts` | Circuito criado, ligado, varrido por chunk e ticado; varredura de placas por entidade; `use()` antes da porta |
+| `~` | `src/render/itemsprites.ts` | Arte desenhada vence o cubo isométrico — o pó na mão é pó, não um cubo vazado |
+| `~` | `src/ui/debug.ts` · `src/main.ts` | Linha `E:` mostra `N redstone` quando há circuito rodando |
+
+### Testes e documentos
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `tests/shapes.test.ts` | 10 testes de geometria das formas novas e do encaixe por direção |
+| `~` | `tests/complexmesh.test.ts` | Todo componente sai do mesher com geometria; 4 degraus de brilho do pó; pistão estendido é mais curto |
+| `~` | `tests/perf.test.ts` | Orçamento de tick do circuito: fio de 64 em menos de 5 ms |
+| `~` | `docs/02-orcamento-performance.md` | §3: teto de atlas 128 → 256, com o motivo |
+| `~` | `docs/15-status.md` | §1 (M7 em andamento, multijogador fora), §2 (métricas), §3 (redstone), §5 (dependência fechada), §6, data |
+
+---
+
 ## 2026-09-12 · 10:55 → 11:14 · A perseguição que não perseguia
 
 **Pedido:** *"Agora finalmente consegui encontrar os monstros, porém eles estão muito lentos"* e

@@ -12,6 +12,8 @@ import { menuButton, menuPanel, menuRoot } from './menu';
 export interface TitleCallbacks {
   onPlay: () => void;
   onOptions: () => void;
+  /** Pacote de texturas do jogador (M7). */
+  onPacks: () => void;
 }
 
 export class TitleScreen {
@@ -28,12 +30,13 @@ export class TitleScreen {
 
     this.playButton = menuButton('Jogar', callbacks.onPlay, 'primary');
     const options = menuButton('Opções', callbacks.onOptions);
+    const packs = menuButton('Texturas', callbacks.onPacks);
 
     const footer = document.createElement('p');
     footer.className = 'footer';
     footer.textContent = 'Projeto independente, sem afiliação com nenhuma empresa de jogos.';
 
-    body.append(tagline, this.playButton, options, footer);
+    body.append(tagline, this.playButton, options, packs, footer);
     this.root.appendChild(panel);
     injectTitleStyle();
   }

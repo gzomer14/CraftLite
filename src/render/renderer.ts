@@ -11,6 +11,7 @@ import { ChunkRenderer } from './chunkrenderer';
 import { Particles } from './particles';
 import { SelectionPass } from './selection';
 import { SkyPass } from './sky';
+import { dimensionOf } from '../data/dimensions';
 import { TerrainPass, type SkyParams } from './terrain';
 import type { Atlas } from './atlas';
 import type { GlContext } from './gl';
@@ -28,6 +29,12 @@ export interface HighlightState {
   /** Brilho médio da textura do bloco mirado (0..1), para tingir a fissura. */
   brightness: number;
 }
+
+/**
+ * Fator de "dia" no Nether: constante e baixo. Zero apagaria o terreno todo,
+ * porque a luz do céu é o que o shader usa como iluminação global.
+ */
+const NETHER_DAY_FACTOR = 0.35;
 
 export class Renderer {
   readonly ctx: GlContext;
@@ -58,6 +65,10 @@ export class Renderer {
    * mora aqui e é reaplicado lá.
    */
   minSkyLight = 0.06;
+  /** Cor fixa de céu e névoa da dimensão; `null` = céu com ciclo de dia. */
+  private fogOverride: readonly [number, number, number] | null = null;
+  /** Piso de luz da dimensão, 0..1 (o Nether nunca é preto absoluto). */
+  private ambient = 0;
   private readonly skyParams: SkyParams = {
     fogColor: new Float32Array(3),
     fogDensity: 0.006,
@@ -133,6 +144,17 @@ export class Renderer {
     this.resize();
   }
 
+  /**
+   * Dimensão desenhada (M7). No Nether não há ciclo de dia: o céu é a cor de
+   * `data/dimensions.ts` e o piso de luz sobe, senão a dimensão sem céu fica
+   * preta a três metros do jogador.
+   */
+  setDimension(dimension: number): void {
+    const def = dimensionOf(dimension);
+    this.fogOverride = def.fog;
+    this.ambient = def.ambientLight / 15;
+  }
+
   /** `dayTime` em ticks do dia (0..23999). */
   /**
    * `rain` é 0..1 (doc 03 §8). Ele acinzenta o céu e o fog no mesmo passo:
@@ -141,8 +163,17 @@ export class Renderer {
   setDayTime(dayTime: number, dayFactor: number, rain = 0): void {
     this.sky.update(dayTime);
     this.sky.applyRain(rain);
+    this.skyParams.minSkyLight = Math.max(this.minSkyLight, this.ambient);
+
+    const override = this.fogOverride;
+    if (override !== null) {
+      // Dimensão sem céu: fator de dia fixo e o horizonte pintado por tabela.
+      this.skyParams.dayFactor = NETHER_DAY_FACTOR;
+      this.sky.override(override);
+      this.skyParams.fogColor.set(this.sky.horizon);
+      return;
+    }
     this.skyParams.dayFactor = dayFactor * (1 - rain * 0.45);
-    this.skyParams.minSkyLight = this.minSkyLight;
     // O fog usa a cor do horizonte: se divergir, o terreno distante fica
     // recortado contra o céu.
     this.skyParams.fogColor.set(this.sky.horizon);

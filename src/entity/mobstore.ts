@@ -35,6 +35,10 @@ const AUTO_STEP = 0.6;
 /** Impulso de pulo: o mesmo do jogador, para transpor um bloco inteiro. */
 export const JUMP_IMPULSE = 0.42;
 const GROUND_BLEND = 0.28;
+/** Arrasto vertical de quem voa: sem isto o ghast sobe para sempre. */
+const FLIGHT_DRAG = 0.92;
+/** Quanto da velocidade vertical alvo entra por tick, para quem voa. */
+const FLIGHT_BLEND = 0.12;
 const AIR_BLEND = 0.06;
 const GROUND_FRICTION = 0.6;
 const AIR_FRICTION = 0.91;
@@ -44,6 +48,16 @@ const GLIDE_MAX_FALL = -0.12;
 
 export class MobStore {
   readonly capacity: number;
+
+  /**
+   * Aleatório do jogo, injetável — o mesmo padrão de `world/growth.ts`.
+   *
+   * Chamar `Math.random()` direto daqui tornava **todo** teste de mob
+   * não-determinístico: o yaw de nascimento e o primeiro passeio saíam
+   * diferentes a cada execução, e a suíte completa falhava de vez em quando
+   * sem ninguém conseguir reproduzir (doc 15 §6, 2026-09-13).
+   */
+  random: () => number = Math.random;
 
   readonly x: Float64Array;
   readonly y: Float64Array;
@@ -179,12 +193,14 @@ export class MobStore {
     this.prevX[i] = x; this.prevY[i] = y; this.prevZ[i] = z;
     this.vx[i] = 0; this.vy[i] = 0; this.vz[i] = 0;
     this.variant[i] = variant;
-    this.scale[i] = def.traits.splitsOnDeath === true ? slimeScale(variant) : 1;
+    this.scale[i] = def.traits.splitsOnDeath === true
+      ? slimeScale(variant)
+      : def.traits.modelScale ?? 1;
     this.health[i] = def.traits.splitsOnDeath === true
       ? slimeHealth(variant)
       : def.health;
     this.age[i] = 0;
-    this.yaw[i] = Math.random() * Math.PI * 2;
+    this.yaw[i] = this.random() * Math.PI * 2;
     this.prevYaw[i] = this.yaw[i];
     this.headYaw[i] = this.yaw[i];
     this.pitch[i] = 0;
@@ -204,7 +220,7 @@ export class MobStore {
     this.hasMove[i] = 0;
     this.moveSpeed[i] = 1;
     this.pathCooldown[i] = 0;
-    this.wanderCooldown[i] = (Math.random() * 40) | 0;
+    this.wanderCooldown[i] = (this.random() * 40) | 0;
     this.jumpCooldown[i] = 0;
     this.pathLen[i] = 0;
     this.pathIndex[i] = 0;
@@ -323,8 +339,11 @@ export class MobStore {
 
     this.steerToMoveTarget(i, def.speed, inWater);
 
-    // Gravidade (lula flutua; galinha planeja).
-    if (def.traits.swims === true && inWater) {
+    // Gravidade (lula flutua; ghast voa; galinha planeja).
+    if (def.traits.flies === true) {
+      // Sem gravidade nenhuma: quem voa é sustentado pelo próprio movimento.
+      this.vy[i] *= FLIGHT_DRAG;
+    } else if (def.traits.swims === true && inWater) {
       this.vy[i] *= 0.9;
     } else if (inWater) {
       this.vy[i] = (this.vy[i] + GRAVITY * 0.25) * WATER_DRAG;
@@ -392,6 +411,15 @@ export class MobStore {
     const dx = this.moveX[i] - this.x[i];
     const dz = this.moveZ[i] - this.z[i];
     const distance = Math.hypot(dx, dz);
+    const flying = mobDef(this.type[i]).traits.flies === true;
+    // Quem voa também persegue o Y do destino; quem anda ignora, e confia no
+    // pulo automático para subir degrau.
+    if (flying) {
+      const dy = this.moveY[i] - this.y[i];
+      const perTickY = (speed / 20) * this.moveSpeed[i];
+      const targetVy = Math.abs(dy) < 0.5 ? 0 : Math.sign(dy) * perTickY;
+      this.vy[i] += (targetVy - this.vy[i]) * FLIGHT_BLEND;
+    }
     if (distance < 0.25) {
       this.hasMove[i] = 0;
       return;

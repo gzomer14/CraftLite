@@ -3,6 +3,7 @@
  *
  * Ordem do boot (doc 02 §4: a tela aparece antes de qualquer worker subir):
  *   1. contexto GL e detecção de tier
+ *   1b. resource pack do jogador, se houver — ele precisa chegar antes do atlas
  *   2. atlas procedural (~15–25 ms, o único trabalho pesado do boot)
  *   3. renderer, mundo, pipeline, jogador, controles, HUD, debug
  *   4. loop 20 Hz + rAF
@@ -33,11 +34,12 @@ import { MAX_AIR } from './game/survival';
 import { Controls } from './input/controls';
 import { Atlas } from './render/atlas';
 import { DynamicScale } from './render/dynamicscale';
-import { EntityAtlas, ARROW_LAYER, BOAT_LAYER } from './render/entityatlas';
+import { EntityAtlas, ARROW_LAYER, BOAT_LAYER, MINECART_LAYER } from './render/entityatlas';
 import { createContext } from './render/gl';
 import { ItemRenderer } from './render/itemrender';
 import { HandRenderer } from './render/hand';
 import { ItemSprites } from './render/itemsprites';
+import { loadPack, overridesFor } from './render/pack';
 import { MobRenderer } from './render/mobrender';
 import { Renderer } from './render/renderer';
 import { SaveDatabase, isAvailable as saveAvailable, type WorldMeta } from './save/db';
@@ -64,7 +66,7 @@ const STARTING_BLOCKS = [
   'stone', 'cobblestone', 'dirt', 'oak_planks', 'oak_log', 'glass', 'torch', 'glowstone', 'sand',
 ];
 
-function boot(): void {
+async function boot(): Promise<void> {
   const view = document.getElementById('view') as HTMLCanvasElement | null;
   if (view === null) throw new Error('Canvas #view não encontrado.');
   // Cópia não-nula: o `startGame` é uma função aninhada e o TypeScript não
@@ -85,11 +87,33 @@ function boot(): void {
   const rdOverride = settings.get('renderDistance');
   if (rdOverride > 0) preset.renderDistance = rdOverride;
 
+  /*
+   * Banco e resource pack antes do atlas (M7).
+   *
+   * O pack é do jogador e mora no banco dele (doc 13 §7). Ele precisa estar na
+   * mão **antes** de o atlas gerar um pixel, porque mipmap, média de cor das
+   * partículas e a folha de sprites de item derivam todos dos mesmos arrays.
+   * É uma leitura só e o banco ia abrir daqui a três linhas de qualquer jeito.
+   */
+  const db = saveAvailable() ? new SaveDatabase() : null;
+  /*
+   * Armazenamento persistente (doc 11 §4), pedido o quanto antes.
+   *
+   * Sem `persist()` o navegador trata a base como descartável e pode limpá-la
+   * sozinho sob pressão de espaço — num aparelho de 2 GB isso não é hipótese.
+   * O método existia em `save/db.ts` desde o M4 e **nunca tinha sido chamado**
+   * (relato de campo 2026-09-12). Não bloqueia o boot: negado ou não
+   * implementado, o jogo entra igual. Os avisos ao jogador ficam no
+   * `startGame`, que é onde existe HUD para mostrá-los.
+   */
+  void db?.requestPersistence();
+  const pack = await loadPack(db);
+
   progress(0.35, 'gerando texturas…');
-  const atlas = new Atlas(ctx);
-  const entityAtlas = new EntityAtlas(ctx);
+  const atlas = new Atlas(ctx, overridesFor(pack, 'block'));
+  const entityAtlas = new EntityAtlas(ctx, overridesFor(pack, 'entity'));
   // Folha de sprites de item: cubo isométrico para bloco, máscara para o resto.
-  const itemSprites = new ItemSprites(atlas);
+  const itemSprites = new ItemSprites(atlas, overridesFor(pack, 'item'));
   itemSprites.installCssVariables();
 
   progress(0.65, 'preparando renderizador…');
@@ -108,18 +132,6 @@ function boot(): void {
   hideBootScreen();
 
   // --- fluxo de menus: título → mundos → jogo ------------------------------
-  const db = saveAvailable() ? new SaveDatabase() : null;
-  /*
-   * Armazenamento persistente (doc 11 §4), pedido o quanto antes.
-   *
-   * Sem `persist()` o navegador trata a base como descartável e pode limpá-la
-   * sozinho sob pressão de espaço — num aparelho de 2 GB isso não é hipótese.
-   * O método existia em `save/db.ts` desde o M4 e **nunca tinha sido chamado**
-   * (relato de campo 2026-09-12). Não bloqueia o boot: negado ou não
-   * implementado, o jogo entra igual. Os avisos ao jogador ficam no
-   * `startGame`, que é onde existe HUD para mostrá-los.
-   */
-  void db?.requestPersistence();
   const menu = new MenuFlow(db, settings, {
     start: (meta) => { void startGame(meta); },
   });
@@ -223,6 +235,21 @@ function boot(): void {
   });
 
   const session = new Session(world, player, {
+    onDimensionChange: (dimension) => {
+      /*
+       * Trocar de dimensão é uma troca de mundo inteira: o pipeline descarrega
+       * tudo e recomeça, o save passa a gravar com a chave da dimensão nova, e
+       * o céu muda de tabela. A ordem importa — `pipeline.setDimension` dispara
+       * `onChunkUnloaded` para cada coluna, e o save precisa gravá-las ainda
+       * com a chave **antiga**.
+       */
+      // `world.dimension` é escrito pela própria `Session`, **depois** deste
+      // evento: quem ouve ainda precisa ver a dimensão que está sendo deixada.
+      pipeline.setDimension(dimension);
+      save?.switchDimension(dimension);
+      renderer.setDimension(dimension);
+      renderer.chunks.clear();
+    },
     onOpenScreen: (screen, container) => {
       if (screen === 'none') containerScreen.close();
       else containerScreen.open(screen, session.inventory, container);
@@ -444,6 +471,7 @@ function boot(): void {
     blockLight: 0,
     skyLight: 15,
     entities: { mobs: 0, items: 0, arrows: 0, paths: 0 },
+    redstone: 0,
     clock: '00:00',
     sounds: 0,
   };
@@ -507,7 +535,17 @@ function boot(): void {
       );
     }
 
-    // Barcos: mesmo batcher dos mobs, como a flecha (doc 07 §6).
+    // Barco e carrinho: mesmo batcher dos mobs, como a flecha (doc 07 §6).
+    const cartModel = modelOf(MINECART_LAYER);
+    const cartLayer = entityAtlas.layerOf(MINECART_LAYER);
+    session.carts.forEach((x, y, z, yaw) => {
+      const light = world.getSkyLight(Math.floor(x), Math.floor(y), Math.floor(z)) * dayFactor;
+      mobRenderer.addModel(
+        cartModel, cartLayer, x, y, z, yaw, 0, yaw, 0, 0, 0, 0,
+        Math.max(4, light), 0, 1, 0,
+      );
+    }, alpha);
+
     const boatModel = modelOf(BOAT_LAYER);
     const boatLayer = entityAtlas.layerOf(BOAT_LAYER);
     session.boats.forEach((x, y, z, yaw) => {
@@ -562,9 +600,16 @@ function boot(): void {
       if (!spawned) {
         spawned = trySpawn(world, player, restored);
         player.prevX = player.x; player.prevY = player.y; player.prevZ = player.z;
+      } else if (session.travel.isTravelling) {
+        /*
+         * Atravessando o portal: o mundo de destino ainda está carregando, e
+         * rodar a física aqui derrubaria o jogador pelo vazio. A `Session`
+         * continua ticando — é ela que espera o chunk chegar e o reposiciona.
+         */
+        player.prevX = player.x; player.prevY = player.y; player.prevZ = player.z;
       } else if (session.isRiding) {
-        // Pilotando: o barco é que anda, e o jogador vai junto (M6).
-        session.driveBoat(controls.state.forward);
+        // Pilotando: o veículo é que anda, e o jogador vai junto (M6/M7).
+        session.driveVehicle(controls.state.forward);
       } else if (!session.survival.isDead) {
         const fallBefore = player.fallDistance;
         const wasAirborne = !player.onGround;
@@ -761,6 +806,7 @@ function boot(): void {
         debugSource.entities.items = session.items.active;
         debugSource.entities.arrows = session.projectiles.active;
         debugSource.entities.paths = session.mobs.pathsComputed;
+        debugSource.redstone = session.redstone.lastUpdates;
         debugSource.clock = dayNight.clock;
         debugSource.sounds = audio.loadedSounds;
         updateDebugSource(debugSource, renderer, pipeline, world, player);
@@ -951,8 +997,4 @@ function fail(error: unknown): void {
   console.error(error);
 }
 
-try {
-  boot();
-} catch (error) {
-  fail(error);
-}
+boot().catch(fail);

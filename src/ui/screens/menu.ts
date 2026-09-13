@@ -204,3 +204,8 @@ function injectMenuStyle(): void {
 `;
   document.head.appendChild(css);
 }
+
+/** Mensagem de erro legível, ou o texto de reserva. Usada pelas telas de menu. */
+export function messageOf(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message !== '' ? error.message : fallback;
+}

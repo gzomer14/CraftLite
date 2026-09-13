@@ -36,6 +36,78 @@ function shelfBooks(y0: number): TexOp[] {
   return ops;
 }
 
+/**
+ * Cruz de pó de redstone sobre fundo vazado (M7).
+ *
+ * O pó é desenhado como um ladrilho inteiro deitado no chão, não como uma
+ * geometria que muda com a conexão: é a mesma escolha do gênero e custa 6 quads
+ * por bloco em vez de 30. O núcleo central sai mais claro, para o cruzamento
+ * ler como cruzamento.
+ */
+function dustCross(color: Rgb): TexOp {
+  return (c) => {
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) {
+        const o = (y * 16 + x) << 2;
+        const inX = x >= 6 && x <= 9;
+        const inY = y >= 6 && y <= 9;
+        if (!inX && !inY) { c.data[o + 3] = 0; continue; }
+        const core = inX && inY ? 1.3 : 1;
+        c.data[o] = color[0] * core;
+        c.data[o + 1] = color[1] * core;
+        c.data[o + 2] = color[2] * core;
+        c.data[o + 3] = 255;
+      }
+    }
+  };
+}
+
+/** Uma receita de pó por nível de brilho. */
+function dustTextures(): Record<string, TexRecipe> {
+  const cores: Rgb[] = [[72, 14, 14], [132, 26, 24], [186, 38, 32], [244, 68, 52]];
+  const out: Record<string, TexRecipe> = {};
+  for (let i = 0; i < cores.length; i++) {
+    out[`block/redstone_dust_${i}`] = {
+      base: cores[i], noise: 'flat', scale: 1, variance: 0, ops: [dustCross(cores[i])],
+    };
+  }
+  return out;
+}
+
+/**
+ * Leito de trilho reto: dormentes de madeira com dois trilhos de metal por
+ * cima, o resto vazado. Só a cor do metal muda entre comum e motorizado.
+ */
+function railBed(metalColor: Rgb): TexOp {
+  return (c) => {
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) {
+        const o = (y * 16 + x) << 2;
+        const sleeper = y % 4 < 2;
+        const metal = x === 4 || x === 5 || x === 10 || x === 11;
+        if (metal) {
+          c.data[o] = metalColor[0]; c.data[o + 1] = metalColor[1]; c.data[o + 2] = metalColor[2];
+        } else if (!sleeper) {
+          c.data[o + 3] = 0;
+        }
+      }
+    }
+  };
+}
+
+/** Faixa entre os dois trilhos: a brasa do motorizado e a placa do detector. */
+function railGlow(color: Rgb): TexOp {
+  return (c) => {
+    for (let y = 0; y < 16; y++) {
+      for (let x = 7; x <= 8; x++) {
+        const o = (y * 16 + x) << 2;
+        c.data[o] = color[0]; c.data[o + 1] = color[1]; c.data[o + 2] = color[2];
+        c.data[o + 3] = 255;
+      }
+    }
+  };
+}
+
 export const TEXTURES: Record<string, TexRecipe> = {
   // --- pedras -------------------------------------------------------------
   'block/stone': {
@@ -485,14 +557,20 @@ export const TEXTURES: Record<string, TexRecipe> = {
   },
   'block/rail': {
     base: [120, 100, 74], noise: 'flat', scale: 1, variance: 0,
+    ops: [railBed([176, 176, 184])],
+  },
+  // Curva: os dois trilhos viram no meio do ladrilho, em diagonal.
+  'block/rail_curved': {
+    base: [120, 100, 74], noise: 'flat', scale: 1, variance: 0,
     ops: [
       (c) => {
-        // Dormentes de madeira com dois trilhos de metal por cima.
         for (let y = 0; y < 16; y++) {
           for (let x = 0; x < 16; x++) {
             const o = (y * 16 + x) << 2;
-            const sleeper = y % 4 < 2;
-            const metal = x === 4 || x === 5 || x === 10 || x === 11;
+            // Duas diagonais paralelas ligando a borda +Z à borda +X.
+            const d = Math.abs(x + y - 10);
+            const metal = d <= 1 || Math.abs(x + y - 16) <= 1;
+            const sleeper = (x + y) % 4 < 2;
             if (metal) {
               c.data[o] = 176; c.data[o + 1] = 176; c.data[o + 2] = 184;
             } else if (!sleeper) {
@@ -502,6 +580,24 @@ export const TEXTURES: Record<string, TexRecipe> = {
         }
       },
     ],
+  },
+  // Motorizado: dormente escuro e trilho dourado; aceso, brasa entre eles.
+  'block/powered_rail': {
+    base: [92, 70, 52], noise: 'flat', scale: 1, variance: 0,
+    ops: [railBed([206, 172, 74])],
+  },
+  'block/powered_rail_on': {
+    base: [92, 70, 52], noise: 'flat', scale: 1, variance: 0,
+    ops: [railBed([246, 214, 96]), railGlow([230, 96, 48])],
+  },
+  // Detector: trilho comum com a placa de pressão entre os trilhos.
+  'block/detector_rail': {
+    base: [120, 100, 74], noise: 'flat', scale: 1, variance: 0,
+    ops: [railBed([176, 176, 184]), railGlow([108, 108, 116])],
+  },
+  'block/detector_rail_on': {
+    base: [120, 100, 74], noise: 'flat', scale: 1, variance: 0,
+    ops: [railBed([176, 176, 184]), railGlow([226, 72, 60])],
   },
   'block/oak_sign': {
     inherit: 'block/oak_planks',
@@ -584,6 +680,84 @@ export const TEXTURES: Record<string, TexRecipe> = {
     inherit: 'block/dirt', ops: [tintBy(0.62), furrows([48, 32, 20])],
   },
   ...cropTextures(),
+
+  // --- redstone (M7) ------------------------------------------------------
+  ...dustTextures(),
+  'block/redstone_torch': {
+    base: [140, 108, 60], noise: 'flat', scale: 1, variance: 0,
+    ops: [alphaMask('cross', 0), blobs([255, 86, 64], 2, 2)],
+  },
+  'block/redstone_torch_off': {
+    base: [140, 108, 60], noise: 'flat', scale: 1, variance: 0,
+    ops: [alphaMask('cross', 0), blobs([104, 34, 30], 2, 2)],
+  },
+  'block/lever': {
+    inherit: 'block/cobblestone',
+    ops: [rect(6, 2, 4, 12, [126, 96, 54]), outline(6, 2, 4, 12, [82, 60, 32])],
+  },
+  'block/repeater': {
+    base: [186, 186, 190], noise: 'value', scale: 6, variance: 0.06,
+    ops: [
+      border([142, 142, 148], 1),
+      rect(2, 7, 12, 2, [110, 110, 116]),
+      rect(4, 3, 2, 3, [196, 58, 48]),
+      rect(10, 10, 2, 3, [196, 58, 48]),
+      dither(0.04),
+    ],
+  },
+  'block/piston': {
+    base: [150, 122, 74], noise: 'grain', scale: 6, variance: 0.1,
+    ops: [plankLines(8, WOOD_DARK), border(IRON_DARK, 2), dither(0.04)],
+  },
+  'block/piston_sticky': {
+    inherit: 'block/piston', ops: [rect(5, 5, 6, 6, [126, 176, 84], 0.85)],
+  },
+  'block/piston_head': {
+    base: [160, 132, 82], noise: 'grain', scale: 6, variance: 0.1,
+    ops: [border(IRON_LIGHT, 1), rect(6, 0, 4, 16, IRON_LIGHT, 0.5), dither(0.04)],
+  },
+  'block/redstone_lamp': {
+    base: [108, 74, 42], noise: 'value', scale: 5, variance: 0.1,
+    ops: [bricks(8, 8, [72, 48, 26]), speckle([140, 96, 54], 0.12, 1), dither(0.05)],
+  },
+  'block/redstone_lamp_on': {
+    base: [246, 200, 112], noise: 'value', scale: 5, variance: 0.08,
+    ops: [bricks(8, 8, [214, 154, 68]), speckle([255, 238, 180], 0.14, 1), dither(0.04)],
+  },
+  'block/redstone_block': {
+    base: [172, 26, 22], noise: 'cell', scale: 4, variance: 0.2,
+    ops: [speckle([226, 62, 48], 0.16, 1), emboss(0.3), dither(0.05)],
+  },
+
+  // --- Nether (M7) --------------------------------------------------------
+  'block/netherrack': {
+    base: [111, 54, 52], noise: 'cell', scale: 4, variance: 0.28,
+    ops: [speckle([78, 34, 34], 0.22, 1), emboss(0.3), dither(0.06)],
+  },
+  'block/soul_sand': {
+    base: [82, 62, 52], noise: 'grain', scale: 5, variance: 0.16,
+    ops: [
+      blobs([54, 40, 34], 3, 3),
+      // Três covinhas escuras: o olho lê "rostos" sem desenhar nenhum.
+      speckle([40, 30, 26], 0.1, 2),
+      dither(0.05),
+    ],
+  },
+  'block/nether_quartz_ore': {
+    inherit: 'block/netherrack', ops: [oreBlobs([238, 232, 226], 6)],
+  },
+  'block/nether_bricks': {
+    base: [58, 28, 33], noise: 'value', scale: 5, variance: 0.12,
+    ops: [bricks(8, 8, [38, 18, 22]), emboss(0.35), dither(0.05)],
+  },
+  'block/magma_block': {
+    base: [142, 62, 30], noise: 'cell', scale: 3, variance: 0.35,
+    ops: [speckle([246, 176, 62], 0.18, 2), emboss(0.4), dither(0.05)],
+  },
+  'block/nether_portal': {
+    base: [116, 48, 186], noise: 'value', scale: 3, variance: 0.3, alpha: 0.78,
+    ops: [speckle([196, 132, 246], 0.2, 1), dither(0.08)],
+  },
 
   // --- utilidade ----------------------------------------------------------
   ...crackStages(),

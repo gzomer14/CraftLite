@@ -1,10 +1,15 @@
 /**
- * Flechas (doc 07 §6).
+ * Flechas e bolas de fogo (doc 07 §6).
  *
  * Existem no M5 por causa do esqueleto: um hostil que só bate de perto não
  * obriga o jogador a se cobrir, e é isso que faz a primeira noite ser tensa.
  * O arco do jogador entra no M6 e reusa exatamente este módulo — daí o campo
  * `fromPlayer`.
+ *
+ * O M7 acrescentou a bola de fogo do ghast, que é uma flecha com duas
+ * diferenças declaradas por bandeira e não por classe nova: **não cai** (sem
+ * gravidade) e **explode** ao parar. Um segundo pool para dois campos seria
+ * dobrar o código do tick para nada.
  *
  * Arrays paralelas e pool fixo, como o resto das entidades.
  */
@@ -20,6 +25,12 @@ const MAX_AGE = 1200;
 /** Subpassos por tick: uma flecha rápida não pode atravessar uma parede. */
 const SUBSTEPS = 4;
 
+/** Bandeiras de projétil. */
+export const FLAG_NO_GRAVITY = 1;
+export const FLAG_EXPLOSIVE = 2;
+/** A bola de fogo do ghast: voa reto e explode onde parar. */
+export const FIREBALL_FLAGS = FLAG_NO_GRAVITY | FLAG_EXPLOSIVE;
+
 export class Projectiles {
   private readonly x: Float64Array;
   private readonly y: Float64Array;
@@ -33,12 +44,16 @@ export class Projectiles {
   private readonly damage: Float32Array;
   private readonly age: Int32Array;
   private readonly fromPlayer: Uint8Array;
+  /** Bandeiras: bit 0 = sem gravidade, bit 1 = explode ao parar. */
+  private readonly flags: Uint8Array;
   private readonly capacity: number;
   private count = 0;
 
-  /** Chamado quando a flecha encosta em algo que pode levar dano. */
+  /** Chamado quando o projétil encosta em algo que pode levar dano. */
   onHit: ((x: number, y: number, z: number, damage: number, fromPlayer: boolean) => boolean) | null = null;
   onImpactSound: ((x: number, y: number, z: number) => void) | null = null;
+  /** Um projétil explosivo parou: quem ouve detona (bola de fogo do ghast). */
+  onExplode: ((x: number, y: number, z: number) => void) | null = null;
 
   constructor(capacity = 64) {
     this.capacity = capacity;
@@ -54,17 +69,18 @@ export class Projectiles {
     this.damage = new Float32Array(capacity);
     this.age = new Int32Array(capacity);
     this.fromPlayer = new Uint8Array(capacity);
+    this.flags = new Uint8Array(capacity);
   }
 
   get active(): number {
     return this.count;
   }
 
-  /** Lança uma flecha. `speed` em blocos por tick. */
+  /** Lança um projétil. `speed` em blocos por tick. */
   spawn(
     x: number, y: number, z: number,
     dx: number, dy: number, dz: number,
-    damage: number, fromPlayer = false, speed = 1.2,
+    damage: number, fromPlayer = false, speed = 1.2, flags = 0,
   ): boolean {
     if (this.count >= this.capacity) return false;
     const i = this.count++;
@@ -76,6 +92,7 @@ export class Projectiles {
     this.damage[i] = damage;
     this.age[i] = 0;
     this.fromPlayer[i] = fromPlayer ? 1 : 0;
+    this.flags[i] = flags;
     return true;
   }
 
@@ -88,7 +105,7 @@ export class Projectiles {
 
       if (this.age[i] > MAX_AGE) { this.removeAt(i); i--; continue; }
 
-      this.vy[i] += GRAVITY;
+      if ((this.flags[i] & FLAG_NO_GRAVITY) === 0) this.vy[i] += GRAVITY;
       this.vx[i] *= DRAG;
       this.vy[i] *= DRAG;
       this.vz[i] *= DRAG;
@@ -113,10 +130,12 @@ export class Projectiles {
       ));
       if (def.solid) {
         this.onImpactSound?.(this.x[i], this.y[i], this.z[i]);
+        this.detonate(i);
         return true;
       }
       if (this.onHit !== null
         && this.onHit(this.x[i], this.y[i], this.z[i], this.damage[i], this.fromPlayer[i] === 1)) {
+        this.detonate(i);
         return true;
       }
       if (this.y[i] < -8) return true;
@@ -135,6 +154,13 @@ export class Projectiles {
     this.damage[i] = this.damage[last];
     this.age[i] = this.age[last];
     this.fromPlayer[i] = this.fromPlayer[last];
+    this.flags[i] = this.flags[last];
+  }
+
+  /** Explode, se for explosivo. Chamado em todo fim de trajetória. */
+  private detonate(i: number): void {
+    if ((this.flags[i] & FLAG_EXPLOSIVE) === 0) return;
+    this.onExplode?.(this.x[i], this.y[i], this.z[i]);
   }
 
   /** Percorre as flechas ativas para o render, sem alocar. */

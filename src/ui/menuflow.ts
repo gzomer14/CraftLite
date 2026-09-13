@@ -11,9 +11,12 @@
  */
 
 import { seedFromString } from '../core/rng';
+import { archiveFileName, exportWorld, importWorld } from '../save/archive';
 import { newWorldId, type SaveDatabase, type WorldMeta, STORE_WORLDS } from '../save/db';
+import { clearPack, decodeImage, loadPack, readPack, savePack } from '../render/pack';
 import { WORLD_HEIGHT } from '../world/chunk';
 import { OptionsScreen } from './screens/options';
+import { PacksScreen, type PackSummary } from './screens/packs';
 import { TitleScreen } from './screens/title';
 import { WorldsScreen } from './screens/worlds';
 import type { SettingsStore } from '../game/settings';
@@ -28,6 +31,7 @@ export class MenuFlow {
   private readonly title: TitleScreen;
   private readonly worlds: WorldsScreen;
   private readonly options: OptionsScreen;
+  private readonly packs: PacksScreen;
   /** Mundos em memória, quando não há banco. */
   private readonly transient: WorldMeta[] = [];
 
@@ -43,8 +47,22 @@ export class MenuFlow {
       },
       create: (name, seed, mode, difficulty) => this.createWorld(name, seed, mode, difficulty),
       remove: (meta) => this.removeWorld(meta),
+      exportWorld: (meta) => this.exportWorld(meta),
+      importWorld: (file) => this.importWorld(file),
       back: () => {
         this.worlds.hide();
+        this.title.show();
+      },
+    });
+
+    this.packs = new PacksScreen({
+      current: () => this.currentPack(),
+      install: (file) => this.installPack(file),
+      remove: () => this.removePack(),
+      // Recarregar é o que aplica o pacote — ver o comentário de `render/pack.ts`.
+      apply: () => location.reload(),
+      back: () => {
+        this.packs.hide();
         this.title.show();
       },
     });
@@ -58,11 +76,16 @@ export class MenuFlow {
         this.title.hide();
         this.options.show(() => this.title.show());
       },
+      onPacks: () => {
+        this.title.hide();
+        void this.packs.show();
+      },
     });
   }
 
   get isOpen(): boolean {
-    return this.title.isOpen || this.worlds.isOpen || this.options.isOpen;
+    return this.title.isOpen || this.worlds.isOpen || this.options.isOpen
+      || this.packs.isOpen;
   }
 
   showTitle(): void {
@@ -78,6 +101,67 @@ export class MenuFlow {
     this.title.hide();
     this.worlds.hide();
     this.options.hide();
+    this.packs.hide();
+  }
+
+  // --- pacote de texturas (M7) ---------------------------------------------
+
+  private async currentPack(): Promise<PackSummary | null> {
+    const pack = await loadPack(this.db);
+    return pack === null
+      ? null
+      : { name: pack.name, accepted: pack.textures.size, ignored: 0 };
+  }
+
+  /**
+   * Lê o `.zip` escolhido e guarda o pacote.
+   *
+   * O nome do pacote é o do arquivo, sem extensão: é o que o jogador reconhece,
+   * e nenhum formato de pacote do gênero tem metadado que a gente possa ler sem
+   * inventar convenção nova.
+   */
+  private async installPack(file: File): Promise<PackSummary> {
+    if (this.db === null) throw new Error('Sem armazenamento: não dá para guardar o pacote.');
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const name = file.name.replace(/\.zip$/i, '');
+    const { pack, ignored } = await readPack(name, bytes, decodeImage);
+    await savePack(this.db, pack);
+    return { name: pack.name, accepted: pack.textures.size, ignored: ignored.length };
+  }
+
+  private async removePack(): Promise<void> {
+    if (this.db === null) return;
+    await clearPack(this.db);
+  }
+
+  /**
+   * Exporta o mundo para um arquivo que o navegador baixa (M7).
+   *
+   * O download é um `<a download>` com uma URL de blob — o único jeito de
+   * escrever no disco sem permissão especial, e o que funciona no WebView
+   * antigo tanto quanto no Chrome de hoje. A URL é revogada logo depois, senão
+   * o arquivo inteiro fica preso na memória da aba.
+   */
+  private async exportWorld(meta: WorldMeta): Promise<void> {
+    if (this.db === null) throw new Error('Sem armazenamento: não há o que exportar.');
+    const bytes = await exportWorld(this.db, meta.id);
+    const blob = new Blob([bytes as BlobPart], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = archiveFileName(meta.name);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  /** Lê o arquivo escolhido e cria o mundo. Devolve o nome que ele ganhou. */
+  private async importWorld(file: File): Promise<string> {
+    if (this.db === null) throw new Error('Sem armazenamento: não dá para importar.');
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const meta = await importWorld(this.db, bytes);
+    return meta.name;
   }
 
   private async listWorlds(): Promise<WorldMeta[]> {

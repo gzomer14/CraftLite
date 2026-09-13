@@ -9,7 +9,7 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-12 11:14 — **perseguição de mobs: velocidade da tabela não era atingida, e a tabela era lenta demais**
+**Última atualização:** 2026-09-13 11:12 — **M7 fechado: resource pack. Os oito marcos estão de pé.**
 
 ---
 
@@ -22,9 +22,14 @@
 | **M2** Interação | física do jogador, raycast, quebrar/colocar, hotbar, luz por flood fill, dia/noite | ✅ concluído | — |
 | **M3** Mobile | toque completo, HUD responsivo, presets por tier, escala dinâmica, PWA offline | ✅ **validado em T0 real (J7 Metal): 60 FPS, RD 4, escala 1,00, heap estável** | — |
 | **M4** Sobrevivência | inventário 46 slots, crafting, fornalha, baú duplo, ferramentas, vida/fome, itens no chão, fluidos, save ligado, telas de mundo e opções, sprites de item, livro de receitas, inventário criativo | ✅ concluído | — |
-| **M5** Vida no mundo | 12 mobs com IA/animação/spawn, combate, armadura, cama, som procedural, árvores e plantas | ✅ concluído | confirmar densidade de hostis no aparelho |
+| **M5** Vida no mundo | 12 mobs com IA/animação/spawn, combate, armadura, cama, som procedural, árvores e plantas | ✅ concluído | — |
 | **M6** Profundidade | agricultura, reprodução, XP, encantamento, estruturas, clima, arco, conquistas | ✅ concluído | — |
-| **M7** Extras | redstone, Nether, trilhos, multiplayer P2P, import/export, resource packs | ⬜ não iniciado | — |
+| **M7** Extras | redstone, Nether, trilhos, import/export, resource pack | ✅ concluído | multijogador P2P fora de escopo (ver abaixo) |
+
+**O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
+ele irá pesar muito o jogo e trazer muita complexidade por enquanto desnecessária"*. O
+[doc 12](12-multiplayer.md) continua normativo e o `world.setBlock(..., source)` continua
+preparado para ele (`source: 'network'`); o que não existe é implementação nem prazo.
 
 Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ não iniciado
 
@@ -32,16 +37,19 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-12 11:14, com `npm test`, `npm run build` e
+Medidas em 2026-09-13 11:12, com `npm test`, `npm run build` e
 `SIZE_BUDGET_KB=350 npm run size`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **149,0 KB** | < 350 KB | `npm run size` |
-| Testes | **948**, 57 arquivos | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **170,7 KB** | < 350 KB | `npm run size` |
+| Testes | **1130**, 63 arquivos | manter verde | `npm test` |
+| Camadas de atlas | **152** | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Geração de chunk | 6–14 ms (mediana; varia muito com a carga da máquina) | < 25 ms | `tests/perf.test.ts` |
+| Geração de chunk do Nether | 3,8 ms (mediana) | < 25 ms | `tests/perf.test.ts` |
 | Meshing de section | 0,6–1,5 ms (mediana) | < 8 ms | `tests/perf.test.ts` |
 | Tick de 20 mobs | 0,14 ms | << 50 ms | `tests/mobs.test.ts` |
+| Tick de circuito (fio de 64) | 0,88 ms | < 5 ms | `tests/perf.test.ts` |
 | FPS em T0 real (2017) | **60**, RD 4, escala 1,00 (Galaxy J7 Metal) | 30 estáveis | teste manual |
 | Render em T0 | **2,7 ms** de 33,3 ms de orçamento | ≤ 8 ms (soma do doc 02 §2) | overlay F3 no aparelho |
 | Heap em T0 | **20 MB**, estável na sessão | sem crescimento | overlay F3 no aparelho |
@@ -300,8 +308,250 @@ ganhou um campo.
 **Desvio consciente do doc 04 §3:** a escada não tem variante de canto (`inner`/`outer`). Dobrar a
 geometria dela para arredondar quina custa mais, em T0, do que o olho ganha.
 
-### M7 ⬜
-Não iniciado. Ver checklist em [14-roadmap.md](14-roadmap.md).
+### M7 ✅
+Checklist em [14-roadmap.md](14-roadmap.md), menos o multijogador P2P, que saiu de escopo (§1).
+
+#### Redstone ✅ (2026-09-13)
+
+Quinze blocos novos (`data/blocks.ts`, ids 102–116), um motor de circuito
+(`world/redstone.ts`, ~640 linhas) e uma tabela de papéis (`data/redstone.ts`) que é o único lugar
+onde se declara o que cada componente faz.
+
+- **Pó** (`redstone_wire`): energia 0–15 nos bits de estado, perde 1 por bloco, sobe e desce
+  degrau. É `itemless` — quem o coloca é o item `redstone`, via o campo `placesBlock` que existia
+  na tabela de itens e **nunca tinha sido usado** por `game/interaction.ts`.
+- **Emissores:** alavanca (liga e fica), botão de pedra e de madeira (1 s e 1,5 s), placa de
+  pressão de pedra e de madeira, tocha de redstone (inverte o apoio, com 2 ticks de atraso) e
+  bloco de redstone (15 constante).
+- **Lógica:** repetidor com quatro atrasos (1–4 ticks) que só aceita entrada por trás e renova o
+  sinal em 15.
+- **Saídas:** lâmpada, porta/portão/alçapão, pistão e pistão pegajoso (empurra até 12 blocos,
+  o pegajoso puxa de volta).
+- **Instrumentação:** a linha `E:` do overlay F3 ganhou `N redstone` — posições reavaliadas no
+  último tick —, que só aparece quando há circuito rodando.
+
+**O modelo de energia, declarado no comentário do módulo:** existe a distinção forte/fraca, mas em
+uma frase — *forte* é o que um emissor entrega ao bloco em que está encostado (e que realimenta pó
+vizinho com 15); *fraca* é o que o pó entrega aos seis vizinhos (liga mecanismo, **não** realimenta
+pó). É isso que impede o fio de atravessar parede e voltar a 15 do outro lado. Ficaram de fora, de
+propósito: comparador, observador, tremonha, queima de tocha e energia quasi-conectada.
+
+**Propagação:** fila incremental alimentada pelo evento de mudança de bloco, drenada **dentro do
+mesmo tick** até esvaziar ou bater 1024 atualizações. Um fio de 60 blocos acende no tick em que a
+alavanca é puxada; um oscilador patológico custa um frame ruim, nunca uma aba travada. O segundo
+anel de vizinhos só é agendado quando o bloco que mudou é circuito ou conduz — sem isso, cada
+célula de água em movimento custaria 43 consultas ao mundo em vez de 7.
+
+**Dois bugs de integração achados e corrigidos antes de sair:**
+
+1. **A porta não abria na mão.** Abrir uma porta dispara uma reavaliação da posição; o circuito
+   via energia zero e a fechava no mesmo tick. O bit 4 do estado (`DOOR_POWERED_BIT`) passou a
+   guardar "esta porta está aberta por energia", e a porta só se mexe quando a energia **muda**.
+   Regressão coberta em `tests/redstone.test.ts`.
+2. **A placa de pressão não afundava.** A colisão pousa o pé um décimo de milésimo **abaixo** do
+   topo do bloco (`TOUCH_EPSILON` de `physics.ts`), e o `Math.floor` caía no bloco de baixo.
+
+**Desvios conscientes, todos no comentário do módulo ou da forma:**
+
+- O **pistão não anima**: move os blocos de uma vez. Animar exigiria entidade de bloco em
+  movimento, com colisão própria e re-meshing por quadro.
+- A **textura do pistão é a mesma nas seis faces** — o formato de vértice não guarda rotação de
+  textura (doc 01 §5.1). Quem diz para onde ele aponta é a geometria: a placa da frente é mais
+  estreita que o corpo, e o degrau se vê de qualquer ângulo.
+- O **pó não muda de desenho com a conexão**: é sempre um ladrilho deitado com uma cruz vazada,
+  como no visual do gênero. Custa 6 quads por bloco em vez de 30.
+- **Pistão não move** baú, fornalha, mesa de encantamento, gerador, obsidiana nem rocha-mãe.
+
+**Mudança de orçamento aprovada junto:** o teto de camadas de atlas do doc 02 §3 subiu de 128 para
+256. A linha antiga era arbitrária e travava em 127 de 128; o GLES 3.0 garante 256 em qualquer
+aparelho, e 256 × 16×16 RGBA com mips custa 0,34 MB. Depois das 14 texturas novas do redstone
+estamos em **141**.
+
+**Mudança de alcance geral:** `BlockDef` ganhou `support: 'none' | 'below' | 'mount'`. É o que faz
+pó, placa, repetidor, alavanca e botão caírem como item quando perdem o apoio — e é declarativo,
+disponível para qualquer bloco futuro.
+
+#### Nether ✅ (2026-09-13)
+
+Uma dimensão inteira: gerador próprio, portal, travessia, save separado e dois mobs. Os documentos
+normativos **não especificam o Nether** — o doc 00 §52 e o doc 14 só o nomeiam —, então o desenho
+mora nos comentários dos módulos, como manda a regra de desvio do `CLAUDE.md`.
+
+**A decisão de arquitetura que manda em tudo: só existe uma dimensão carregada por vez.** Num
+aparelho de 2 GB, manter o Overworld na memória enquanto o jogador está no Nether dobraria voxel,
+luz e malha sem nada na tela para mostrar. Atravessar o portal grava o que está sujo, descarrega
+tudo e recarrega do outro lado — `world.takeAllChunks`, `pipeline.setDimension`,
+`renderer.chunks.clear()` e `save.setDimension()`, nesta ordem, porque o save precisa gravar as
+colunas que saem ainda com a chave **antiga**.
+
+- **`data/dimensions.ts`** é a tabela: céu, luz ambiente, cor de névoa, escala de bloco, se a água
+  evapora, alcance da lava e teto sólido. Acrescentar uma dimensão é uma entrada aqui mais um
+  módulo em `world/gen/` — e uma linha no worker.
+- **`world/gen/nether.ts`**: netherrack maciço de 0 a 127 esvaziado por ruído 3D, rocha-mãe no
+  chão e no teto, mar de lava até Y=31, quartzo, magma na beira da lava, areia das almas no chão
+  dos salões e glowstone pendurado no teto. **A densidade sai de uma grade esparsa de 5×5×17
+  interpolada trilinearmente**: a primeira versão amostrava os 32.768 voxels e custava 56 ms por
+  chunk, o dobro do orçamento. A versão final custa **3,8 ms**.
+- **`game/portal.ts`**: moldura de obsidiana de 2×3 a 21×21 nos dois eixos, sem contar os cantos —
+  a moldura de 10 obsidianas do gênero funciona. Acender é o isqueiro no ar da face clicada;
+  quebrar qualquer parte apaga o portal inteiro e deixa a moldura.
+- **`game/travel.ts`**: três estados — parado, carregando e chegando. O estado do meio existe
+  porque o pipeline é assíncrono: sem esperar o chunk de destino, o jogador cai pelo mundo vazio,
+  que foi exatamente o que a primeira versão fez. Há tempo limite: destino que nunca carrega aborta
+  a viagem em vez de largar o jogador no nada.
+- **Escala 1:8.** Ida divide, volta multiplica. É o que torna o Nether um atalho de viagem em vez
+  de um cenário a mais. A chegada procura um portal aceso num raio de 12 colunas antes de escavar
+  um novo — é isso que faz a ida e a volta caírem no mesmo par.
+- **Save por dimensão:** a chave de chunk do Overworld **continua sendo o `worldId` puro**, então
+  mundo salvo antes do M7 abre sem migração; as outras ganham sufixo, e `deleteWorld` apaga todas.
+  `PlayerSave.dimension` é opcional pelo mesmo motivo — save antigo abre na superfície.
+- **Mobs:** porco zumbi (neutro, corpo-a-corpo, imune ao fogo) e **ghast** — voa, atira bola de
+  fogo a 30 blocos e explode onde ela para. O voo é um traço novo (`flies`): sem gravidade e com
+  o Y do destino entrando no steering. O tamanho de 4 blocos sai de `modelScale`, o mesmo
+  mecanismo que o slime já usava — um modelo de 64 px não caberia na folha de skin.
+- **Regras da dimensão que mudam o jogo:** água evapora, lava anda 4 blocos em vez de 3, a luz do
+  céu não existe (a rocha-mãe do teto já garante isso no flood fill) e a névoa é vermelha por
+  tabela, sem ciclo de dia.
+- **Morrer no Nether devolve à superfície**, e sair do mundo dentro dele volta nele.
+
+**Desvios conscientes:**
+
+- O bloco de portal é um **cubo inteiro** translúcido, não o plano fino do gênero: um plano
+  exigiria forma nova com eixo no estado, e o portal é atravessado, não observado de perto.
+- O isqueiro **não põe fogo em nada** além do portal. Fogo que se espalha é um sistema com
+  orçamento próprio, e o M7 não pediu isso.
+- O ghast tem quatro tentáculos curtos em vez de nove compridos — a 30 blocos de distância, que é
+  onde ele é visto, lê igual e custa metade das caixas no batcher.
+
+**Uma dívida de cinco marcos fechada no caminho:** o traço `fireImmune` existia desde o M5 e
+**nenhum mob o declarava**, porque não havia como um mob pegar fogo fora do sol. Agora lava
+machuca mob, e os dois do Nether são imunes.
+
+#### Trilhos e carrinho de mina ✅ (2026-09-13)
+
+O bloco `rail` existia desde o M6 porque a mina o usa — o que faltava era tudo que faz dele
+transporte: forma, máquina e veículo.
+
+- **`world/rails.ts`** — conexão automática. Um trilho não é colocado com uma forma: ele a
+  **descobre** olhando os vizinhos, e a redescobre quando um vizinho muda. Dois vizinhos mandam
+  (reta no mesmo eixo, curva em eixos diferentes), um define o eixo, nenhum mantém o que estava; e
+  a rampa entra depois, sobre o eixo já decidido. Mesma fila incremental com teto do redstone.
+- **A forma vai para os bits 0..3 do estado**, e não é calculada no meshing como a conexão da
+  cerca, porque **o carrinho precisa dela**: cerca conectada é desenho, trilho conectado é física.
+- **`entity/minecart.ts`** — o carrinho guarda uma velocidade escalar e a direção; a cada tick lê a
+  forma do trilho, projeta a direção sobre o eixo dela, anda e **gruda no centro** no eixo
+  perpendicular. É o que o mantém na linha sem uma única consulta de colisão. Fora do trilho, cai e
+  freia até parar.
+- **Trilho motorizado** empurra quando energizado e **freia** quando não — os dois lados da mesma
+  peça, como no gênero. **Trilho detector** vira fonte de redstone enquanto há carrinho em cima.
+- **Os dois sistemas escrevem no mesmo voxel sem se atropelar:** `rails.ts` mexe nos bits 0..3
+  (forma), `redstone.ts` no bit 4 (energia), e cada um preserva os bits do outro. Há teste de
+  regressão para exatamente isso.
+
+**Uma exceção de mesher, a primeira em sete marcos:** o trilho ganhou `CPLX_RAIL`, um caminho que
+emite **um quad só**, deitado ou inclinado. Caixa alinhada aos eixos não representa rampa, e o
+trilho é a única forma do jogo que precisa de plano inclinado. De quebra, um quad custa 1/6 do que
+a caixa achatada custava.
+
+**Desvio consciente:** o carrinho não tem acelerador. O olhar escolhe **para que lado** da linha
+ele vai e dá o empurrão; quem mantém a velocidade é o trilho motorizado — que é o ponto de existir
+um. Um acelerador contínuo tornaria o motorizado decorativo.
+
+#### Import/export de mundos ✅ (2026-09-13)
+
+Responde à pergunta que o usuário fez em 2026-09-12 — *"se eu criar um mundo no celular consigo
+acessar no computador?"* — e que até aqui se respondia "não dá". Nada vai para servidor (doc 11 §1);
+o transporte é um arquivo `.clw` que o jogador guarda onde quiser.
+
+- **`save/archive.ts`** é o formato e as duas operações de banco. O formato **reaproveita o que já
+  existe**: cada chunk entra no arquivo exatamente como está no banco, já serializado e comprimido
+  por `save/serialize.ts`. Reserializar seria pagar duas vezes, e JSON com base64 ficaria três
+  vezes maior. Meta, jogador, baús e veículos são JSON — é pouco, e assim um formato novo de baú
+  não quebra o arquivo antigo.
+- **Todas as dimensões vão no arquivo**, cada uma com seus chunks, baús e veículos. Dimensão nunca
+  visitada não entra: quem nunca abriu um portal não carrega um Nether vazio junto.
+- **O mundo importado sempre ganha id novo**, e o nome ganha sufixo quando já existe outro igual.
+  Reaproveitar o id do arquivo sobrescreveria em silêncio um mundo que o jogador já tem — o pior
+  resultado possível para uma função cujo ponto é não perder nada.
+- **Erro de arquivo é mensagem, não exceção crua:** assinatura errada, truncado, corrompido e
+  versão futura têm cada um a sua frase, e ela aparece na tela de mundos.
+- A tela de mundos ganhou **Exportar** e **Importar**. O download é `<a download>` com URL de blob —
+  o que funciona no WebView antigo tanto quanto no Chrome de hoje —, e a URL é revogada logo
+  depois, senão o arquivo inteiro fica preso na memória da aba.
+
+`packArchive`/`unpackArchive` são **puros**: só mexem em bytes. É por isso que o formato é testado
+sem IndexedDB nenhum, inclusive os quatro modos de arquivo inválido.
+
+#### Barco e carrinho no save, e um bug do Nether ✅ (2026-09-13)
+
+Duas coisas que sumiam sozinhas, corrigidas juntas porque moram no mesmo lugar:
+
+1. **Barco e carrinho nunca foram salvos**, desde que existem. Sair do mundo e voltar sumia com os
+   dois: o trilho ficava, o carrinho em cima dele não. Agora há `VehicleRecord`, com
+   `Session.vehicleSnapshot()` e `restoreVehicles()`.
+2. **O baú do Nether sobrescrevia o da superfície.** A lista de tile entities tinha **uma chave por
+   mundo**; atravessar o portal gravava a lista de lá por cima da de cá, e o conteúdo de todo baú
+   de casa ia junto. A chave passou a ser a de dimensão — e, como `dimensionIdFor` devolve o
+   `worldId` puro para a superfície, mundo salvo antes do M7 continua abrindo sem migração.
+
+**A ordem virou regra explícita:** a `Session` dispara `onDimensionChange` **antes** de limpar as
+listas, e o `SaveGame` tira o instantâneo de baús e veículos de forma síncrona dentro do evento —
+só a gravação é adiada. Invertendo a ordem, o save encontraria tudo vazio. A troca de dimensão
+também virou **um caminho só**: portal, renascimento e restauração do save passam todos por
+`Session.enterDimension`.
+
+#### Resource pack ✅ (2026-09-13)
+
+O último item do doc 14. **A regra do doc 13 §1 continua inteira:** nenhum asset de terceiros entra
+no repositório, e todo pixel que o jogo distribui continua saindo de `data/textures.ts`,
+`data/itemart.ts` e `data/mobskins.ts`. Um pack é o caminho para quem quer a **própria** arte: um
+`.zip` que o jogador escolhe, que mora no banco dele e que nunca passa por servidor nem por `src/`.
+
+- **`core/zip.ts`** — o leitor de ZIP, ~150 linhas, porque o doc 13 §7 pede um `.zip` e o projeto
+  não tem dependência de runtime. Só a leitura: nada de escrever, de ZIP64, de arquivo cifrado nem
+  de conferir CRC (o PNG tem o dele). **Vai pelo diretório central**, no fim do arquivo, e não
+  pelos cabeçalhos locais — é o que faz funcionar com zip gerado em streaming, cujo cabeçalho local
+  traz tamanho zero. A descompressão é `DecompressionStream('deflate-raw')`, a mesma dos chunks:
+  zero bytes de bundle.
+- **`render/pack.ts`** — a convenção de nomes, a reamostragem e a persistência. Três famílias:
+  `block/<textura>` e `item/<item>` em 16×16, `entity/<skin>` em 64×64 (a terceira é acréscimo
+  nosso; o doc só nomeia as duas primeiras). O caminho pode ter qualquer prefixo de pastas: valem
+  os **dois últimos segmentos**, então `block/stone.png` e `assets/x/textures/block/stone.png`
+  chegam no mesmo lugar. Imagem de outro tamanho é reamostrada **no import**, com média ponderada
+  pelo alfa — sem isso a borda de um vidro ganha um halo da cor de fundo do PNG. Nome sem
+  correspondente no jogo é recusado e contado.
+- **O pack entra no boot, antes de o atlas gerar um pixel.** Mipmap, média de cor das partículas de
+  quebra e a folha de sprites de item derivam todos dos mesmos arrays. `Atlas` e `EntityAtlas`
+  ganharam `overrides` no construtor, `buildItemSheet` ganhou um mapa por item, e `boot()` virou
+  assíncrono — o banco subiu três linhas, porque ia abrir logo depois de qualquer jeito.
+- **De graça:** um `item/<nome>.png` **dá sprite a item que não tinha nenhum**.
+- **A tela é a de título, não a de opções** (`ui/screens/packs.ts`). Aplicar recarrega a página, e
+  das opções se chega de dentro do jogo, pelo menu de pausa: recarregar ali custaria o que se fez
+  desde o último autosave. Importar guarda o pacote e mostra o resultado; **quem aperta recarregar
+  é o jogador**, que assim lê "38 aceitas, 4 ignoradas" antes de a tela sumir.
+
+**Desvios conscientes, todos no comentário do módulo:**
+
+- **Não há decodificador de PNG no projeto.** `createImageBitmap`, com `Image` + URL de blob como
+  reserva para o WebView antigo, gasta 20 linhas em vez de 300 de bundle para repetir o que todo
+  navegador já faz.
+- **A arte do pack vale só na camada dela**: textura gerada a partir de outra continua saindo do
+  procedural, senão trocar a pedra mudaria o minério, o musgo e mais uma dúzia de blocos.
+- **`Atlas.loadOverrides` troca só o nível 0** de mipmap. O caminho do pack é o construtor; a
+  função existe porque o `PROMPT.md` §219 a pede pelo nome.
+
+#### Dívida do aleatório dos mobs, fechada (2026-09-13)
+
+`entity/mobs.ts`, `entity/mobstore.ts` e `entity/spawn.ts` chamavam `Math.random()` direto, ao
+contrário de `world/growth.ts`, que sempre teve o aleatório injetável. A consequência era medida:
+`tests/mobs.test.ts` falhava 2 vezes em ~14 execuções da suíte completa e **nunca reproduzia
+isolado** — o tipo de teste que acaba ignorado.
+
+Os três passaram a expor `random: () => number`, e `Mobs.random` propaga para o store e para o
+contexto de IA de uma vez. Os quatro arquivos de teste que montam mobs semeiam um `Rng` da própria
+`core/rng.ts`. Há regressão: dois mobs nascidos com a mesma semente têm o mesmo yaw e o mesmo
+cooldown de passeio, e quarenta ticks com a mesma semente dão o mesmo estado. Doze execuções
+seguidas da suíte completa depois da mudança: verde.
 
 ---
 
@@ -409,27 +659,40 @@ aparelho entregou 60.
 
 As **duas decisões de balanceamento** que ficaram abertas foram aplicadas em 2026-09-12, com o
 aval do usuário, e estão no §4: T0 subiu para 2 workers (anel de RD 4 em 75 frames, não 149) e o
-cap de mobs deixou de punir duas vezes (20/40/70, como o doc 02 §1 sempre disse). Falta **medir as
-duas no aparelho**: a geração deve acompanhar quem anda, e a caverna deve ter bicho.
+cap de mobs deixou de punir duas vezes (20/40/70, como o doc 02 §1 sempre disse).
 
-O M7 pode começar.
+**2026-09-13: as duas foram confirmadas em campo.** Relato do usuário sobre o mesmo Galaxy J7
+Metal: *"eu já havia feito os testes no dispositivo T0, tudo funcionando perfeitamente e sempre a
+60 FPS sem problema"*. Com isso **a dependência externa fechou por inteiro** e não sobrou nenhuma
+pendência de marco anterior: M0 a M6 estão fechados e validados no aparelho-alvo.
+
+A única coisa que resta é o M7, e dele o multijogador P2P saiu de escopo (ver §1). A ordem do
+doc 14 continua valendo para o que ficou:
+
+```
+redstone ✅  ──►  Nether ✅  ──►  trilhos ✅  ──►  import/export ✅  ──►  resource pack ✅
+```
+
+**O M7 fechou em 2026-09-13**, e com ele os oito marcos do `PROMPT.md`. Não há mais pendência de
+funcionalidade de marco no projeto — o que resta está no §6, e é tudo de outra natureza: campo,
+polimento de UI e oportunidades pequenas.
+
+**O que o Nether deixou pronto para quem vier depois:** `data/dimensions.ts` e o carimbo de
+dimensão no protocolo do worker são genéricos — uma terceira dimensão é uma entrada na tabela e um
+gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca de mundo precisa.
 
 ---
 
 ## 6. Próximo passo recomendado
 
-1. **Confirmar em campo as duas mudanças de balanceamento de 2026-09-12** (§4), no mesmo
-   Galaxy J7 Metal: (a) andar e voar em terreno novo, vendo se a geração acompanha agora com 2
-   workers — a coluna "na fila" da linha `C:` do overlay é o termômetro; (b) descer numa caverna e
-   ver se aparece hostil, agora que o cap de T0 subiu de 8 para 20 e o Y de spawn segue o jogador.
-   As duas foram medidas em teste, **nenhuma foi medida no aparelho**.
-2. **Começar o M7**, na ordem do doc 14: redstone básico, Nether, trilhos e carrinho, multijogador
-   P2P (doc 12), import/export de mundos e resource pack.
-3. **Rever o teto de 128 camadas de atlas no doc 02 §3.** Está em **127 de 128** depois das
-   texturas novas: a próxima textura estoura a linha. A linha é arbitrária — vale 0,13 MB dentro
-   de um alvo de 350 MB de RSS — e o GLES 3.0 garante no mínimo 256 camadas de array em qualquer
-   aparelho, então 256 caberia em ~0,34 MB. Decisão de doc, não de código.
-4. **O que a revisão de UX levantou e ficou para depois**, todos da tabela de Vídeo do doc 08 ou
+1. **Jogar o M7 inteiro no aparelho.** É a única coisa da lista que não é polimento: redstone,
+   Nether, trilhos, import/export e resource pack nasceram todos em 2026-09-13, com orçamento
+   medido em teste (0,88 ms/tick de circuito, 3,8 ms/chunk de Nether) e **nenhum rodou no J7
+   Metal**. Três termômetros no overlay: `N redstone` na linha `E:`, que não deve chegar perto de
+   1024; a linha `C:` durante a travessia do portal — trocar de dimensão descarrega e recarrega o
+   anel inteiro, que é o pior caso de pipeline que o jogo tem; e o tempo de atlas no boot, que
+   agora pode incluir um pacote vindo do banco.
+2. **O que a revisão de UX levantou e ficou para depois**, todos da tabela de Vídeo do doc 08 ou
    das listas de Controles/Som:
    - **remapeamento de teclas** (doc 08, Controles: "lista completa de teclas remapeáveis, conflito
      em vermelho") — hoje as teclas são fixas em `input/controls.ts`;
@@ -440,18 +703,22 @@ O M7 pode começar.
      Partículas, Névoa, Balanço de Câmera, Mostrar FPS;
    - resto da Acessibilidade: modo daltônico, contorno de bloco em alto contraste, esconder flashes
      do céu, efeitos de distorção.
-5. Oportunidades pequenas que sobraram:
+3. Oportunidades pequenas que sobraram:
    - **boneco 3D do jogador** na tela de inventário: o doc 08 §3.5 desenha um preview do modelo
      ao lado dos slots de armadura, e ele nunca foi feito — hoje a seção Equipamento é só a fila
      de slots. O doc já prevê sprite estático como saída para T0;
    - **morcego**: o doc 07 §4 lista a categoria `ambient` com cap próprio, mas **não existe
      nenhum mob `ambient` no código** — é a única linha da tabela de spawn sem nada atrás dela;
-   - miniatura do mundo na tela de seleção (o doc 11 §1 prevê `STORE_THUMBS`, que existe e está vazio);
    - `sizeBytes` da meta do mundo, hoje sempre 0;
    - painel de receitas mostrando **a grade** da receita, não só o resultado;
    - variante de canto da escada (`inner`/`outer`), se o orçamento de T0 permitir;
-   - barco não vai para o save: sair do mundo e voltar deixa o barco onde ele estava? Não — ele
-     some, porque `Boats` não é serializado.
+   - miniatura do mundo na tela de seleção (`STORE_THUMBS` existe e está vazio) — e agora ela teria
+     um segundo uso: o arquivo `.clw` poderia carregá-la;
+   - **fogo que se espalha**: o isqueiro do M7 só acende portal (ver §3). Não há bloco de fogo, e
+     `flammable` da tabela de blocos continua sem ninguém que o leia;
+   - **som no pacote de texturas**: a máquina de `render/pack.ts` serve para `.ogg` também, mas o
+     `audio/synth.ts` gera onda, não toca amostra — seria um caminho de áudio novo, não uma
+     substituição de tabela.
 
 ---
 

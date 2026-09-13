@@ -73,4 +73,17 @@ export const BLOCK_LOOT: Record<string, LootEntry> = {
   water: { drops: [] },
   lava: { drops: [] },
   mob_spawner: { drops: [] },
+
+  // Redstone (M7): o lado "apagado" de cada par dropa o item que o jogador
+  // conhece, e o pó volta a ser pó.
+  redstone_wire: { drops: [{ item: 'redstone', count: 1 }] },
+  redstone_torch_off: { drops: [{ item: 'redstone_torch', count: 1 }] },
+  redstone_lamp_on: { drops: [{ item: 'redstone_lamp', count: 1 }] },
+  // O braço não é item: quem o quebra fica com o pistão, que volta a recolher.
+  piston_head: { drops: [] },
+
+  // Nether (M7).
+  nether_quartz_ore: { drops: [{ item: 'nether_quartz', count: 1, fortune: true }], xp: [2, 5] },
+  // O portal não é bloco de mão nenhuma: quebrá-lo só apaga o portal.
+  nether_portal: { drops: [] },
 };

@@ -9,6 +9,7 @@
  * A regra que mais importa em T0: **carregar devagar é melhor que travar.**
  */
 
+import { DIM_OVERWORLD } from '../data/dimensions';
 import { ChunkColumn, ChunkState, SECTIONS_PER_COLUMN, chunkKey } from './chunk';
 import { extractNeighborhood, NB_VOLUME } from './neighborhood';
 import type { World } from './world';
@@ -71,6 +72,9 @@ export class ChunkPipeline {
   private readonly inFlight: number[] = [];
   private readonly maxInFlight: number;
 
+  /** Dimensão que os pedidos de geração carregam (`DIM_*`). */
+  dimension = DIM_OVERWORLD;
+
   private readonly genQueue: PendingJob[] = [];
   private readonly meshQueue: PendingJob[] = [];
   private readonly queuedKeys = new Set<number>();
@@ -129,10 +133,39 @@ export class ChunkPipeline {
     this.unloadFarChunks();
   }
 
+  /**
+   * Troca a dimensão e limpa tudo que era da anterior.
+   *
+   * Chama `onChunkUnloaded` para cada coluna que sai — é assim que o save grava
+   * o que estava sujo e o renderer solta a malha da GPU. As filas e os jobs em
+   * voo são esquecidos: a resposta que chegar depois vem carimbada com a
+   * dimensão de origem e é descartada em `onGenerated`.
+   */
+  setDimension(dimension: number): void {
+    if (dimension === this.dimension) return;
+    this.dimension = dimension;
+
+    const taken: ChunkColumn[] = [];
+    const count = this.world.takeAllChunks(taken);
+    for (let i = 0; i < count; i++) this.onChunkUnloaded?.(taken[i]);
+
+    this.genQueue.length = 0;
+    this.meshQueue.length = 0;
+    this.queuedKeys.clear();
+    this.generating.clear();
+    this.meshing.clear();
+    this.readyMeshes.length = 0;
+    // Força o `setCenter` seguinte a reenfileirar, mesmo na mesma coluna.
+    this.centerX = Number.NaN;
+    this.centerZ = Number.NaN;
+  }
+
   /** Recentra o pipeline na posição do jogador e reordena as filas. */
   setCenter(x: number, z: number): void {
     const cx = Math.floor(x / 16);
     const cz = Math.floor(z / 16);
+    // `NaN` no centro vem de `setDimension` e nunca compara igual: é o que
+    // força o reenfileiramento na primeira chamada depois do portal.
     if (cx === this.centerX && cz === this.centerZ && this.queuedKeys.size > 0) return;
     this.centerX = cx;
     this.centerZ = cz;
@@ -257,7 +290,7 @@ export class ChunkPipeline {
     this.generating.add(key);
 
     if (this.loadSaved === null) {
-      this.send({ type: 'gen', cx: job.cx, cz: job.cz });
+      this.send({ type: 'gen', cx: job.cx, cz: job.cz, dim: this.dimension });
       return;
     }
 
@@ -266,13 +299,13 @@ export class ChunkPipeline {
     // existe.
     void this.loadSaved(job.cx, job.cz).then((saved) => {
       if (saved === null) {
-        this.send({ type: 'gen', cx: job.cx, cz: job.cz });
+        this.send({ type: 'gen', cx: job.cx, cz: job.cz, dim: this.dimension });
         return;
       }
       this.generating.delete(key);
       this.acceptChunk(saved);
     }).catch(() => {
-      this.send({ type: 'gen', cx: job.cx, cz: job.cz });
+      this.send({ type: 'gen', cx: job.cx, cz: job.cz, dim: this.dimension });
     });
   }
 
@@ -330,6 +363,8 @@ export class ChunkPipeline {
   private onGenerated(response: GenResponse): void {
     const key = chunkKey(response.cx, response.cz);
     this.generating.delete(key);
+    // Chegou depois de atravessar o portal: é terreno da outra dimensão.
+    if (response.dim !== this.dimension) return;
     this.stats.genMs += (response.ms - this.stats.genMs) * 0.1;
 
     const chunk = new ChunkColumn(response.cx, response.cz);

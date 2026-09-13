@@ -132,6 +132,18 @@ export class ChunkRenderer {
   }
 
   /**
+   * Solta **toda** a geometria da GPU (M7: troca de dimensão).
+   *
+   * `releaseColumn` por coluna deixaria para trás o que o pipeline já tinha
+   * esquecido — e uma malha do Overworld pendurada no Nether é memória de vídeo
+   * perdida até o jogo fechar.
+   */
+  clear(): void {
+    for (const entry of this.sections.values()) entry.dispose();
+    this.sections.clear();
+  }
+
+  /**
    * Monta as três listas de desenho com frustum culling.
    * Opacos ficam front-to-back; translúcidos, back-to-front.
    */

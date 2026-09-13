@@ -26,11 +26,12 @@
  */
 
 import {
-  CPLX_BOXES, CPLX_CROSS, stageTexOf, shapeIdOf, type BlockTables,
+  CPLX_BOXES, CPLX_CROSS, CPLX_RAIL, stageTexOf, shapeIdOf, type BlockTables,
 } from './blockinfo';
 import { nbIndex } from './greedy';
 import {
   BOX_STRIDE, FACING_STEP, MAX_BOXES, SHAPE_FENCE, SHAPE_FENCE_GATE, SHAPE_PANE, boxesFor,
+  railSlopeDir,
 } from './shapes';
 import { FACE_POS_Y } from '../../render/vertex';
 import type { MeshBuilder } from '../../render/mesh';
@@ -80,6 +81,8 @@ export function meshComplex(
 
         if (kind === CPLX_CROSS) {
           quads += emitCross(out, x, y, z, tex, blockLight, skyLight, tint);
+        } else if (kind === CPLX_RAIL) {
+          quads += emitRail(out, x, y, z, bits & 0xf, tex, blockLight, skyLight, tint);
         } else if (kind === CPLX_BOXES) {
           const shape = shapeIdOf(tables, id);
           const links = needsConnections(shape)
@@ -133,6 +136,40 @@ function emitCross(
   out.addPolyQuad(CORNERS, FACE_POS_Y, tex, blockLight, skyLight, tint, true);
   return 2;
 }
+
+/**
+ * Trilho: **um quad só**, deitado ou inclinado (M7).
+ *
+ * A rampa é a única geometria do jogo que não é caixa alinhada aos eixos, e é
+ * por isso que ela tem um caminho próprio aqui em vez de uma forma em
+ * `shapes.ts`. Os quatro cantos saem direto, como na cruz da planta.
+ *
+ * Visível dos dois lados: um trilho é fino, e olhar por baixo de uma ponte não
+ * pode mostrar um buraco.
+ */
+function emitRail(
+  out: MeshBuilder, x: number, y: number, z: number, shape: number,
+  tex: number, blockLight: number, skyLight: number, tint: number,
+): number {
+  const slope = railSlopeDir(shape);
+  // Alturas dos quatro cantos, na ordem (0,0) (1,0) (1,1) (0,1) em (x,z).
+  const base = y + RAIL_LIFT;
+  let h00 = base; let h10 = base; let h11 = base; let h01 = base;
+  if (slope === 0) { h10 += 1; h11 += 1; }        // sobe para +X
+  else if (slope === 1) { h00 += 1; h01 += 1; }   // sobe para −X
+  else if (slope === 2) { h01 += 1; h11 += 1; }   // sobe para +Z
+  else if (slope === 3) { h00 += 1; h10 += 1; }   // sobe para −Z
+
+  CORNERS[0] = x; CORNERS[1] = h00; CORNERS[2] = z;
+  CORNERS[3] = x + 1; CORNERS[4] = h10; CORNERS[5] = z;
+  CORNERS[6] = x + 1; CORNERS[7] = h11; CORNERS[8] = z + 1;
+  CORNERS[9] = x; CORNERS[10] = h01; CORNERS[11] = z + 1;
+  out.addPolyQuad(CORNERS, FACE_POS_Y, tex, blockLight, skyLight, tint, true);
+  return 1;
+}
+
+/** Quanto o trilho fica acima do chão, para não brigar com a face do bloco. */
+const RAIL_LIFT = 1 / 16;
 
 /** Plano vertical do canto `(ax,az)` ao canto `(bx,bz)` do bloco. */
 function setCorners(

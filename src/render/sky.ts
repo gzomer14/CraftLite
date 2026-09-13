@@ -92,6 +92,17 @@ export class SkyPass {
    * Chamado **depois** de `update`, sobre as cores do ciclo: assim a
    * tempestade ao pôr do sol continua alaranjada, só que apagada.
    */
+  /**
+   * Pinta céu e horizonte com uma cor fixa (M7: o Nether não tem ciclo de dia).
+   * O zênite sai mais escuro que o horizonte, como num teto de rocha.
+   */
+  override(color: readonly [number, number, number]): void {
+    for (let c = 0; c < 3; c++) {
+      this.horizon[c] = color[c];
+      this.zenith[c] = color[c] * 0.45;
+    }
+  }
+
   applyRain(amount: number): void {
     if (amount <= 0) return;
     const t = Math.min(1, amount);

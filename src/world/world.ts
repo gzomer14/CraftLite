@@ -7,6 +7,7 @@
  */
 
 import { AIR } from '../data/blocks';
+import { DIM_OVERWORLD, dimensionOf, type DimensionDef } from '../data/dimensions';
 import {
   ChunkColumn, SECTION_SIZE, SECTIONS_PER_COLUMN, WORLD_HEIGHT, chunkKey,
 } from './chunk';
@@ -23,6 +24,15 @@ export interface BlockChange {
 
 export class World {
   readonly seed: number;
+  /**
+   * Dimensão carregada agora (`DIM_*` de `data/dimensions.ts`).
+   *
+   * **Só existe uma por vez**, e trocar não é um detalhe de renderização:
+   * atravessar o portal grava o que está sujo, descarrega tudo e recarrega do
+   * outro lado (ver `game/travel.ts`). Num aparelho de 2 GB, manter as duas na
+   * memória dobraria voxel, luz e malha sem nada na tela para mostrar.
+   */
+  dimension = DIM_OVERWORLD;
   private readonly chunks = new Map<number, ChunkColumn>();
   /** Sections marcadas para re-meshing, como chaves `key*8+sy`. */
   private readonly dirtySections = new Set<number>();
@@ -36,6 +46,26 @@ export class World {
 
   get chunkCount(): number {
     return this.chunks.size;
+  }
+
+  /** Definição da dimensão atual — quem pergunta "tem céu?" pergunta aqui. */
+  get dimensionDef(): DimensionDef {
+    return dimensionOf(this.dimension);
+  }
+
+  /**
+   * Esvazia o mundo para receber outra dimensão.
+   *
+   * Devolve as colunas removidas para quem precisa descarregá-las em ordem
+   * (gravar o que está sujo, soltar a malha da GPU). Não avisa os ouvintes de
+   * mudança de bloco: não é o mundo mudando, é outro mundo entrando.
+   */
+  takeAllChunks(out: ChunkColumn[]): number {
+    let n = 0;
+    for (const chunk of this.chunks.values()) out[n++] = chunk;
+    this.chunks.clear();
+    this.dirtySections.clear();
+    return n;
   }
 
   getChunk(cx: number, cz: number): ChunkColumn | undefined {

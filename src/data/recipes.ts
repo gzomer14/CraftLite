@@ -166,6 +166,48 @@ export const RECIPES: readonly Recipe[] = [
   { type: 'shaped', pattern: ['.B.', 'DOD', 'OOO'],
     key: { B: 'book', D: 'diamond', O: 'obsidian' },
     result: { item: 'enchanting_table', count: 1 } },
+
+  // --- redstone (M7) ------------------------------------------------------
+  // O pó sai do minério; daqui para a frente é tudo pó + um material comum.
+  { type: 'shaped', pattern: ['R', 'S'], key: { R: 'redstone', S: 'stick' },
+    result: { item: 'redstone_torch', count: 1 } },
+  { type: 'shaped', pattern: ['S', 'C'], key: { S: 'stick', C: 'cobblestone' },
+    result: { item: 'lever', count: 1 } },
+  { type: 'shapeless', ingredients: ['stone'], result: { item: 'stone_button', count: 1 } },
+  { type: 'shapeless', ingredients: ['#planks'], result: { item: 'oak_button', count: 1 } },
+  { type: 'shaped', pattern: ['SS'], key: { S: 'stone' },
+    result: { item: 'stone_pressure_plate', count: 1 } },
+  { type: 'shaped', pattern: ['PP'], key: { P: '#planks' },
+    result: { item: 'oak_pressure_plate', count: 1 } },
+  { type: 'shaped', pattern: ['TRT', 'SSS'], key: { T: 'redstone_torch', R: 'redstone', S: 'stone' },
+    result: { item: 'repeater', count: 1 } },
+  { type: 'shaped', pattern: ['PPP', 'CIC', 'CRC'],
+    key: { P: '#planks', C: 'cobblestone', I: 'iron_ingot', R: 'redstone' },
+    result: { item: 'piston', count: 1 } },
+  { type: 'shapeless', ingredients: ['piston', 'slime_ball'],
+    result: { item: 'sticky_piston', count: 1 } },
+  { type: 'shaped', pattern: ['.R.', 'RGR', '.R.'], key: { R: 'redstone', G: 'glowstone' },
+    result: { item: 'redstone_lamp', count: 1 } },
+  { type: 'shaped', pattern: ['RRR', 'RRR', 'RRR'], key: { R: 'redstone' },
+    result: { item: 'redstone_block', count: 1 } },
+  { type: 'shapeless', ingredients: ['redstone_block'], result: { item: 'redstone', count: 9 } },
+
+  // --- Nether (M7) --------------------------------------------------------
+  // O isqueiro é o que abre o portal, e por isso é barato: ferro e sílex.
+  { type: 'shapeless', ingredients: ['iron_ingot', 'flint'],
+    result: { item: 'flint_and_steel', count: 1 } },
+  { type: 'shaped', pattern: ['BB', 'BB'], key: { B: 'nether_brick' },
+    result: { item: 'nether_bricks', count: 1 } },
+
+  // --- trilhos e carrinho (M7) --------------------------------------------
+  { type: 'shaped', pattern: ['I.I', 'ISI', 'IRI'],
+    key: { I: 'gold_ingot', S: 'stick', R: 'redstone' },
+    result: { item: 'powered_rail', count: 6 } },
+  { type: 'shaped', pattern: ['I.I', 'IPI', 'IRI'],
+    key: { I: 'iron_ingot', P: 'stone_pressure_plate', R: 'redstone' },
+    result: { item: 'detector_rail', count: 6 } },
+  { type: 'shaped', pattern: ['I.I', 'III'], key: { I: 'iron_ingot' },
+    result: { item: 'minecart', count: 1 } },
 ];
 
 /**

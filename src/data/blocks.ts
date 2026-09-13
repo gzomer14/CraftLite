@@ -13,7 +13,18 @@ export type Face = 'top' | 'bottom' | 'north' | 'south' | 'east' | 'west';
 
 export type BlockShape =
   | 'cube' | 'cross' | 'slab' | 'stairs' | 'fence' | 'fence_gate' | 'door' | 'trapdoor'
-  | 'torch' | 'carpet' | 'flat' | 'liquid' | 'pane' | 'ladder' | 'sign' | 'painting' | 'none';
+  | 'torch' | 'carpet' | 'flat' | 'liquid' | 'pane' | 'ladder' | 'sign' | 'painting'
+  | 'lever' | 'button' | 'plate' | 'repeater' | 'piston' | 'piston_head' | 'rail' | 'none';
+
+/**
+ * De que o bloco precisa para continuar existindo (M7).
+ *
+ * `below` = um bloco opaco embaixo (pó, placa de pressão, repetidor, tocha de
+ * chão); `mount` = o bloco na direção em que ele está encaixado, nos bits 0..2
+ * do estado (alavanca, botão). Quem perde o apoio cai como item — a checagem é
+ * de `world/redstone.ts`, que já visita essas posições.
+ */
+export type SupportKind = 'none' | 'below' | 'mount';
 
 export type ToolKind = 'none' | 'pickaxe' | 'axe' | 'shovel' | 'hoe' | 'shears' | 'sword';
 export type TintKind = 'none' | 'grass' | 'foliage' | 'water';
@@ -50,6 +61,16 @@ export interface BlockDef {
   stages: readonly string[];
   /** true = não existe item deste bloco (água, lava, plantação). */
   itemless: boolean;
+  /** Apoio de que o bloco precisa para ficar em pé (doc 04 §3, M7). */
+  support: SupportKind;
+  /**
+   * Desenhado no passe translúcido, com mistura alfa (M7).
+   *
+   * Até o M6 só a água era translúcida, e `mesh/blockinfo.ts` a reconhecia pelo
+   * id. O portal precisa do mesmo passe, e reconhecer **dois** ids por nome
+   * seria o começo de uma lista — daí o campo.
+   */
+  translucent: boolean;
 }
 
 /** Campos com valor padrão — a tabela só declara o que foge do comum. */
@@ -74,6 +95,8 @@ const DEFAULTS: Omit<BlockDef, 'id' | 'name' | 'display'> = {
   sound: 'stone',
   stages: [],
   itemless: false,
+  support: 'none',
+  translucent: false,
 };
 
 /**
@@ -268,8 +291,9 @@ const SPECS: BlockSpec[] = [
     hardness: 5, opaque: false, lightAttenuation: 1, ...rock('pickaxe', 2) },
   { id: 77, name: 'cobweb', display: 'Teia', tex: 'block/cobweb', shape: 'cross', solid: false,
     opaque: false, lightAttenuation: 0, hardness: 4, tool: 'sword', sound: 'cloth' },
-  { id: 78, name: 'rail', display: 'Trilho', tex: 'block/rail', shape: 'flat', solid: false,
-    opaque: false, lightAttenuation: 0, hardness: 0.7, tool: 'pickaxe', sound: 'metal' },
+  { id: 78, name: 'rail', display: 'Trilho', tex: 'block/rail', shape: 'rail', solid: false,
+    opaque: false, lightAttenuation: 0, hardness: 0.7, tool: 'pickaxe', sound: 'metal',
+    support: 'below', stages: railStages('block/rail', 'block/rail_curved') },
   { id: 79, name: 'oak_sign', display: 'Placa de Carvalho', tex: 'block/oak_sign', shape: 'sign',
     solid: false, opaque: false, lightAttenuation: 0, hardness: 1, ...wood() },
   { id: 80, name: 'painting', display: 'Quadro', tex: 'block/painting', shape: 'painting',
@@ -339,6 +363,134 @@ function buildingSpecs(): BlockSpec[] {
 }
 
 SPECS.push(...buildingSpecs());
+
+/**
+ * Redstone (doc 14 — M7). Entram **depois** das peças geradas porque o id vai
+ * para o save: encaixá-los antes empurraria escada, laje e cerca de lugar.
+ *
+ * Tocha e lâmpada existem em **dois ids**, aceso e apagado, e não em um id com
+ * bit de estado: a emissão de luz é uma coluna da tabela indexada por id, e o
+ * flood fill de `world/lighting.ts` lê ela — um bit de estado não chegaria lá
+ * sem espalhar estado por todo o caminho da luz.
+ */
+
+/**
+ * Texturas do trilho por forma: retas e rampas usam uma, as curvas usam outra.
+ *
+ * As formas vivem nos bits 0..3 (`RAIL_*` de `world/mesh/shapes.ts`), e o
+ * índice 16 do bit de energizado nunca chega aqui porque `stageTexOf` satura em
+ * `MAX_STAGES - 1`. Trilho motorizado passa a textura acesa como `powered`.
+ */
+function railStages(
+  straight: string, curved: string, powered = straight,
+): readonly string[] {
+  const out: string[] = [];
+  for (let shape = 0; shape < 16; shape++) {
+    out.push(shape >= 6 && shape <= 9 ? curved : (shape >= 16 ? powered : straight));
+  }
+  return out;
+}
+
+/** 16 níveis de pó em 4 texturas: o brilho sobe em degraus, não pixel a pixel. */
+function dustStages(): readonly string[] {
+  const out: string[] = [];
+  for (let power = 0; power < 16; power++) {
+    const step = power === 0 ? 0 : 1 + Math.min(2, Math.floor((power - 1) / 5));
+    out.push(`block/redstone_dust_${step}`);
+  }
+  return out;
+}
+
+/** Alavanca, botão e placa: quebram na mão, não somem do mundo por acidente. */
+const gadget = (sound: SoundKind): Partial<BlockDef> => ({
+  solid: false, opaque: false, lightAttenuation: 0, hardness: 0.5, sound,
+});
+
+SPECS.push(
+  { id: 102, name: 'redstone_wire', display: 'Pó de Redstone', shape: 'flat',
+    solid: false, opaque: false, lightAttenuation: 0, hardness: 0, sound: 'stone',
+    itemless: true, support: 'below', tex: 'block/redstone_dust_0', stages: dustStages() },
+  { id: 103, name: 'redstone_torch', display: 'Tocha de Redstone', shape: 'torch',
+    tex: 'block/redstone_torch', solid: false, opaque: false, lightAttenuation: 0,
+    emission: 7, hardness: 0, sound: 'wood', support: 'below' },
+  { id: 104, name: 'redstone_torch_off', display: 'Tocha de Redstone', shape: 'torch',
+    tex: 'block/redstone_torch_off', solid: false, opaque: false, lightAttenuation: 0,
+    hardness: 0, sound: 'wood', itemless: true, support: 'below' },
+  { id: 105, name: 'lever', display: 'Alavanca', shape: 'lever', tex: 'block/lever',
+    ...gadget('wood'), support: 'mount' },
+  { id: 106, name: 'stone_button', display: 'Botão de Pedra', shape: 'button',
+    tex: 'block/stone', ...gadget('stone'), support: 'mount' },
+  { id: 107, name: 'oak_button', display: 'Botão de Carvalho', shape: 'button',
+    tex: 'block/oak_planks', ...gadget('wood'), support: 'mount' },
+  { id: 108, name: 'stone_pressure_plate', display: 'Placa de Pressão de Pedra', shape: 'plate',
+    tex: 'block/stone', ...gadget('stone'), support: 'below' },
+  { id: 109, name: 'oak_pressure_plate', display: 'Placa de Pressão de Carvalho', shape: 'plate',
+    tex: 'block/oak_planks', ...gadget('wood'), support: 'below' },
+  { id: 110, name: 'repeater', display: 'Repetidor', shape: 'repeater', tex: 'block/repeater',
+    solid: false, opaque: false, lightAttenuation: 0, hardness: 0, sound: 'stone',
+    support: 'below' },
+  { id: 111, name: 'piston', display: 'Pistão', shape: 'piston', tex: 'block/piston',
+    hardness: 1.5, opaque: false, tool: 'pickaxe', sound: 'stone' },
+  { id: 112, name: 'sticky_piston', display: 'Pistão Pegajoso', shape: 'piston',
+    tex: 'block/piston_sticky', hardness: 1.5, opaque: false, tool: 'pickaxe', sound: 'stone' },
+  { id: 113, name: 'piston_head', display: 'Braço de Pistão', shape: 'piston_head',
+    tex: 'block/piston_head', hardness: 1.5, opaque: false, lightAttenuation: 0,
+    tool: 'pickaxe', sound: 'stone', itemless: true },
+  { id: 114, name: 'redstone_lamp', display: 'Lâmpada de Redstone', tex: 'block/redstone_lamp',
+    hardness: 0.3, sound: 'glass' },
+  { id: 115, name: 'redstone_lamp_on', display: 'Lâmpada de Redstone',
+    tex: 'block/redstone_lamp_on', hardness: 0.3, emission: 15, sound: 'glass', itemless: true },
+  { id: 116, name: 'redstone_block', display: 'Bloco de Redstone', tex: 'block/redstone_block',
+    hardness: 5, ...rock('pickaxe', 1), sound: 'metal' },
+);
+
+/**
+ * Nether (doc 14 — M7). Mesma regra de sempre: ids no fim, nunca no meio.
+ *
+ * O portal é `itemless` e tem `emission: 11` — ele é a única fonte de luz de um
+ * corredor recém-aberto, e ver o caminho de volta importa mais que o realismo.
+ */
+SPECS.push(
+  { id: 117, name: 'netherrack', display: 'Netherrack', tex: 'block/netherrack',
+    hardness: 0.4, ...rock('pickaxe', 1) },
+  // Areia das almas segura o passo: `slipperiness` baixo é o freio que a
+  // física do jogador já lê (`entity/player.ts`), sem campo novo na tabela.
+  { id: 118, name: 'soul_sand', display: 'Areia das Almas', tex: 'block/soul_sand',
+    hardness: 0.5, ...soil(), sound: 'sand', slipperiness: 0.4 },
+  { id: 119, name: 'nether_quartz_ore', display: 'Minério de Quartzo', ...ore(), minTier: 1,
+    tex: 'block/nether_quartz_ore' },
+  { id: 120, name: 'nether_bricks', display: 'Tijolos do Nether', tex: 'block/nether_bricks',
+    hardness: 2, ...rock() },
+  { id: 121, name: 'magma_block', display: 'Bloco de Magma', tex: 'block/magma_block',
+    hardness: 0.5, emission: 3, ...rock('pickaxe', 1) },
+  // Cubo inteiro em vez do plano fino do gênero: um plano exigiria forma nova
+  // com eixo no estado, e o portal é atravessado, não observado de perto.
+  { id: 122, name: 'nether_portal', display: 'Portal do Nether', tex: 'block/nether_portal',
+    solid: false, opaque: false, lightAttenuation: 0, emission: 11, hardness: -1,
+    sound: 'glass', itemless: true, translucent: true },
+);
+
+/**
+ * Trilhos especiais (doc 14 — M7).
+ *
+ * O trilho comum já existia desde o M6, porque a mina usa — o que faltava era o
+ * que o torna transporte: um que empurra e um que avisa. Os dois **não fazem
+ * curva**: máquina dentro de curva não existe no gênero, e a lógica de conexão
+ * de `world/rails.ts` respeita isso sem um caso próprio, lendo `railCurves`.
+ */
+const railBase = (): Partial<BlockDef> => ({
+  shape: 'rail', solid: false, opaque: false, lightAttenuation: 0,
+  hardness: 0.7, tool: 'pickaxe', sound: 'metal', support: 'below',
+});
+
+SPECS.push(
+  { id: 123, name: 'powered_rail', display: 'Trilho Motorizado', ...railBase(),
+    tex: 'block/powered_rail',
+    stages: railStages('block/powered_rail', 'block/powered_rail', 'block/powered_rail_on') },
+  { id: 124, name: 'detector_rail', display: 'Trilho Detector', ...railBase(),
+    tex: 'block/detector_rail',
+    stages: railStages('block/detector_rail', 'block/detector_rail', 'block/detector_rail_on') },
+);
 
 /** Tabela final, indexada por id. Buracos ficam como `undefined`. */
 export const BLOCKS: readonly BlockDef[] = buildTable();

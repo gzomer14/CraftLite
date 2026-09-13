@@ -13,7 +13,7 @@
 import { ChunkColumn } from '../world/chunk';
 import { compressChunk, decompressChunk } from './serialize';
 import {
-  SaveDatabase, STORE_PLAYERS, STORE_SETTINGS, STORE_WORLDS, playerKeyFor,
+  SaveDatabase, STORE_PLAYERS, STORE_SETTINGS, STORE_WORLDS, dimensionIdFor, playerKeyFor,
   type PlayerSave, type WorldMeta,
 } from './db';
 
@@ -36,6 +36,13 @@ export interface SaveStats {
 export class SaveManager {
   private readonly db: SaveDatabase;
   private readonly worldId: string;
+  /**
+   * Dimensão cujos chunks estão sendo gravados (M7).
+   *
+   * Jogador, meta e tile entities continuam por mundo; só o chunk tem chave por
+   * dimensão, porque só ele existe duas vezes.
+   */
+  private dimension = 0;
   /** Chunks sujos aguardando gravação, por chave. */
   private readonly dirty = new Map<number, ChunkColumn>();
   private ticksSinceSave = 0;
@@ -56,6 +63,22 @@ export class SaveManager {
   constructor(db: SaveDatabase, worldId: string) {
     this.db = db;
     this.worldId = worldId;
+  }
+
+  /**
+   * Troca a dimensão dos chunks. **Grava o que estiver pendente antes**: os
+   * chunks sujos da fila são do lado que está sendo deixado, e escrevê-los com
+   * a chave nova os perderia dos dois lados.
+   */
+  async setDimension(dimension: number): Promise<void> {
+    if (dimension === this.dimension) return;
+    await this.flush();
+    this.dimension = dimension;
+  }
+
+  /** Id de armazenamento dos chunks da dimensão atual. */
+  private get chunkStoreId(): string {
+    return dimensionIdFor(this.worldId, this.dimension);
   }
 
   /** Marca uma coluna para gravação. Chamado por quem observa `modified`. */
@@ -95,7 +118,7 @@ export class SaveManager {
           if (batch.length >= CHUNKS_PER_BATCH) break;
         }
 
-        await this.db.putChunks(this.worldId, batch);
+        await this.db.putChunks(this.chunkStoreId, batch);
         for (const key of keys) this.dirty.delete(key);
         this.stats.pending = this.dirty.size;
 
@@ -116,7 +139,7 @@ export class SaveManager {
     if (!chunk.modified) return;
     this.dirty.delete(chunkKey(chunk.cx, chunk.cz));
     try {
-      await this.db.putChunks(this.worldId, [[chunk.cx, chunk.cz, await compressChunk(chunk)]]);
+      await this.db.putChunks(this.chunkStoreId, [[chunk.cx, chunk.cz, await compressChunk(chunk)]]);
     } catch (error) {
       this.reportError(error);
     }
@@ -132,7 +155,7 @@ export class SaveManager {
   /** Carrega uma coluna salva, ou `null` se nunca foi modificada. */
   async loadChunk(cx: number, cz: number): Promise<ChunkColumn | null> {
     try {
-      const data = await this.db.getChunk(this.worldId, cx, cz);
+      const data = await this.db.getChunk(this.chunkStoreId, cx, cz);
       if (data === undefined) return null;
       const chunk = await decompressChunk(data);
       chunk.modified = true; // veio do disco: continua sendo responsabilidade do save
@@ -160,12 +183,33 @@ export class SaveManager {
    * embuti-las no formato de chunk obrigaria a subir a versão do save por uma
    * coisa que cabe em um `put`.
    */
+  /**
+   * Tile entities da **dimensão atual**.
+   *
+   * A chave é a de dimensão, não a do mundo: baú no Nether e baú na superfície
+   * são listas diferentes. Com a chave única de antes, atravessar o portal
+   * gravava a lista do Nether por cima da da superfície e o conteúdo de todo
+   * baú de casa sumia (bug do M7, corrigido antes de sair).
+   *
+   * Para a superfície `dimensionIdFor` devolve o `worldId` puro, então mundo
+   * salvo antes do M7 continua abrindo sem migração.
+   */
   async saveTiles(tiles: readonly unknown[]): Promise<void> {
-    await this.db.put(STORE_SETTINGS, tiles, `${this.worldId}.tiles`);
+    await this.db.put(STORE_SETTINGS, tiles, `${this.chunkStoreId}.tiles`);
   }
 
   async loadTiles<T>(): Promise<T[]> {
-    const stored = await this.db.get<T[]>(STORE_SETTINGS, `${this.worldId}.tiles`);
+    const stored = await this.db.get<T[]>(STORE_SETTINGS, `${this.chunkStoreId}.tiles`);
+    return stored ?? [];
+  }
+
+  /** Veículos da dimensão atual — barco e carrinho (M7). Mesma regra de chave. */
+  async saveVehicles(vehicles: readonly unknown[]): Promise<void> {
+    await this.db.put(STORE_SETTINGS, vehicles, `${this.chunkStoreId}.vehicles`);
+  }
+
+  async loadVehicles<T>(): Promise<T[]> {
+    const stored = await this.db.get<T[]>(STORE_SETTINGS, `${this.chunkStoreId}.vehicles`);
     return stored ?? [];
   }
 

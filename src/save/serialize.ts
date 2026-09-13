@@ -22,7 +22,12 @@ export const FORMAT_VERSION = 1;
 const FLAG_DEFLATED = 1;
 
 /** Escreve inteiros de tamanho variável — economiza nos comprimentos pequenos. */
-class ByteWriter {
+/**
+ * Escritor de bytes. Exportado porque `save/archive.ts` empacota o mundo
+ * inteiro com o mesmo par de primitivas — dois formatos binários no projeto,
+ * um único jeito de escrever inteiro e varint.
+ */
+export class ByteWriter {
   private buffer: Uint8Array;
   private length = 0;
 
@@ -78,7 +83,7 @@ class ByteWriter {
   }
 }
 
-class ByteReader {
+export class ByteReader {
   private offset = 0;
   constructor(private readonly data: Uint8Array) {}
 

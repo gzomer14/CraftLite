@@ -63,12 +63,19 @@ export interface ItemSheet {
 /**
  * Monta a folha com todos os itens que têm sprite.
  * Puro: recebe os pixels das texturas e devolve pixels — dá para testar sem DOM.
+ *
+ * `overrides` é a arte do jogador (`render/pack.ts`), por nome de item. Ela
+ * vence tudo, e **dá sprite a item que não tinha nenhum**: quem desenhar
+ * `item/bucket.png` vê o balde, que hoje cai no vazio.
  */
-export function buildItemSheet(source: SpriteSource): ItemSheet {
+export function buildItemSheet(
+  source: SpriteSource, overrides?: ReadonlyMap<string, Uint8ClampedArray>,
+): ItemSheet {
   const drawable: ItemDef[] = [];
   for (const item of ITEMS) {
     if (item === undefined) continue;
-    if (item.placesBlock !== undefined || ITEM_ART[item.name] !== undefined) drawable.push(item);
+    if (item.placesBlock !== undefined || ITEM_ART[item.name] !== undefined
+      || overrides?.has(item.name) === true) drawable.push(item);
   }
 
   const rows = Math.max(1, Math.ceil(drawable.length / COLUMNS));
@@ -82,11 +89,13 @@ export function buildItemSheet(source: SpriteSource): ItemSheet {
     const item = drawable[i];
     tile.fill(0);
 
-    if (item.placesBlock !== undefined) {
-      drawBlockIsometric(tile, item.placesBlock, source);
-    } else {
-      drawItemArt(tile, ITEM_ART[item.name]);
-    }
+    // A arte desenhada vence o cubo isométrico: o pó de redstone coloca um
+    // bloco, mas na mão ele é pó, e o cubo de uma textura vazada não lê nada.
+    const custom = overrides?.get(item.name);
+    const art = ITEM_ART[item.name];
+    if (custom !== undefined && custom.length === tile.length) tile.set(custom);
+    else if (art !== undefined) drawItemArt(tile, art);
+    else if (item.placesBlock !== undefined) drawBlockIsometric(tile, item.placesBlock, source);
 
     blit(pixels, width, tile, (i % COLUMNS) * SPRITE_SIZE, Math.floor(i / COLUMNS) * SPRITE_SIZE);
     index.set(item.id, i);
@@ -215,9 +224,9 @@ export class ItemSprites {
   readonly buildMs: number;
   private readonly sheet: ItemSheet;
 
-  constructor(source: SpriteSource) {
+  constructor(source: SpriteSource, overrides?: ReadonlyMap<string, Uint8ClampedArray>) {
     const t0 = performance.now();
-    this.sheet = buildItemSheet(source);
+    this.sheet = buildItemSheet(source, overrides);
     this.cssUrl = toDataUrl(this.sheet);
     this.buildMs = performance.now() - t0;
   }

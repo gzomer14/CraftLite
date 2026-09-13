@@ -41,6 +41,18 @@ export interface MobTraits {
   glides?: boolean;
   /** Nada livremente em vez de andar no chão (lula). */
   swims?: boolean;
+  /** Voa: sem gravidade, e o destino de movimento inclui o Y (ghast). */
+  flies?: boolean;
+  /** Atira bola de fogo em vez de flecha (ghast). */
+  shootsFireball?: boolean;
+  /**
+   * Escala do modelo **e** da hitbox, como o slime já fazia por tamanho.
+   *
+   * É o que deixa o ghast ter 4 blocos sem um modelo de 64 px: `width` e
+   * `height` da tabela são os do modelo base, e a escala multiplica os dois.
+   */
+  modelScale?: number;
+
   /** Fica hostil só depois de provocado (lobo, enderman, aranha na luz). */
   neutralUntilProvoked?: boolean;
   /** Chama os da mesma espécie por perto ao ser atacado (lobo). */
@@ -76,6 +88,11 @@ export interface SpawnRule {
   weight: number;
   /** Só nasce de noite (slime no pântano). */
   nightOnly?: boolean;
+  /**
+   * Dimensão em que a regra vale (`DIM_*`). Ausente = superfície.
+   * É o que mantém o zumbi fora do Nether e o ghast fora da superfície.
+   */
+  dimension?: number;
 }
 
 export interface MobAttack {
@@ -134,6 +151,10 @@ export const SPAWN_RULES: Record<string, SpawnRule> = {
   skeleton: { light: 'dark', ground: [], minY: 0, maxY: 127, biomes: [], packMin: 1, packMax: 3, weight: 10 },
   creeper: { light: 'dark', ground: [], minY: 0, maxY: 127, biomes: [], packMin: 1, packMax: 2, weight: 8 },
   slime: { light: 'any', ground: [], minY: 0, maxY: 40, biomes: [], packMin: 1, packMax: 3, weight: 4, nightOnly: false },
+
+  // --- Nether (M7): luz não filtra nada aqui, porque lá tudo é escuro ------
+  zombified_piglin: { light: 'any', ground: ['netherrack', 'soul_sand', 'nether_bricks'], minY: 32, maxY: 120, biomes: [], packMin: 2, packMax: 4, weight: 12, dimension: 1 },
+  ghast: { light: 'any', ground: ['netherrack', 'soul_sand'], minY: 40, maxY: 110, biomes: [], packMin: 1, packMax: 1, weight: 4, dimension: 1 },
 };
 
 /**
@@ -300,6 +321,44 @@ const SPECS: MobSpec[] = [
     goals: ['floatInWater', 'panic', 'wander', 'lookAtPlayer'],
     model: 'humanoid', skin: 'villager', sound: 'villager',
     despawnable: false, traits: {},
+  },
+
+  // --- Nether (M7) --------------------------------------------------------
+  /*
+   * Porco zumbi: neutro, como na referência. Ele não ataca até apanhar, e é o
+   * que faz o Nether ser atravessável — um corredor de hostis puros na dimensão
+   * em que se chega sem equipamento seria só morte.
+   */
+  {
+    id: 13, name: 'zombified_piglin', display: 'Porco Zumbi', category: 'neutral',
+    health: 20, width: 0.6, height: 1.95, speed: 3.4,
+    attack: { damage: [3, 5, 7], reach: 1.4, cooldownTicks: 20 },
+    followRange: 16, xp: [5, 5],
+    drops: [
+      { item: 'rotten_flesh', count: [0, 1] },
+      { item: 'gold_ingot', count: 1, chance: 0.08 },
+    ],
+    goals: HOSTILE_GOALS, model: 'humanoid', skin: 'zombified_piglin', sound: 'zombie',
+    despawnable: true,
+    traits: { neutralUntilProvoked: true, callsForHelp: true, fireImmune: true },
+  },
+  /*
+   * Ghast: voa, atira de longe e tem 10 de vida em 4 blocos de corpo.
+   *
+   * O contrato dele é ser **visto antes de ser sentido** — é a única ameaça do
+   * jogo que não precisa chegar perto, e por isso o alcance é o dobro do
+   * esqueleto. A bola de fogo explode onde para, o que quebra ponte e assusta.
+   */
+  {
+    id: 14, name: 'ghast', display: 'Ghast', category: 'hostile',
+    health: 10, width: 1, height: 1, speed: 2.2,
+    attack: { damage: [3, 5, 7], reach: 2, cooldownTicks: 60 },
+    followRange: 32, xp: [5, 5],
+    drops: [{ item: 'gunpowder', count: [0, 2] }],
+    goals: ['shoot', 'wander', 'lookAtPlayer'],
+    model: 'cube', skin: 'ghast', sound: 'ghast',
+    despawnable: true,
+    traits: { flies: true, shootsFireball: true, fireImmune: true, modelScale: 4 },
   },
 ];
 

@@ -7,9 +7,10 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
-  BOX_STRIDE, FENCE_COLLISION_HEIGHT, MAX_BOXES, SHAPE_BY_NAME, SHAPE_DOOR, SHAPE_FENCE,
-  SHAPE_FENCE_GATE, SHAPE_FLAT, SHAPE_SLAB, SHAPE_STAIRS, SHAPE_TRAPDOOR, boxesFor,
-  collisionBoxesFor,
+  BOX_STRIDE, FENCE_COLLISION_HEIGHT, MAX_BOXES, MOUNT_CEILING, MOUNT_FLOOR, SHAPE_BUTTON,
+  SHAPE_BY_NAME, SHAPE_DOOR, SHAPE_FENCE, SHAPE_FENCE_GATE, SHAPE_FLAT, SHAPE_LEVER,
+  SHAPE_PISTON, SHAPE_PISTON_HEAD, SHAPE_PLATE, SHAPE_REPEATER, SHAPE_SLAB, SHAPE_STAIRS,
+  SHAPE_TRAPDOOR, boxesFor, collisionBoxesFor, mountForDir,
 } from '../src/world/mesh/shapes';
 import { BLOCKS, BLOCK_BY_NAME, makeState } from '../src/data/blocks';
 import { World } from '../src/world/world';
@@ -89,6 +90,79 @@ describe('caixas por forma', () => {
       if (def === undefined) continue;
       if (def.shape === 'cube' || def.shape === 'liquid' || def.shape === 'none') continue;
       expect(SHAPE_BY_NAME[def.shape]).toBeDefined();
+    }
+  });
+
+  // --- redstone (M7) -----------------------------------------------------
+
+  it('botão no chão é uma pastilha rasa, e mais rasa ainda apertado', () => {
+    expect(boxesFor(SHAPE_BUTTON, MOUNT_FLOOR, 0, out)).toBe(1);
+    expect(box(0)).toEqual([5 / 16, 0, 6 / 16, 11 / 16, 2 / 16, 10 / 16]);
+    boxesFor(SHAPE_BUTTON, MOUNT_FLOOR | 8, 0, out);
+    expect(box(0)[4]).toBe(1 / 16);
+  });
+
+  it('botão no teto cresce para baixo a partir de y=1', () => {
+    boxesFor(SHAPE_BUTTON, MOUNT_CEILING, 0, out);
+    expect(box(0)[1]).toBe(1 - 2 / 16);
+    expect(box(0)[4]).toBe(1);
+  });
+
+  it('botão na parede encosta na face daquele lado', () => {
+    // Encaixe 0 = apoio em +X: a pastilha fica colada na face +X.
+    boxesFor(SHAPE_BUTTON, 0, 0, out);
+    expect(box(0)[3]).toBe(1);
+    // Encaixe 1 = apoio em −X.
+    boxesFor(SHAPE_BUTTON, 1, 0, out);
+    expect(box(0)[0]).toBe(0);
+  });
+
+  it('alavanca é base mais haste, e a haste muda de lado ao ligar', () => {
+    expect(boxesFor(SHAPE_LEVER, MOUNT_FLOOR, 0, out)).toBe(2);
+    const desligada = box(1)[2];
+    boxesFor(SHAPE_LEVER, MOUNT_FLOOR | 8, 0, out);
+    expect(box(1)[2]).not.toBe(desligada);
+  });
+
+  it('placa de pressão afunda ao ser pisada', () => {
+    expect(boxesFor(SHAPE_PLATE, 0, 0, out)).toBe(1);
+    const solta = box(0)[4];
+    boxesFor(SHAPE_PLATE, 1, 0, out);
+    expect(box(0)[4]).toBeLessThan(solta);
+  });
+
+  it('repetidor tem base e duas tochinhas, e o atraso afasta a de trás', () => {
+    expect(boxesFor(SHAPE_REPEATER, 0, 0, out)).toBe(3);
+    const perto = box(2)[0];
+    boxesFor(SHAPE_REPEATER, 0 | (3 << 2), 0, out);
+    expect(box(2)[0]).toBeLessThan(perto);
+  });
+
+  it('pistão recolhido tem corpo e placa; estendido, só o corpo', () => {
+    expect(boxesFor(SHAPE_PISTON, 0, 0, out)).toBe(2);
+    expect(boxesFor(SHAPE_PISTON, 0 | 8, 0, out)).toBe(1);
+    // Aponta para +X: o corpo ocupa os 12/16 a partir da face −X.
+    expect(box(0)[0]).toBe(0);
+    expect(box(0)[3]).toBeCloseTo(12 / 16);
+  });
+
+  it('braço do pistão é haste mais placa na ponta', () => {
+    expect(boxesFor(SHAPE_PISTON_HEAD, 0, 0, out)).toBe(2);
+    // A placa fica no fim do curso, na direção em que o pistão empurra.
+    expect(box(1)[3]).toBe(1);
+    expect(box(1)[0]).toBeCloseTo(12 / 16);
+  });
+
+  it('a direção do pistão vira o encaixe certo nos seis eixos', () => {
+    expect(mountForDir(0)).toBe(0);
+    expect(mountForDir(3)).toBe(3);
+    expect(mountForDir(4)).toBe(MOUNT_CEILING);
+    expect(mountForDir(5)).toBe(MOUNT_FLOOR);
+  });
+
+  it('pó, alavanca, botão e placa não colidem com nada', () => {
+    for (const name of ['redstone_wire', 'lever', 'stone_button', 'stone_pressure_plate']) {
+      expect(BLOCK_BY_NAME.get(name)!.solid).toBe(false);
     }
   });
 });

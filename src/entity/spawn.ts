@@ -16,6 +16,7 @@
  */
 
 import { BIOMES } from '../data/biomes';
+import { DIM_OVERWORLD } from '../data/dimensions';
 import { defOf } from '../data/blocks';
 import { MOBS_BY_CATEGORY, mobDef, spawnRuleOf, type MobCategory, type SpawnRule } from '../data/mobs';
 import { WORLD_HEIGHT } from '../world/chunk';
@@ -119,6 +120,13 @@ export class MobSpawner {
    */
   slimeFactor = 1;
 
+  /**
+   * Aleatório do jogo, injetável — mesmo motivo de `MobStore.random`: sem isto
+   * nenhum teste de spawn é reproduzível, e a suíte falha às vezes sem causa
+   * localizável.
+   */
+  random: () => number = Math.random;
+
   private tickCount = 0;
   /** Última categoria tentada, para alternar sem favorecer nenhuma. */
   private cursor = 0;
@@ -159,6 +167,7 @@ export class MobSpawner {
     if (typeId < 0) return 0;
     const rule = spawnRuleOf(mobDef(typeId).name);
     if (rule === undefined) return 0;
+    if (!this.allowedHere(rule)) return 0;
     if (rule.nightOnly === true && !this.isNight) return 0;
 
     // Escolhe um chunk carregado a distância 1..simulationDistance do jogador.
@@ -166,8 +175,8 @@ export class MobSpawner {
     const centerZ = Math.floor(playerZ) >> 4;
     const span = Math.max(2, this.simulationDistance);
     for (let attempt = 0; attempt < 4; attempt++) {
-      const cx = centerX + randomInt(-span, span);
-      const cz = centerZ + randomInt(-span, span);
+      const cx = centerX + this.randomInt(-span, span);
+      const cz = centerZ + this.randomInt(-span, span);
       const distance = Math.max(Math.abs(cx - centerX), Math.abs(cz - centerZ));
       if (distance < MIN_CHUNK_DISTANCE) continue;
       const chunk = this.world.getChunk(cx, cz);
@@ -187,16 +196,32 @@ export class MobSpawner {
    * É isso que faz o mundo já nascer com bichos em vez de esperar o ciclo.
    */
   populateChunk(chunk: ChunkColumn): number {
-    if (Math.random() > INITIAL_PASSIVE_CHANCE) return 0;
+    if (this.random() > INITIAL_PASSIVE_CHANCE) return 0;
     const ids = MOBS_BY_CATEGORY.passive;
     if (ids.length === 0) return 0;
     const typeId = this.pickWeighted(ids);
     if (typeId < 0) return 0;
     const rule = spawnRuleOf(mobDef(typeId).name);
-    if (rule === undefined) return 0;
+    if (rule === undefined || !this.allowedHere(rule)) return 0;
     // Sem restrição de distância do jogador: o chunk pode ser o de spawn.
     // O Y do jogador não entra: passivo nasce na superfície, não na faixa dele.
     return this.trySpawnPack(chunk, rule, typeId, Infinity, 0, Infinity);
+  }
+
+  /**
+   * true se a regra vale na dimensão carregada (M7).
+   *
+   * Sem isto o zumbi nasceria no Nether e o ghast na superfície — e o peso do
+   * sorteio é global, então metade das tentativas seria desperdiçada num mundo
+   * onde nenhum dos dois pode nascer.
+   */
+  private allowedHere(rule: SpawnRule): boolean {
+    return (rule.dimension ?? DIM_OVERWORLD) === this.world.dimension;
+  }
+
+  /** Inteiro em [min, max] com a fonte de aleatório do spawner. */
+  private randomInt(min: number, max: number): number {
+    return randomIntFrom(this.random, min, max);
   }
 
   /** Sorteio ponderado pelo `weight` da regra de spawn. */
@@ -204,7 +229,7 @@ export class MobSpawner {
     let total = 0;
     for (let i = 0; i < ids.length; i++) total += this.weightOf(ids[i]);
     if (total <= 0) return -1;
-    let roll = Math.random() * total;
+    let roll = this.random() * total;
     for (let i = 0; i < ids.length; i++) {
       roll -= this.weightOf(ids[i]);
       if (roll <= 0) return ids[i];
@@ -215,8 +240,9 @@ export class MobSpawner {
   /** Peso do mob no sorteio, já com o efeito da lua sobre o slime. */
   private weightOf(id: number): number {
     const def = mobDef(id);
-    const weight = spawnRuleOf(def.name)?.weight ?? 0;
-    return def.name === 'slime' ? weight * this.slimeFactor : weight;
+    const rule = spawnRuleOf(def.name);
+    if (rule === undefined || !this.allowedHere(rule)) return 0;
+    return def.name === 'slime' ? rule.weight * this.slimeFactor : rule.weight;
   }
 
   /** Tenta um grupo de 1..N do mesmo tipo em posições próximas. */
@@ -225,20 +251,20 @@ export class MobSpawner {
     playerX: number, playerY: number, playerZ: number,
   ): number {
     const def = mobDef(typeId);
-    const biome = BIOMES[chunk.biomeMap[randomInt(0, 255)]];
+    const biome = BIOMES[chunk.biomeMap[this.randomInt(0, 255)]];
     if (rule.biomes.length > 0 && (biome === undefined || rule.biomes.indexOf(biome.name) < 0)) {
       return 0;
     }
 
-    const lx = randomInt(0, 15);
-    const lz = randomInt(0, 15);
+    const lx = this.randomInt(0, 15);
+    const lz = this.randomInt(0, 15);
     const baseX = (chunk.cx << 4) + lx;
     const baseZ = (chunk.cz << 4) + lz;
     const surface = chunk.heightMap[(lz << 4) | lx];
     const top = Math.min(rule.maxY, Math.max(rule.minY, surface + 1));
     // Quem precisa de escuro cava; de noite, a maioria fica na superfície.
     const atSurface = rule.light !== 'dark'
-      || (this.isNight && Math.random() < NIGHT_SURFACE_CHANCE);
+      || (this.isNight && this.random() < NIGHT_SURFACE_CHANCE);
     /*
      * Cavando, o Y sai de uma faixa em volta do **jogador**, não da coluna
      * inteira.
@@ -253,18 +279,18 @@ export class MobSpawner {
      */
     const baseY = atSurface
       ? top
-      : clampY(Math.round(playerY) + randomInt(-CAVE_Y_SPREAD, CAVE_Y_SPREAD), rule.minY, top);
+      : clampY(Math.round(playerY) + this.randomInt(-CAVE_Y_SPREAD, CAVE_Y_SPREAD), rule.minY, top);
 
-    const packSize = randomInt(rule.packMin, rule.packMax);
+    const packSize = this.randomInt(rule.packMin, rule.packMax);
     let spawned = 0;
     // Passo 5 do doc: 3 posições próximas por membro do grupo.
     for (let member = 0; member < packSize; member++) {
       for (let attempt = 0; attempt < 3; attempt++) {
-        const x = baseX + randomInt(-5, 5);
-        const z = baseZ + randomInt(-5, 5);
-        const y = baseY + (attempt === 0 ? 0 : randomInt(-2, 2));
+        const x = baseX + this.randomInt(-5, 5);
+        const z = baseZ + this.randomInt(-5, 5);
+        const y = baseY + (attempt === 0 ? 0 : this.randomInt(-2, 2));
         if (!this.isValidSpot(rule, def.height, x, y, z, playerX, playerZ)) continue;
-        const variant = def.traits.splitsOnDeath === true ? randomInt(1, 3) : 0;
+        const variant = def.traits.splitsOnDeath === true ? this.randomInt(1, 3) : 0;
         if (this.mobs.spawn(typeId, x + 0.5, y, z + 0.5, variant) < 0) return spawned;
         spawned++;
         break;
@@ -335,6 +361,7 @@ function capKey(category: MobCategory): keyof SpawnCaps {
   return 'passive';
 }
 
-function randomInt(min: number, max: number): number {
-  return min + Math.floor(Math.random() * (max - min + 1));
+/** Inteiro em [min, max], a partir de uma fonte de aleatório qualquer. */
+function randomIntFrom(random: () => number, min: number, max: number): number {
+  return min + Math.floor(random() * (max - min + 1));
 }

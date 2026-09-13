@@ -689,6 +689,9 @@ const SIMPLE: Record<string, [string, Rgb]> = {
   redstone: ['dust', [214, 44, 44]],
   lapis_lazuli: ['gem', [54, 92, 186]],
   flint: ['chunk', [62, 58, 62]],
+  // Nether (M7): o quartzo é gema branca, o tijolo é lingote vermelho-escuro.
+  nether_quartz: ['gem', [236, 230, 220]],
+  nether_brick: ['ingot', [86, 42, 48]],
   clay_ball: ['round', [166, 172, 184]],
   brick: ['ingot', [174, 92, 72]],
   glowstone_dust: ['dust', [248, 216, 128]],
@@ -757,5 +760,9 @@ function buildArt(): Record<string, ItemArt> {
   // Arco e escudo têm acento próprio: a corda e o brasão (M6).
   out.bow = { shape: 'bow', color: WOOD, accent: [236, 236, 230] };
   out.shield = { shape: 'shield', color: WOOD, accent: [176, 60, 56] };
+  // Carrinho (M7): a tigela vira caçamba, o acento é a ferragem.
+  out.minecart = { shape: 'bowl', color: [142, 142, 150], accent: [92, 92, 100] };
+  // Isqueiro (M7): a silhueta da barra de ferro com a pederneira de acento.
+  out.flint_and_steel = { shape: 'ingot', color: [188, 188, 196], accent: [62, 58, 62] };
   return out;
 }

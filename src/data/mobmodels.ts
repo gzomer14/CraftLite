@@ -190,6 +190,39 @@ export const MODELS: Record<string, ModelDef> = {
   },
 
   /**
+   * Ghast (M7): um cubo grande e quatro tentáculos curtos.
+   *
+   * O original tem nove tentáculos compridos; quatro curtos leem igual a 30
+   * blocos de distância, que é onde o ghast é visto, e custam cinco caixas em
+   * vez de dez no batcher.
+   */
+  cube: {
+    skinSize: 64, height: 16,
+    parts: [
+      { name: 'body', pivot: [0, 0, 0], box: [-8, 0, -8, 16, 16, 16], uv: [0, 0] },
+      { name: 'tentacle_a', pivot: [-4, 0, -4], box: [-1, -6, -1, 2, 6, 2], uv: [0, 32] },
+      { name: 'tentacle_b', pivot: [4, 0, -4], box: [-1, -6, -1, 2, 6, 2], uv: [0, 32] },
+      { name: 'tentacle_c', pivot: [-4, 0, 4], box: [-1, -6, -1, 2, 6, 2], uv: [0, 32] },
+      { name: 'tentacle_d', pivot: [4, 0, 4], box: [-1, -6, -1, 2, 6, 2], uv: [0, 32] },
+    ],
+  },
+
+  /**
+   * Carrinho de mina (M7): caçamba aberta, quatro paredes e um piso.
+   * Mesmo precedente da flecha e do barco — caixa com skin, batcher dos mobs.
+   */
+  minecart: {
+    skinSize: 64, height: 8,
+    parts: [
+      { name: 'floor', pivot: [0, 0, 0], box: [-7, 0, -7, 14, 2, 14], uv: [0, 0] },
+      { name: 'wall_n', pivot: [0, 0, -7], box: [-7, 2, 0, 14, 5, 2], uv: [0, 18] },
+      { name: 'wall_s', pivot: [0, 0, 5], box: [-7, 2, 0, 14, 5, 2], uv: [0, 18] },
+      { name: 'wall_w', pivot: [-7, 0, 0], box: [0, 2, -5, 2, 5, 10], uv: [0, 26] },
+      { name: 'wall_e', pivot: [5, 0, 0], box: [0, 2, -5, 2, 5, 10], uv: [0, 26] },
+    ],
+  },
+
+  /**
    * Flecha. Não é mob, mas é uma caixa com skin — reusar o mesmo batcher sai
    * mais barato que um passe novo só para ela (doc 07 §6).
    */

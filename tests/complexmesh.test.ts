@@ -8,7 +8,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import { GreedyMesher, NB_SIDE, nbIndex } from '../src/world/mesh/greedy';
-import { CPLX_BOXES, CPLX_CROSS, buildBlockTables, stageTexOf } from '../src/world/mesh/blockinfo';
+import {
+  CPLX_BOXES, CPLX_CROSS, CPLX_RAIL, buildBlockTables, stageTexOf,
+} from '../src/world/mesh/blockinfo';
 import { buildLayerIndex } from '../src/render/layers';
 import { BLOCK_BY_NAME, BLOCKS, makeState } from '../src/data/blocks';
 import { STONE } from './helpers/blockids';
@@ -38,9 +40,17 @@ describe('tabelas de forma', () => {
 
   it('laje, camada de neve, escada e cerca viram lista de caixas', () => {
     for (const name of ['cobblestone_slab', 'snow_layer', 'oak_stairs', 'oak_fence',
-      'oak_fence_gate', 'oak_trapdoor', 'oak_door', 'ladder', 'oak_sign', 'painting', 'rail']) {
+      'oak_fence_gate', 'oak_trapdoor', 'oak_door', 'ladder', 'oak_sign', 'painting',
+      'redstone_wire', 'lever', 'stone_button', 'stone_pressure_plate', 'repeater',
+      'piston', 'piston_head']) {
       const id = BLOCK_BY_NAME.get(name)!.id;
       expect(tables.complex[id]).toBe(CPLX_BOXES);
+    }
+  });
+
+  it('trilho tem caminho próprio: um quad só, que a caixa não representa', () => {
+    for (const name of ['rail', 'powered_rail', 'detector_rail']) {
+      expect(tables.complex[BLOCK_BY_NAME.get(name)!.id], name).toBe(CPLX_RAIL);
     }
   });
 
@@ -120,6 +130,38 @@ describe('geometria', () => {
     const out = mesher().mesh(blocks, light);
     // Some a base e a face contra a parede; sobram 4 (topo + 3 lados) × 4 vértices.
     expect(out.cutout?.vertexCount).toBe(16);
+  });
+
+  // --- redstone (M7) -------------------------------------------------------
+
+  it('todo componente de redstone sai do mesher com geometria', () => {
+    for (const name of ['redstone_wire', 'redstone_torch', 'redstone_torch_off', 'lever',
+      'stone_button', 'oak_button', 'stone_pressure_plate', 'repeater', 'piston',
+      'sticky_piston', 'piston_head', 'redstone_lamp', 'redstone_lamp_on', 'redstone_block']) {
+      const { blocks, light } = empty();
+      blocks[nbIndex(8, 8, 8)] = makeState(BLOCK_BY_NAME.get(name)!.id);
+      const out = mesher().mesh(blocks, light);
+      expect(out.quads, name).toBeGreaterThan(0);
+    }
+  });
+
+  it('o pó muda de textura com a energia, em quatro degraus', () => {
+    const wire = BLOCK_BY_NAME.get('redstone_wire')!.id;
+    const layers = new Set<number>();
+    for (let power = 0; power <= 15; power++) layers.add(stageTexOf(tables, wire, power));
+    expect(layers.size).toBe(4);
+    // Apagado e cheio nunca podem coincidir: é o único retorno visual do fio.
+    expect(stageTexOf(tables, wire, 0)).not.toBe(stageTexOf(tables, wire, 15));
+  });
+
+  it('o pistão estendido é mais curto que o recolhido', () => {
+    const piston = BLOCK_BY_NAME.get('piston')!.id;
+    const { blocks: a, light } = empty();
+    a[nbIndex(8, 8, 8)] = makeState(piston, 0);
+    const recolhido = mesher().mesh(a, light).quads;
+    const { blocks: b } = empty();
+    b[nbIndex(8, 8, 8)] = makeState(piston, 8);
+    expect(mesher().mesh(b, light).quads).toBeLessThan(recolhido);
   });
 
   it('o padding não entra na conta: planta fora da section é ignorada', () => {

@@ -48,12 +48,18 @@ Usar pools e escrever em objetos pré-alocados. GC major de 100 ms em celular fr
 | Luz (block + sky, nibble cada) | 81 × 32768 × 1 B | ~2,7 MB |
 | Meshes na GPU | ~81 × 250 KB | ~20 MB |
 | Meshes espelhados na CPU | descartar após upload | 0 |
-| Texturas (array 128 × 16×16 RGBA + mips) | | ~0,2 MB |
+| Texturas (array 256 × 16×16 RGBA + mips) | | ~0,34 MB |
 | Código + heap JS | | ~40 MB |
 | **Total alvo** | | **< 350 MB RSS** |
 
 **Descartar o ArrayBuffer do mesh no main thread logo após `bufferData`.** Ele já foi transferido
 do worker; manter dobra o custo.
+
+**O teto de camadas do atlas é 256, não 128** (revisto no M7). A linha antiga era arbitrária e
+travava em 127 de 128 antes do redstone entrar; o GLES 3.0 garante no mínimo 256 camadas de
+`TEXTURE_2D_ARRAY` em qualquer aparelho, e 256 × 16×16 RGBA com mips custa 0,34 MB dentro de um
+alvo de 350 MB de RSS. Nada no código aplica o limite — ele é orçamento, e quem o excede paga em
+memória de textura, não em correção.
 
 ## 4. Orçamento de download
 

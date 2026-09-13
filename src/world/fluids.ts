@@ -14,9 +14,12 @@ import { AIR, LAVA, WATER, blockIdOf, defOf, makeState, stateBitsOf } from '../d
 import { WORLD_HEIGHT } from './chunk';
 import type { World } from './world';
 
-/** Alcance horizontal: água 7, lava 3 (doc 03 §9). */
+/**
+ * Alcance horizontal da água (doc 03 §9). O da lava mora em
+ * `data/dimensions.ts`, porque muda com a dimensão: 3 na superfície, 4 no
+ * Nether.
+ */
 const WATER_RANGE = 7;
-const LAVA_RANGE = 3;
 /** Intervalo entre atualizações. */
 const WATER_INTERVAL = 5;
 const LAVA_INTERVAL = 30;
@@ -59,6 +62,17 @@ export class Fluids {
 
   /** Contadores para o overlay de debug. */
   lastUpdates = 0;
+
+  /**
+   * Alcance da lava, que muda com a dimensão (doc 03 §9: 3, 4 no Nether).
+   * Lido do mundo a cada tick — o portal troca a dimensão debaixo do sistema.
+   */
+  private get lavaRange(): number {
+    return this.world.dimensionDef.lavaRange;
+  }
+
+  /** A água evaporou — quem ouve toca o chiado. */
+  onEvaporate: ((x: number, y: number, z: number) => void) | null = null;
 
   constructor(world: World) {
     this.world = world;
@@ -118,6 +132,14 @@ export class Fluids {
     const state = this.world.getBlock(x, y, z);
     const id = blockIdOf(state);
 
+    // Onde não chove, não fica água: no Nether ela vira vapor na hora, fonte
+    // inclusive. É o que impede o jogador levar um balde e apagar a dimensão.
+    if (id === WATER && this.world.dimensionDef.waterEvaporates) {
+      this.setFluid(x, y, z, AIR);
+      this.onEvaporate?.(x, y, z);
+      return;
+    }
+
     if (id === WATER || id === LAVA) {
       this.updateFluid(x, y, z, id, fluidLevel(state));
       return;
@@ -154,7 +176,7 @@ export class Fluids {
     const above = this.world.getBlock(x, y + 1, z);
     if (blockIdOf(above) === id) return 1;
 
-    const range = id === LAVA ? LAVA_RANGE : WATER_RANGE;
+    const range = id === LAVA ? this.lavaRange : WATER_RANGE;
     let best: number | null = null;
     for (let d = 0; d < 4; d++) {
       const nx = x + DIRS[d * 2];
@@ -170,7 +192,7 @@ export class Fluids {
 
   /** Espalha para baixo e, se não puder descer, para os lados. */
   private spread(x: number, y: number, z: number, id: number, level: number): void {
-    const range = id === LAVA ? LAVA_RANGE : WATER_RANGE;
+    const range = id === LAVA ? this.lavaRange : WATER_RANGE;
 
     // Descer tem prioridade absoluta; se desceu, não espalha lateralmente.
     const below = this.world.getBlock(x, y - 1, z);
@@ -229,7 +251,7 @@ export class Fluids {
     for (const id of [WATER, LAVA]) {
       const level = this.bestSupply(x, y, z, id);
       if (level === null) continue;
-      const range = id === LAVA ? LAVA_RANGE : WATER_RANGE;
+      const range = id === LAVA ? this.lavaRange : WATER_RANGE;
       if (level > range) continue;
       this.setFluid(x, y, z, makeFluid(id, level));
       return;

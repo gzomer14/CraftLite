@@ -41,6 +41,14 @@ export interface GenRequest {
   type: 'gen';
   cx: number;
   cz: number;
+  /**
+   * Dimensão a gerar (`DIM_*` de `data/dimensions.ts`).
+   *
+   * Vai na **requisição**, não no `init`: o jogador troca de dimensão em jogo, e
+   * recriar o pool de workers a cada portal custaria mais que um número por
+   * mensagem.
+   */
+  dim: number;
 }
 
 export interface MeshRequest {
@@ -60,6 +68,8 @@ export interface GenResponse {
   type: 'gen';
   cx: number;
   cz: number;
+  /** Dimensão gerada: o pipeline descarta resposta de dimensão já trocada. */
+  dim: number;
   sections: SerializedSection[];
   heightMap: Uint8Array;
   biomeMap: Uint8Array;

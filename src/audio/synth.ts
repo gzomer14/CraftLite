@@ -271,6 +271,8 @@ const MOB_VOICES: Record<string, VoiceSpec> = {
   slime: { freq: 130, type: 'sine', formants: [300, 620], noise: 0.5 },
   // O "hmmm" do aldeão: fundamental baixa, formante de vogal fechada (M6).
   villager: { freq: 130, type: 'sawtooth', formants: [500, 1100], vibrato: 0.02, noise: 0.12 },
+  // O choro do ghast (M7): agudo, trêmulo e fino — ele é ouvido antes de visto.
+  ghast: { freq: 520, type: 'sine', formants: [900, 2100], vibrato: 0.08, noise: 0.18 },
 };
 
 /** Variação de cada tipo de vocalização a partir da voz base. */
@@ -320,6 +322,14 @@ const BASE_SOUNDS: Record<string, Recipe> = {
   'ui/enchant': { kind: 'arpeggio', notes: [261.63, 392, 523.25, 659.25], step: 0.09, gain: 0.26, decay: 0.6 },
 
   'mob/enderman_teleport': { kind: 'tones', duration: 0.3, freqs: [180, 900, 1800], type: 'sine', gain: 0.35, decay: 0.24, freqTo: 3000 },
+
+  // M7: o clique seco de alavanca, botão e placa, e o sopro do pistão.
+  'block/click': { kind: 'tones', duration: 0.05, freqs: [1100, 660], type: 'square', gain: 0.25, decay: 0.04 },
+  'block/piston': { kind: 'noise', duration: 0.18, color: 'pink', gain: 0.32, attack: 0.004, decay: 0.16, filter: 'bandpass', freq: 420, freqTo: 900, q: 1.2 },
+  // O portal acendendo: um sopro grave que sobe, sem nota definida.
+  'block/portal': { kind: 'noise', duration: 0.9, color: 'brown', gain: 0.3, attack: 0.06, decay: 0.8, filter: 'lowpass', freq: 240, freqTo: 1400 },
+  // Água virando vapor no Nether: chiado agudo que morre rápido.
+  'block/evaporate': { kind: 'noise', duration: 0.35, color: 'white', gain: 0.3, attack: 0.002, decay: 0.32, filter: 'highpass', freq: 2400, freqTo: 5200 },
 };
 
 /** Tabela final: sons de bloco/UI + as quatro vozes de cada mob. */

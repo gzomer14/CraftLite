@@ -9,7 +9,7 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-13 14:32 — **portal longe da origem, canvas piscando e o tier do S24**
+**Última atualização:** 2026-09-13 14:48 — **o campo que nasceu no Nether, e a chuva que caiu lá**
 
 ---
 
@@ -37,13 +37,13 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-13 14:32, com `npm test`, `npm run build` e
+Medidas em 2026-09-13 14:48, com `npm test`, `npm run build` e
 `SIZE_BUDGET_KB=350 npm run size`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
 | Bundle (gzip, tudo) | **171,2 KB** | < 350 KB | `npm run size` |
-| Testes | **1151**, 64 arquivos | manter verde | `npm test` |
+| Testes | **1155**, 64 arquivos | manter verde | `npm test` |
 | Camadas de atlas | **152** | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Geração de chunk | 6–14 ms (mediana; varia muito com a carga da máquina) | < 25 ms | `tests/perf.test.ts` |
 | Geração de chunk do Nether | 6,1 ms (mediana; 3,8 antes de a luz entrar) | < 25 ms | `tests/perf.test.ts` |
@@ -55,7 +55,7 @@ Medidas em 2026-09-13 14:32, com `npm test`, `npm run build` e
 | FPS em T0 real (2017) | **60**, RD 4, escala 1,00 (Galaxy J7 Metal) | 30 estáveis | teste manual |
 | Render em T0 | **2,7 ms** de 33,3 ms de orçamento | ≤ 8 ms (soma do doc 02 §2) | overlay F3 no aparelho |
 | Heap em T0 | **20 MB**, estável na sessão | sem crescimento | overlay F3 no aparelho |
-| FPS em celular atual | 60 (S24 Ultra, relato do jogador) | — | teste manual |
+| FPS em celular atual | **75, T2, RD 16, escala 1,00, render 2,6 ms** (S24 Ultra) | — | teste manual |
 
 ---
 
@@ -564,6 +564,8 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-13 | `game/savegame.ts` | **Um pedaço de campo nasceu dentro do Nether — o inverso exato do bug da manhã, e a correção dele alargou esta fresta.** O pipeline troca de dimensão de forma **síncrona** e pede chunk no mesmo tick; o save troca de forma **assíncrona**, porque antes grava baús, veículos e as colunas que estão saindo. Nessa fresta o pipeline pedia chunk do Nether e o save respondia com a chave da superfície. O carimbo de dimensão do pipeline não pega este caso: quem está fora de sincronia não é o pipeline consigo mesmo, é o save com o pipeline. `SaveGame.loadChunk` passou a **esperar a troca terminar** — o carregamento já é assíncrono, o pipeline já sabe esperar, e a viagem tem tempo limite se algo travar. |
+| 2026-09-13 | `game/weather.ts`, `game/session.ts` | **Chovia no Nether**, debaixo de um teto de rocha-mãe. `hasSky` estava em `data/dimensions.ts` desde que o Nether nasceu e **nada no código a lia** — a terceira dívida desse tipo no projeto, depois de `fireImmune` e `flammable`. O corte é em `Weather.kind`, um lugar só: `isRaining`, `isThundering`, `intensity` e o teto de luz do céu saem todos dele. |
 | 2026-09-13 | `game/travel.ts`, `game/session.ts` | **O portal só funcionava perto da origem.** O pipeline carrega o anel em volta do **jogador**, e a travessia o deixava parado nas coordenadas antigas enquanto esperava o chunk de destino — que, com a escala 1:8, pode estar a 700 blocos dali. O chunk nunca chegava, a viagem estourava o tempo limite de 30 s e o jogador ficava largado na dimensão nova, nas coordenadas velhas, **preso dentro da rocha e sem portal nenhum**. Perto do spawn passava despercebido, porque a diferença cabia no render distance. Agora `onDimensionChange` leva as coordenadas do destino e a `Session` põe o jogador lá na hora; a física está congelada durante o carregamento, então mover antes de existir chão é seguro, e o Y definitivo continua saindo de `arriveAt`. Relato de campo: *"apareci travado voando… não consigo me mexer… não renderizou portal algum"*. |
 | 2026-09-13 | `render/gl.ts` | **A textura piscava a tela inteira.** O contexto era criado com `desynchronized: true`, que tira o canvas da sincronia com o compositor — a especificação diz que nesse modo pode haver tearing e quadro apresentado fora de hora. Num painel LTPO, que troca de 120 para 60 Hz sozinho, isso vira piscada constante, com a tela parada e só naquele aparelho. O que se ganhava eram alguns milissegundos de latência de toque. Agrava o teto de FPS de `core/loop.ts`, que devolve o quadro **sem desenhar**: sem sincronia com o compositor, quadro não desenhado é conteúdo indefinido na tela. |
 | 2026-09-13 | `core/tier.ts` | **A regra de textura de 16384 não promovia ninguém — e o motivo veio do aparelho.** A linha de aparelho nova mostrou `tex 8192` num Adreno 750: quem responde `MAX_TEXTURE_SIZE` é o ANGLE, não o driver. Sobrou o nome, que é o que o aparelho de fato informa (`ANGLE (Qualcomm, Adreno (TM) 750, OpenGL ES 3.2)`). A regra virou simétrica à das GPUs antigas: família de topo — Adreno 7xx/8xx, Mali-G7xx, Immortalis, Xclipse, Apple GPU — vale +2. Envelhece do mesmo jeito que a outra, e é por isso que a opção **Qualidade** existe. |
@@ -699,8 +701,10 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
 
 ## 6. Próximo passo recomendado
 
-1. **Rejogar o M7 no aparelho, depois das correções de 2026-09-13.** As duas sessões de campo no
-   S24 Ultra acharam sete coisas, todas no §4, e **nenhuma foi reverificada em aparelho**. O que
+1. **Rejogar o M7 no aparelho, depois das correções de 2026-09-13.** As quatro sessões de campo no
+   S24 Ultra acharam nove coisas, todas no §4. A quarta sessão confirmou **T2, RD 16, 75 FPS,
+   render de 2,6 ms, sem piscar e com o mundo carregando na hora** — mas a travessia do portal só
+   foi reverificada uma vez, e foi ela que revelou o campo dentro do Nether. O que
    olhar no overlay: a linha `C:` — a fila tem que cair depressa agora, e `gerando` não pode ficar
    em zero enquanto há fila; a linha de aparelho nova, que diz o que `detectTier` viu e explica o
    tier escolhido; e `N redstone` na linha `E:`, que não deve chegar perto de 1024.

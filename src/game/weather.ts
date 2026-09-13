@@ -81,6 +81,17 @@ export class Weather {
 
   private lastKind: WeatherKind = 'clear';
 
+  /**
+   * A dimensão tem céu (`data/dimensions.ts`). Sem céu não chove.
+   *
+   * `hasSky` estava na tabela de dimensões desde que o Nether nasceu e **nada
+   * no código a lia** — então chovia no Nether, com partícula caindo do teto de
+   * rocha-mãe e névoa cinza por cima da vermelha (relato de campo 2026-09-13).
+   * O corte é aqui, em `kind`, e não em cada efeito: `isRaining`, `intensity` e
+   * o teto de luz do céu saem todos dele.
+   */
+  hasSky = true;
+
   setSeed(seed: number): void {
     this.seed = seed;
     this.window = weatherOfDay(seed, this.day);
@@ -107,6 +118,7 @@ export class Weather {
 
   /** Clima agora. Fora da janela do dia é sempre `clear`. */
   get kind(): WeatherKind {
+    if (!this.hasSky) return 'clear';
     if (this.window.kind === 'clear') return 'clear';
     if (this.timeOfDay < this.window.start || this.timeOfDay >= this.window.end) return 'clear';
     return this.window.kind;
@@ -125,7 +137,7 @@ export class Weather {
    * O render usa isso para a densidade das partículas e para escurecer o céu.
    */
   get intensity(): number {
-    if (this.window.kind === 'clear') return 0;
+    if (!this.hasSky || this.window.kind === 'clear') return 0;
     const { start, end } = this.window;
     if (this.timeOfDay < start || this.timeOfDay >= end) return 0;
     const inRamp = (this.timeOfDay - start) / Weather.FADE_TICKS;

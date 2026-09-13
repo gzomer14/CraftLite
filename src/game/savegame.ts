@@ -54,6 +54,13 @@ export class SaveGame {
   private readonly meta: WorldMeta;
   private readonly options: SaveGameOptions;
   private unsubscribe: (() => void) | null = null;
+  /**
+   * Troca de dimensão em andamento, ou `null`.
+   *
+   * Ver `loadChunk`: enquanto ela não termina, o save ainda responde com a
+   * chave da dimensão **antiga**.
+   */
+  private switching: Promise<void> | null = null;
 
   constructor(
     manager: SaveManager, session: Session, player: Player, meta: WorldMeta,
@@ -105,7 +112,8 @@ export class SaveGame {
   switchDimension(dimension: number): void {
     const tiles = this.session.tileEntities.map(tileFrom);
     const vehicles = this.session.vehicleSnapshot();
-    void this.finishSwitch(dimension, tiles, vehicles);
+    this.switching = this.finishSwitch(dimension, tiles, vehicles)
+      .finally(() => { this.switching = null; });
   }
 
   private async finishSwitch(
@@ -129,7 +137,24 @@ export class SaveGame {
     this.session.restoreVehicles(await this.manager.loadVehicles<VehicleRecord>());
   }
 
+  /**
+   * Chunk pedido pelo pipeline, da dimensão em que o save está.
+   *
+   * **Espera a troca de dimensão terminar.** O pipeline vira de dimensão de
+   * forma síncrona e começa a pedir chunk no mesmo tick; o save vira de forma
+   * assíncrona, porque antes precisa gravar baús, veículos e as colunas que
+   * estão saindo. Nessa fresta o pipeline pedia chunk do Nether e o save
+   * respondia com a chave da superfície — um pedaço de campo, com grama e
+   * chuva, plantado no meio do Nether (relato de campo 2026-09-13). É o
+   * inverso exato da coluna de netherrack que apareceu na grama de manhã, e a
+   * correção daquela **alargou** esta fresta, porque `setDimension` passou a
+   * esperar a gravação de verdade.
+   *
+   * Segurar aqui é o lugar certo: o carregamento já é assíncrono, o pipeline
+   * já sabe esperar, e a viagem tem tempo limite se algo travar.
+   */
   async loadChunk(cx: number, cz: number): Promise<ChunkColumn | null> {
+    if (this.switching !== null) await this.switching;
     const chunk = await this.manager.loadChunk(cx, cz);
     if (chunk === null) return null;
     // A luz não é salva (doc 11 §2): recalcula antes de entregar, senão a

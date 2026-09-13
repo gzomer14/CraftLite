@@ -12,6 +12,61 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-13 · 14:36 → 14:50 · O campo que nasceu no Nether, e a chuva que caiu lá
+
+**Pedido:** *"Agora está perfeito, a tela não piscou mais em nenhum momento"* — com duas
+observações: o FPS ficar preso na taxa do display mesmo com teto 240, e *"indo para o nether agora
+aconteceu o inverso, um pedaço da terra foi gerado lá no nether, e inclusive nesse pedaço de terra
+até começou a chover"*.
+
+**Resultado:** o aparelho fechou em **T2, 4 workers, RD 16, 75 FPS, render 2,6 ms, sem piscar**. Das
+duas observações, uma não é bug e a outra eram dois.
+
+### O FPS preso na taxa do display não é bug
+
+`requestAnimationFrame` é chamado pelo navegador **na cadência do display**. O teto só sabe
+*recusar* quadros; ele não tem como pedir mais do que a tela oferece. Num painel LTPO de 1 a 120 Hz,
+teto 240 é o mesmo que teto nenhum — e é por isso que o overlay marca 75, que é a média de um painel
+alternando entre 120 e 60. Nada a corrigir; fica registrado porque a pergunta vai voltar.
+
+### O campo dentro do Nether — e a correção da manhã abriu essa porta
+
+É o inverso exato do pilar de netherrack na grama, e o carimbo de dimensão que resolveu aquele **não
+pega este**. Lá, o pipeline trocava de dimensão enquanto uma leitura estava em voo; aqui, quem está
+fora de sincronia não é o pipeline consigo mesmo, é o **save com o pipeline**:
+
+- o pipeline troca de dimensão de forma **síncrona** e já pede chunk no mesmo tick;
+- o save troca de forma **assíncrona**, porque antes precisa gravar baús, veículos e as colunas que
+  estão saindo.
+
+Na fresta entre os dois, o pipeline pedia chunk do Nether e o save respondia com a chave da
+superfície. E a correção da manhã **alargou a fresta**: `setDimension` passou a esperar a gravação
+de verdade, em vez de voltar na hora. Consertar um lado do mesmo problema aumentou o outro.
+
+`SaveGame.loadChunk` agora **espera a troca terminar**. É o lugar certo: o carregamento já é
+assíncrono, o pipeline já sabe esperar por ele, e a travessia tem tempo limite se algo travar.
+
+### A chuva no Nether
+
+`hasSky` está em `data/dimensions.ts` desde que o Nether nasceu e **nada no código a lia** — a
+terceira dívida desse tipo no projeto, depois de `fireImmune` (fechada no M7) e `flammable` (ainda
+aberta). O corte ficou em `Weather.kind`, um lugar só: `isRaining`, `isThundering`, `intensity` e o
+teto de luz do céu derivam todos dele.
+
+### Arquivos
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/game/savegame.ts` | `loadChunk` espera a troca de dimensão; `switchDimension` guarda a promessa |
+| `~` | `src/game/weather.ts` | `hasSky`: sem céu, `kind` é sempre `clear` |
+| `~` | `src/game/session.ts` | passa o `hasSky` da dimensão ao entrar nela e ao nascer |
+| `~` | `tests/dimensionrace.test.ts` | leitura durante a troca sai na chave nova; o mesmo instante chuvoso fica seco sem céu |
+| `~` | `docs/15-status.md`, `docs/16-auditoria.md`, `README.md` | §4, métricas, FPS de campo |
+
+**Portões:** 1155 testes (64 arquivos), lint limpo, build limpo, **171,3 KB gzip** de 350.
+
+---
+
 ## 2026-09-13 · 14:15 → 14:35 · O portal que só funcionava perto de casa
 
 **Pedido:** *"deu uma melhorada absurda no carregamento do mundo, não vejo mais problema"* — e três

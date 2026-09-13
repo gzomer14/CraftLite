@@ -51,7 +51,7 @@ import { Redstone } from '../world/redstone';
 import { Travel } from './travel';
 import { extinguishPortal, ignitePortal, isPortalBlock } from './portal';
 import { isRail } from '../world/rails';
-import { DIM_OVERWORLD } from '../data/dimensions';
+import { DIM_OVERWORLD, dimensionOf } from '../data/dimensions';
 import { Lighting } from '../world/lighting';
 import { WORLD_HEIGHT, type ChunkColumn } from '../world/chunk';
 import type { World } from '../world/world';
@@ -265,6 +265,8 @@ export class Session {
     );
 
     this.weather.setSeed(world.seed);
+    // Mundo restaurado direto no Nether nasce sem céu, sem passar por portal.
+    this.weather.hasSky = dimensionOf(world.dimension).hasSky;
     this.weather.onChange = (kind) => {
       if (kind === 'thunder') this.events.onMessage?.('A tempestade chegou');
       else if (kind === 'rain') this.events.onMessage?.('Começou a chover');
@@ -593,6 +595,9 @@ export class Session {
     this.events.onDimensionChange?.(dimension);
     this.clearForDimension();
     this.world.dimension = dimension;
+    // Sem céu não chove: `hasSky` da tabela de dimensões existia desde o M7 e
+    // ninguém a lia, então chovia no Nether — debaixo de um teto de rocha-mãe.
+    this.weather.hasSky = dimensionOf(dimension).hasSky;
     /*
      * Quem chega por portal já sabe onde vai cair, e precisa estar lá **antes**
      * do próximo `pipeline.setCenter` — é a posição do jogador que decide onde

@@ -19,6 +19,12 @@ import { GreedyMesher } from '../src/world/mesh/greedy';
 import { buildBlockTables } from '../src/world/mesh/blockinfo';
 import { buildLayerIndex } from '../src/render/layers';
 import { detectTier, type DeviceInfo } from '../src/core/tier';
+import { SaveGame } from '../src/game/savegame';
+import { Weather, weatherOfDay } from '../src/game/weather';
+import { TICKS_PER_DAY } from '../src/game/daynight';
+import { newWorldMeta } from '../src/ui/menuflow';
+import type { Session } from '../src/game/session';
+import type { Player } from '../src/entity/player';
 import type { WorkerRequest, WorkerResponse } from '../src/workers/protocol';
 
 /** Worker que só conta: nenhuma resposta volta, então as vagas ficam presas. */
@@ -425,3 +431,89 @@ function genResponse(cx: number, cz: number, dim: number): WorkerResponse {
     ms: 1,
   };
 }
+
+describe('o save respondendo durante a troca de dimensão', () => {
+  /**
+   * Banco que registra de qual chave cada leitura saiu, e cuja escrita demora
+   * — é a demora que abre a fresta entre o pipeline virar (síncrono) e o save
+   * virar (assíncrono).
+   */
+  function tracingDb() {
+    const reads: string[] = [];
+    return {
+      reads,
+      async get(): Promise<undefined> { await settle(); return undefined; },
+      async put(): Promise<void> { await settle(); },
+      async putChunks(): Promise<void> { await settle(); },
+      async getChunk(dimensionId: string): Promise<undefined> {
+        reads.push(dimensionId);
+        return undefined;
+      },
+    };
+  }
+
+  /** `SaveGame` precisa de pouco da sessão: lista de baús e de veículos. */
+  const stubSession = (): Session => ({
+    tileEntities: [],
+    vehicleSnapshot: () => [],
+    restoreContainer: () => { /* nada */ },
+    restoreVehicles: () => { /* nada */ },
+  }) as unknown as Session;
+
+  it('a leitura espera a troca terminar, e sai na chave nova', async () => {
+    const db = tracingDb();
+    const meta = newWorldMeta('Teste', 'x', 'survival', 2);
+    const manager = new SaveManager(db as unknown as SaveDatabase, meta.id);
+    const save = new SaveGame(manager, stubSession(), {} as unknown as Player, meta);
+
+    // O pipeline vira e pede chunk no mesmo tick em que o save começa a virar.
+    save.switchDimension(DIM_NETHER);
+    await save.loadChunk(3, 4);
+
+    expect(db.reads).toEqual([dimensionIdFor(meta.id, DIM_NETHER)]);
+  });
+
+  it('sem troca em curso, a leitura não espera nada', async () => {
+    const db = tracingDb();
+    const meta = newWorldMeta('Teste', 'x', 'survival', 2);
+    const manager = new SaveManager(db as unknown as SaveDatabase, meta.id);
+    const save = new SaveGame(manager, stubSession(), {} as unknown as Player, meta);
+
+    await save.loadChunk(0, 0);
+    expect(db.reads).toEqual([dimensionIdFor(meta.id, DIM_OVERWORLD)]);
+  });
+});
+
+describe('chuva onde não há céu', () => {
+  /** Um dia chuvoso daquela seed, e o tick em que a chuva está no auge. */
+  function rainyMoment(seed: number): { totalTicks: number } | null {
+    for (let day = 0; day < 200; day++) {
+      const window = weatherOfDay(seed, day);
+      if (window.kind === 'clear') continue;
+      const middle = Math.floor((window.start + window.end) / 2);
+      return { totalTicks: day * TICKS_PER_DAY + middle };
+    }
+    return null;
+  }
+
+  it('com céu, chove como sempre', () => {
+    const moment = rainyMoment(1234);
+    expect(moment).not.toBeNull();
+    const weather = new Weather();
+    weather.setSeed(1234);
+    weather.update((moment as { totalTicks: number }).totalTicks);
+    expect(weather.isRaining).toBe(true);
+    expect(weather.intensity).toBeGreaterThan(0);
+  });
+
+  it('sem céu, o mesmo instante fica seco', () => {
+    const moment = rainyMoment(1234) as { totalTicks: number };
+    const weather = new Weather();
+    weather.setSeed(1234);
+    weather.hasSky = false;
+    weather.update(moment.totalTicks);
+    expect(weather.isRaining).toBe(false);
+    expect(weather.isThundering).toBe(false);
+    expect(weather.intensity).toBe(0);
+  });
+});

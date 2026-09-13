@@ -81,7 +81,14 @@ async function boot(): Promise<void> {
   const ctx = createContext(canvas);
 
   const device = readDeviceInfo(ctx.caps);
-  const tier = detectTier(device);
+  /*
+   * A escolha do jogador vence a detecção (doc 02 §1, e o comentário de
+   * `core/tier.ts` desde sempre). Ela lê quatro números do navegador, dois dos
+   * quais saturam — `deviceMemory` para em 8 —, e num celular topo de linha
+   * errou para baixo em campo. Quem sabe que aparelho tem é quem está com ele.
+   */
+  const forced = settings.get('quality');
+  const tier = forced >= 0 ? (forced as 0 | 1 | 2) : detectTier(device);
   const preset = presetFor(tier, device);
   // Override manual das opções vence a detecção, que erra com frequência.
   const rdOverride = settings.get('renderDistance');
@@ -126,7 +133,7 @@ async function boot(): Promise<void> {
   let music: Music | null = null;
   const dynamicScale = new DynamicScale(preset.targetFps);
   dynamicScale.enabled = settings.get('dynamicResolution');
-  const debug = new DebugOverlay(tier, preset, ctx.caps, atlas.layerCount, atlas.buildMs);
+  const debug = new DebugOverlay(tier, preset, ctx.caps, device, atlas.layerCount, atlas.buildMs);
 
   progress(1, 'pronto');
   hideBootScreen();
@@ -164,6 +171,7 @@ async function boot(): Promise<void> {
     workers: preset.workers,
     renderDistance: preset.renderDistance,
     packed: ctx.gl2 !== null,
+    targetFps: preset.targetFps,
   });
   pipeline.onChunkUnloaded = (chunk) => {
     save?.unloadChunk(chunk);

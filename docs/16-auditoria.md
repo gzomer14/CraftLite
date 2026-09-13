@@ -12,6 +12,89 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-13 · 13:50 → 14:15 · A máquina não estava lenta, estava entediada
+
+**Pedido:** *"Mesmo após seu ajuste aqui no S24 ultra a geração de mundo está muito estranha, bem
+lenta mesmo"*, e em seguida *"Será que não é limitação do próprio navegador Chrome?"*.
+
+**Resultado:** não era o Chrome, e a correção da manhã tinha atacado o sintoma menor. O overlay
+trazia a resposta inteira: **861/861 colunas carregadas** — a geração tinha terminado —, **7051
+sections na fila**, 60 FPS e **render de 3,2 ms num frame de 16,6**. Um aparelho sem nada para
+fazer e uma fila de sete mil.
+
+### O gargalo
+
+`maxInFlight = workers * 2`, e o `pump` roda **uma vez por frame**. O teto de pedidos em voo era,
+portanto, o teto de despachos por frame: **4**. O aparelho mandava quatro jobs e esperava o frame
+seguinte, com os workers parados ~90% do tempo. Nada disso aparece como queda de FPS — aparece como
+mundo que não nasce.
+
+Medido no pipeline, varrendo o multiplicador com um mundo de RD 16 (861 colunas, ~4.400 sections):
+
+| Vagas por worker | Pumps para ficar pronto | A 60 FPS |
+|---|---|---|
+| 2 (como estava) | 1315 | 21,9 s |
+| 4 | 657 | 10,9 s |
+| 8 | 328 | 5,5 s |
+| 16 | 165 | 2,7 s |
+| 32 | 82 | 1,4 s |
+
+Linear, porque o trabalho total é idêntico nos cinco casos (as mesmas 4.398 malhas): só muda quantos
+cabem por frame.
+
+### A correção, e por que não é só "aumentar o número"
+
+O teto subiu para `workers * 16`, mas quem passa a limitar de verdade é um **orçamento de tempo**:
+20% do frame, derivado do FPS alvo do preset. Despachar não é de graça — cada job de malha copia a
+vizinhança 18³ da coluna (blocos e luz) **na thread principal**, ~0,26 ms por section. Um número
+fixo alto entregaria o frame de um aparelho fraco para a cópia; sendo orçamento, a conta se ajusta
+sozinha: o aparelho rápido despacha mais, o lento despacha menos, e nenhum dos dois engasga.
+
+### Duas coisas que a medição corrigiu em mim
+
+**O primeiro número estava errado por culpa do duplo de teste.** O worker falso meshava dentro do
+`postMessage`, então o custo do worker era cobrado do orçamento de despacho da thread principal —
+que no navegador roda em outra thread. Medido assim, a correção parecia render 887 pumps; com o
+duplo consertado, 463.
+
+**E a reserva de vagas da manhã perdeu o efeito.** Com 32 vagas ela não muda nada: sobra para os
+dois lados. Ela guarda o regime oposto — aparelho lento, onde o orçamento deixa passar meia dúzia de
+despachos por frame e sem reserva o meshing leva todos —, que era o regime de **todo** aparelho
+antes. O teste dela foi refeito para rodar com o teto apertado, que é onde ela tem o que provar; o
+§4 do doc 15 registra a revisão de escopo.
+
+**O teste de vazão também estava flaky** e passou despercebido por pouco: o orçamento é de relógio,
+então a vazão dependia de quanto a máquina estava ocupada — passava sozinho e falhava na suíte
+cheia. `dispatchBudgetMs` e `maxInFlight` viraram opções do pipeline; os testes passam `Infinity` e
+medem só a estrutura.
+
+### O tier, que o usuário estranhou de novo
+
+O bônus de textura de 16384 da manhã **não promoveu** o S24 Ultra, e não havia como saber qual dos
+quatro números de `detectTier` está baixo. Duas respostas:
+
+- o overlay ganhou uma **linha de aparelho** — memória, núcleos, workers, textura máxima e GPU
+  reportada;
+- Opções → Vídeo ganhou **Qualidade** (Automática/Baixa/Média/Alta). O comentário de `core/tier.ts`
+  promete desde o M0 que tudo ali pode ser sobrescrito nas opções, e só a distância de render era.
+  Vale no carregamento seguinte, porque o número de workers é decidido quando o pipeline nasce.
+
+### Arquivos
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/world/pipeline.ts` | teto de vagas `workers * 16` e orçamento de despacho de 20% do frame; `maxInFlight` e `dispatchBudgetMs` viraram opções |
+| `~` | `src/ui/debug.ts` | linha de aparelho, para diagnosticar o tier em vez de adivinhar |
+| `~` | `src/game/settings.ts`, `src/ui/screens/options.ts` | opção **Qualidade**, com tier forçado |
+| `~` | `src/main.ts` | escolha do jogador vence `detectTier`; `targetFps` vai para o pipeline |
+| `~` | `tests/dimensionrace.test.ts` | vazão de RD 16 (165 pumps contra 1315) e reserva medida com teto apertado |
+| `~` | `docs/15-status.md`, `docs/16-auditoria.md`, `README.md` | §4, métricas |
+
+**Portões:** 1146 testes (64 arquivos), lint limpo, build limpo, **171,2 KB gzip** de 350. Três
+execuções seguidas da suíte completa: verde.
+
+---
+
 ## 2026-09-13 · 13:20 → 13:45 · Quatro bugs que só um aparelho na mão acha
 
 **Pedido:** *"Notei algumas coisas estranhas no jogo"* — pilar de netherrack na superfície depois

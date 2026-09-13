@@ -61,9 +61,32 @@ export interface PipelineOptions {
   workers: number;
   renderDistance: number;
   packed: boolean;
+  /** FPS alvo do preset. Define quanto do frame o despacho pode gastar. */
+  targetFps?: number;
+  /** Teto de pedidos em voo. O padrão é `workers * 16`. */
+  maxInFlight?: number;
+  /**
+   * Teto de tempo de despacho por frame, em ms. O padrão sai do `targetFps`.
+   *
+   * Existe explícito para **teste**: um orçamento de relógio faz a vazão
+   * depender de quanto a máquina está ocupada, e um teste de vazão assim passa
+   * sozinho e falha na suíte cheia. Passando `Infinity`, quem limita é só o
+   * teto de jobs em voo, e a medição vira determinística.
+   */
+  dispatchBudgetMs?: number;
   /** Fábrica de worker. O padrão cria o worker real; os testes injetam um duplo. */
   createWorker?: (index: number) => WorkerLike;
 }
+
+/**
+ * Quanto do frame o `pump` pode gastar **despachando**.
+ *
+ * Despachar não é de graça: cada job de malha copia a vizinhança 18³ da coluna
+ * (blocos e luz) na thread principal, ~0,26 ms por section. É este orçamento —
+ * e não uma contagem fixa — que decide quantos cabem, porque num aparelho
+ * lento cada cópia custa mais e a conta se ajusta sozinha.
+ */
+const DISPATCH_FRAME_SHARE = 0.2;
 
 export class ChunkPipeline {
   private readonly world: World;
@@ -71,6 +94,8 @@ export class ChunkPipeline {
   /** Quantos pedidos cada worker tem em voo — usado para o round-robin. */
   private readonly inFlight: number[] = [];
   private readonly maxInFlight: number;
+  /** Teto de tempo de despacho por frame, em ms. Ver `DISPATCH_FRAME_SHARE`. */
+  private readonly dispatchBudgetMs: number;
 
   /** Dimensão que os pedidos de geração carregam (`DIM_*`). */
   dimension = DIM_OVERWORLD;
@@ -107,7 +132,24 @@ export class ChunkPipeline {
     this.world = world;
     this.renderDistance = options.renderDistance;
     this.packed = options.packed;
-    this.maxInFlight = options.workers * 2;
+    /*
+     * Dezesseis por worker, não dois.
+     *
+     * Dois era o gargalo do jogo inteiro: o `pump` roda **uma vez por frame**,
+     * então o teto de jobs em voo é também o teto de despachos por frame. Com
+     * `workers * 2` o aparelho mandava 4 jobs e esperava o frame seguinte, com
+     * os workers ociosos 90% do tempo — medido num S24 Ultra: mundo de render
+     * distance 16 a 60 FPS, render de 3,2 ms de 16,6, e **7051 sections na
+     * fila** que levavam ~22 s para sair. A máquina não estava lenta, estava
+     * entediada (relato de campo 2026-09-13).
+     *
+     * O que segura o despacho agora é o orçamento de tempo abaixo, que se
+     * ajusta ao aparelho; este número é só o teto de segurança para a fila de
+     * mensagens do worker não crescer sem limite.
+     */
+    this.maxInFlight = options.maxInFlight ?? options.workers * 16;
+    this.dispatchBudgetMs = options.dispatchBudgetMs
+      ?? (1000 / (options.targetFps ?? 60)) * DISPATCH_FRAME_SHARE;
 
     const create = options.createWorker ?? defaultWorkerFactory;
     for (let i = 0; i < options.workers; i++) {
@@ -250,6 +292,7 @@ export class ChunkPipeline {
   pump(): void {
     let busy = 0;
     for (let i = 0; i < this.inFlight.length; i++) busy += this.inFlight[i];
+    const deadline = performance.now() + this.dispatchBudgetMs;
 
     /*
      * Meshing tem prioridade sobre geração — mas **não prioridade absoluta**.
@@ -285,6 +328,9 @@ export class ChunkPipeline {
       const outcome = this.dispatchMesh(job);
       if (outcome === MESH_SENT) busy++;
       else if (outcome === MESH_DEFERRED) deferred.push(job);
+      // Só quem foi mesmo despachado custou cópia; adiar é barato, e parar por
+      // causa deles deixaria a fila parada quando a borda do anel se repete.
+      if (outcome === MESH_SENT && performance.now() >= deadline) break;
     }
     for (let i = 0; i < deferred.length; i++) this.meshQueue.push(deferred[i]);
     deferred.length = 0;
@@ -292,6 +338,7 @@ export class ChunkPipeline {
       const job = this.genQueue.shift() as PendingJob;
       this.dispatchGen(job);
       busy++;
+      if (performance.now() >= deadline) break;
     }
 
     this.stats.queued = this.genQueue.length + this.meshQueue.length;

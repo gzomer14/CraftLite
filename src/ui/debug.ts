@@ -9,7 +9,7 @@
  */
 
 import { FRAME_HISTORY, type LoopStats } from '../core/loop';
-import type { Preset, Tier } from '../core/tier';
+import type { DeviceInfo, Preset, Tier } from '../core/tier';
 import type { GlCaps } from '../render/gl';
 
 const GRAPH_W = FRAME_HISTORY;
@@ -55,11 +55,13 @@ export class DebugOverlay {
   private readonly pre: HTMLPreElement;
   private readonly canvas: HTMLCanvasElement;
   private readonly g2d: CanvasRenderingContext2D | null;
-  private readonly lines: string[] = ['', '', '', '', '', '', '', ''];
+  private readonly lines: string[] = ['', '', '', '', '', '', '', '', ''];
   private header = '';
   /** Partes fixas do cabeçalho; só o render distance muda em partida. */
   private readonly headerPrefix: string;
   private readonly headerSuffix: string;
+  /** O que `detectTier` viu do aparelho. Fixo: nada disso muda em partida. */
+  private readonly deviceLine: string;
   private readonly targetMs: number;
   private lastUpdate = 0;
   private visible = false;
@@ -68,7 +70,10 @@ export class DebugOverlay {
   private hzSamples = 0;
   private hzSince = 0;
 
-  constructor(tier: Tier, preset: Preset, caps: GlCaps, atlasLayers: number, atlasMs: number) {
+  constructor(
+    tier: Tier, preset: Preset, caps: GlCaps, device: DeviceInfo,
+    atlasLayers: number, atlasMs: number,
+  ) {
     this.targetMs = 1000 / preset.targetFps;
     // Sem marcar o marco: ficaria desatualizado a cada entrega.
     /*
@@ -81,6 +86,18 @@ export class DebugOverlay {
       `CraftLite  ·  tier T${tier} (${preset.label})  ·  ${caps.webgl2 ? 'WebGL2' : 'WebGL1'}  ·  RD `;
     this.headerSuffix = `  ·  atlas ${atlasLayers} camadas em ${atlasMs.toFixed(1)}ms`;
     this.setRenderDistance(preset.renderDistance);
+
+    /*
+     * A linha que explica o tier.
+     *
+     * `detectTier` decide render distance e workers a partir de quatro números,
+     * e quando ele erra não há como saber **qual** deles está baixo: um S24
+     * Ultra entrou como T1 e nem o bônus de textura o promoveu (relato de campo
+     * 2026-09-13). Sem os números na tela, diagnosticar isso é adivinhação.
+     */
+    this.deviceLine =
+      `mem ${device.memGB}GB  ·  ${device.cores} núcleos  ·  ${preset.workers} workers  ·  `
+      + `tex ${device.maxTexSize}  ·  ${device.renderer || 'GPU não informada'}`;
 
     this.root = document.createElement('div');
     this.root.id = 'debug';
@@ -150,27 +167,28 @@ export class DebugOverlay {
     // O rAF segue a taxa do display, então mostrar os dois lado a lado evita a
     // confusão de ver 100 FPS num jogo "de 60".
     const cap = src.maxFps > 0 ? `teto ${src.maxFps}` : `display ~${this.displayHz}Hz`;
-    l[1] =
+    l[1] = this.deviceLine;
+    l[2] =
       `fps ${s.fps.toFixed(0)} (${s.frameMs.toFixed(1)}ms)  |  ${cap}  |  ` +
       `escala ${src.renderScale.toFixed(2)}` + (mem > 0 ? `  |  mem ${mem}MB` : '');
-    l[2] =
+    l[3] =
       `XYZ ${cam.renderX.toFixed(1)} / ${cam.renderY.toFixed(1)} / ${cam.renderZ.toFixed(1)}` +
       `   chunk ${cx} ${Math.floor(cam.renderY / 16)} ${cz}`;
-    l[3] = `bioma: ${src.biome}   luz: b${src.blockLight} s${src.skyLight}   olhando: ${facing}`;
+    l[4] = `bioma: ${src.biome}   luz: b${src.blockLight} s${src.skyLight}   olhando: ${facing}`;
     const c = src.chunks;
-    l[4] =
+    l[5] =
       `C: ${c.loaded}/${c.total} colunas, ${c.queued} na fila, ` +
       `${c.generating} gerando, ${c.meshing} meshando`;
-    l[5] =
+    l[6] =
       `V: ${formatCount(src.vertices)} vértices, ${src.drawCalls} draw calls, ` +
       `${c.visibleSections} sections visíveis`;
     const e = src.entities;
-    l[6] =
+    l[7] =
       `E: ${e.mobs} mobs, ${e.items} itens, ${e.arrows} flechas, ${e.paths} caminhos/tick` +
       // Só aparece quando há circuito rodando: linha curta é linha lida.
       (src.redstone > 0 ? `, ${src.redstone} redstone` : '') +
       `   ${src.clock}` + (src.sounds > 0 ? `   ${src.sounds} sons` : '');
-    l[7] =
+    l[8] =
       `T: tick ${s.tickMs.toFixed(1)}ms  mesh-upload ${s.pumpMs.toFixed(1)}ms  ` +
       `render ${s.renderMs.toFixed(1)}ms`;
 

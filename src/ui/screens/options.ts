@@ -16,6 +16,20 @@ const percent = (value: number): string => `${Math.round(value * 100)}%`;
 
 const VIDEO: readonly Field[] = [
   {
+    /*
+     * Muda no próximo carregamento, e não agora: o tier decide quantos workers
+     * o pipeline cria, e eles nascem junto com o mundo. Trocar ao vivo exigiria
+     * derrubar e refazer o pool inteiro no meio da partida.
+     */
+    kind: 'choice', key: 'quality', label: 'Qualidade (recarrega)',
+    options: [
+      { value: -1, label: 'Automática' },
+      { value: 0, label: 'Baixa' },
+      { value: 1, label: 'Média' },
+      { value: 2, label: 'Alta' },
+    ],
+  },
+  {
     kind: 'range', key: 'renderDistance', label: 'Distância de render',
     min: 0, max: 16, step: 1,
     format: (v) => (v === 0 ? 'automática' : `${v} chunks`),

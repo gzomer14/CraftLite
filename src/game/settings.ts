@@ -26,6 +26,16 @@ export interface Settings {
   vibration: boolean;
   /** Distância de render; 0 = automática pelo tier. */
   renderDistance: number;
+  /**
+   * Qualidade forçada: −1 = automática, 0/1/2 = tier (doc 02 §1).
+   *
+   * A detecção lê quatro números do navegador e erra com frequência — e quando
+   * erra não há como o jogador consertar, porque tier define workers, nuvens,
+   * partículas e teto de mobs, e nada disso tem controle próprio. O comentário
+   * de `core/tier.ts` sempre prometeu que tudo ali podia ser sobrescrito nas
+   * opções; esta é a opção.
+   */
+  quality: number;
   /** Escala de GUI em passos de meio, 0,5–4; 0 = automática pela resolução. */
   guiScale: number;
   dynamicResolution: boolean;
@@ -68,6 +78,7 @@ const DEFAULTS: Settings = {
   leftHanded: false,
   vibration: true,
   renderDistance: 0,
+  quality: -1,
   guiScale: 0,
   dynamicResolution: true,
   maxFps: 0,
@@ -108,6 +119,7 @@ const RANGES: Partial<Record<keyof Settings, [number, number]>> = {
   longPressMs: [150, 1000],
   touchButtonScale: [0.7, 1.5],
   renderDistance: [0, 32],
+  quality: [-1, 2],
   guiScale: [0, 4],
   maxFps: [0, 480],
   masterVolume: [0, 1],

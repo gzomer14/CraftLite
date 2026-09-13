@@ -9,7 +9,7 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-13 13:40 — **quatro bugs de campo do M7 (S24 Ultra), corrigidos**
+**Última atualização:** 2026-09-13 14:10 — **o gargalo de vazão do pipeline, achado em campo**
 
 ---
 
@@ -37,20 +37,21 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-13 13:40, com `npm test`, `npm run build` e
+Medidas em 2026-09-13 14:10, com `npm test`, `npm run build` e
 `SIZE_BUDGET_KB=350 npm run size`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **170,9 KB** | < 350 KB | `npm run size` |
-| Testes | **1145**, 64 arquivos | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **171,2 KB** | < 350 KB | `npm run size` |
+| Testes | **1146**, 64 arquivos | manter verde | `npm test` |
 | Camadas de atlas | **152** | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Geração de chunk | 6–14 ms (mediana; varia muito com a carga da máquina) | < 25 ms | `tests/perf.test.ts` |
 | Geração de chunk do Nether | 6,1 ms (mediana; 3,8 antes de a luz entrar) | < 25 ms | `tests/perf.test.ts` |
 | Meshing de section | 0,6–1,5 ms (mediana) | < 8 ms | `tests/perf.test.ts` |
 | Tick de 20 mobs | 0,14 ms | << 50 ms | `tests/mobs.test.ts` |
 | Tick de circuito (fio de 64) | 0,88 ms | < 5 ms | `tests/perf.test.ts` |
-| Colunas em 40 ciclos de pipeline (RD 8, 2 workers) | **86** (eram 44) | — | `tests/dimensionrace.test.ts` |
+| Mundo de RD 16 pronto | **165 pumps** (eram 1315) | — | `tests/dimensionrace.test.ts` |
+| Colunas em 40 ciclos com 4 vagas (RD 8) | **86** (eram 44) | — | `tests/dimensionrace.test.ts` |
 | FPS em T0 real (2017) | **60**, RD 4, escala 1,00 (Galaxy J7 Metal) | 30 estáveis | teste manual |
 | Render em T0 | **2,7 ms** de 33,3 ms de orçamento | ≤ 8 ms (soma do doc 02 §2) | overlay F3 no aparelho |
 | Heap em T0 | **20 MB**, estável na sessão | sem crescimento | overlay F3 no aparelho |
@@ -563,9 +564,12 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-13 | `world/pipeline.ts` | **O teto de jobs em voo era o gargalo do jogo inteiro.** `maxInFlight = workers * 2`, e o `pump` roda **uma vez por frame** — então o teto de pedidos em voo era também o teto de despachos por frame: 4. O aparelho mandava 4 jobs e esperava o frame seguinte, com os workers ociosos ~90% do tempo. Num S24 Ultra com RD 16: 60 FPS, render de 3,2 ms de 16,6 ms, **7051 sections na fila** e 861/861 colunas já geradas — a máquina não estava lenta, estava **entediada**. Medido no pipeline: um mundo de RD 16 saía em **1315 pumps** (22 s a 60 FPS) e agora sai em **165**. O teto subiu para `workers * 16` e quem limita passou a ser um **orçamento de tempo** de 20% do frame, porque despachar não é de graça: cada job de malha copia a vizinhança 18³ da coluna na thread principal (~0,26 ms). Sendo orçamento, ele se ajusta ao aparelho sozinho. |
+| 2026-09-13 | `ui/debug.ts` | **Não havia como diagnosticar um tier errado.** `detectTier` decide a partir de quatro números do navegador e, quando erra, nada na tela diz **qual** deles está baixo — o bônus de textura de 16384 não promoveu o S24 Ultra e não havia como saber por quê. O overlay ganhou uma linha com memória, núcleos, workers, tamanho máximo de textura e GPU reportada. |
+| 2026-09-13 | `game/settings.ts`, `ui/screens/options.ts`, `main.ts` | **O tier não tinha como ser corrigido pelo jogador.** O comentário de `core/tier.ts` promete desde o M0 que *"todo valor derivado aqui pode ser sobrescrito nas opções"*, e só a distância de render era. Tier define workers, nuvens, partículas e teto de mobs, nenhum com controle próprio. Opções → Vídeo ganhou **Qualidade** (Automática/Baixa/Média/Alta). Vale no carregamento seguinte: o número de workers é decidido quando o pipeline nasce. |
 | 2026-09-13 | `save/savemanager.ts` | **Coluna do Nether gravada como coluna da superfície — netherrack plantado na grama, permanente.** `flush` devolvia na hora quando já havia uma gravação em curso (*"chamadas concorrentes são ignoradas"*), mas `setDimension` faz `await this.flush()` **justamente** para gravar com a chave antiga o que está saindo. Com um autosave rodando, esse `await` não esperava nada: a dimensão virava no meio e o lote em voo ia para o disco com a chave **nova**. Agora `flush` devolve a promessa em curso, e `setDimension` chama duas vezes — a primeira espera a que já rodava, a segunda leva o que o `pipeline.setDimension` acabou de sujar ao descarregar. A chave passou a ser capturada antes de qualquer `await`, aqui e em `saveAndForget` (onde o acerto dependia da ordem de avaliação dos argumentos — correto por acidente). Relato de campo: *"parece que ele trouxe parte do mundo do nether para terra"*. |
 | 2026-09-13 | `world/pipeline.ts` | **A mesma corrupção pela outra porta.** O caminho do save em `dispatchGen` é assíncrono e `acceptChunk` só conferia distância: atravessar o portal com uma leitura de IndexedDB em voo punha a coluna do outro lado no mundo novo — e, como ela volta do disco marcada `modified`, ao sair de alcance era **gravada** na dimensão errada. A dimensão agora é carimbada no despacho e conferida na volta, como já acontecia com a resposta do worker. |
-| 2026-09-13 | `world/pipeline.ts` | **O meshing matava a geração de fome.** São `workers × 2` vagas, o meshing era despachado primeiro **sem teto**, e uma coluna rende até 8 jobs de malha: com a fila cheia as quatro vagas iam todas para malha e quase nada nascia. No S24 Ultra com RD 16: *"201/861 colunas, 1046 na fila, 0 gerando, 4 meshando"*. Metade das vagas agora fica reservada para a geração enquanto houver fila dela — gerar e meshar uma coluna custam a mesma ordem de grandeza (6–14 ms contra 8 × 0,6–1,5 ms). Medido no pipeline: **86 colunas em 40 ciclos, contra 44**. É também a explicação real do *"o mundo não acompanha a geração"* de T0, que em 2026-09-12 se atribuiu ao número de workers. |
+| 2026-09-13 | `world/pipeline.ts` | **O meshing matava a geração de fome.** São `workers × 2` vagas, o meshing era despachado primeiro **sem teto**, e uma coluna rende até 8 jobs de malha: com a fila cheia as quatro vagas iam todas para malha e quase nada nascia. No S24 Ultra com RD 16: *"201/861 colunas, 1046 na fila, 0 gerando, 4 meshando"*. Metade das vagas agora fica reservada para a geração enquanto houver fila dela — gerar e meshar uma coluna custam a mesma ordem de grandeza (6–14 ms contra 8 × 0,6–1,5 ms). Medido com 4 vagas: **86 colunas em 40 ciclos, contra 44**. **Escopo revisto no mesmo dia:** com o teto de vagas corrigido na linha seguinte desta tabela, a reserva deixa de mudar qualquer coisa num aparelho rápido — sobra vaga para os dois lados. Ela guarda o regime oposto, o do aparelho lento, onde o orçamento de tempo deixa passar meia dúzia de despachos por frame e sem reserva o meshing leva todos. Era esse o regime de **todo** aparelho antes. |
 | 2026-09-13 | `world/gen/nether.ts` | **O Nether nascia sem luz nenhuma.** `generateNetherChunk` chamava `recomputeHeightMap()` e **não** `computeChunkLight()`, que o gerador da superfície sempre chamou. Lava, pedra luminosa e magma declaravam `emission` na tabela e não acendiam nada. Pior que escuro, ficava **manchado**: coluna que o jogador tinha modificado voltava pelo save, que recalcula a luz, e nascia iluminada ao lado de uma que não — *"parte da lava fica mais acesa e parte da lava mais escura"*. Custo: 3,8 → 6,1 ms por chunk, contra um orçamento de 25. |
 | 2026-09-13 | `core/tier.ts` | **Nenhum celular podia chegar ao T2, por mais forte que fosse.** `navigator.deviceMemory` satura em 8, então um aparelho de 12 GB pontua igual a um de 8; com a penalidade de `isMobile`, o melhor celular possível somava 3 e o T2 exige 4. Um Galaxy S24 Ultra entrava como **T1**, com render distance 8 e 2 workers. `maxTexSize >= 16384` — GPU de classe GLES 3.1/3.2, e o único número que vem do driver em vez de um nome para casar com regex — passou a valer +1, **só com WebGL2** (sem essa condição um aparelho sem WebGL2 subia para T2, que é o oposto da regra de errar para baixo). |
 | 2026-09-13 | `ui/debug.ts`, `main.ts` | **O overlay mentia o render distance.** O cabeçalho era montado uma vez no construtor: quem subisse a opção para 16 em jogo continuava lendo "RD 8" e media o mundo errado. O cabeçalho virou prefixo + valor + sufixo, e `applyRenderDistance` avisa o overlay junto com o pipeline e o renderer. |
@@ -692,13 +696,13 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
 
 ## 6. Próximo passo recomendado
 
-1. **Rejogar o M7 no aparelho, depois das quatro correções de 2026-09-13.** A primeira sessão de
-   campo (S24 Ultra) achou os quatro bugs do §4 — a coluna do Nether na superfície, a geração
-   morrendo de fome, o Nether sem luz e o tier travado em T1 — e nenhum deles foi reverificado em
-   aparelho. Três termômetros no overlay: `N redstone` na linha `E:`, que não deve chegar perto
-   de 1024; a linha `C:` durante a travessia do portal, agora esperando ver `gerando` maior que
-   zero enquanto há fila; e o tier, que num celular topo de linha deve dizer **T2**.
-   **O J7 Metal continua sem ver nada do M7.**
+1. **Rejogar o M7 no aparelho, depois das correções de 2026-09-13.** As duas sessões de campo no
+   S24 Ultra acharam sete coisas, todas no §4, e **nenhuma foi reverificada em aparelho**. O que
+   olhar no overlay: a linha `C:` — a fila tem que cair depressa agora, e `gerando` não pode ficar
+   em zero enquanto há fila; a linha de aparelho nova, que diz o que `detectTier` viu e explica o
+   tier escolhido; e `N redstone` na linha `E:`, que não deve chegar perto de 1024.
+   **O J7 Metal continua sem ver nada do M7** — e é lá que o orçamento de despacho de 20% do
+   frame precisa ser medido, porque é o aparelho em que ele realmente limita.
 2. **O que a revisão de UX levantou e ficou para depois**, todos da tabela de Vídeo do doc 08 ou
    das listas de Controles/Som:
    - **remapeamento de teclas** (doc 08, Controles: "lista completa de teclas remapeáveis, conflito

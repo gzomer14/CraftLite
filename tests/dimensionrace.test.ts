@@ -195,11 +195,75 @@ describe('geração não morre de fome', () => {
     terminate(): void { /* nada */ }
   }
 
-  it('o mundo nasce no dobro da velocidade com a vaga reservada', () => {
+  /**
+   * Worker que **não** trabalha dentro do `postMessage`.
+   *
+   * Vale a distinção: no navegador o `postMessage` volta na hora e o mesher
+   * roda em outra thread. Um duplo que mesha ali dentro cobra o custo do
+   * worker no orçamento de despacho da thread principal e mede o pipeline
+   * errado — foi o que aconteceu na primeira medição desta correção.
+   */
+  class ThreadedWorker extends RealWorker {
+    private readonly queued: WorkerRequest[] = [];
+
+    override postMessage(message: unknown): void {
+      const request = message as WorkerRequest;
+      if (request.type === 'mesh') { this.queued.push(request); return; }
+      super.postMessage(message);
+    }
+
+    override flush(): void {
+      while (this.queued.length > 0) super.postMessage(this.queued.shift());
+      super.flush();
+    }
+  }
+
+  it('um mundo de render distance 16 fica pronto em menos de 400 pumps', () => {
+    const world = new World(11);
+    const workers: ThreadedWorker[] = [];
+    const pipeline = new ChunkPipeline(world, {
+      // Sem relógio: quem limita é o teto de jobs em voo, e a conta de pumps
+      // não muda conforme a máquina esteja ocupada.
+      workers: 2, renderDistance: 16, packed: true, dispatchBudgetMs: Infinity,
+      createWorker: () => { const w = new ThreadedWorker(); workers.push(w); return w; },
+    });
+
+    pipeline.setCenter(0, 0);
+    let pumps = 0;
+    while (pumps < 2000) {
+      pumps++;
+      pipeline.pump();
+      for (const w of workers) w.flush();
+      pipeline.drainReady(1000, () => { /* descarta */ });
+      if (pipeline.stats.queued === 0) break;
+    }
+
+    expect(pipeline.stats.queued).toBe(0);
+    /*
+     * Com o teto de `workers * 2` eram **1314** pumps — 22 s a 60 FPS, que é o
+     * que o jogador viu no aparelho. Com o teto alto mais o orçamento de tempo
+     * são ~460. O piso protege a ordem de grandeza, não o número exato: ele
+     * depende de quanto a máquina do teste gasta por `extractNeighborhood`.
+     */
+    expect(pumps).toBeLessThan(400);
+    // Meshar 4.400 sections de verdade leva alguns segundos numa máquina
+    // carregada, e o padrão de 5 s do vitest não cobre a suíte inteira em
+    // paralelo. É o teste de vazão mais importante do projeto: vale o tempo.
+  }, 30_000);
+
+  /*
+   * Este caso roda com o teto **apertado** de propósito. Com `workers * 16` a
+   * reserva não muda nada — sobra vaga para os dois lados. Ela existe para o
+   * regime oposto, que é o do aparelho lento: lá o orçamento de tempo deixa
+   * passar meia dúzia de despachos por frame, e sem reserva o meshing leva
+   * todos. Era esse o regime de antes, em todo aparelho.
+   */
+  it('com poucas vagas, a reserva dobra a velocidade do mundo nascer', () => {
     const world = new World(7);
     const workers: RealWorker[] = [];
     const pipeline = new ChunkPipeline(world, {
       workers: 2, renderDistance: 8, packed: true,
+      dispatchBudgetMs: Infinity, maxInFlight: 4,
       createWorker: () => { const w = new RealWorker(); workers.push(w); return w; },
     });
 

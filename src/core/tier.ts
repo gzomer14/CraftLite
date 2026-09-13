@@ -127,22 +127,7 @@ export function detectTier(info: DeviceInfo): Tier {
 
   if (!info.hasWebGL2) score -= 3;
   if (info.maxTexSize < 4096) score -= 2;
-  /*
-   * Textura de 16384: GPU de classe GLES 3.1/3.2, e o **único número que vem
-   * do driver** em vez de um nome para casar com regex.
-   *
-   * Sem esta linha nenhum celular chegava ao T2, por mais forte que fosse:
-   * `navigator.deviceMemory` satura em 8, então um aparelho de 12 GB pontua
-   * igual a um de 8, e a penalidade de `isMobile` travava o melhor celular
-   * possível em 3 — um a menos do que o T2 exige. Um Galaxy S24 Ultra entrava
-   * como T1 (relato de campo 2026-09-13), com render distance 8 e 2 workers
-   * num aparelho que segura o dobro.
-   *
-   * **Só vale com WebGL2.** Sem essa condição, um aparelho sem WebGL2 mas com
-   * textura grande subia para T2 — render distance 12 e DPR 2 em cima do
-   * caminho de fallback, exatamente o que a regra de errar para baixo proíbe.
-   */
-  if (info.hasWebGL2 && info.maxTexSize >= 16384) score += 1;
+
 
   if (info.memGB <= 2) score -= 2;
   else if (info.memGB <= 4) score += 0;
@@ -158,6 +143,28 @@ export function detectTier(info: DeviceInfo): Tier {
   // GPUs móveis antigas conhecidas por não segurarem render distance alto.
   if (/adreno \(tm\) (3|4|5)0\d/i.test(info.renderer) || /mali-t[678]\d\d/i.test(info.renderer)) {
     score -= 3;
+  }
+  /*
+   * E o contrário: família de GPU móvel de topo, que vale um desktop.
+   *
+   * Sem isto **nenhum celular chegava ao T2**, por mais forte que fosse.
+   * `navigator.deviceMemory` satura em 8, então 12 GB pontuam como 8; com a
+   * penalidade de `isMobile`, o melhor aparelho possível somava 3 e o T2 exige
+   * 4. Um Galaxy S24 Ultra entrava como T1, com render distance 8 e 2 workers.
+   *
+   * A primeira tentativa usou `maxTexSize >= 16384` — número do driver, sem
+   * regex — e **não funcionou**: o mesmo S24 Ultra reporta 8192, porque quem
+   * responde é o ANGLE e não o driver. Sobrou o nome, que é o que o aparelho
+   * de fato informa: `ANGLE (Qualcomm, Adreno (TM) 750, OpenGL ES 3.2)`. É a
+   * regra simétrica à de cima, e envelhece do mesmo jeito — uma lista de
+   * famílias que um dia deixarão de ser topo.
+   */
+  if (/adreno \(tm\)? ?[78]\d\d/i.test(info.renderer)
+    || /mali-g7\d\d/i.test(info.renderer)
+    || /immortalis/i.test(info.renderer)
+    || /xclipse/i.test(info.renderer)
+    || /apple gpu/i.test(info.renderer)) {
+    score += 2;
   }
 
   if (score <= -1) return 0;

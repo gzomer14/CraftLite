@@ -9,7 +9,7 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-13 14:10 — **o gargalo de vazão do pipeline, achado em campo**
+**Última atualização:** 2026-09-13 14:32 — **portal longe da origem, canvas piscando e o tier do S24**
 
 ---
 
@@ -37,13 +37,13 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-13 14:10, com `npm test`, `npm run build` e
+Medidas em 2026-09-13 14:32, com `npm test`, `npm run build` e
 `SIZE_BUDGET_KB=350 npm run size`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
 | Bundle (gzip, tudo) | **171,2 KB** | < 350 KB | `npm run size` |
-| Testes | **1146**, 64 arquivos | manter verde | `npm test` |
+| Testes | **1151**, 64 arquivos | manter verde | `npm test` |
 | Camadas de atlas | **152** | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Geração de chunk | 6–14 ms (mediana; varia muito com a carga da máquina) | < 25 ms | `tests/perf.test.ts` |
 | Geração de chunk do Nether | 6,1 ms (mediana; 3,8 antes de a luz entrar) | < 25 ms | `tests/perf.test.ts` |
@@ -564,6 +564,9 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-13 | `game/travel.ts`, `game/session.ts` | **O portal só funcionava perto da origem.** O pipeline carrega o anel em volta do **jogador**, e a travessia o deixava parado nas coordenadas antigas enquanto esperava o chunk de destino — que, com a escala 1:8, pode estar a 700 blocos dali. O chunk nunca chegava, a viagem estourava o tempo limite de 30 s e o jogador ficava largado na dimensão nova, nas coordenadas velhas, **preso dentro da rocha e sem portal nenhum**. Perto do spawn passava despercebido, porque a diferença cabia no render distance. Agora `onDimensionChange` leva as coordenadas do destino e a `Session` põe o jogador lá na hora; a física está congelada durante o carregamento, então mover antes de existir chão é seguro, e o Y definitivo continua saindo de `arriveAt`. Relato de campo: *"apareci travado voando… não consigo me mexer… não renderizou portal algum"*. |
+| 2026-09-13 | `render/gl.ts` | **A textura piscava a tela inteira.** O contexto era criado com `desynchronized: true`, que tira o canvas da sincronia com o compositor — a especificação diz que nesse modo pode haver tearing e quadro apresentado fora de hora. Num painel LTPO, que troca de 120 para 60 Hz sozinho, isso vira piscada constante, com a tela parada e só naquele aparelho. O que se ganhava eram alguns milissegundos de latência de toque. Agrava o teto de FPS de `core/loop.ts`, que devolve o quadro **sem desenhar**: sem sincronia com o compositor, quadro não desenhado é conteúdo indefinido na tela. |
+| 2026-09-13 | `core/tier.ts` | **A regra de textura de 16384 não promovia ninguém — e o motivo veio do aparelho.** A linha de aparelho nova mostrou `tex 8192` num Adreno 750: quem responde `MAX_TEXTURE_SIZE` é o ANGLE, não o driver. Sobrou o nome, que é o que o aparelho de fato informa (`ANGLE (Qualcomm, Adreno (TM) 750, OpenGL ES 3.2)`). A regra virou simétrica à das GPUs antigas: família de topo — Adreno 7xx/8xx, Mali-G7xx, Immortalis, Xclipse, Apple GPU — vale +2. Envelhece do mesmo jeito que a outra, e é por isso que a opção **Qualidade** existe. |
 | 2026-09-13 | `world/pipeline.ts` | **O teto de jobs em voo era o gargalo do jogo inteiro.** `maxInFlight = workers * 2`, e o `pump` roda **uma vez por frame** — então o teto de pedidos em voo era também o teto de despachos por frame: 4. O aparelho mandava 4 jobs e esperava o frame seguinte, com os workers ociosos ~90% do tempo. Num S24 Ultra com RD 16: 60 FPS, render de 3,2 ms de 16,6 ms, **7051 sections na fila** e 861/861 colunas já geradas — a máquina não estava lenta, estava **entediada**. Medido no pipeline: um mundo de RD 16 saía em **1315 pumps** (22 s a 60 FPS) e agora sai em **165**. O teto subiu para `workers * 16` e quem limita passou a ser um **orçamento de tempo** de 20% do frame, porque despachar não é de graça: cada job de malha copia a vizinhança 18³ da coluna na thread principal (~0,26 ms). Sendo orçamento, ele se ajusta ao aparelho sozinho. |
 | 2026-09-13 | `ui/debug.ts` | **Não havia como diagnosticar um tier errado.** `detectTier` decide a partir de quatro números do navegador e, quando erra, nada na tela diz **qual** deles está baixo — o bônus de textura de 16384 não promoveu o S24 Ultra e não havia como saber por quê. O overlay ganhou uma linha com memória, núcleos, workers, tamanho máximo de textura e GPU reportada. |
 | 2026-09-13 | `game/settings.ts`, `ui/screens/options.ts`, `main.ts` | **O tier não tinha como ser corrigido pelo jogador.** O comentário de `core/tier.ts` promete desde o M0 que *"todo valor derivado aqui pode ser sobrescrito nas opções"*, e só a distância de render era. Tier define workers, nuvens, partículas e teto de mobs, nenhum com controle próprio. Opções → Vídeo ganhou **Qualidade** (Automática/Baixa/Média/Alta). Vale no carregamento seguinte: o número de workers é decidido quando o pipeline nasce. |

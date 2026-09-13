@@ -37,10 +37,15 @@ export type TravelPhase = 'idle' | 'loading' | 'done';
 
 export interface TravelEvents {
   /**
-   * A dimensão mudou: quem ouve troca o pipeline, o destino do save e o céu.
-   * Chamado **antes** de o mundo novo ter qualquer chunk.
+   * A dimensão mudou: quem ouve troca o pipeline, o destino do save e o céu,
+   * e **leva o jogador para `(x, z)`**. Chamado antes de o mundo novo ter
+   * qualquer chunk.
+   *
+   * As coordenadas vêm junto porque o pipeline carrega o anel em volta do
+   * jogador: deixá-lo onde estava faz o mundo nascer a 1/8 de distância do
+   * destino e o chunk esperado não chega nunca. Ver `begin`.
    */
-  onDimensionChange(dimension: number): void;
+  onDimensionChange(dimension: number, x: number, z: number): void;
   /** O jogador saiu do outro lado, nestas coordenadas. */
   onArrive(x: number, y: number, z: number): void;
   /** Aviso curto para o HUD. */
@@ -100,7 +105,19 @@ export class Travel {
     return true;
   }
 
-  /** Começa a travessia a partir da dimensão atual. */
+  /**
+   * Começa a travessia a partir da dimensão atual.
+   *
+   * **O jogador vai para o destino agora**, antes de o terreno existir, e é por
+   * isso que o evento leva as coordenadas. O pipeline carrega o anel em volta
+   * dele; com a escala 1:8, deixá-lo parado onde estava punha o anel a até 700
+   * blocos do chunk que a viagem espera — que então não chegava nunca, a
+   * viagem estourava o tempo limite e o jogador ficava preso dentro da rocha,
+   * sem portal (relato de campo 2026-09-13). Funcionava só perto da origem,
+   * onde a diferença entre a posição antiga e o destino cabe no render
+   * distance. A física está congelada enquanto isto dura, então mover antes de
+   * haver chão é seguro — o Y certo sai de `arriveAt` na chegada.
+   */
   begin(x: number, z: number): void {
     const destination = destinationOf(x, z, this.world.dimension);
     this.targetX = destination.x;
@@ -108,7 +125,7 @@ export class Travel {
     this.charge = 0;
     this.waiting = 0;
     this.phase = 'loading';
-    this.events.onDimensionChange(destination.dimension);
+    this.events.onDimensionChange(destination.dimension, destination.x, destination.z);
     this.events.onMessage?.(
       destination.dimension === DIM_OVERWORLD ? 'Voltando à superfície…' : 'Entrando no Nether…',
     );

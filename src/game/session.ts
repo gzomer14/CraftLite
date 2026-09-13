@@ -244,7 +244,7 @@ export class Session {
     });
     this.travel = new Travel(world, {
       // A travessia entra pelo mesmo caminho que o save e o renascimento.
-      onDimensionChange: (dimension) => { this.enterDimension(dimension); },
+      onDimensionChange: (dimension, x, z) => { this.enterDimension(dimension, x, z); },
       onArrive: (x, y, z) => {
         this.player.setPosition(x, y, z);
         this.player.vx = 0; this.player.vy = 0; this.player.vz = 0;
@@ -582,7 +582,7 @@ export class Session {
    * Entra numa dimensão sem portal: usado pelo save ao restaurar o mundo e pelo
    * renascimento. Quem troca pipeline, save e céu é quem ouve o evento.
    */
-  enterDimension(dimension: number): void {
+  enterDimension(dimension: number, x?: number, z?: number): void {
     if (dimension === this.world.dimension) return;
     /*
      * O evento vem **antes** da limpeza de propósito: quem ouve precisa ler
@@ -593,6 +593,16 @@ export class Session {
     this.events.onDimensionChange?.(dimension);
     this.clearForDimension();
     this.world.dimension = dimension;
+    /*
+     * Quem chega por portal já sabe onde vai cair, e precisa estar lá **antes**
+     * do próximo `pipeline.setCenter` — é a posição do jogador que decide onde
+     * o mundo novo nasce. O Y é o de agora; o definitivo vem de `arriveAt`
+     * quando o chunk chega. Renascimento e restauração do save não passam
+     * coordenadas: eles posicionam o jogador por conta própria.
+     */
+    if (x !== undefined && z !== undefined) {
+      this.player.setPosition(x + 0.5, this.player.y, z + 0.5);
+    }
   }
 
   /** Clique direito: abre contêiner, ara, planta ou come; senão, coloca bloco. */

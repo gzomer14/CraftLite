@@ -340,11 +340,25 @@ describe('tier de um celular topo de linha', () => {
   });
 
   it('um celular de 2024 chega ao T2', () => {
-    // `deviceMemory` satura em 8, então 12 GB reais chegam aqui como 8.
+    /*
+     * A string é a do aparelho, copiada do overlay: quem responde é o ANGLE,
+     * e ele informa **8192** de textura máxima num Adreno 750. Foi por isso
+     * que a primeira regra, baseada em `maxTexSize`, não promoveu ninguém.
+     * `deviceMemory` satura em 8, então 12 GB reais chegam aqui como 8.
+     */
     expect(detectTier(device({
-      memGB: 8, cores: 8, isMobile: true, maxTexSize: 16384,
-      renderer: 'Adreno (TM) 750',
+      memGB: 8, cores: 8, isMobile: true, maxTexSize: 8192,
+      renderer: 'ANGLE (Qualcomm, Adreno (TM) 750, OpenGL ES 3.2)',
     }))).toBe(2);
+  });
+
+  it('as outras famílias de topo também contam', () => {
+    const flagship = (renderer: string): number => detectTier(device({
+      memGB: 8, cores: 8, isMobile: true, maxTexSize: 8192, renderer,
+    }));
+    expect(flagship('ANGLE (Samsung Xclipse 940)')).toBe(2);
+    expect(flagship('Mali-G715-Immortalis')).toBe(2);
+    expect(flagship('Apple GPU')).toBe(2);
   });
 
   it('o celular de 2020 continua em T1', () => {
@@ -361,8 +375,16 @@ describe('tier de um celular topo de linha', () => {
     }))).toBe(0);
   });
 
-  it('textura grande não promove quem não tem WebGL2', () => {
-    expect(detectTier(device({ hasWebGL2: false, maxTexSize: 16384 }))).toBeLessThan(2);
+  it('GPU de topo não promove quem não tem WebGL2', () => {
+    expect(detectTier(device({
+      hasWebGL2: false, isMobile: true, renderer: 'Adreno (TM) 750',
+    }))).toBeLessThan(2);
+  });
+
+  it('o Adreno 610 de 2020 não é confundido com a família 7xx', () => {
+    expect(detectTier(device({
+      memGB: 8, cores: 8, isMobile: true, renderer: 'Adreno (TM) 610',
+    }))).toBe(1);
   });
 });
 

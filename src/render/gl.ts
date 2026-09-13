@@ -40,7 +40,19 @@ const CONTEXT_ATTRS: WebGLContextAttributes = {
   preserveDrawingBuffer: false,
   powerPreference: 'high-performance',
   failIfMajorPerformanceCaveat: false,
-  desynchronized: true, // reduz latência de input no Chrome mobile
+  /*
+   * **Desligado.** Ligado, ele tira o canvas da sincronia com o compositor —
+   * a especificação diz, com todas as letras, que nesse modo pode haver
+   * tearing e quadro apresentado fora de hora. Num painel de taxa variável
+   * (LTPO), que muda de 120 para 60 Hz sozinho, isso vira **piscada**: o
+   * jogador do S24 Ultra relatou a textura sumindo e voltando o tempo todo,
+   * com a tela parada, e só nesse aparelho (2026-09-13). O que se ganhava era
+   * alguns milissegundos de latência de toque; o que se perdia era poder
+   * jogar. Ver também o teto de FPS em `core/loop.ts`, que devolve o quadro
+   * sem desenhar: sem sincronia com o compositor, quadro não desenhado é
+   * conteúdo indefinido na tela.
+   */
+  desynchronized: false,
 };
 
 export function createContext(canvas: HTMLCanvasElement): GlContext {

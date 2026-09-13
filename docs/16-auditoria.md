@@ -12,6 +12,76 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-13 · 14:15 → 14:35 · O portal que só funcionava perto de casa
+
+**Pedido:** *"deu uma melhorada absurda no carregamento do mundo, não vejo mais problema"* — e três
+coisas novas: travar ao entrar no Nether *"sem renderizar portal algum"*, a textura *"piscando toda
+hora… deixando tudo transparente e voltando"*, e o tier ainda em T1.
+
+**Resultado:** a vazão do pipeline está resolvida (861/861 colunas, **0 na fila**). Os três achados
+novos eram bugs, e o terceiro se resolveu com o dado que a linha de aparelho de meia hora atrás
+passou a mostrar.
+
+### 1 — o portal só funcionava perto da origem
+
+O pipeline carrega o anel em volta do **jogador**, e a travessia o deixava parado nas coordenadas
+antigas enquanto esperava o chunk de destino. Com a escala 1:8, esse chunk pode estar a 700 blocos
+dali: nunca chegava, a viagem estourava o tempo limite de 30 s e o jogador ficava largado na
+dimensão nova, nas coordenadas velhas — dentro da rocha, sem portal, sem conseguir andar nem voar.
+Perto do spawn a diferença cabia no render distance e tudo parecia funcionar, que é por que passou
+por todos os testes e pela primeira sessão de campo.
+
+`onDimensionChange` passou a levar as coordenadas do destino, e a `Session` põe o jogador lá na
+hora. A física já estava congelada durante o carregamento, então mover antes de existir chão é
+seguro; o Y definitivo continua saindo de `arriveAt` quando o chunk chega. Duas regressões com
+coordenadas bem longe da origem — ida e volta — mais uma de que a `Session` sem coordenadas (save e
+renascimento) não mexe no jogador.
+
+### 2 — a tela piscando
+
+O contexto era criado com **`desynchronized: true`**. A opção tira o canvas da sincronia com o
+compositor, e a especificação diz com todas as letras que nesse modo pode haver tearing e quadro
+apresentado fora de hora. Num painel LTPO, que troca de 120 para 60 Hz sozinho, isso vira piscada
+constante — com a tela parada, e só naquele aparelho, que foi exatamente o relato.
+
+Agrava o teto de FPS de `core/loop.ts`, que devolve o quadro **sem desenhar**: fora de sincronia com
+o compositor, quadro não desenhado é conteúdo indefinido na tela. O que se ganhava eram alguns
+milissegundos de latência de toque.
+
+**Não dá para reproduzir aqui** — é um aparelho e um painel específicos. O que sustenta a mudança é
+que `desynchronized` é a única coisa no contexto que abre mão da sincronia, e desligá-la é o valor
+seguro; o custo de estar errado é milissegundos de latência.
+
+### 3 — o tier, resolvido pelo dado e não pelo palpite
+
+A linha de aparelho nova mostrou o motivo de a regra da manhã não ter promovido ninguém:
+
+```
+mem 8GB · 8 núcleos · 2 workers · tex 8192 · ANGLE (Qualcomm, Adreno (TM) 750, OpenGL ES 3.2)
+```
+
+**`tex 8192` num Adreno 750** — quem responde `MAX_TEXTURE_SIZE` é o ANGLE, não o driver. A
+heurística de 16384 era inútil e saiu. Sobrou o nome, que é o que o aparelho de fato informa: a
+regra virou simétrica à das GPUs antigas, com família de topo (Adreno 7xx/8xx, Mali-G7xx,
+Immortalis, Xclipse, Apple GPU) valendo +2. Envelhece igual à outra — e é por isso que a opção
+**Qualidade** entrou junto.
+
+### Arquivos
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/game/travel.ts` | `onDimensionChange` leva as coordenadas do destino |
+| `~` | `src/game/session.ts` | `enterDimension(dim, x?, z?)` reposiciona o jogador no destino |
+| `~` | `src/render/gl.ts` | `desynchronized: false`, com o motivo no comentário |
+| `~` | `src/core/tier.ts` | heurística de textura fora; família de GPU de topo no lugar |
+| `~` | `tests/nether.test.ts` | ida e volta longe da origem, e a `Session` sem coordenadas |
+| `~` | `tests/dimensionrace.test.ts` | tier com a string real do aparelho e as outras famílias |
+| `~` | `docs/15-status.md`, `docs/16-auditoria.md`, `README.md` | §4, métricas |
+
+**Portões:** 1151 testes (64 arquivos), lint limpo, build limpo, **171,2 KB gzip** de 350.
+
+---
+
 ## 2026-09-13 · 13:50 → 14:15 · A máquina não estava lenta, estava entediada
 
 **Pedido:** *"Mesmo após seu ajuste aqui no S24 ultra a geração de mundo está muito estranha, bem

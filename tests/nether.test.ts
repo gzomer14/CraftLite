@@ -378,6 +378,63 @@ function standInPortal(world: World): void {
 }
 
 describe('travessia', () => {
+  /**
+   * Regressão do bug de campo de 2026-09-13: longe da origem, a viagem nunca
+   * terminava. O pipeline carrega o anel em volta do **jogador**, e ele ficava
+   * parado nas coordenadas antigas enquanto a viagem esperava um chunk a até
+   * 700 blocos dali. Estourava o tempo limite e o jogador ficava preso dentro
+   * da rocha, sem portal. Perto da origem passava despercebido, porque a
+   * diferença cabia no render distance.
+   */
+  it('a sessão leva o jogador para o destino, e é isso que recentra o mundo', () => {
+    const world = flatWorld();
+    const player = new Player(-1703.5, GROUND + 1, -7831.5);
+    const session = new Session(world, player, {
+      onOpenScreen: () => { /* nada */ },
+      onDeath: () => { /* nada */ },
+      onPickup: () => { /* nada */ },
+    });
+
+    session.enterDimension(DIM_NETHER, -213, -979);
+    // O X e o Z vão para o destino; o Y só muda quando o chunk chega.
+    expect(player.x).toBeCloseTo(-212.5);
+    expect(player.z).toBeCloseTo(-978.5);
+    expect(player.y).toBe(GROUND + 1);
+    // `setPosition` iguala `prev`: sem isso o render interpolaria 700 blocos.
+    expect(player.prevX).toBe(player.x);
+  });
+
+  it('a troca de dimensão leva as coordenadas do destino', () => {
+    const world = flatWorld();
+    const events: number[][] = [];
+    const travel = new Travel(world, {
+      onDimensionChange: (dimension, x, z) => {
+        events.push([dimension, x, z]);
+        world.dimension = dimension;
+      },
+      onArrive: () => { /* nada */ },
+    });
+
+    travel.begin(-1704, -7832);
+    expect(events).toEqual([[DIM_NETHER, -213, -979]]);
+  });
+
+  it('o destino da volta também vem no evento, multiplicado', () => {
+    const world = flatWorld();
+    world.dimension = DIM_NETHER;
+    const events: number[][] = [];
+    const travel = new Travel(world, {
+      onDimensionChange: (dimension, x, z) => {
+        events.push([dimension, x, z]);
+        world.dimension = dimension;
+      },
+      onArrive: () => { /* nada */ },
+    });
+
+    travel.begin(-213, -979);
+    expect(events).toEqual([[DIM_OVERWORLD, -1704, -7832]]);
+  });
+
   it('fora do portal nada acontece', () => {
     const r = travelRig();
     for (let t = 0; t < 100; t++) r.travel.tick(8.5, GROUND + 1, 8.5);
@@ -552,6 +609,9 @@ describe('save por dimensão', () => {
 
     session.enterDimension(DIM_NETHER);
     expect(changes).toEqual([DIM_NETHER]);
+    // Sem coordenadas o jogador não se mexe: é o caminho do save e do
+    // renascimento, que posicionam por conta própria.
+    expect(player.x).toBe(8.5);
     const snapshot = save.snapshot();
     expect(snapshot.dimension).toBe(DIM_NETHER);
 

@@ -9,7 +9,7 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-13 14:48 — **o campo que nasceu no Nether, e a chuva que caiu lá**
+**Última atualização:** 2026-09-13 15:26 — **estilo de textura Nítido**
 
 ---
 
@@ -37,19 +37,21 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-13 14:48, com `npm test`, `npm run build` e
+Medidas em 2026-09-13 15:26, com `npm test`, `npm run build` e
 `SIZE_BUDGET_KB=350 npm run size`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **171,2 KB** | < 350 KB | `npm run size` |
-| Testes | **1155**, 64 arquivos | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **174,5 KB** | < 350 KB | `npm run size` |
+| Testes | **1179**, 65 arquivos | manter verde | `npm test` |
 | Camadas de atlas | **152** | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Geração de chunk | 6–14 ms (mediana; varia muito com a carga da máquina) | < 25 ms | `tests/perf.test.ts` |
 | Geração de chunk do Nether | 6,1 ms (mediana; 3,8 antes de a luz entrar) | < 25 ms | `tests/perf.test.ts` |
 | Meshing de section | 0,6–1,5 ms (mediana) | < 8 ms | `tests/perf.test.ts` |
 | Tick de 20 mobs | 0,14 ms | << 50 ms | `tests/mobs.test.ts` |
 | Tick de circuito (fio de 64) | 0,88 ms | < 5 ms | `tests/perf.test.ts` |
+| Acabamento do estilo Nítido (atlas inteiro) | **2,0 ms**, uma vez no boot | < 60 ms | `tests/perf.test.ts` |
+| Folha de sprites em volume (32 px) | **26,7 ms**, uma vez no boot | < 200 ms | `tests/perf.test.ts` |
 | Mundo de RD 16 pronto | **165 pumps** (eram 1315) | — | `tests/dimensionrace.test.ts` |
 | Colunas em 40 ciclos com 4 vagas (RD 8) | **86** (eram 44) | — | `tests/dimensionrace.test.ts` |
 | FPS em T0 real (2017) | **60**, RD 4, escala 1,00 (Galaxy J7 Metal) | 30 estáveis | teste manual |
@@ -555,6 +557,62 @@ contexto de IA de uma vez. Os quatro arquivos de teste que montam mobs semeiam u
 cooldown de passeio, e quarenta ticks com a mesma semente dão o mesmo estado. Doze execuções
 seguidas da suíte completa depois da mudança: verde.
 
+### Fora de marco — estilo de textura Nítido (2026-09-13) ✅
+
+Pedido do usuário: *"o que está me incomodando profundamente é essa textura completa do jogo,
+principalmente dos itens do inventário"*, com o alvo de *"dar um bom salto nas texturas… ainda
+pixelado obviamente, porém que fique fácil bater o olho e distinguir cada bloco, cada item, que os
+itens possuam realmente profundidade"* — e sem custar nada para quem não quiser.
+
+**Não é um resource pack.** O caminho do pacote (`render/pack.ts`) serve para arte de fora, e um
+`.zip` versionado seria exatamente o asset de terceiros que o PROMPT.md §6 proíbe. Também não
+serviria: um override vence só na própria camada, então trocar a pedra deixaria minério, musgo e
+mais uma dúzia de blocos derivados com a pedra antiga. O estilo entra **dentro da geração**, e as
+receitas de `data/textures.ts` continuam sendo a única fonte de desenho.
+
+Três módulos novos:
+
+- **`data/texturestyle.ts`** — os números, declarativos: o acabamento padrão de bloco, o de skin de
+  mob, as exceções por textura e a resposta de luz de cada material de item. Bloco novo amanhã
+  nasce com os dois visuais sem escrever linha nenhuma aqui.
+- **`render/texfinish.ts`** — quatro passadas sobre o ladrilho pronto: **relevo** (a luminância
+  vira campo de altura e é iluminada de cima-à-esquerda), **realce** (máscara de nitidez),
+  **tom** (contraste, saturação e empurrão de cor) e **chanfro** (borda de cima clara, de baixo
+  escura). Com greedy meshing a UV repete por bloco, então o chanfro desenha a grade do mundo — é
+  o que faz uma parede de pedra parar de ser uma mancha cinza. Textura vazada é detectada pelo
+  alfa e não leva chanfro; água, lava e portal não levam nada, porque acabamento fixo sobre
+  imagem que rola vira cintilação.
+- **`render/itemart3d.ts`** — as mesmas máscaras de `data/itemart.ts` viradas sólido iluminado:
+  transformada de distância → abaulamento → normal → Lambert + Blinn-Phong → luz de quina fria →
+  contorno tingido pelo item. O expoente do especular é o que separa metal (ponto duro) de gema
+  (brilho espalhado): a picareta de diamante passa a parecer de diamante ao lado da de ferro.
+
+A folha de sprites dobra para **32 px por item** no Nítido — é o espaço que o sombreado precisa. A
+silhueta continua ampliada por repetição de pixel, então o desenho segue quadriculado; o que ganha
+resolução é a luz. A arte de um pacote do jogador é ampliada e **não** passa pelo sombreado.
+
+Duas decisões que só apareceram olhando o resultado renderizado fora do navegador:
+
+1. **O contraste gira na média da própria textura**, não no cinza fixo. Com pivô em 128, neve, lã e
+   o topo da grama — que já nascem claros — eram empurrados para o branco chapado e perdiam o pouco
+   de detalhe que têm.
+2. **Corpo e acento têm volume medido separado.** Com uma peça só, a cabeça da pá de madeira
+   desaparecia dentro do cabo: mesma cor, e só o volume os distinguia. Medindo cada peça contra a
+   própria borda nasce o vinco onde uma encosta na outra.
+
+O contorno do cubo isométrico é decidido pela **espessura média do traço**: teia (1,3), gerador
+(1,1), plantação (1,5), trilho e escada (2,0–2,5) ficam de fora, porque ali o contorno engrossa
+cada fio e o desenho vira borrão; a muda em cruz (2,7) e qualquer cubo cheio (acima de 6) levam.
+
+**Custo:** zero em jogo, dos dois lados. Nenhum caminho de render, tick ou mesh pergunta o estilo —
+o que ele muda são os bytes gerados no boot, 2,0 ms no atlas e 26,7 ms na folha de sprites. A
+primeira versão da folha custava 89 ms porque o cubo isométrico dividia o passo de amostragem por
+`k`, ficando 16 vezes mais fino do que precisa; o passo não acompanha o tamanho do tile.
+
+Escolhe-se em **Opções → Vídeo → "Texturas (recarrega)"**, e o padrão é o Nítido. Recarrega pelo
+mesmo motivo da Qualidade: o atlas já foi para a GPU e a folha já é `background-image` de dezenas
+de slots.
+
 ---
 
 ## 4. Correções fora de marco
@@ -710,7 +768,13 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
    tier escolhido; e `N redstone` na linha `E:`, que não deve chegar perto de 1024.
    **O J7 Metal continua sem ver nada do M7** — e é lá que o orçamento de despacho de 20% do
    frame precisa ser medido, porque é o aparelho em que ele realmente limita.
-2. **O que a revisão de UX levantou e ficou para depois**, todos da tabela de Vídeo do doc 08 ou
+2. **Olhar o estilo Nítido no aparelho.** Ele foi conferido renderizando as texturas fora do
+   navegador, imagem por imagem, mas **nunca foi visto em jogo**. O que olhar: se o chanfro de
+   borda desenha a grade do mundo sem virar azulejo à distância; se o relevo cintila quando a
+   câmera anda (ele é fixo na textura, então não deveria); e o tempo de boot no J7 Metal, onde os
+   28,7 ms medidos aqui podem virar algo entre 150 e 300 ms de barra de carregamento. O caminho de
+   fuga é uma linha: Opções → Vídeo → Texturas → Clássicas.
+3. **O que a revisão de UX levantou e ficou para depois**, todos da tabela de Vídeo do doc 08 ou
    das listas de Controles/Som:
    - **remapeamento de teclas** (doc 08, Controles: "lista completa de teclas remapeáveis, conflito
      em vermelho") — hoje as teclas são fixas em `input/controls.ts`;
@@ -721,14 +785,14 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      Partículas, Névoa, Balanço de Câmera, Mostrar FPS;
    - resto da Acessibilidade: modo daltônico, contorno de bloco em alto contraste, esconder flashes
      do céu, efeitos de distorção.
-3. **Mundo já corrompido não se conserta sozinho.** A coluna gravada na dimensão errada antes de
+4. **Mundo já corrompido não se conserta sozinho.** A coluna gravada na dimensão errada antes de
    2026-09-13 continua no banco do jogador, e é indistinguível de uma torre de netherrack que
    alguém tenha construído — não há como um migrador decidir. O caminho é o jogador quebrar o que
    sobrou, ou recriar o mundo. **E pode ter havido perda:** a gravação é um `put` na chave
    `[dimensão, cx, cz]`, então uma coluna do Nether escrita na chave da superfície **substitui** o
    que estivesse salvo naquelas coordenadas. Como a escala é 1:8, as coordenadas atingidas ficam
    perto da origem do mundo de superfície — que é onde se costuma construir.
-4. Oportunidades pequenas que sobraram:
+5. Oportunidades pequenas que sobraram:
    - **boneco 3D do jogador** na tela de inventário: o doc 08 §3.5 desenha um preview do modelo
      ao lado dos slots de armadura, e ele nunca foi feito — hoje a seção Equipamento é só a fila
      de slots. O doc já prevê sprite estático como saída para T0;

@@ -11,6 +11,8 @@
  */
 
 import { ANIMATED_OPS, TEXTURES } from '../data/textures';
+import { blockFinishOf, type TextureStyleId } from '../data/texturestyle';
+import { applyFinish } from './texfinish';
 import { buildLayerIndex, type LayerIndex } from './layers';
 import { TEX_SIZE, renderRecipe, type Canvas16, type TexRecipe } from './texgen';
 import type { AnyGL, GlContext } from './gl';
@@ -53,6 +55,10 @@ export class Atlas {
   private readonly pixelData: Uint8ClampedArray[];
 
   /**
+   * `style` é o visual escolhido nas opções (`data/texturestyle.ts`). No
+   * Clássico nada roda; no Nítido cada ladrilho passa pelo acabamento de
+   * `render/texfinish.ts` depois de gerado.
+   *
    * `overrides` é a arte do jogador (`render/pack.ts`), por nome de textura.
    *
    * Ela entra **antes** de qualquer coisa derivar dos pixels: mipmaps, média de
@@ -60,12 +66,15 @@ export class Atlas {
    * que o pack trouxe, não do procedural. É por isso que o pack é lido no boot
    * e não aplicado depois.
    */
-  constructor(ctx: GlContext, overrides?: ReadonlyMap<string, Uint8ClampedArray>) {
+  constructor(
+    ctx: GlContext, overrides?: ReadonlyMap<string, Uint8ClampedArray>,
+    style: TextureStyleId = 'classico',
+  ) {
     const t0 = performance.now();
     this.gl = ctx.gl;
     this.isArray = ctx.gl2 !== null;
 
-    const pixels = buildPixels(this.layers, this.layerIndex, overrides);
+    const pixels = buildPixels(this.layers, this.layerIndex, overrides, style);
     this.layerCount = pixels.length;
     this.averages = computeAverages(pixels);
     this.pixelData = pixels;
@@ -169,6 +178,7 @@ export class Atlas {
 function buildPixels(
   out: Map<string, AtlasLayer>, index: LayerIndex,
   overrides?: ReadonlyMap<string, Uint8ClampedArray>,
+  style: TextureStyleId = 'classico',
 ): Uint8ClampedArray[] {
   const cache = new Map<string, Uint8ClampedArray>();
   const pixels: Uint8ClampedArray[] = [];
@@ -197,9 +207,14 @@ function buildPixels(
     // é gerada a partir de outra continua saindo do procedural, senão trocar a
     // pedra mudaria o minério, o musgo e mais uma dúzia de blocos.
     const custom = overrides?.get(name);
+    // O acabamento entra **depois** do `resolve` e sobre uma cópia: quem herda
+    // (minério sobre pedra) tem que herdar o ladrilho cru, senão o relevo é
+    // aplicado duas vezes e o minério fica com a pedra de outro bloco.
     const base = custom !== undefined && custom.length === TEX_SIZE * TEX_SIZE * 4
       ? custom
-      : resolve(name);
+      : style === 'nitido'
+        ? applyFinish(resolve(name).slice(), TEX_SIZE, blockFinishOf(name))
+        : resolve(name);
     const frames = recipe.frames ?? 1;
     const first = pixels.length;
 

@@ -6,6 +6,8 @@
  * é a fonte da verdade para ela.
  */
 
+import type { TextureStyleId } from '../data/texturestyle';
+
 const STORAGE_KEY = 'craftlite.settings.v1';
 
 /** Modo de interação por toque (doc 09 §2.2). O A é o padrão. */
@@ -36,6 +38,15 @@ export interface Settings {
    * opções; esta é a opção.
    */
   quality: number;
+  /**
+   * Visual das texturas: `classico` é o procedural cru, `nitido` acrescenta
+   * relevo, contraste e sprites de item com volume (`data/texturestyle.ts`).
+   *
+   * Custa **zero em jogo** dos dois lados: o que muda são os pixels gerados no
+   * boot. Por isso muda só no próximo carregamento — o atlas já está na GPU e a
+   * folha de sprites já virou `background-image` de dezenas de slots.
+   */
+  textureStyle: TextureStyleId;
   /** Escala de GUI em passos de meio, 0,5–4; 0 = automática pela resolução. */
   guiScale: number;
   dynamicResolution: boolean;
@@ -79,6 +90,7 @@ const DEFAULTS: Settings = {
   vibration: true,
   renderDistance: 0,
   quality: -1,
+  textureStyle: 'nitido',
   guiScale: 0,
   dynamicResolution: true,
   maxFps: 0,
@@ -209,6 +221,7 @@ function loadStored(): Partial<Settings> {
       if (!Number.isFinite(value) || value < range[0] || value > range[1]) continue;
     }
     if (key === 'touchMode' && value !== 'A' && value !== 'B') continue;
+    if (key === 'textureStyle' && value !== 'classico' && value !== 'nitido') continue;
     out[key] = value as never;
   }
   return out;

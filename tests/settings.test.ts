@@ -85,6 +85,15 @@ describe('6. opções novas da revisão de UX', () => {
   });
 });
 
+describe('estilo de textura', () => {
+  it('nasce no Nítido e guarda a escolha do Clássico', () => {
+    const settings = new SettingsStore();
+    expect(settings.get('textureStyle')).toBe('nitido');
+    settings.set('textureStyle', 'classico');
+    expect(new SettingsStore().get('textureStyle')).toBe('classico');
+  });
+});
+
 describe('persistência', () => {
   it('grava e relê', () => {
     const a = new SettingsStore();
@@ -126,6 +135,11 @@ describe('validação', () => {
     expect(settings.get('longPressMs')).toBe(1000);
     settings.set('longPressMs', 10);
     expect(settings.get('longPressMs')).toBe(150);
+  });
+
+  it('ignora estilo de textura desconhecido vindo do storage', () => {
+    store['craftlite.settings.v1'] = JSON.stringify({ textureStyle: 'ultra' });
+    expect(new SettingsStore().get('textureStyle')).toBe('nitido');
   });
 
   it('ignora JSON corrompido', () => {

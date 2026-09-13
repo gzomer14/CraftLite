@@ -57,8 +57,14 @@ celulares antigos — e a **implementação em andamento**.
   com todas as dimensões, os baús e os veículos, que leva o mundo do celular para o computador sem
   passar por servidor nenhum. O multijogador P2P **saiu do escopo** deste marco por decisão do
   projeto.
+- **Dois estilos de textura**, ambos gerados por código e trocáveis em Opções → Vídeo. O
+  **Clássico** é o procedural cru; o **Nítido** passa cada ladrilho por relevo direcional, realce,
+  tom e chanfro de borda, e transforma as máscaras de item em sólidos iluminados — mesma silhueta
+  quadriculada, com volume, especular por material e contorno. Não é resource pack e não baixa
+  nada: são os mesmos desenhos, iluminados. Custo em jogo: zero dos dois lados, porque só muda os
+  bytes gerados no boot.
 
-**171 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
+**175 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
 além de dois ícones de PWA de 6,7 KB, gerados por código.
 
 Validado em aparelho alvo (**Galaxy J7 Metal**, Android 7, 2 GB, Mali-T830) em 2026-09-12:
@@ -71,7 +77,7 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 1155 testes (vitest)
+npm test           # 1179 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
 npm run icons      # regenera os ícones do PWA
@@ -148,7 +154,7 @@ src/
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      1155 testes, incluindo orçamento de performance e de luz
+tests/                      1179 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios

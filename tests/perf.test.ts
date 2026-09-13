@@ -18,6 +18,12 @@ import { Redstone } from '../src/world/redstone';
 import { NetherNoise, generateNetherChunk } from '../src/world/gen/nether';
 import { BLOCK_BY_NAME, STONE, makeState } from '../src/data/blocks';
 import { MOUNT_FLOOR } from '../src/world/mesh/shapes';
+import { TEXTURES } from '../src/data/textures';
+import { blockFinishOf } from '../src/data/texturestyle';
+import { applyFinish } from '../src/render/texfinish';
+import { TEX_SIZE } from '../src/render/texgen';
+import { HD_SPRITE_SIZE } from '../src/render/itemart3d';
+import { buildItemSheet } from '../src/render/itemsprites';
 
 const SEED = 4242;
 const tables = buildBlockTables(buildLayerIndex());
@@ -151,6 +157,62 @@ describe('orçamento de performance', () => {
     const ms = median(samples);
     console.log(`  redstone: ${ms.toFixed(2)} ms/tick (fio de 64, mediana de 20)`);
     expect(ms).toBeLessThan(5);
+  });
+
+  /*
+   * O estilo Nítido roda uma vez no boot e nunca mais. O orçamento existe
+   * porque ele entra **antes da primeira tela**, no aparelho mais fraco: se
+   * passar de algumas dezenas de ms, o jogador vê a barra de carregamento
+   * parar. O que ele pega é regressão de ordem de grandeza — alguém trocar a
+   * varredura linear por algo quadrático no número de pixels.
+   *
+   * Medido nesta máquina: **2,0 ms** o acabamento do atlas e **26,7 ms** a
+   * folha. Os limites são muito mais folgados de propósito, pela mesma razão do
+   * cabeçalho do arquivo: um orçamento apertado em teste de relógio falha por
+   * ruído de máquina, e teste que falha por ruído vira teste ignorado. A folha
+   * já custou 89 ms — é esse tipo de salto que estes dois pegam.
+   */
+  it('o acabamento do estilo Nítido custa menos de 60 ms no atlas inteiro', () => {
+    const nomes = Object.keys(TEXTURES);
+    const tiles = nomes.map(() => {
+      const data = new Uint8ClampedArray(TEX_SIZE * TEX_SIZE * 4);
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = (i * 7) & 255;
+        data[i + 1] = (i * 13) & 255;
+        data[i + 2] = (i * 29) & 255;
+        data[i + 3] = 255;
+      }
+      return data;
+    });
+    // Aquecimento: a primeira passada paga a compilação do JIT.
+    for (let i = 0; i < nomes.length; i++) {
+      applyFinish(tiles[i].slice(), TEX_SIZE, blockFinishOf(nomes[i]));
+    }
+
+    const samples: number[] = [];
+    for (let round = 0; round < 5; round++) {
+      const t0 = performance.now();
+      for (let i = 0; i < nomes.length; i++) {
+        applyFinish(tiles[i].slice(), TEX_SIZE, blockFinishOf(nomes[i]));
+      }
+      samples.push(performance.now() - t0);
+    }
+    expect(median(samples)).toBeLessThan(60);
+  });
+
+  it('a folha de sprites em volume sai em menos de 200 ms', () => {
+    const source = {
+      texturePixels: (): Uint8ClampedArray => new Uint8ClampedArray(TEX_SIZE * TEX_SIZE * 4),
+    };
+    buildItemSheet(source, undefined, { size: HD_SPRITE_SIZE, style: 'nitido' });
+
+    const samples: number[] = [];
+    for (let round = 0; round < 3; round++) {
+      const t0 = performance.now();
+      buildItemSheet(source, undefined, { size: HD_SPRITE_SIZE, style: 'nitido' });
+      samples.push(performance.now() - t0);
+    }
+    expect(median(samples)).toBeLessThan(200);
   });
 
   it('o greedy reduz os vértices de uma section típica a menos de 4000', () => {

@@ -12,6 +12,61 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-13 · 15:05 → 15:27 · Um estilo de textura com relevo, e itens que têm volume
+
+**Pedido:** *"o que está me incomodando profundamente é essa textura completa do jogo,
+principalmente dos itens do inventário no geral, na mão"* — com o alvo de *"dar um bom salto nas
+texturas… ainda pixelado obviamente, porém que fique fácil bater o olho e distinguir cada bloco,
+cada item, que os itens possuam realmente profundidade"*, e a exigência de *"habilitar ou não e
+não impactar em literalmente nada na performance caso alguém não queira utilizá-la"*.
+
+**Resultado:** um segundo visual, **Nítido**, gerado por código e escolhido em Opções → Vídeo. O
+caminho do resource pack **não** foi usado: um `.zip` versionado seria o asset de terceiros que o
+PROMPT.md §6 proíbe, e um override do pacote vence só na própria camada — trocar a pedra deixaria
+minério e musgo com a pedra velha. O estilo entra dentro da geração, e `data/textures.ts` continua
+sendo a única fonte de desenho.
+
+Blocos ganham quatro passadas sobre o ladrilho pronto (relevo direcional, realce, tom e chanfro de
+borda); o chanfro desenha a grade do mundo porque a UV repete por bloco no greedy meshing. Itens
+ganham um sólido iluminado a partir da **mesma máscara** de `data/itemart.ts`: transformada de
+distância, abaulamento, Lambert, Blinn-Phong, luz de quina e contorno tingido — com o expoente do
+especular separando metal de gema. A folha de sprites dobra para 32 px por item no Nítido.
+
+Custo em jogo: **zero dos dois lados**. Nenhum caminho de render, tick ou mesh pergunta o estilo; o
+que ele muda são os bytes gerados no boot — 2,0 ms no atlas e 26,7 ms na folha.
+
+Três coisas só apareceram olhando o resultado renderizado fora do navegador, imagem por imagem:
+
+1. **contraste com pivô fixo em 128 estourava os claros** — neve, lã e o topo da grama viravam
+   branco chapado. Passou a girar na média da própria textura;
+2. **cabeça e cabo de madeira viravam uma peça só** — a pá sumia dentro do próprio cabo. Corpo e
+   acento passaram a medir o volume separados, e o vinco nasce sozinho;
+3. **o contorno do cubo isométrico borrava desenho de traço fino** — a teia virava mancha. Quem
+   decide agora é a espessura média do traço.
+
+A primeira versão da folha custava 89 ms: o cubo isométrico dividia o passo de amostragem pelo
+tamanho do tile e ficava 16 vezes mais fino do que precisa.
+
+**Portões:** 1179 testes (65 arquivos) verdes, lint limpo, build limpo, **174,5 KB gzip** de 350.
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `+` | `src/data/texturestyle.ts` | Os números do estilo, declarativos: acabamento de bloco e de skin, exceções por textura, material de item. |
+| `+` | `src/render/texfinish.ts` | Relevo, realce, tom e chanfro sobre o ladrilho pronto. Vazada não leva chanfro; água e lava não levam nada. |
+| `+` | `src/render/itemart3d.ts` | Máscara de item virada sólido iluminado: distância por peça, abaulamento, Lambert, especular, quina, contorno. |
+| `+` | `tests/texstyle.test.ts` | 20 testes: o Clássico intacto byte a byte, o pivô de contraste, o vinco entre peças, o contorno, a espessura de traço. |
+| `~` | `src/render/itemsprites.ts` | Folha com tamanho e estilo; `drawItemArt`/`drawBlockIsometric` deixam de assumir 16; contorno por espessura; passo de amostragem corrigido. |
+| `~` | `src/render/atlas.ts` | Acabamento depois do `resolve` e sobre cópia, para quem herda herdar o ladrilho cru. |
+| `~` | `src/render/entityatlas.ts` | Acabamento de skin, sem chanfro — a skin não é ladrilhada. |
+| `~` | `src/game/settings.ts` | `textureStyle`, padrão `nitido`, validado na leitura do storage. |
+| `~` | `src/ui/screens/options.ts` | Campo "Texturas (recarrega)" em Vídeo. |
+| `~` | `src/main.ts` | Lê o estilo uma vez e passa aos três geradores; folha em 32 px no Nítido. |
+| `~` | `tests/perf.test.ts` | Orçamento de boot: acabamento < 60 ms, folha < 200 ms — folgados de propósito, contra ruído de máquina. |
+| `~` | `tests/settings.test.ts` | Padrão do estilo e rejeição de valor desconhecido. |
+| `~` | `docs/15-status.md` | Seção fora de marco, métricas, e o passo de campo que falta. |
+
+---
+
 ## 2026-09-13 · 14:36 → 14:50 · O campo que nasceu no Nether, e a chuva que caiu lá
 
 **Pedido:** *"Agora está perfeito, a tela não piscou mais em nenhum momento"* — com duas

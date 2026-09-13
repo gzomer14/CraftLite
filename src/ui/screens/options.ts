@@ -30,6 +30,19 @@ const VIDEO: readonly Field[] = [
     ],
   },
   {
+    /*
+     * Igual à qualidade, e pelo mesmo motivo: o estilo decide os pixels do
+     * atlas, que já foi enviado para a GPU, e os da folha de sprites, que já é
+     * `background-image` de dezenas de slots. Regerar ao vivo seria refazer os
+     * dois e reconstruir toda a interface.
+     */
+    kind: 'choice', key: 'textureStyle', label: 'Texturas (recarrega)',
+    options: [
+      { value: 'nitido', label: 'Nítidas — com relevo e volume' },
+      { value: 'classico', label: 'Clássicas — chapadas' },
+    ],
+  },
+  {
     kind: 'range', key: 'renderDistance', label: 'Distância de render',
     min: 0, max: 16, step: 1,
     format: (v) => (v === 0 ? 'automática' : `${v} chunks`),

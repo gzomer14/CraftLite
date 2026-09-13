@@ -11,6 +11,8 @@
 
 import { MOBS } from '../data/mobs';
 import { MOB_SKINS } from '../data/mobskins';
+import { ENTITY_FINISH, type TextureStyleId } from '../data/texturestyle';
+import { applyFinish } from './texfinish';
 import { modelOf } from '../data/mobmodels';
 import { generateSkin } from './skingen';
 import type { AnyGL, GlContext } from './gl';
@@ -43,15 +45,24 @@ export class EntityAtlas {
   /**
    * `overrides` é a arte do jogador (`render/pack.ts`), por nome de skin. Ela
    * entra **antes** do upload: nada é regerado nem reenviado depois.
+   *
+   * `style` é o visual das opções. No Nítido a skin gerada recebe o mesmo
+   * relevo dos blocos, **sem chanfro** — ver `ENTITY_FINISH`. A skin do jogador
+   * não recebe nada: a arte dele é dele.
    */
-  constructor(ctx: GlContext, overrides?: ReadonlyMap<string, Uint8ClampedArray>) {
+  constructor(
+    ctx: GlContext, overrides?: ReadonlyMap<string, Uint8ClampedArray>,
+    style: TextureStyleId = 'classico',
+  ) {
     const t0 = performance.now();
     this.gl = ctx.gl;
     this.isArray = ctx.gl2 !== null;
 
     const custom = (name: string, generated: () => Uint8ClampedArray): Uint8ClampedArray => {
       const art = overrides?.get(name);
-      return art !== undefined && art.length === SKIN_SIZE * SKIN_SIZE * 4 ? art : generated();
+      if (art !== undefined && art.length === SKIN_SIZE * SKIN_SIZE * 4) return art;
+      const made = generated();
+      return style === 'nitido' ? applyFinish(made, SKIN_SIZE, ENTITY_FINISH) : made;
     };
     const pixels: Uint8ClampedArray[] = [];
     // Uma camada por tipo de mob, na ordem da tabela: assim `layerOf` de um mob

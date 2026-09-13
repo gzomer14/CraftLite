@@ -38,7 +38,8 @@ import { EntityAtlas, ARROW_LAYER, BOAT_LAYER, MINECART_LAYER } from './render/e
 import { createContext } from './render/gl';
 import { ItemRenderer } from './render/itemrender';
 import { HandRenderer } from './render/hand';
-import { ItemSprites } from './render/itemsprites';
+import { ItemSprites, SPRITE_SIZE } from './render/itemsprites';
+import { HD_SPRITE_SIZE } from './render/itemart3d';
 import { loadPack, overridesFor } from './render/pack';
 import { MobRenderer } from './render/mobrender';
 import { Renderer } from './render/renderer';
@@ -117,10 +118,22 @@ async function boot(): Promise<void> {
   const pack = await loadPack(db);
 
   progress(0.35, 'gerando texturas…');
-  const atlas = new Atlas(ctx, overridesFor(pack, 'block'));
-  const entityAtlas = new EntityAtlas(ctx, overridesFor(pack, 'entity'));
+  /*
+   * Estilo de textura (`data/texturestyle.ts`), lido uma vez e só aqui.
+   *
+   * Ele não chega a existir depois do boot: o que ele muda são os bytes que o
+   * atlas, o atlas de entidade e a folha de sprites geram. Nenhum caminho de
+   * render, tick ou mesh pergunta o estilo — é por isso que o Clássico custa
+   * exatamente o que sempre custou.
+   */
+  const style = settings.get('textureStyle');
+  const atlas = new Atlas(ctx, overridesFor(pack, 'block'), style);
+  const entityAtlas = new EntityAtlas(ctx, overridesFor(pack, 'entity'), style);
   // Folha de sprites de item: cubo isométrico para bloco, máscara para o resto.
-  const itemSprites = new ItemSprites(atlas, overridesFor(pack, 'item'));
+  const itemSprites = new ItemSprites(atlas, overridesFor(pack, 'item'), {
+    size: style === 'nitido' ? HD_SPRITE_SIZE : SPRITE_SIZE,
+    style,
+  });
   itemSprites.installCssVariables();
 
   progress(0.65, 'preparando renderizador…');

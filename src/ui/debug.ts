@@ -56,7 +56,10 @@ export class DebugOverlay {
   private readonly canvas: HTMLCanvasElement;
   private readonly g2d: CanvasRenderingContext2D | null;
   private readonly lines: string[] = ['', '', '', '', '', '', '', ''];
-  private readonly header: string;
+  private header = '';
+  /** Partes fixas do cabeçalho; só o render distance muda em partida. */
+  private readonly headerPrefix: string;
+  private readonly headerSuffix: string;
   private readonly targetMs: number;
   private lastUpdate = 0;
   private visible = false;
@@ -68,9 +71,16 @@ export class DebugOverlay {
   constructor(tier: Tier, preset: Preset, caps: GlCaps, atlasLayers: number, atlasMs: number) {
     this.targetMs = 1000 / preset.targetFps;
     // Sem marcar o marco: ficaria desatualizado a cada entrega.
-    this.header =
-      `CraftLite  ·  tier T${tier} (${preset.label})  ·  ${caps.webgl2 ? 'WebGL2' : 'WebGL1'}  ·  ` +
-      `RD ${preset.renderDistance}  ·  atlas ${atlasLayers} camadas em ${atlasMs.toFixed(1)}ms`;
+    /*
+     * O cabeçalho é montado em duas partes porque o **render distance muda em
+     * partida** e antes ele ficava congelado no valor do boot: quem subisse a
+     * opção para 16 continuava lendo "RD 8" no overlay e media o mundo errado
+     * (relato de campo 2026-09-13). O resto da linha não muda mesmo.
+     */
+    this.headerPrefix =
+      `CraftLite  ·  tier T${tier} (${preset.label})  ·  ${caps.webgl2 ? 'WebGL2' : 'WebGL1'}  ·  RD `;
+    this.headerSuffix = `  ·  atlas ${atlasLayers} camadas em ${atlasMs.toFixed(1)}ms`;
+    this.setRenderDistance(preset.renderDistance);
 
     this.root = document.createElement('div');
     this.root.id = 'debug';
@@ -87,6 +97,11 @@ export class DebugOverlay {
     this.root.append(this.pre, this.canvas);
     document.body.appendChild(this.root);
     injectStyle();
+  }
+
+  /** O overlay passa a mostrar este render distance. */
+  setRenderDistance(distance: number): void {
+    this.header = this.headerPrefix + distance + this.headerSuffix;
   }
 
   toggle(): void {

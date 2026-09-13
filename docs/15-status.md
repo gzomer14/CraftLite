@@ -9,7 +9,7 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-13 11:12 — **M7 fechado: resource pack. Os oito marcos estão de pé.**
+**Última atualização:** 2026-09-13 13:40 — **quatro bugs de campo do M7 (S24 Ultra), corrigidos**
 
 ---
 
@@ -37,19 +37,20 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-13 11:12, com `npm test`, `npm run build` e
+Medidas em 2026-09-13 13:40, com `npm test`, `npm run build` e
 `SIZE_BUDGET_KB=350 npm run size`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **170,7 KB** | < 350 KB | `npm run size` |
-| Testes | **1130**, 63 arquivos | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **170,9 KB** | < 350 KB | `npm run size` |
+| Testes | **1145**, 64 arquivos | manter verde | `npm test` |
 | Camadas de atlas | **152** | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Geração de chunk | 6–14 ms (mediana; varia muito com a carga da máquina) | < 25 ms | `tests/perf.test.ts` |
-| Geração de chunk do Nether | 3,8 ms (mediana) | < 25 ms | `tests/perf.test.ts` |
+| Geração de chunk do Nether | 6,1 ms (mediana; 3,8 antes de a luz entrar) | < 25 ms | `tests/perf.test.ts` |
 | Meshing de section | 0,6–1,5 ms (mediana) | < 8 ms | `tests/perf.test.ts` |
 | Tick de 20 mobs | 0,14 ms | << 50 ms | `tests/mobs.test.ts` |
 | Tick de circuito (fio de 64) | 0,88 ms | < 5 ms | `tests/perf.test.ts` |
+| Colunas em 40 ciclos de pipeline (RD 8, 2 workers) | **86** (eram 44) | — | `tests/dimensionrace.test.ts` |
 | FPS em T0 real (2017) | **60**, RD 4, escala 1,00 (Galaxy J7 Metal) | 30 estáveis | teste manual |
 | Render em T0 | **2,7 ms** de 33,3 ms de orçamento | ≤ 8 ms (soma do doc 02 §2) | overlay F3 no aparelho |
 | Heap em T0 | **20 MB**, estável na sessão | sem crescimento | overlay F3 no aparelho |
@@ -562,6 +563,12 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-13 | `save/savemanager.ts` | **Coluna do Nether gravada como coluna da superfície — netherrack plantado na grama, permanente.** `flush` devolvia na hora quando já havia uma gravação em curso (*"chamadas concorrentes são ignoradas"*), mas `setDimension` faz `await this.flush()` **justamente** para gravar com a chave antiga o que está saindo. Com um autosave rodando, esse `await` não esperava nada: a dimensão virava no meio e o lote em voo ia para o disco com a chave **nova**. Agora `flush` devolve a promessa em curso, e `setDimension` chama duas vezes — a primeira espera a que já rodava, a segunda leva o que o `pipeline.setDimension` acabou de sujar ao descarregar. A chave passou a ser capturada antes de qualquer `await`, aqui e em `saveAndForget` (onde o acerto dependia da ordem de avaliação dos argumentos — correto por acidente). Relato de campo: *"parece que ele trouxe parte do mundo do nether para terra"*. |
+| 2026-09-13 | `world/pipeline.ts` | **A mesma corrupção pela outra porta.** O caminho do save em `dispatchGen` é assíncrono e `acceptChunk` só conferia distância: atravessar o portal com uma leitura de IndexedDB em voo punha a coluna do outro lado no mundo novo — e, como ela volta do disco marcada `modified`, ao sair de alcance era **gravada** na dimensão errada. A dimensão agora é carimbada no despacho e conferida na volta, como já acontecia com a resposta do worker. |
+| 2026-09-13 | `world/pipeline.ts` | **O meshing matava a geração de fome.** São `workers × 2` vagas, o meshing era despachado primeiro **sem teto**, e uma coluna rende até 8 jobs de malha: com a fila cheia as quatro vagas iam todas para malha e quase nada nascia. No S24 Ultra com RD 16: *"201/861 colunas, 1046 na fila, 0 gerando, 4 meshando"*. Metade das vagas agora fica reservada para a geração enquanto houver fila dela — gerar e meshar uma coluna custam a mesma ordem de grandeza (6–14 ms contra 8 × 0,6–1,5 ms). Medido no pipeline: **86 colunas em 40 ciclos, contra 44**. É também a explicação real do *"o mundo não acompanha a geração"* de T0, que em 2026-09-12 se atribuiu ao número de workers. |
+| 2026-09-13 | `world/gen/nether.ts` | **O Nether nascia sem luz nenhuma.** `generateNetherChunk` chamava `recomputeHeightMap()` e **não** `computeChunkLight()`, que o gerador da superfície sempre chamou. Lava, pedra luminosa e magma declaravam `emission` na tabela e não acendiam nada. Pior que escuro, ficava **manchado**: coluna que o jogador tinha modificado voltava pelo save, que recalcula a luz, e nascia iluminada ao lado de uma que não — *"parte da lava fica mais acesa e parte da lava mais escura"*. Custo: 3,8 → 6,1 ms por chunk, contra um orçamento de 25. |
+| 2026-09-13 | `core/tier.ts` | **Nenhum celular podia chegar ao T2, por mais forte que fosse.** `navigator.deviceMemory` satura em 8, então um aparelho de 12 GB pontua igual a um de 8; com a penalidade de `isMobile`, o melhor celular possível somava 3 e o T2 exige 4. Um Galaxy S24 Ultra entrava como **T1**, com render distance 8 e 2 workers. `maxTexSize >= 16384` — GPU de classe GLES 3.1/3.2, e o único número que vem do driver em vez de um nome para casar com regex — passou a valer +1, **só com WebGL2** (sem essa condição um aparelho sem WebGL2 subia para T2, que é o oposto da regra de errar para baixo). |
+| 2026-09-13 | `ui/debug.ts`, `main.ts` | **O overlay mentia o render distance.** O cabeçalho era montado uma vez no construtor: quem subisse a opção para 16 em jogo continuava lendo "RD 8" e media o mundo errado. O cabeçalho virou prefixo + valor + sufixo, e `applyRenderDistance` avisa o overlay junto com o pipeline e o renderer. |
 | 2026-09-12 | `entity/mobstore.ts` | **O mob nunca atingia a velocidade da tabela.** A ordem do tick é mesclar, mover, atritar: `steerToMoveTarget` mira `def.speed` mas o atrito entra depois, todo tick, e o regime permanente estabiliza em `blend / (1 − atrito × (1 − blend))` do alvo — **46%** no chão. O zumbi de 1,15 blocos/s andava a 0,53. Agora o alvo é dividido por esse fator, calculado com o atrito do próprio tick (chão, ar ou água), e `def.speed` passa a significar o que o doc 07 §1 diz. Regressão em `tests/mobs.test.ts`. |
 | 2026-09-12 | `data/mobs.ts`, `docs/07` §2 | **A tabela de velocidade era lenta demais.** Hostil andava de 1,05 a 1,3 blocos/s contra 4,317 do jogador caminhando — um quarto. Mesmo com o bug acima corrigido, um mob que leva oito segundos para cruzar dez blocos não parece estar perseguindo ninguém, e o relato de campo foi exatamente esse: *"os monstros estão muito lentos"* e *"não me seguem"*. A régua agora é o jogador: hostil fica entre caminhar (4,317) e correr (5,612) — zumbi 3.7, esqueleto 4.0, creeper 3.4, aranha 4.2, slime 1.9, lobo 4.8, enderman 4.5. Passivo continua lento de propósito. Decisão registrada no doc 07 §2. |
 | 2026-09-12 | `game/spawnplacement.ts` (novo), `main.ts` | **Voltar ao mundo teletransportava o jogador para o ponto inicial.** `trySpawn` tem duas funções — segurar a simulação até existir chão (senão o jogador cai pelo vazio enquanto os chunks carregam) e posicioná-lo em mundo novo — e fazia as duas **sempre**, inclusive logo depois de `save.load()` ter devolvido a posição do disco. Como ela reposiciona na coluna (0,0), que é onde toda partida começa, o jogador voltava exatamente para o spawn por mais longe que tivesse construído. Agora o caminho do save só espera a coluna do jogador chegar, sem tocar na posição. A função saiu do `main.ts` para um módulo próprio porque `main.ts` chama `boot()` no topo e não pode ser importado por teste; regressões em `tests/savegame.test.ts`. |
@@ -685,13 +692,13 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
 
 ## 6. Próximo passo recomendado
 
-1. **Jogar o M7 inteiro no aparelho.** É a única coisa da lista que não é polimento: redstone,
-   Nether, trilhos, import/export e resource pack nasceram todos em 2026-09-13, com orçamento
-   medido em teste (0,88 ms/tick de circuito, 3,8 ms/chunk de Nether) e **nenhum rodou no J7
-   Metal**. Três termômetros no overlay: `N redstone` na linha `E:`, que não deve chegar perto de
-   1024; a linha `C:` durante a travessia do portal — trocar de dimensão descarrega e recarrega o
-   anel inteiro, que é o pior caso de pipeline que o jogo tem; e o tempo de atlas no boot, que
-   agora pode incluir um pacote vindo do banco.
+1. **Rejogar o M7 no aparelho, depois das quatro correções de 2026-09-13.** A primeira sessão de
+   campo (S24 Ultra) achou os quatro bugs do §4 — a coluna do Nether na superfície, a geração
+   morrendo de fome, o Nether sem luz e o tier travado em T1 — e nenhum deles foi reverificado em
+   aparelho. Três termômetros no overlay: `N redstone` na linha `E:`, que não deve chegar perto
+   de 1024; a linha `C:` durante a travessia do portal, agora esperando ver `gerando` maior que
+   zero enquanto há fila; e o tier, que num celular topo de linha deve dizer **T2**.
+   **O J7 Metal continua sem ver nada do M7.**
 2. **O que a revisão de UX levantou e ficou para depois**, todos da tabela de Vídeo do doc 08 ou
    das listas de Controles/Som:
    - **remapeamento de teclas** (doc 08, Controles: "lista completa de teclas remapeáveis, conflito
@@ -703,7 +710,14 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      Partículas, Névoa, Balanço de Câmera, Mostrar FPS;
    - resto da Acessibilidade: modo daltônico, contorno de bloco em alto contraste, esconder flashes
      do céu, efeitos de distorção.
-3. Oportunidades pequenas que sobraram:
+3. **Mundo já corrompido não se conserta sozinho.** A coluna gravada na dimensão errada antes de
+   2026-09-13 continua no banco do jogador, e é indistinguível de uma torre de netherrack que
+   alguém tenha construído — não há como um migrador decidir. O caminho é o jogador quebrar o que
+   sobrou, ou recriar o mundo. **E pode ter havido perda:** a gravação é um `put` na chave
+   `[dimensão, cx, cz]`, então uma coluna do Nether escrita na chave da superfície **substitui** o
+   que estivesse salvo naquelas coordenadas. Como a escala é 1:8, as coordenadas atingidas ficam
+   perto da origem do mundo de superfície — que é onde se costuma construir.
+4. Oportunidades pequenas que sobraram:
    - **boneco 3D do jogador** na tela de inventário: o doc 08 §3.5 desenha um preview do modelo
      ao lado dos slots de armadura, e ele nunca foi feito — hoje a seção Equipamento é só a fila
      de slots. O doc já prevê sprite estático como saída para T0;

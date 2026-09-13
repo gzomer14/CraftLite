@@ -46,7 +46,13 @@ export class SaveManager {
   /** Chunks sujos aguardando gravação, por chave. */
   private readonly dirty = new Map<number, ChunkColumn>();
   private ticksSinceSave = 0;
-  private flushing = false;
+  /**
+   * Gravação em andamento, ou `null`.
+   *
+   * É a **promessa**, não um booleano: quem chama `flush` durante outra
+   * gravação precisa poder esperar por ela. Ver o comentário de `flush`.
+   */
+  private flushing: Promise<void> | null = null;
 
   readonly stats: SaveStats = { pending: 0, lastSaveAt: 0, saving: false, lastError: null };
 
@@ -72,6 +78,10 @@ export class SaveManager {
    */
   async setDimension(dimension: number): Promise<void> {
     if (dimension === this.dimension) return;
+    // Duas vezes de propósito: a primeira espera a gravação que já estava em
+    // curso, a segunda leva o que foi sujado enquanto ela rodava (as colunas
+    // que o `pipeline.setDimension` acabou de descarregar, por exemplo).
+    await this.flush();
     await this.flush();
     this.dimension = dimension;
   }
@@ -99,13 +109,29 @@ export class SaveManager {
 
   /**
    * Grava tudo que está sujo, em lotes, fora do frame.
-   * Chamadas concorrentes são ignoradas — a primeira já vai levar o resto.
+   *
+   * Chamada concorrente **espera** a gravação em curso em vez de voltar na
+   * hora. Voltar na hora custou caro: `setDimension` faz `await this.flush()`
+   * justamente para gravar as colunas que estão saindo **com a chave antiga**,
+   * e se um autosave já estivesse rodando esse `await` não esperava nada — a
+   * dimensão virava no meio, e o lote em voo ia para o disco com a chave
+   * **nova**. Chunk do Nether gravado como chunk da superfície: ao voltar para
+   * lá, o mundo tinha uma coluna de netherrack no meio da grama (relato de
+   * campo 2026-09-13).
    */
-  async flush(): Promise<void> {
-    if (this.flushing || this.dirty.size === 0) return;
-    this.flushing = true;
+  flush(): Promise<void> {
+    if (this.flushing !== null) return this.flushing;
+    if (this.dirty.size === 0) return Promise.resolve();
+    this.flushing = this.runFlush().finally(() => { this.flushing = null; });
+    return this.flushing;
+  }
+
+  private async runFlush(): Promise<void> {
     this.stats.saving = true;
     this.stats.lastError = null;
+    // Uma vez só, antes de qualquer `await`: a dimensão não pode mudar no meio
+    // de uma gravação, e ler a chave a cada lote deixaria isso possível.
+    const storeId = this.chunkStoreId;
 
     try {
       while (this.dirty.size > 0) {
@@ -118,7 +144,7 @@ export class SaveManager {
           if (batch.length >= CHUNKS_PER_BATCH) break;
         }
 
-        await this.db.putChunks(this.chunkStoreId, batch);
+        await this.db.putChunks(storeId, batch);
         for (const key of keys) this.dirty.delete(key);
         this.stats.pending = this.dirty.size;
 
@@ -129,17 +155,24 @@ export class SaveManager {
     } catch (error) {
       this.reportError(error);
     } finally {
-      this.flushing = false;
       this.stats.saving = false;
     }
   }
 
-  /** Grava uma coluna que está sendo descarregada e já era modificada. */
+  /**
+   * Grava uma coluna que está sendo descarregada e já era modificada.
+   *
+   * A chave é capturada **antes** do `await` de compressão, pela mesma razão do
+   * `flush`: quem descarrega é o `pipeline.setDimension`, e a dimensão vira
+   * logo depois. Depender da ordem de avaliação dos argumentos para isso dar
+   * certo seria correto por acidente.
+   */
   async saveAndForget(chunk: ChunkColumn): Promise<void> {
     if (!chunk.modified) return;
     this.dirty.delete(chunkKey(chunk.cx, chunk.cz));
+    const storeId = this.chunkStoreId;
     try {
-      await this.db.putChunks(this.chunkStoreId, [[chunk.cx, chunk.cz, await compressChunk(chunk)]]);
+      await this.db.putChunks(storeId, [[chunk.cx, chunk.cz, await compressChunk(chunk)]]);
     } catch (error) {
       this.reportError(error);
     }

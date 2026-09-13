@@ -12,6 +12,93 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-13 · 13:20 → 13:45 · Quatro bugs que só um aparelho na mão acha
+
+**Pedido:** *"Notei algumas coisas estranhas no jogo"* — pilar de netherrack na superfície depois
+de voltar do Nether, mundo demorando muito para renderizar num S24 Ultra, o aparelho entrando como
+T1, e *"parte da lava fica mais acesa e parte da lava mais escura"*.
+
+**Resultado:** os quatro eram bugs de verdade, todos no código do M7 entregue hoje de manhã, e
+nenhum deles apareceria em teste de FPS. Todos com regressão que **falha sem a correção** —
+verificado revertendo cada uma.
+
+### 1 e 2 — a coluna do Nether na superfície, por duas portas
+
+O pilar de netherrack é uma **coluna inteira gravada na dimensão errada**, e havia dois caminhos
+para isso.
+
+**No save:** `flush` devolvia na hora quando já havia gravação em curso — *"chamadas concorrentes
+são ignoradas, a primeira já vai levar o resto"*, o que é verdade para o autosave e catastrófico
+para `setDimension`, cuja razão de existir é gravar **com a chave antiga** o que está saindo. Com
+um autosave rodando, aquele `await this.flush()` não esperava nada: a dimensão virava no meio e o
+lote em voo caía no disco com a chave nova. Agora `flush` devolve a promessa em curso, e
+`setDimension` chama duas vezes — a primeira espera a que já rodava, a segunda leva o que o
+`pipeline.setDimension` acabou de sujar ao descarregar o mundo.
+
+**No pipeline:** o caminho do save em `dispatchGen` é uma leitura assíncrona de IndexedDB, e
+`acceptChunk` só conferia **distância**. Atravessar o portal com uma leitura em voo punha a coluna
+do outro lado no mundo novo — e, como ela volta do disco marcada `modified`, ao sair de alcance era
+gravada na dimensão errada. A dimensão passou a ser carimbada no despacho e conferida na volta,
+exatamente como já acontecia com a resposta do worker. O comentário de `setDimension` afirmava que
+isso já valia para tudo; valia só para o worker.
+
+De quebra, a chave de armazenamento passou a ser capturada **antes** de qualquer `await`, aqui e em
+`saveAndForget` — onde funcionava por depender da ordem de avaliação dos argumentos, o que é estar
+certo por acidente.
+
+### 3 — o meshing matando a geração de fome
+
+*"C: 201/861 colunas, 1046 na fila, 0 gerando, 4 meshando"*. São `workers × 2` vagas, o meshing era
+despachado primeiro **sem teto**, e uma coluna rende até 8 jobs de malha: com a fila cheia as
+quatro vagas iam todas para malha e quase nada nascia. Metade das vagas agora fica reservada para a
+geração enquanto houver fila dela — gerar e meshar uma coluna custam a mesma ordem de grandeza
+(6–14 ms contra 8 × 0,6–1,5 ms), então meio a meio é onde nenhum dos dois espera pelo outro.
+
+Medido no pipeline com worker de verdade: **86 colunas em 40 ciclos, contra 44**. O primeiro teste
+que escrevi para isto **passava com o bug** — os jobs de malha eram todos adiados por falta de
+vizinho e não gastavam vaga. Só com coluna cheia e mesher real o sintoma aparece.
+
+É também a explicação real do *"o mundo não acompanha a geração"* de T0, que em 2026-09-12 se
+atribuiu ao número de workers.
+
+### 4 — o Nether sem luz
+
+`generateNetherChunk` chamava `recomputeHeightMap()` e **não** `computeChunkLight()`, que o gerador
+da superfície sempre chamou. Lava, pedra luminosa e magma declaravam `emission` na tabela de blocos
+e não acendiam nada. Pior que escuro, ficava **manchado**: coluna que o jogador tinha modificado
+voltava pelo save, que recalcula a luz, e nascia iluminada ao lado de uma que não — que é
+literalmente *"parte da lava mais acesa e parte mais escura"*. Custo: 3,8 → 6,1 ms por chunk,
+contra um orçamento de 25.
+
+### 5 — e o tier, que o usuário estranhou com razão
+
+Nenhum celular podia chegar ao T2, por mais forte que fosse. `navigator.deviceMemory` satura em 8,
+então um aparelho de 12 GB pontua igual a um de 8; com a penalidade de `isMobile`, o melhor celular
+possível somava **3** e o T2 exige 4. `maxTexSize >= 16384` — GPU de classe GLES 3.1/3.2, e o único
+número que vem do driver em vez de um nome para casar com regex — passou a valer +1.
+
+A primeira versão dessa regra **promovia a T2 um aparelho sem WebGL2**, o oposto da regra de errar
+para baixo; o teste novo pegou, e o bônus passou a exigir WebGL2.
+
+De brinde: o overlay mentia o render distance. O cabeçalho era montado uma vez no construtor, então
+quem subisse a opção para 16 em jogo continuava lendo "RD 8" — e media o mundo errado.
+
+### Arquivos
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `+` | `tests/dimensionrace.test.ts` | 15 regressões: as duas portas da corrupção, a vazão do pipeline, a luz do Nether e o tier |
+| `~` | `src/save/savemanager.ts` | `flush` devolve a promessa em curso; chave capturada antes dos `await` |
+| `~` | `src/world/pipeline.ts` | dimensão carimbada no caminho do save; metade das vagas reservada para a geração |
+| `~` | `src/world/gen/nether.ts` | `computeChunkLight` no fim da geração |
+| `~` | `src/core/tier.ts` | bônus de textura 16384 com WebGL2 |
+| `~` | `src/ui/debug.ts`, `src/main.ts` | render distance vivo no cabeçalho do overlay |
+| `~` | `docs/15-status.md`, `docs/16-auditoria.md`, `README.md` | §4 com os quatro bugs, métricas |
+
+**Portões:** 1145 testes (64 arquivos), lint limpo, build limpo, **170,9 KB gzip** de 350.
+
+---
+
 ## 2026-09-13 · 10:31 → 11:12 · A arte do jogador, e o M7 fecha
 
 **Pedido:** *"Continue o desenvolvimento do resource pack"*.

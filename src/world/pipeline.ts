@@ -251,9 +251,25 @@ export class ChunkPipeline {
     let busy = 0;
     for (let i = 0; i < this.inFlight.length; i++) busy += this.inFlight[i];
 
-    // Meshing tem prioridade sobre geração: um chunk gerado e não meshado é
-    // memória parada que o jogador não vê.
-    //
+    /*
+     * Meshing tem prioridade sobre geração — mas **não prioridade absoluta**.
+     *
+     * Tinha, e isso matava a geração de fome: as vagas são `workers * 2`, o
+     * meshing é despachado primeiro, e uma coluna rende até 8 jobs de malha.
+     * Com a fila cheia o meshing ocupava as quatro vagas todo frame e nada
+     * novo nascia — num S24 Ultra com render distance 16, 201 colunas de 861,
+     * "1046 na fila, 0 gerando, 4 meshando" no overlay (relato de campo
+     * 2026-09-13). É o mesmo sintoma que em T0 se atribuiu a ter um worker só.
+     *
+     * Quando os dois lados têm trabalho, metade das vagas fica reservada para
+     * a geração. Gerar e meshar uma coluna custam a mesma ordem de grandeza
+     * (6–14 ms contra 8 × 0,6–1,5 ms), então meio a meio é o ponto em que
+     * nenhum dos dois espera pelo outro. Sem fila de geração, o meshing
+     * continua levando tudo.
+     */
+    const reserved = this.genQueue.length > 0 ? Math.max(1, this.maxInFlight >> 1) : 0;
+    const meshLimit = this.maxInFlight - reserved;
+
     // O job que não pode ser meshado agora (falta vizinho) **não** volta para
     // `meshQueue` aqui dentro: espera em `deferredMeshes` e só retorna ao fim
     // do laço. Devolver na hora fazia o `while` reexaminar o mesmo job para
@@ -263,7 +279,7 @@ export class ChunkPipeline {
     // mesmo que alguém reintroduza o reenfileiramento lá dentro.
     const deferred = this.deferredMeshes;
     let scan = this.meshQueue.length;
-    while (busy < this.maxInFlight && scan > 0 && this.meshQueue.length > 0) {
+    while (busy < meshLimit && scan > 0 && this.meshQueue.length > 0) {
       scan--;
       const job = this.meshQueue.shift() as PendingJob;
       const outcome = this.dispatchMesh(job);
@@ -294,18 +310,30 @@ export class ChunkPipeline {
       return;
     }
 
-    // Caminho do save: não passa pelo worker, então não entra na conta de
-    // `inFlight` — quem devolve o crédito é a resposta do worker, que aqui não
-    // existe.
+    /*
+     * Caminho do save: não passa pelo worker, então não entra na conta de
+     * `inFlight` — quem devolve o crédito é a resposta do worker, que aqui não
+     * existe.
+     *
+     * **A dimensão é carimbada aqui e conferida na volta**, exatamente como a
+     * resposta do worker. A leitura do IndexedDB é assíncrona: atravessar o
+     * portal enquanto ela está em voo fazia a coluna do outro lado entrar no
+     * mundo novo — e, como ela vem do disco marcada como `modified`, ao sair de
+     * alcance era gravada de volta **na dimensão errada**. Uma coluna de
+     * netherrack no meio da grama, permanente (relato de campo 2026-09-13).
+     */
+    const dim = this.dimension;
     void this.loadSaved(job.cx, job.cz).then((saved) => {
+      if (dim !== this.dimension) return;
       if (saved === null) {
-        this.send({ type: 'gen', cx: job.cx, cz: job.cz, dim: this.dimension });
+        this.send({ type: 'gen', cx: job.cx, cz: job.cz, dim });
         return;
       }
       this.generating.delete(key);
       this.acceptChunk(saved);
     }).catch(() => {
-      this.send({ type: 'gen', cx: job.cx, cz: job.cz, dim: this.dimension });
+      if (dim !== this.dimension) return;
+      this.send({ type: 'gen', cx: job.cx, cz: job.cz, dim });
     });
   }
 

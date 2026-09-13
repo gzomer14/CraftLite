@@ -27,6 +27,7 @@ import { Noise } from '../../core/noise';
 import { hash3 } from '../../core/rng';
 import { DIM_NETHER, dimensionOf } from '../../data/dimensions';
 import { ChunkColumn, SECTION_SIZE, WORLD_HEIGHT } from '../chunk';
+import { computeChunkLight } from './terrain';
 
 /** Topo do mar de lava. Abaixo disto, o que não é rocha é lava. */
 export const LAVA_SEA_LEVEL = 31;
@@ -144,6 +145,21 @@ export function generateNetherChunk(
   }
 
   chunk.recomputeHeightMap();
+  /*
+   * A luz, que **faltava** (bug de campo 2026-09-13).
+   *
+   * A coluna saía do gerador com luz zero em tudo: lava, pedra luminosa e
+   * magma declaravam `emission` na tabela de blocos e não acendiam nada, e o
+   * que se via era só a luz ambiente da dimensão. Pior que escuro, ficava
+   * **manchado** — coluna que o jogador tinha modificado voltava pelo save,
+   * que chama `computeChunkLight`, e nascia iluminada ao lado de uma que não.
+   * Daí "parte da lava mais acesa e parte mais escura".
+   *
+   * O gerador da superfície sempre chamou isto; só o do Nether não chamava. A
+   * luz do céu sai naturalmente em zero: a rocha-mãe do teto barra o flood
+   * fill na primeira camada.
+   */
+  computeChunkLight(chunk);
   return chunk;
 }
 

@@ -127,6 +127,22 @@ export function detectTier(info: DeviceInfo): Tier {
 
   if (!info.hasWebGL2) score -= 3;
   if (info.maxTexSize < 4096) score -= 2;
+  /*
+   * Textura de 16384: GPU de classe GLES 3.1/3.2, e o **único número que vem
+   * do driver** em vez de um nome para casar com regex.
+   *
+   * Sem esta linha nenhum celular chegava ao T2, por mais forte que fosse:
+   * `navigator.deviceMemory` satura em 8, então um aparelho de 12 GB pontua
+   * igual a um de 8, e a penalidade de `isMobile` travava o melhor celular
+   * possível em 3 — um a menos do que o T2 exige. Um Galaxy S24 Ultra entrava
+   * como T1 (relato de campo 2026-09-13), com render distance 8 e 2 workers
+   * num aparelho que segura o dobro.
+   *
+   * **Só vale com WebGL2.** Sem essa condição, um aparelho sem WebGL2 mas com
+   * textura grande subia para T2 — render distance 12 e DPR 2 em cima do
+   * caminho de fallback, exatamente o que a regra de errar para baixo proíbe.
+   */
+  if (info.hasWebGL2 && info.maxTexSize >= 16384) score += 1;
 
   if (info.memGB <= 2) score -= 2;
   else if (info.memGB <= 4) score += 0;

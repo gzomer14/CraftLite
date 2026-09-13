@@ -844,6 +844,9 @@ async function boot(): Promise<void> {
     if (distance === pipeline.renderDistance) return;
     pipeline.setRenderDistance(distance);
     renderer.setRenderDistance(distance);
+    // Senão o overlay segue anunciando o valor do boot, e quem está medindo o
+    // mundo mede errado (relato de campo 2026-09-13).
+    debug.setRenderDistance(distance);
   }
 
   function applyPlayfieldSettings(): void {

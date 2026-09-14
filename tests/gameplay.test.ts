@@ -127,11 +127,19 @@ describe('quebrar e colocar em terreno gerado', () => {
     const z = Math.floor(player.z);
     const surface = world.getChunk(0, 0)!.heightMap[((z & 15) << 4) | (x & 15)];
 
-    // Cava 4 blocos para baixo.
+    /*
+     * Cava 4 blocos para baixo, **um clique por bloco**.
+     *
+     * O `tickBreaking(false, …)` no meio não é enfeite: desde que existe o
+     * intervalo entre quebras (`BREAK_INTERVAL`), segurar o botão derruba um
+     * bloco a cada 5 ticks, e um laço que só segura cavaria um buraco de um
+     * bloco. Soltar entre as quebras é o que um jogador faz.
+     */
     for (let i = 0; i < 4; i++) {
       interaction.updateTarget();
       if (interaction.state.target === null) break;
       interaction.tickBreaking(true, null);
+      interaction.tickBreaking(false, null);
       player.setPosition(player.x, player.y - 1, player.z);
     }
 

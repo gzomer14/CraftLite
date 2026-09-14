@@ -12,6 +12,59 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-14 · 15:15 → 15:24 · Um clique, um bloco — e as plantas que ninguém conseguia quebrar
+
+**Pedido:** dois relatos, o segundo lembrado no meio do primeiro. *"No modo criativo... a
+sensibilidade para fazer essa quebra acredito que esteja absurda... mesmo dando um clique
+extremamente rápido é quase impossível quebrar só um bloco. Tem momentos em que um simples clique
+rápido acaba quebrando três blocos em sequência"*, com o pedido explícito de **verificar se o mesmo
+acontece no sobrevivência** com bloco frágil ou ferramenta forte. E, logo depois: *"as plantas que
+encontro na grama, nenhuma delas consigo quebrar"*.
+
+**Resultado:** os dois eram bugs, e o segundo é mais antigo e mais grave do que parece.
+
+### A quebra acontecia uma vez por tick
+
+No criativo `tickBreaking` derrubava um bloco **a cada tick** enquanto o botão estivesse
+pressionado: 50 ms por bloco, então um clique normal de 150 ms fazia uma fila de três. Não havia
+como o jogador clicar mais rápido que isso.
+
+A pergunta sobre o sobrevivência tinha resposta, e foi medida em vez de estimada: **478 combinações
+bloco+ferramenta quebram em um único tick**, das quais **18 apenas com a mão** — todas as plantas
+de dureza zero — mais neve com pá. Todas tinham o mesmo comportamento.
+
+A correção é um intervalo de 5 ticks entre quebras **dentro do mesmo apertar de botão**. Três
+propriedades a mantêm honesta: soltar o botão zera o intervalo (um clique é um bloco, e quem clica
+rápido de propósito continua mandando no ritmo); o intervalo gate apenas a **conclusão**, com o
+progresso correndo durante ele, então nenhum bloco comum o encontra; e a quebra do criativo
+continua instantânea — o que passou a ser limitado é a fila, não o golpe.
+
+### O raio atravessava toda planta
+
+A condição de acerto do raycast excluía tudo que é `replaceable`, e é exatamente isso que `plant()`
+marca. Grama alta, samambaia, flores, mudas, cana, arbusto morto e trepadeira — mais neve fina e
+fogo — **não podiam nem ser miradas**: o raio passava direto e acertava o chão atrás.
+
+O código de colocação já esperava o contrário. Ele tem um ramo escrito e comentado — *"bloco
+substituível recebe no próprio lugar"* — que **nunca era alcançado** para nada que não fosse
+líquido. Era uma contradição entre dois módulos, parada ali desde o M2.
+
+A regra não podia simplesmente cair: os outros dois usuários do raio são **linha de visão de mob** e
+**linha de explosão**, e uma flor não pode esconder o jogador de um creeper nem barrar uma explosão.
+Virou opção (`RayOptions.replaceable`), ligada só no raio da interação.
+
+**Portões:** 1342 testes (74 arquivos) verdes, lint limpo, build limpo, **189,0 KB gzip** de 350.
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `+` | `tests/breakrate.test.ts` | 10 testes: um clique é um bloco no criativo e no sobrevivência, segurar dá ritmo controlável, soltar zera a espera, **a mineração normal não fica mais lenta**, toda planta de dureza zero é mirável, e o inventário de quebras instantâneas fica registrado. |
+| `~` | `src/game/interaction.ts` | `BREAK_INTERVAL` de 5 ticks entre quebras do mesmo apertar, zerado ao soltar; ele gate a conclusão e não o progresso. O raio da interação passa `{ replaceable: true }`. |
+| `~` | `src/world/raycast.ts` | `RayOptions` no lugar do booleano de líquidos: o que conta como acerto depende de para que serve o raio. Linha de visão e explosão seguem ignorando planta. |
+| `~` | `tests/gameplay.test.ts` | O teste do poço segurava o botão por 4 ticks para cavar 4 blocos; passou a modelar **quatro cliques**, que é o que um jogador faz. |
+| `~` | `docs/15-status.md`, `README.md` | Métricas, duas correções fora de marco e o roteiro de reteste da quebra. |
+
+---
+
 ## 2026-09-14 · 14:55 → 15:12 · O Modo A de toque tinha três bugs, e o padrão virou o B
 
 **Pedido:** *"para mim a opção A de controles... está bem estranha. Vira e mexe ela falha, parece

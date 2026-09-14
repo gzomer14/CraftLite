@@ -22,6 +22,25 @@ import { forwardFrom, createVec3 } from '../core/math';
 export const BREAK_STAGES = 10;
 /** Cooldown de colocação, em ticks. Sem ele, segurar o botão põe 20 blocos/s. */
 const PLACE_COOLDOWN = 4;
+/**
+ * Ticks entre duas quebras **dentro do mesmo apertar de botão** (0,25 s).
+ *
+ * Sem ele, a quebra instantânea acontece **uma vez por tick**: no criativo um
+ * clique de 150 ms — que é um clique normal — derrubava três blocos em fila, e
+ * era impossível quebrar só um (relato de campo 2026-09-14). O mesmo valia no
+ * sobrevivência para tudo que quebra em um tick: os 18 blocos de dureza zero
+ * (grama alta, flores, mudas, cana) com a mão, e neve com pá.
+ *
+ * **Ele não atrasa a mineração normal.** O intervalo só gate a *conclusão* da
+ * quebra, e o progresso continua correndo durante ele — qualquer bloco que
+ * leve mais de 5 ticks (todos os comuns) nunca o encontra. O que ele limita é
+ * exatamente o caso que o jogador não consegue controlar com o dedo.
+ *
+ * **Soltar o botão zera o intervalo.** Um clique é um bloco, e quem clica
+ * rápido de propósito continua quebrando no ritmo que quiser — o limite é para
+ * o botão segurado, não para a intenção do jogador.
+ */
+const BREAK_INTERVAL = 5;
 
 /**
  * Progresso de quebra por tick, em fração do total (quebra quando ≥ 1).
@@ -93,6 +112,8 @@ export class Interaction {
   };
 
   private placeCooldown = 0;
+  /** Ticks restantes até a próxima quebra poder acontecer. */
+  private breakCooldown = 0;
   private breakingActive = false;
 
   /** Chamado quando um bloco é quebrado — o M4 pluga drops aqui. */
@@ -127,6 +148,9 @@ export class Interaction {
       player.x, player.y + player.eyeHeight, player.z,
       dx, dy, dz,
       player.reach,
+      // O raio da interação enxerga planta, neve fina e fogo: é o que o
+      // jogador mira. Linha de visão e explosão usam o padrão, que os ignora.
+      { replaceable: true },
     );
     this.state.target = hit.hit ? hit : null;
   }
@@ -141,8 +165,11 @@ export class Interaction {
 
     if (!holding || s.target === null) {
       this.resetBreaking();
+      // Soltar o botão zera o intervalo: um clique, um bloco.
+      this.breakCooldown = 0;
       return;
     }
+    if (this.breakCooldown > 0) this.breakCooldown--;
 
     const target = s.target;
     const sameBlock = this.breakingActive
@@ -158,7 +185,13 @@ export class Interaction {
 
     const block = defOf(target.state);
     if (this.player.mode === 'creative') {
+      // Instantânea continua instantânea; o que o intervalo limita é a fila.
+      if (this.breakCooldown > 0) {
+        s.stage = -1;
+        return;
+      }
       this.breakBlock(target.x, target.y, target.z);
+      this.breakCooldown = BREAK_INTERVAL;
       this.resetBreaking();
       return;
     }
@@ -174,7 +207,17 @@ export class Interaction {
 
     s.progress += perTick;
     if (s.progress >= 1) {
+      /*
+       * Pronto, mas ainda no intervalo: a rachadura fica cheia e o bloco cai no
+       * tick em que o intervalo vencer. Só chega aqui o que quebra em menos de
+       * 5 ticks — bloco comum termina muito depois de o intervalo ter passado.
+       */
+      if (this.breakCooldown > 0) {
+        s.stage = BREAK_STAGES - 1;
+        return;
+      }
       this.breakBlock(target.x, target.y, target.z);
+      this.breakCooldown = BREAK_INTERVAL;
       this.resetBreaking();
       return;
     }

@@ -12,6 +12,20 @@ import { defOf } from '../data/blocks';
 import { WORLD_HEIGHT } from './chunk';
 import type { World } from './world';
 
+/** O que o raio deve considerar um acerto. */
+export interface RayOptions {
+  /** Líquidos contam como acerto (balde, pesca). */
+  fluids?: boolean;
+  /**
+   * Blocos substituíveis contam: planta, neve fina, fogo.
+   *
+   * É o raio **da interação** — o que o jogador mira para quebrar e onde ele
+   * coloca. Linha de visão e explosão não usam isto, porque nada disso
+   * bloqueia coisa nenhuma.
+   */
+  replaceable?: boolean;
+}
+
 export interface RayHit {
   hit: boolean;
   /** Bloco atingido. */
@@ -37,16 +51,18 @@ const HIT: RayHit = {
 
 /**
  * Lança um raio de `(ox,oy,oz)` na direção `(dx,dy,dz)` (normalizada) até
- * `maxDistance` blocos. `predicate` decide o que conta como acerto — o padrão
- * é qualquer bloco que não seja atravessável.
+ * `maxDistance` blocos. `options` decide o que conta como acerto — o padrão é
+ * o que **bloqueia**, que é o que linha de visão e explosão precisam.
  */
 export function raycast(
   world: World,
   ox: number, oy: number, oz: number,
   dx: number, dy: number, dz: number,
   maxDistance: number,
-  includeFluids = false,
+  options: RayOptions = {},
 ): RayHit {
+  const includeFluids = options.fluids === true;
+  const includeReplaceable = options.replaceable === true;
   const r = HIT;
   r.hit = false;
   r.distance = 0;
@@ -76,7 +92,21 @@ export function raycast(
     if (y >= 0 && y < WORLD_HEIGHT) {
       const state = world.getBlock(x, y, z);
       const def = defOf(state);
-      const solid = def.shape === 'liquid' ? includeFluids : def.shape !== 'none' && !def.replaceable;
+      /*
+       * O que conta como acerto depende de **para quê** é o raio.
+       *
+       * Planta, neve fina e fogo são `replaceable`: eles não bloqueiam nada —
+       * uma flor não pode esconder o jogador de um creeper nem barrar uma
+       * explosão —, mas **são** o que o jogador mira quando quer quebrá-los.
+       * Com a regra única de antes, nenhuma planta podia ser mirada: o raio
+       * atravessava as 18 de dureza zero e acertava o chão atrás (relato de
+       * campo 2026-09-14). O código de colocação já esperava o contrário: ele
+       * tem um ramo para "bloco substituível recebe no próprio lugar" que
+       * nunca era alcançado.
+       */
+      const solid = def.shape === 'liquid'
+        ? includeFluids
+        : def.shape !== 'none' && (includeReplaceable || !def.replaceable);
       if (solid) {
         r.hit = true;
         r.x = x; r.y = y; r.z = z;

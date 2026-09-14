@@ -13,7 +13,8 @@ import { UiNavigator } from '../src/input/uinav';
 import type { NavState } from '../src/input/gamepad';
 
 const NOTHING: NavState = {
-  up: false, down: false, left: false, right: false, confirm: false, cancel: false,
+  up: false, down: false, left: false, right: false,
+  confirm: false, cancel: false, secondary: false, cursorX: 0, cursorY: 0,
 };
 
 class FakeEl {
@@ -33,8 +34,18 @@ class FakeEl {
   readonly events: string[] = [];
   clicks = 0;
   focused = false;
+  id = '';
+  readonly style: Record<string, string> = {};
+  /** Retângulo na tela. `null` = elemento sem layout, como em Node de verdade. */
+  rect: { left: number; top: number; width: number; height: number } | null = null;
 
   constructor(readonly tag: string) {}
+
+  getAttribute(name: string): string | null { return this.attributes[name] ?? null; }
+
+  getBoundingClientRect(): { left: number; top: number; width: number; height: number } {
+    return this.rect ?? { left: 0, top: 0, width: 0, height: 0 };
+  }
 
   appendChild(child: FakeEl): FakeEl {
     child.parentElement = this;
@@ -67,8 +78,19 @@ class FakeEl {
 /** Casamento de seletor suficiente para os dois seletores do módulo. */
 function matches(el: FakeEl, selector: string): boolean {
   if (selector.includes('role="dialog"')) return el.attributes.role === 'dialog';
+  const tabindex = el.attributes.tabindex;
+  if (tabindex !== undefined && tabindex !== '-1') return true;
   const tags = ['button', 'input', 'select', 'textarea'];
   return tags.includes(el.tag) && !el.disabled;
+}
+
+/** Um slot de inventário: `div[role=button]` com foco, como em `containers/screen.ts`. */
+function slot(x: number, y: number): FakeEl {
+  const node = el('div');
+  node.setAttribute('role', 'button');
+  node.setAttribute('tabindex', '0');
+  node.rect = { left: x, top: y, width: 20, height: 20 };
+  return node;
 }
 
 let allElements: FakeEl[] = [];
@@ -107,6 +129,10 @@ beforeEach(() => {
   });
   vi.stubGlobal('HTMLInputElement', FakeEl);
   vi.stubGlobal('HTMLSelectElement', FakeEl);
+  vi.stubGlobal('MouseEvent', class {
+    constructor(readonly type: string, readonly init: Record<string, unknown>) {}
+    get button(): unknown { return this.init.button; }
+  });
 });
 
 afterEach(() => vi.unstubAllGlobals());
@@ -322,5 +348,189 @@ describe('esquerda e direita mexem no valor', () => {
     nav.tick(NOTHING);
     tap(nav, 'right');
     expect(b.focused, 'a seta não pode ficar inerte').toBe(true);
+  });
+});
+
+describe('navegação espacial', () => {
+  /*
+   * Relato de campo 2026-09-14: com o inventário aberto, ir da grade de
+   * criação até a mochila custava passar por armadura, boneco e resultado —
+   * o direcional andava na ordem do documento e a ordem do documento não é a
+   * ordem que o olho vê.
+   *
+   * O layout aqui é o do inventário em miniatura: coluna da esquerda com
+   * armadura e criação, coluna da direita com a mochila. Na ordem do
+   * documento a mochila vem por último; na tela ela está **ao lado**.
+   */
+  function inventario(): { craft: FakeEl; armadura: FakeEl; mochila: FakeEl } {
+    const armadura = slot(10, 10);
+    const craft = slot(10, 40);
+    const mochila = slot(200, 40);
+    dialog(armadura, craft, mochila);
+    return { craft, armadura, mochila };
+  }
+
+  it('para a direita corta caminho até a coluna do lado', () => {
+    const { craft, mochila } = inventario();
+    const nav = new UiNavigator();
+    nav.tick(NOTHING);
+    craft.focus();
+
+    tap(nav, 'right');
+    expect(mochila.focused, 'um passo, e não três').toBe(true);
+  });
+
+  it('para cima e para baixo seguem a coluna, não a ordem do documento', () => {
+    const { craft, armadura } = inventario();
+    const nav = new UiNavigator();
+    nav.tick(NOTHING);
+    craft.focus();
+
+    tap(nav, 'up');
+    expect(armadura.focused, 'o de cima na mesma coluna').toBe(true);
+    tap(nav, 'down');
+    expect(craft.focused).toBe(true);
+  });
+
+  it('o mais alinhado ganha do mais perto mas torto', () => {
+    const origem = slot(0, 100);
+    const torto = slot(40, 10);
+    const alinhado = slot(90, 100);
+    dialog(origem, torto, alinhado);
+
+    const nav = new UiNavigator();
+    nav.tick(NOTHING);
+    origem.focus();
+    tap(nav, 'right');
+    expect(alinhado.focused, 'a linha reta é o que o polegar espera').toBe(true);
+  });
+
+  it('sem nada daquele lado, cai na ordem do documento e dá a volta', () => {
+    const { mochila, armadura } = inventario();
+    const nav = new UiNavigator();
+    nav.tick(NOTHING);
+    mochila.focus();
+
+    tap(nav, 'right');
+    expect(armadura.focused, 'a seta nunca fica inerte').toBe(true);
+  });
+
+  it('sem layout nenhum a travessia continua sendo a da ordem do documento', () => {
+    // É o caso dos testes acima e de qualquer tela ainda não desenhada: sem
+    // geometria não dá para escolher pela tela, e o comportamento antigo vale.
+    const a = el('button');
+    const b = el('button');
+    dialog(a, b);
+    const nav = new UiNavigator();
+    nav.tick(NOTHING);
+    tap(nav, 'down');
+    expect(b.focused).toBe(true);
+  });
+});
+
+describe('slots do inventário', () => {
+  /*
+   * Os slots não são `<button>`: são `div[role="button"]` que agem no `keydown`
+   * de Enter e no `pointerdown` (doc 08 §3.5). `click()` neles dispara um
+   * evento que ninguém escuta — confirmar num slot com o controle não fazia
+   * nada até 2026-09-14.
+   */
+  it('confirmar num slot manda Enter, que é o que ele escuta', () => {
+    const casa = slot(0, 0);
+    dialog(casa);
+    const nav = new UiNavigator();
+    nav.tick(NOTHING);
+    tap(nav, 'confirm');
+    expect(casa.events, 'o slot age no keydown').toContain('keydown');
+    expect(casa.clicks, 'e não num click que ninguém ouve').toBe(0);
+  });
+
+  it('o clique secundário manda pointerdown de botão direito', () => {
+    const casa = slot(0, 0);
+    dialog(casa);
+    const nav = new UiNavigator();
+    nav.tick(NOTHING);
+    tap(nav, 'secondary');
+    expect(casa.events, 'é como se pegar metade da pilha fosse no mouse')
+      .toContain('pointerdown');
+  });
+
+  it('num botão comum o secundário não faz nada', () => {
+    const botao = el('button');
+    dialog(botao);
+    const nav = new UiNavigator();
+    nav.tick(NOTHING);
+    tap(nav, 'secondary');
+    expect(botao.clicks, 'botão de menu não tem clique direito').toBe(0);
+  });
+});
+
+describe('cursor do analógico direito', () => {
+  /** Documento com `createElement` e `elementFromPoint`, que o cursor usa. */
+  function comCursor(sob: FakeEl | null): void {
+    const body = new FakeEl('body');
+    const head = new FakeEl('head');
+    vi.stubGlobal('document', {
+      get activeElement() { return activeElement; },
+      querySelectorAll: (selector: string) => root.querySelectorAll(selector),
+      createElement: (tag: string) => new FakeEl(tag),
+      elementFromPoint: () => sob,
+      body,
+      head,
+    });
+    vi.stubGlobal('window', { innerWidth: 800, innerHeight: 600 });
+    vi.stubGlobal('HTMLElement', FakeEl);
+  }
+
+  it('empurrar o analógico foca quem está debaixo do cursor', () => {
+    const a = slot(0, 0);
+    const longe = slot(600, 400);
+    dialog(a, longe);
+    comCursor(longe);
+
+    const nav = new UiNavigator();
+    nav.tick(NOTHING);
+    expect(a.focused, 'começa no primeiro item').toBe(true);
+
+    nav.tick({ ...NOTHING, cursorX: 1, cursorY: 1 });
+    expect(longe.focused, 'o cursor vai direto na casa apontada').toBe(true);
+  });
+
+  it('o cursor sobe do rótulo até o slot que recebe o foco', () => {
+    // `elementFromPoint` devolve o `<span>` de dentro do slot muito mais vezes
+    // do que o slot em si.
+    const casa = slot(0, 0);
+    const rotulo = el('span');
+    casa.appendChild(rotulo);
+    const outro = slot(600, 400);
+    dialog(casa, outro);
+    comCursor(rotulo);
+
+    const nav = new UiNavigator();
+    nav.tick(NOTHING);
+    outro.focus();
+    nav.tick({ ...NOTHING, cursorX: -1, cursorY: -1 });
+    expect(casa.focused).toBe(true);
+  });
+
+  it('analógico parado não mexe no foco', () => {
+    const a = slot(0, 0);
+    const b = slot(600, 400);
+    dialog(a, b);
+    comCursor(b);
+
+    const nav = new UiNavigator();
+    nav.tick(NOTHING);
+    expect(a.focused).toBe(true);
+    nav.tick(NOTHING);
+    expect(a.focused, 'sem empurrar o analógico, o foco fica onde está').toBe(true);
+  });
+
+  it('sem DOM para criar o cursor, nada quebra', () => {
+    // É o ambiente dos outros testes: `document` sem `createElement`.
+    const a = el('button');
+    dialog(a);
+    const nav = new UiNavigator();
+    expect(() => nav.tick({ ...NOTHING, cursorX: 1, cursorY: 0 })).not.toThrow();
   });
 });

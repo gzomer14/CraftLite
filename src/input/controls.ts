@@ -232,10 +232,10 @@ export class Controls {
 
     if (this.mouse.locked && this.mousePlacing) this.placeRequested = true;
     if (this.touch.consumePlace()) this.placeRequested = true;
-    // `place` e `use` do doc 09 §3 caem os dois em "colocar/usar", que é uma
-    // ação só no resto do jogo: o botão de face e o gatilho esquerdo servem à
-    // mesma mão, e ter dois caminhos para o mesmo pedido não muda nada.
-    if (g.placing || g.using) this.placeRequested = true;
+    // Um caminho só: o gatilho esquerdo (doc 09 §3). Ele era dois — o □ também
+    // colocava —, e a duplicata foi desfeita quando o □ virou o botão da
+    // mochila.
+    if (g.placing) this.placeRequested = true;
 
     /*
      * As ações de borda do controle, que até aqui eram **calculadas e jogadas

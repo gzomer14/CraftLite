@@ -76,9 +76,12 @@ pendência de funcionalidade. Falta jogar em aparelho o que foi entregue depois 
   o que muda entre eles é sobretudo o **nome do botão**, e o jogo passa a dizer `✕ ○ □ △` a quem
   segura um controle da Sony. Mapeamento completo do doc 09 §3, e **os menus navegáveis por
   gamepad**, sem o que não dá nem para entrar num mundo só com o controle na mão. Funciona por cabo
-  ou Bluetooth, no computador e no celular.
+  ou Bluetooth, no computador e no celular. Nos menus o controle vira mouse: o direcional anda pela
+  **geometria da tela** e não pela ordem do documento, o **analógico direito é um cursor** que
+  aponta direto na casinha desejada, e o gatilho esquerdo vale **clique direito** — que é o que
+  permite pegar metade de uma pilha.
 
-**189 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
+**190 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
 além de dois ícones de PWA de 6,7 KB, gerados por código.
 
 Validado em aparelho alvo (**Galaxy J7 Metal**, Android 7, 2 GB, Mali-T830) em 2026-09-12:
@@ -91,7 +94,7 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 1342 testes (vitest)
+npm test           # 1371 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
 npm run icons      # regenera os ícones do PWA
@@ -162,13 +165,14 @@ src/
                             clima, conquistas
   audio/                    síntese procedural, motor de vozes, música
   save/                     IndexedDB, serialização de chunk, autosave, arquivo `.clw`
-  input/                    controls (camada única), keyboard, mouse, touch, gamepad
+  input/                    controls (camada única), keyboard, mouse, touch, gamepad,
+                            navegação e cursor de interface
   ui/                       HUD, controles de toque, tela cheia/orientação, debug
     screens/                título, mundos, opções, texturas, pausa, morte
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      1342 testes, incluindo orçamento de performance e de luz
+tests/                      1371 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios

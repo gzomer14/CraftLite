@@ -12,6 +12,97 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-14 · 17:30 → 17:58 · O controle vira mouse nos menus
+
+**Pedido:** cinco ajustes depois de jogar com o DualSense ligado por Bluetooth — que *"ele
+reconheceu perfeitamente"*, o que fecha a maior incógnita da entrega da manhã. (1) *"O botão para
+pausar... pressionando uma vez ele considera que apertei duas ou até três vezes... e isso tenho
+certeza que não é problema do controle"*; (2) `L1`/`R1` para trocar o item da mão; (3) *"colocar o
+quadrado para abertura do meu inventário... hoje não entendi o que o quadrado está fazendo"*;
+(4) *"tornar a movimentação da seleção dos itens mais inteligente... ele não corta caminho, ele
+passa por todas as casinhas até finalmente mover para o lado direito"*; (5) *"controlar o cursor
+dentro do jogo, com o analógico direito, quando esses menus estão abertos"*.
+
+**Resultado:** dois eram bug, dois eram desenho e um já existia.
+
+### O `Start` que valia por três
+
+A desconfiança do usuário estava certa: não era o controle. `togglePause` chama `Controls.reset()`
+— o mesmo caminho do `blur` —, e `Gamepads.reset()` **limpava** o estado anterior das bordas de
+subida. No tick seguinte o `Start` continuava apertado e não havia mais nada guardado dizendo isso,
+então o jogo lia uma borda nova e pausava de novo. A 20 Hz, enquanto o dedo estivesse no botão.
+
+`reset` passou a **silenciar até soltar**: marca toda intenção como já apertada, e o primeiro
+polling em que o botão aparece solto devolve o aperto seguinte — conserta-se sozinho, sem estado
+extra. A única exceção é o instante em que o controle é reconhecido: a Gamepad API só revela o
+aparelho **depois** do primeiro aperto, então o botão apertado ali é justamente o que o acordou, e
+engoli-lo pediria dois apertos para entrar.
+
+### Botão e intenção viraram duas tabelas
+
+`data/gamepads.ts` tinha uma tabela só, e os nomes dela eram os da ação (`place: 2`). Parecia
+econômico e escondia uma armadilha: mudar o que o `□` faz obrigava a mexer num **índice**, que é do
+aparelho e não do jogo. Agora `STANDARD_BUTTONS` diz onde o botão fica e `PAD_BINDINGS` diz o que
+ele dispara — a regra "dado é dado, não código" aplicada a um lugar onde ela não estava.
+
+Com isso o pedido do `□` virou uma linha. O que ele fazia antes era **duplicar o `L2`**: colocar
+bloco, e nada mais. A mochila só abria no `Create`, um botão pequeno e mal colocado para a ação
+mais repetida do jogo. Agora `L2` coloca, `R2` quebra, e as faces ficam para pular, agachar, largar
+e abrir a mochila.
+
+`L1`/`R1` **já trocavam o item da mão** desde a entrega da manhã — o pedido era para algo que
+existia. Ganhou teste próprio, que é o que faltava para ser verificável.
+
+### A navegação passou a andar pela tela
+
+O direcional percorria a **ordem do documento**, e a ordem do documento não é a ordem que o olho vê:
+no inventário, ir da grade de criação até a mochila custava atravessar armadura, boneco e resultado.
+Agora o foco vai para o vizinho mais próximo na direção pedida, medido em pixels, com peso 2 para
+quem sai do eixo — a coluna de slots desce em linha reta e a mochila fica a um passo. Onde não há
+geometria (tela não desenhada, teste em Node) vale a ordem do documento: nada regride onde a medida
+não existe.
+
+### O cursor, e por que ele não clica
+
+`input/uicursor.ts` é novo. O analógico direito é câmera no mundo e não tinha função nenhuma com uma
+tela aberta — que é exatamente onde falta o mouse. Ele **não clica**: encosta num elemento e o foca,
+e quem ativa continua sendo o botão de confirmar; dois caminhos de ativação seriam duas regras para
+a mesma coisa. Nasce no meio da tela, anda 950 px/s, não sai da viewport, some depois de quatro
+segundos parado e só entra no documento quando alguém empurra o analógico pela primeira vez.
+
+Dar alcance sem dar função não resolveria: sem clique direito não há como pegar meia pilha nem
+soltar um item de cada vez. `LT`/`L2` virou o botão direito nos menus e `A`/`RT` o esquerdo — a
+mesma mão que coloca e quebra no mundo.
+
+No caminho apareceu um bug que ninguém tinha relatado: **confirmar num slot não fazia nada**. Os
+slots são `div[role="button"]` que agem no `keydown` de Enter e no `pointerdown`, e a navegação
+chamava `click()` neles — um evento que ninguém escuta. Passou despercebido porque a navegação por
+gamepad e o tratamento de toque dos slots foram entregues no mesmo dia, e os testes de navegação só
+usavam `<button>` de verdade.
+
+### Grid de arquivos
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/data/gamepads.ts` | `PadAction` virou `PadButton` **posicional**; nova tabela `PAD_BINDINGS` (intenção → botões); rótulos passaram a cobrir o layout inteiro; `□` ligado à mochila, `L2` a colocar |
+| `~` | `src/input/gamepad.ts` | polling por intenção; `reset` silencia até soltar em vez de esquecer; `NavState` ganhou `secondary` e o cursor do analógico direito; `state.using` saiu (era duplicata de `placing`) |
+| `~` | `src/input/uinav.ts` | navegação espacial com queda para ordem de documento; ativação que fala a língua do elemento (`keydown` no slot, `click` no botão); clique secundário; integração do cursor |
+| `+` | `src/input/uicursor.ts` | cursor virtual dos menus: posição, limite da viewport, sumiço por inatividade, elemento sob o ponteiro |
+| `~` | `src/input/controls.ts` | um caminho só para colocar bloco, agora que o `□` saiu de cima do `L2` |
+| `~` | `src/main.ts` | dica do controle com os rótulos novos (`L2` colocar, `L1`/`R1` trocar item, `□` mochila); passo do laço de navegação vindo de `NAV_STEP_MS` |
+| `+` | `tests/uicursor.test.ts` | 10 testes: velocidade por segundo, limite da tela, criação preguiçosa, sumiço, ambiente sem DOM |
+| `~` | `tests/gamepad.test.ts` | tabelas novas; regressão do `Start` repetido; `□` abre e não coloca; `L1`/`R1`; cursor e clique secundário; completude de rótulos derivada de `STANDARD_BUTTONS` |
+| `~` | `tests/uinav.test.ts` | DOM falso com geometria e `role`; navegação espacial (5); slots (3); cursor (4) |
+| `~` | `docs/08-interface-ui.md` | §4 regra 3: navegação espacial, cursor e clique direito |
+| `~` | `docs/09-controles-mobile.md` | §3 mapeamento novo e as duas tabelas; §3.2 reescrita com navegação espacial, cursor e os dois botões do mouse |
+| `~` | `docs/15-status.md` | §1 linha da 2ª passada; §2 métricas; §3 seção nova; §4 duas correções; §6 item 5 reescrito |
+| `~` | `docs/16-auditoria.md` | esta sessão |
+| `~` | `README.md` | contagem de testes e bundle |
+
+**Portões:** 1371 testes em 75 arquivos verdes · lint limpo · build limpo · 190,4 KB gzip de 350.
+
+---
+
 ## 2026-09-14 · 15:15 → 15:24 · Um clique, um bloco — e as plantas que ninguém conseguia quebrar
 
 **Pedido:** dois relatos, o segundo lembrado no meio do primeiro. *"No modo criativo... a

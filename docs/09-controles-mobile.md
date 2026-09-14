@@ -128,12 +128,27 @@ escala 70–150%) e salva. Guardar em `localStorage`. Botão "Restaurar padrão"
 
 ## 3. Gamepad (bônus barato)
 
-Usar a Gamepad API. Mapeamento padrão:
+Usar a Gamepad API. Mapeamento padrão (rótulos de Xbox; o DualSense mostra
+`✕ ○ □ △` e `L2`/`R2` nos mesmos lugares):
 - Analógico esquerdo: mover · Analógico direito: câmera (com curva quadrática e dead zone 0.15)
-- `A`: pular · `B`: agachar · `X`: colocar/usar · `Y`: soltar item
-- `RT`/`LT`: quebrar/usar · `LB`/`RB`: rolar hotbar · `Start`: pausa · `Select`: inventário
+- `LT`: colocar/usar · `RT`: quebrar/atacar — o par de gatilhos é a mão inteira
+- `A`: pular · `B`: agachar · `X`: abrir a mochila · `Y`: soltar item
+- `LB`/`RB`: item anterior/próximo da hotbar · `Start`: pausa · `Select`: mochila
 - `L3`: correr · duplo toque em `A`: alternar voo no criativo (doc 06 §9)
-- Direcional: navegar a interface (ver §3.1) · Vibração leve ao quebrar bloco.
+- Direcional: navegar a interface (ver §3.2) · Vibração leve ao quebrar bloco.
+
+**Botão e intenção são tabelas separadas** (`src/data/gamepads.ts`):
+`STANDARD_BUTTONS` diz onde cada botão fica no layout da especificação e
+`PAD_BINDINGS` diz o que ele dispara. Remapear é uma linha na segunda — nenhum
+índice muda de lugar, porque o índice é do aparelho e não do jogo.
+
+**Aperto é uma borda de subida, e soltar o controle não apaga o que estava
+apertado.** Pausar solta todo o input (é o mesmo `reset` do `blur`); se ele
+esquecesse o estado anterior, o botão ainda apertado no tick seguinte contaria
+como aperto novo e o menu abriria e fecharia a 20 Hz. `reset` silencia até o
+botão ser solto — a única exceção é o instante em que o controle é reconhecido,
+porque a Gamepad API só revela o aparelho depois do primeiro aperto e engolir
+esse pediria dois.
 
 ### 3.1 Perfis de controle e o que realmente muda entre eles
 
@@ -171,6 +186,27 @@ pular de campo, porque a tela de opções é quase toda slider.
 O alvo da navegação é o elemento com `role="dialog"` visível mais acima, e não
 uma lista de telas: o doc 08 §4.4 já exige esse atributo em todo modal, então
 tela nova entra na navegação sozinha.
+
+**O direcional anda pela tela, não pela ordem do documento.** O foco vai para o
+vizinho mais próximo na direção pedida, medido em pixels, com peso extra para
+quem sai do eixo — assim uma coluna de slots desce em linha reta e "para a
+direita" na grade de criação chega na mochila em um passo, e não em doze. Onde
+não há geometria (tela ainda não desenhada, ambiente sem layout) vale a ordem
+do documento, dando a volta no fim.
+
+**O analógico direito é um cursor enquanto a tela está aberta.** Ele não clica:
+encosta num elemento e o foca, e quem ativa continua sendo o botão de
+confirmar. Fora dos menus ele volta a ser a câmera. É o que dá ao controle o
+alcance do mouse — ir direto na casinha desejada em vez de atravessar a grade.
+
+**Os dois botões do mouse existem no controle.** Nos menus, `A`/`RT` valem
+clique esquerdo e `LT` vale clique direito — a mesma mão que coloca e quebra no
+mundo. Sem o direito não havia como pegar metade de uma pilha nem soltar um
+item de cada vez (doc 08 §3.5).
+
+Os slots de inventário são `div[role="button"]`, não `<button>`: eles agem no
+`keydown` de Enter e no `pointerdown`. A navegação fala a língua de cada
+elemento — `click()` num slot dispara um evento que ninguém escuta.
 
 > **O que o controle não consegue fazer sozinho.** Ligar o áudio e entrar em
 > tela cheia exigem um **gesto do usuário**, e aperto de botão de controle não

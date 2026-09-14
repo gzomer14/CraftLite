@@ -354,6 +354,9 @@ Abre com `T` ou `/`. Comandos: `/gamemode`, `/time set`, `/tp`, `/give`, `/seed`
 2. Abrir qualquer container **libera o pointer lock** e pausa a rotação de câmera (mas o mundo
    continua rodando — não é pausa de verdade, exceto o menu de pausa em single-player).
 3. Todas as telas são navegáveis por **teclado** (Tab/setas/Enter) e por **gamepad** (D-pad/A/B).
+   No gamepad o direcional anda pela **geometria da tela** — o vizinho mais próximo na direção
+   pedida, não o próximo na ordem do documento —, o **analógico direito vira cursor** e aponta
+   direto no alvo, e o gatilho esquerdo vale **clique direito** nos slots (doc 09 §3.2).
 4. `aria-label` em todo botão; `role="dialog"` + focus trap nos modais.
 5. Animações respeitam `prefers-reduced-motion`.
 6. **Nada de layout thrash:** a UI só re-renderiza quando o estado muda; o HUD atualiza campos

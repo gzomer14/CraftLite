@@ -1,5 +1,5 @@
 /**
- * Perfis de controle (doc 09 §3).
+ * Perfis de controle e o mapa de botões (doc 09 §3).
  *
  * A Gamepad API já resolve **quase** tudo: quando o navegador reconhece o
  * aparelho, ele reporta `mapping: 'standard'` e os índices são os mesmos para
@@ -10,7 +10,7 @@
  * O que muda de verdade entre um DualSense e um Xbox é o **nome do botão**. O
  * jogo que diz "aperte A para colocar" para quem está segurando um controle de
  * PlayStation está mentindo, e o jogador vai procurar um botão que não existe.
- * Por isso todo perfil traz os rótulos das oito teclas que a interface cita.
+ * Por isso todo perfil traz os rótulos das teclas que a interface cita.
  *
  * O segundo papel é a **rede de segurança**: quando o navegador **não**
  * reconhece o aparelho (`mapping` vazio), os índices viram a ordem crua do
@@ -20,22 +20,31 @@
  *
  * **Acrescentar um controle é uma entrada nesta tabela.** Nenhum `if` novo em
  * `input/gamepad.ts`.
+ *
+ * ## Botão e intenção são duas coisas
+ *
+ * Até 2026-09-14 este arquivo tinha uma tabela só, e os nomes dela eram os da
+ * **ação** (`place: 2`). Parecia econômico e escondia uma armadilha: mudar o
+ * que o □ faz obrigava a mexer no índice, e o índice é do aparelho, não do
+ * jogo. Agora são duas tabelas — `STANDARD_BUTTONS` diz **onde o botão fica**
+ * e `PAD_BINDINGS` diz **o que ele faz**. Remapear é uma linha na segunda.
  */
 
 /**
- * Ações que o jogo lê de um controle. A ordem é a do doc 09 §3.
+ * Os botões de um controle, **pela posição**. Nenhum destes nomes carrega o
+ * que o botão faz no jogo: `faceLeft` é o □ do DualSense e o X do Xbox, e o
+ * que ele dispara é assunto de `PAD_BINDINGS`.
  *
- * A lista descreve o **layout inteiro** da especificação, e não só o que o
- * jogo usa hoje: `zoom` (R3) e `home` não têm função nenhuma e estão aqui de
- * propósito, para que a tabela de um controle não normalizado possa declarar
- * onde eles ficam — sem isso, o índice deles cairia em cima de outra ação.
+ * A lista descreve o layout inteiro da especificação, e não só o que o jogo
+ * usa: `r3` e `home` não têm função nenhuma e estão aqui de propósito, para
+ * que a tabela de um controle não normalizado possa declarar onde eles ficam —
+ * sem isso, o índice deles cairia em cima de outro botão.
  */
-export type PadAction =
-  | 'jump' | 'sneak' | 'place' | 'drop'
-  | 'hotbarPrev' | 'hotbarNext'
-  | 'use' | 'break'
+export type PadButton =
+  | 'faceDown' | 'faceRight' | 'faceLeft' | 'faceUp'
+  | 'l1' | 'r1' | 'l2' | 'r2'
   | 'select' | 'start'
-  | 'sprint' | 'zoom'
+  | 'l3' | 'r3'
   | 'dpadUp' | 'dpadDown' | 'dpadLeft' | 'dpadRight'
   | 'home';
 
@@ -43,42 +52,82 @@ export type PadAction =
  * Índices do **layout padrão** da especificação da Gamepad API.
  *
  * É a fonte da verdade quando `mapping === 'standard'`, que é o caso comum.
- * Os nomes dos campos são os da ação, não os do botão: `jump` é o botão de
- * baixo, seja ele `A` ou `✕`.
  */
-export const STANDARD_BUTTONS: Readonly<Record<PadAction, number>> = {
-  jump: 0,        // A · ✕
-  sneak: 1,       // B · ○
-  place: 2,       // X · □
-  drop: 3,        // Y · △
-  hotbarPrev: 4,  // LB · L1
-  hotbarNext: 5,  // RB · R1
-  use: 6,         // LT · L2
-  break: 7,       // RT · R2
-  select: 8,      // Select/View · Share/Create
-  start: 9,       // Start/Menu · Options
-  sprint: 10,     // L3
-  zoom: 11,       // R3
+export const STANDARD_BUTTONS: Readonly<Record<PadButton, number>> = {
+  faceDown: 0,   // A · ✕
+  faceRight: 1,  // B · ○
+  faceLeft: 2,   // X · □
+  faceUp: 3,     // Y · △
+  l1: 4,         // LB · L1
+  r1: 5,         // RB · R1
+  l2: 6,         // LT · L2
+  r2: 7,         // RT · R2
+  select: 8,     // Select/View · Create/Share
+  start: 9,      // Start/Menu · Options
+  l3: 10,
+  r3: 11,
   dpadUp: 12,
   dpadDown: 13,
   dpadLeft: 14,
   dpadRight: 15,
-  home: 16,       // Guide · PS
+  home: 16,      // Guide · PS
 };
 
 /** Eixos do layout padrão: analógico esquerdo e direito. */
 export const STANDARD_AXES = { moveX: 0, moveY: 1, lookX: 2, lookY: 3 } as const;
 
-/** Rótulos que a interface mostra. As chaves são as ações citadas em texto. */
-export interface PadLabels {
-  jump: string;
-  sneak: string;
-  place: string;
-  drop: string;
-  use: string;
-  break: string;
-  start: string;
-  select: string;
+/**
+ * O que o jogo pede de um controle. Cada intenção lista os botões que a
+ * disparam — mais de um quando há dois caminhos naturais para a mesma coisa.
+ */
+export type PadIntent =
+  | 'jump' | 'sneak' | 'sprint'
+  | 'place' | 'break' | 'drop'
+  | 'hotbarPrev' | 'hotbarNext'
+  | 'inventory' | 'pause'
+  | 'navUp' | 'navDown' | 'navLeft' | 'navRight'
+  | 'navConfirm' | 'navCancel' | 'navSecondary';
+
+/**
+ * De botão para ação. **Esta é a tabela que se edita para remapear.**
+ *
+ * Três escolhas que valem a explicação:
+ *
+ * 1. **Colocar é o gatilho esquerdo, quebrar é o direito.** É o par que todo
+ *    jogo de bloco usa, e libera as quatro faces para outra coisa. Até
+ *    2026-09-14 o □ também colocava, duplicando o L2 — e era a única coisa que
+ *    ele fazia, o que deixava a mochila sem botão de face nenhum.
+ * 2. **□ abre o inventário**, junto com o Create/View. Pedido de campo
+ *    (2026-09-14): o botão de face é onde a mão procura, e o Create do
+ *    DualSense é pequeno e mal colocado para uma ação usada o tempo todo.
+ * 3. **Nos menus, o gatilho esquerdo é o botão direito do mouse.** Fora dos
+ *    menus L2 coloca e R2 quebra; dentro deles R2 e ✕ valem clique esquerdo e
+ *    L2 vale clique direito. É a mesma mão fazendo a mesma coisa nos dois
+ *    lados — sem isso não havia como pegar meia pilha ou soltar um item de
+ *    cada vez com o controle.
+ */
+export const PAD_BINDINGS: Readonly<Record<PadIntent, readonly PadButton[]>> = {
+  jump: ['faceDown'],
+  sneak: ['faceRight'],
+  sprint: ['l3'],
+  place: ['l2'],
+  break: ['r2'],
+  drop: ['faceUp'],
+  hotbarPrev: ['l1'],
+  hotbarNext: ['r1'],
+  inventory: ['faceLeft', 'select'],
+  pause: ['start'],
+  navUp: ['dpadUp'],
+  navDown: ['dpadDown'],
+  navLeft: ['dpadLeft'],
+  navRight: ['dpadRight'],
+  navConfirm: ['faceDown', 'r2'],
+  navCancel: ['faceRight'],
+  navSecondary: ['l2'],
+};
+
+/** Rótulos que a interface mostra, na mesma chave posicional do botão. */
+export interface PadLabels extends Readonly<Record<PadButton, string>> {
   /** Nome da família, para a tela de opções dizer o que foi reconhecido. */
   family: string;
 }
@@ -90,7 +139,7 @@ export interface PadProfile {
    * Índices de botão quando o navegador **não** normaliza (`mapping` vazio).
    * Ausente = usa os índices padrão mesmo assim, que é o melhor palpite.
    */
-  rawButtons?: Partial<Record<PadAction, number>>;
+  rawButtons?: Partial<Record<PadButton, number>>;
   /** Eixos quando o navegador não normaliza. */
   rawAxes?: Partial<typeof STANDARD_AXES>;
   /**
@@ -107,35 +156,46 @@ export interface PadProfile {
  *
  * É o relatório HID da Sony: as quatro faces vêm na ordem □ ✕ ○ △, e não na
  * ordem da especificação. Sem esta tabela, um DualSense não reconhecido pularia
- * ao apertar ✕ — que por acaso está certo — mas colocaria bloco no △.
+ * ao apertar □ — e abriria o inventário no ✕.
  *
  * **Não foi verificado em aparelho**: o caminho normal é o padronizado, e este
  * é a rede de segurança. Ver doc 15 §6.
  */
-const PLAYSTATION_RAW: Partial<Record<PadAction, number>> = {
-  place: 0,       // □
-  jump: 1,        // ✕
-  sneak: 2,       // ○
-  drop: 3,        // △
-  hotbarPrev: 4,  // L1
-  hotbarNext: 5,  // R1
-  use: 6,         // L2
-  break: 7,       // R2
-  select: 8,      // Share/Create
-  start: 9,       // Options
-  sprint: 10,     // L3
-  zoom: 11,       // R3
-  home: 12,       // PS
+const PLAYSTATION_RAW: Partial<Record<PadButton, number>> = {
+  faceLeft: 0,   // □
+  faceDown: 1,   // ✕
+  faceRight: 2,  // ○
+  faceUp: 3,     // △
+  l1: 4,
+  r1: 5,
+  l2: 6,
+  r2: 7,
+  select: 8,     // Share/Create
+  start: 9,      // Options
+  l3: 10,
+  r3: 11,
+  home: 12,      // PS
 };
 
+/** Direcional e botões sem nome impresso: iguais em todas as famílias. */
+const SHARED_LABELS = {
+  l3: 'L3', r3: 'R3',
+  dpadUp: '↑', dpadDown: '↓', dpadLeft: '←', dpadRight: '→',
+  home: 'Home',
+} as const;
+
 const PLAYSTATION_LABELS = {
-  jump: '✕', sneak: '○', place: '□', drop: '△',
-  use: 'L2', break: 'R2', start: 'Options', select: 'Create',
+  ...SHARED_LABELS,
+  faceDown: '✕', faceRight: '○', faceLeft: '□', faceUp: '△',
+  l1: 'L1', r1: 'R1', l2: 'L2', r2: 'R2',
+  start: 'Options', select: 'Create',
 } as const;
 
 const XBOX_LABELS = {
-  jump: 'A', sneak: 'B', place: 'X', drop: 'Y',
-  use: 'LT', break: 'RT', start: 'Menu', select: 'View',
+  ...SHARED_LABELS,
+  faceDown: 'A', faceRight: 'B', faceLeft: 'X', faceUp: 'Y',
+  l1: 'LB', r1: 'RB', l2: 'LT', r2: 'RT',
+  start: 'Menu', select: 'View',
 } as const;
 
 /**
@@ -174,11 +234,13 @@ export const PAD_PROFILES: readonly PadProfile[] = [
   {
     id: 'switch',
     labels: {
+      ...SHARED_LABELS,
       // O A/B e o X/Y do Switch são espelhados em relação ao Xbox, **mas** o
       // navegador já entrega a posição, não a letra: o botão de baixo continua
       // sendo o índice 0. O que muda é só o nome impresso nele.
-      jump: 'B', sneak: 'A', place: 'Y', drop: 'X',
-      use: 'ZL', break: 'ZR', start: '+', select: '−',
+      faceDown: 'B', faceRight: 'A', faceLeft: 'Y', faceUp: 'X',
+      l1: 'L', r1: 'R', l2: 'ZL', r2: 'ZR',
+      start: '+', select: '−',
       family: 'Nintendo Switch Pro',
     },
     match: /057e|switch pro|joy-con/i,
@@ -196,8 +258,10 @@ export const PAD_PROFILES: readonly PadProfile[] = [
 export const GENERIC_PROFILE: PadProfile = {
   id: 'generic',
   labels: {
-    jump: 'A', sneak: 'B', place: 'X', drop: 'Y',
-    use: 'LT', break: 'RT', start: 'Start', select: 'Select',
+    ...SHARED_LABELS,
+    faceDown: 'A', faceRight: 'B', faceLeft: 'X', faceUp: 'Y',
+    l1: 'LB', r1: 'RB', l2: 'LT', r2: 'RT',
+    start: 'Start', select: 'Select',
     family: 'Controle genérico',
   },
   match: /.^/,

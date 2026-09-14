@@ -14,7 +14,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Gamepads } from '../src/input/gamepad';
 import {
-  GENERIC_PROFILE, PAD_PROFILES, STANDARD_BUTTONS, profileById, profileFor,
+  GENERIC_PROFILE, PAD_BINDINGS, PAD_PROFILES, STANDARD_BUTTONS, profileById, profileFor,
 } from '../src/data/gamepads';
 
 /** Ids como Chrome e Firefox os escrevem de verdade. */
@@ -82,12 +82,23 @@ describe('detecção de perfil', () => {
     expect(profile.rawButtons).toBeUndefined();
   });
 
-  it('todo perfil tem rótulo para as oito teclas que a interface cita', () => {
+  it('todo perfil tem rótulo para todo botão do layout', () => {
+    // A lista sai de `STANDARD_BUTTONS` e não de uma cópia à mão: botão novo
+    // na tabela cobra o rótulo de todas as famílias sem ninguém lembrar.
     for (const profile of [...PAD_PROFILES, GENERIC_PROFILE]) {
-      for (const key of ['jump', 'sneak', 'place', 'drop', 'use', 'break', 'start', 'select']) {
-        expect(profile.labels[key as 'jump'], `${profile.id}.${key}`).toBeTruthy();
+      for (const key of Object.keys(STANDARD_BUTTONS) as (keyof typeof STANDARD_BUTTONS)[]) {
+        expect(profile.labels[key], `${profile.id}.${key}`).toBeTruthy();
       }
       expect(profile.labels.family, profile.id).toBeTruthy();
+    }
+  });
+
+  it('toda intenção aponta para pelo menos um botão que existe', () => {
+    for (const [intent, buttons] of Object.entries(PAD_BINDINGS)) {
+      expect(buttons.length, intent).toBeGreaterThan(0);
+      for (const button of buttons) {
+        expect(STANDARD_BUTTONS[button], `${intent} → ${button}`).toBeTypeOf('number');
+      }
     }
   });
 
@@ -105,11 +116,11 @@ describe('rótulos', () => {
     connect(fakePad({ id: IDS.dualsenseChrome }));
     const pads = new Gamepads();
     pads.poll();
-    expect(pads.labels.jump).toBe('✕');
-    expect(pads.labels.sneak).toBe('○');
-    expect(pads.labels.place).toBe('□');
-    expect(pads.labels.drop).toBe('△');
-    expect(pads.labels.break).toBe('R2');
+    expect(pads.labels.faceDown).toBe('✕');
+    expect(pads.labels.faceRight).toBe('○');
+    expect(pads.labels.faceLeft).toBe('□');
+    expect(pads.labels.faceUp).toBe('△');
+    expect(pads.labels.r2).toBe('R2');
     expect(pads.labels.start).toBe('Options');
   });
 
@@ -117,8 +128,8 @@ describe('rótulos', () => {
     connect(fakePad({ id: IDS.xboxOne }));
     const pads = new Gamepads();
     pads.poll();
-    expect(pads.labels.jump).toBe('A');
-    expect(pads.labels.break).toBe('RT');
+    expect(pads.labels.faceDown).toBe('A');
+    expect(pads.labels.r2).toBe('RT');
     expect(pads.labels.start).toBe('Menu');
   });
 
@@ -127,25 +138,51 @@ describe('rótulos', () => {
     const pads = new Gamepads();
     pads.forcedProfile = profileById('dualsense');
     pads.poll();
-    expect(pads.labels.jump).toBe('✕');
+    expect(pads.labels.faceDown).toBe('✕');
   });
 });
 
 describe('mapeamento padrão', () => {
-  it('as quatro faces caem nas ações do doc 09 §3', () => {
+  it('cada botão cai na intenção que a tabela declara', () => {
     const pads = new Gamepads();
 
-    connect(fakePad({ id: IDS.dualsenseChrome, pressed: [STANDARD_BUTTONS.jump] }));
+    connect(fakePad({ id: IDS.dualsenseChrome, pressed: [STANDARD_BUTTONS.faceDown] }));
     pads.poll();
-    expect(pads.state.jump).toBe(true);
+    expect(pads.state.jump, '✕ pula').toBe(true);
 
-    connect(fakePad({ id: IDS.dualsenseChrome, pressed: [STANDARD_BUTTONS.place] }));
+    connect(fakePad({ id: IDS.dualsenseChrome, pressed: [STANDARD_BUTTONS.l2] }));
     pads.poll();
-    expect(pads.state.placing, 'colocar é borda de subida').toBe(true);
+    expect(pads.state.placing, 'L2 coloca, e é borda de subida').toBe(true);
 
-    connect(fakePad({ id: IDS.dualsenseChrome, pressed: [STANDARD_BUTTONS.drop] }));
+    connect(fakePad({ id: IDS.dualsenseChrome, pressed: [STANDARD_BUTTONS.faceUp] }));
     pads.poll();
-    expect(pads.state.drop, 'largar item, que não existia').toBe(true);
+    expect(pads.state.drop, '△ larga o item').toBe(true);
+  });
+
+  it('o □ abre a mochila — e não coloca mais bloco', () => {
+    /*
+     * Pedido de campo (2026-09-14). Antes o □ duplicava o L2 e era a única
+     * coisa que fazia; a mochila só abria no Create, que é um botão pequeno e
+     * mal colocado para uma ação usada o tempo todo.
+     */
+    const pads = new Gamepads();
+    connect(fakePad({ id: IDS.dualsenseChrome, pressed: [STANDARD_BUTTONS.faceLeft] }));
+    pads.poll();
+    expect(pads.state.inventory, '□ abre a mochila').toBe(true);
+    expect(pads.state.placing, '□ não coloca bloco').toBe(false);
+  });
+
+  it('L1 e R1 trocam o item da mão, um passo por aperto', () => {
+    const pads = new Gamepads();
+    connect(fakePad({ id: IDS.dualsenseChrome, pressed: [STANDARD_BUTTONS.l1] }));
+    pads.poll();
+    expect(pads.state.hotbarPrev, 'L1 volta um slot').toBe(true);
+    pads.poll();
+    expect(pads.state.hotbarPrev, 'segurar não desfila a hotbar').toBe(false);
+
+    connect(fakePad({ id: IDS.dualsenseChrome, pressed: [STANDARD_BUTTONS.r1] }));
+    pads.poll();
+    expect(pads.state.hotbarNext, 'R1 avança um slot').toBe(true);
   });
 
   it('pausa e inventário chegam ao jogo — antes eram calculados e jogados fora', () => {
@@ -161,23 +198,90 @@ describe('mapeamento padrão', () => {
 
   it('o gatilho é analógico: meio curso já conta', () => {
     const pads = new Gamepads();
-    connect(fakePad({ id: IDS.xboxOne, values: { [STANDARD_BUTTONS.break]: 0.6 } }));
+    connect(fakePad({ id: IDS.xboxOne, values: { [STANDARD_BUTTONS.r2]: 0.6 } }));
     pads.poll();
     expect(pads.state.breaking, 'meio curso de RT quebra').toBe(true);
 
-    connect(fakePad({ id: IDS.xboxOne, values: { [STANDARD_BUTTONS.break]: 0.1 } }));
+    connect(fakePad({ id: IDS.xboxOne, values: { [STANDARD_BUTTONS.r2]: 0.1 } }));
     pads.poll();
     expect(pads.state.breaking, 'um roçar no gatilho não').toBe(false);
   });
 
   it('a borda de subida não repete enquanto o botão fica apertado', () => {
     const pads = new Gamepads();
-    const pad = fakePad({ id: IDS.xboxOne, pressed: [STANDARD_BUTTONS.place] });
+    const pad = fakePad({ id: IDS.xboxOne, pressed: [STANDARD_BUTTONS.l2] });
     connect(pad);
     pads.poll();
     expect(pads.state.placing).toBe(true);
     pads.poll();
     expect(pads.state.placing, 'segurar não coloca em série').toBe(false);
+  });
+});
+
+describe('silêncio até soltar', () => {
+  it('o Options segurado não abre e fecha o menu em série', () => {
+    /*
+     * Relato de campo 2026-09-14: "apertando uma vez ele considera que apertei
+     * duas ou até três".
+     *
+     * A causa não estava no controle. `togglePause` chama `Controls.reset()`,
+     * que chamava `Gamepads.reset()`, que **limpava** o estado anterior. No
+     * tick seguinte o Options continuava apertado e não havia mais nada
+     * guardado dizendo isso — o jogo lia uma borda de subida nova e pausava de
+     * novo, a 20 Hz, enquanto o dedo estivesse no botão.
+     */
+    const pads = new Gamepads();
+    connect(fakePad({ id: IDS.dualsenseChrome, pressed: [STANDARD_BUTTONS.start] }));
+    pads.poll();
+    expect(pads.state.pause, 'o primeiro aperto pausa').toBe(true);
+
+    pads.reset();
+    pads.poll();
+    expect(pads.state.pause, 'o mesmo aperto não pausa de novo').toBe(false);
+    pads.poll();
+    expect(pads.state.pause).toBe(false);
+
+    connect(fakePad({ id: IDS.dualsenseChrome }));
+    pads.poll();
+    connect(fakePad({ id: IDS.dualsenseChrome, pressed: [STANDARD_BUTTONS.start] }));
+    pads.poll();
+    expect(pads.state.pause, 'soltar e apertar de novo volta a valer').toBe(true);
+  });
+
+});
+
+describe('navegação de interface', () => {
+  it('o analógico direito vira cursor e o L2 vira clique direito', () => {
+    const pads = new Gamepads();
+    connect(fakePad({
+      id: IDS.dualsenseChrome,
+      axes: [0, 0, 1, -1],
+      pressed: [STANDARD_BUTTONS.l2],
+    }));
+    pads.pollNav();
+    expect(pads.nav.cursorX, 'direita no analógico direito').toBeGreaterThan(0);
+    expect(pads.nav.cursorY, 'e para cima').toBeLessThan(0);
+    expect(pads.nav.secondary, 'L2 é o botão direito do mouse nos menus').toBe(true);
+  });
+
+  it('✕ e R2 confirmam; ○ volta', () => {
+    const pads = new Gamepads();
+    connect(fakePad({ id: IDS.dualsenseChrome, pressed: [STANDARD_BUTTONS.r2] }));
+    pads.pollNav();
+    expect(pads.nav.confirm, 'o gatilho de quebrar é o clique esquerdo').toBe(true);
+
+    connect(fakePad({ id: IDS.dualsenseChrome, pressed: [STANDARD_BUTTONS.faceRight] }));
+    pads.pollNav();
+    expect(pads.nav.cancel).toBe(true);
+    expect(pads.nav.confirm).toBe(false);
+  });
+
+  it('com tela aberta a hotbar não roda sozinha', () => {
+    const pads = new Gamepads();
+    pads.uiCapture = true;
+    connect(fakePad({ id: IDS.dualsenseChrome, pressed: [STANDARD_BUTTONS.r1] }));
+    pads.poll();
+    expect(pads.state.hotbarNext, 'R1 é da tela enquanto ela estiver aberta').toBe(false);
   });
 });
 
@@ -211,17 +315,17 @@ describe('analógico', () => {
 });
 
 describe('rede de segurança do layout não normalizado', () => {
-  it('num DualSense cru, □ coloca e △ larga — e não o contrário', () => {
+  it('num DualSense cru, □ abre a mochila e ✕ pula — e não o contrário', () => {
     /*
      * Sem a tabela da família, o índice 0 do relatório HID da Sony (□) seria
-     * lido como "pular" e o 3 (△) como "colocar". O jogador apertaria □ e o
+     * lido como "pular" e o 1 (✕) como "agachar". O jogador apertaria □ e o
      * boneco pularia.
      */
     const pads = new Gamepads();
     connect(fakePad({ id: IDS.dualsenseFirefox, mapping: '', pressed: [0] }));
     pads.poll();
     expect(pads.nonStandard).toBe(true);
-    expect(pads.state.placing, '□ coloca').toBe(true);
+    expect(pads.state.inventory, '□ abre a mochila').toBe(true);
     expect(pads.state.jump, '□ não pula').toBe(false);
 
     connect(fakePad({ id: IDS.dualsenseFirefox, mapping: '', pressed: [1] }));
@@ -231,7 +335,7 @@ describe('rede de segurança do layout não normalizado', () => {
 
   it('controle desconhecido e não normalizado usa o layout padrão como palpite', () => {
     const pads = new Gamepads();
-    connect(fakePad({ id: IDS.desconhecido, mapping: '', pressed: [STANDARD_BUTTONS.jump] }));
+    connect(fakePad({ id: IDS.desconhecido, mapping: '', pressed: [STANDARD_BUTTONS.faceDown] }));
     pads.poll();
     expect(pads.state.jump).toBe(true);
   });
@@ -242,7 +346,7 @@ describe('voo no criativo', () => {
     // Sem ela, `jump` é só "segurado" e não dá para contar dois apertos —
     // quem joga de controle no criativo não voaria.
     const pads = new Gamepads();
-    const pad = fakePad({ id: IDS.dualsenseChrome, pressed: [STANDARD_BUTTONS.jump] });
+    const pad = fakePad({ id: IDS.dualsenseChrome, pressed: [STANDARD_BUTTONS.faceDown] });
     connect(pad);
     pads.poll();
     expect(pads.state.jumpPressed).toBe(true);
@@ -269,7 +373,7 @@ describe('estado', () => {
     connect(fakePad({
       id: IDS.dualsenseChrome,
       axes: [1, 1, 1, 1],
-      pressed: [STANDARD_BUTTONS.jump, STANDARD_BUTTONS.select],
+      pressed: [STANDARD_BUTTONS.faceDown, STANDARD_BUTTONS.select],
     }));
     pads.uiCapture = true;
     pads.poll();
@@ -313,7 +417,7 @@ describe('estado', () => {
     // Os dois laços rodam no mesmo quadro: se `pollNav` consumisse a borda, o
     // aperto de colocar bloco sumiria antes de chegar ao jogo.
     const pads = new Gamepads();
-    connect(fakePad({ id: IDS.xboxOne, pressed: [STANDARD_BUTTONS.place] }));
+    connect(fakePad({ id: IDS.xboxOne, pressed: [STANDARD_BUTTONS.l2] }));
     pads.pollNav();
     pads.pollNav();
     pads.poll();

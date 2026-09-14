@@ -9,7 +9,7 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-14 15:24 — **um clique, um bloco; e planta que dá para quebrar**
+**Última atualização:** 2026-09-14 17:56 — **o controle vira mouse nos menus**
 
 ---
 
@@ -26,7 +26,8 @@
 | **M6** Profundidade | agricultura, reprodução, XP, encantamento, estruturas, clima, arco, conquistas | ✅ concluído | — |
 | **M7** Extras | redstone, Nether, trilhos, import/export, resource pack | ✅ concluído | multijogador P2P fora de escopo (ver abaixo) |
 | **Acabamento** pós-M7 | tabela de Vídeo e Acessibilidade completas, teclas remapeáveis, 9 sliders de som, fogo que se espalha, morcego, boneco do jogador, miniatura e tamanho do mundo, canto de escada, som no resource pack | ✅ concluído | **nada disso foi visto em aparelho ainda** |
-| **Controle** pós-M7 | perfis por família (DualSense, DualShock 4, Xbox, Switch Pro), mapeamento completo do doc 09 §3, navegação de interface por gamepad, opções de analógico | ✅ concluído | **não foi testado com controle físico** |
+| **Controle** pós-M7 | perfis por família (DualSense, DualShock 4, Xbox, Switch Pro), mapeamento completo do doc 09 §3, navegação de interface por gamepad, opções de analógico | ✅ concluído | — |
+| **Controle, 2ª passada** | `□` abre a mochila, botão e intenção viraram tabelas separadas, navegação espacial nos menus, cursor no analógico direito, clique direito no gatilho esquerdo | ✅ concluído | **o cursor e a navegação espacial não foram vistos em aparelho** |
 
 **O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
 ele irá pesar muito o jogo e trazer muita complexidade por enquanto desnecessária"*. O
@@ -39,13 +40,13 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-14 15:24, com `npm test`, `npm run build` e
+Medidas em 2026-09-14 17:56, com `npm test`, `npm run build` e
 `SIZE_BUDGET_KB=350 npm run size`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **189,0 KB** | < 350 KB | `npm run size` |
-| Testes | **1342**, 74 arquivos | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **190,4 KB** | < 350 KB | `npm run size` |
+| Testes | **1371**, 75 arquivos | manter verde | `npm test` |
 | Camadas de atlas | **156** | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Memória de áudio | **3,26 MB** (era 3,95 com três sons a menos) | < 3,5 MB | `tests/audio.test.ts` |
 | Geração de chunk | 5,7–6,2 ms (mediana; varia muito com a carga da máquina) | < 25 ms | `tests/perf.test.ts` |
@@ -782,6 +783,62 @@ gasto, que reporta desvio parado e faz o jogador andar sozinho para um lado),
 layout forçado e vibração. A seção mostra o que está conectado: é a primeira
 pergunta de quem liga um controle.
 
+### Controle, segunda passada ✅ — 2026-09-14
+
+Cinco pedidos do usuário depois de jogar com o DualSense ligado por Bluetooth —
+que **foi reconhecido de primeira**, fechando a maior incógnita da entrega
+anterior.
+
+**`Start` valia por dois ou três apertos.** Não era o controle. Está em §4: é o
+`reset` que esquecia o que estava apertado. O relato foi preciso o bastante
+(*"ele abre e fecha o menu, como se eu tivesse apertado mais de uma vez, e isso
+tenho certeza que não é problema do controle"*) para apontar direto para a
+borda de subida.
+
+**`□` passou a abrir a mochila.** O que ele fazia antes era **duplicar o `L2`**:
+colocar bloco. Era a única coisa que ele fazia, e a mochila só abria no
+`Create` — um botão pequeno, mal colocado, para a ação mais repetida do jogo.
+Agora `L2` coloca, `R2` quebra, e as quatro faces ficam para pular, agachar,
+largar e abrir a mochila. `Create`/`View` continua abrindo também.
+
+**Botão e intenção viraram duas tabelas.** `src/data/gamepads.ts` tinha uma só,
+com nomes de ação (`place: 2`), e mudar o que o `□` faz obrigava a mexer num
+índice — que é do aparelho, não do jogo. Agora `STANDARD_BUTTONS` diz **onde o
+botão fica** e `PAD_BINDINGS` diz **o que ele dispara**; remapear é uma linha na
+segunda. É a regra "dado é dado, não código" aplicada a um lugar onde ela não
+estava.
+
+**`L1`/`R1` já trocavam o item da mão** desde a entrega anterior — o pedido era
+para uma coisa que existia. Ficou com teste próprio, que é o que faltava para
+ela ser verificável.
+
+**A navegação do direcional passou a ser espacial.** Era ordem de documento, e
+no inventário isso obrigava a atravessar armadura, boneco e resultado para ir
+da grade de criação até a mochila: doze casinhas para o que o olho lê como "um
+passo para a direita" (*"ele não corta caminho, ele passa por todas as
+casinhas"*). Agora o foco vai para o vizinho **mais próximo na direção pedida**,
+medido em pixels, com peso extra para quem sai do eixo — a coluna de slots desce
+em linha reta e a mochila fica a um passo. Sem geometria (tela ainda não
+desenhada, teste em Node) vale a ordem do documento, que é o comportamento
+antigo; nada regride onde a medida não existe.
+
+**O analógico direito virou cursor nos menus** (`src/input/uicursor.ts`). Fora
+deles ele é a câmera; com uma tela aberta ele não tinha o que fazer, e é
+exatamente aí que falta o mouse. Ele **não clica**: encosta num elemento e o
+foca, e quem ativa continua sendo o botão de confirmar — ter dois caminhos de
+ativação seria duas regras para a mesma coisa. Nasce no meio da tela, anda 950
+px/s, não sai da viewport, some sozinho depois de quatro segundos parado e só
+entra no documento na primeira vez que alguém empurra o analógico: quem joga de
+toque não paga um nó a mais.
+
+**Os dois botões do mouse existem no controle.** `A`/`RT` valem clique esquerdo
+e `LT` vale clique direito nos menus — a mesma mão que coloca e quebra no
+mundo. Sem o direito, o cursor daria alcance mas não daria **função**: não havia
+como pegar metade de uma pilha nem soltar um item de cada vez (doc 08 §3.5), que
+é o gesto que o toque ganhou hoje de manhã.
+
+---
+
 ---
 
 ## 4. Correções fora de marco
@@ -791,6 +848,8 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-14 | `input/gamepad.ts` | **Um aperto no `Start` abria e fechava o menu várias vezes.** `togglePause` solta todo o input (é o mesmo `reset` do `blur`), e `reset` **limpava** o estado anterior das bordas de subida. No tick seguinte o `Start` continuava apertado e não havia mais nada guardado dizendo isso — o jogo lia uma borda nova e pausava de novo, a 20 Hz, enquanto o dedo estivesse no botão. Agora `reset` **silencia até soltar**: marca tudo como já apertado, e o primeiro polling em que o botão aparece solto devolve o aperto seguinte. A exceção é o instante em que o controle é reconhecido — a Gamepad API só revela o aparelho depois do primeiro aperto, e engolir esse pediria dois. Relato de campo: *"pressionando uma vez ele considera que apertei duas ou até três vezes"*. |
+| 2026-09-14 | `input/uinav.ts` | **Confirmar num slot de inventário com o controle não fazia nada.** A navegação chamava `click()` em tudo, e os slots **não são `<button>`**: são `div[role="button"]` que agem no `keydown` de Enter e no `pointerdown` (doc 08 §3.5). O `click` disparava um evento que ninguém escuta. Passou despercebido porque a navegação por gamepad foi entregue no mesmo dia em que os slots ganharam o tratamento de toque, e os testes de navegação usavam só `<button>` de verdade. Agora a ativação fala a língua de cada elemento — e é o mesmo caminho que faz o clique direito do controle funcionar. |
 | 2026-09-14 | `world/raycast.ts`, `game/interaction.ts` | **Nenhuma planta podia ser quebrada — o raio atravessava todas.** A condição de acerto excluía tudo que é `replaceable`, e `plant()` marca exatamente isso: as 18 de dureza zero (grama alta, samambaia, flores, mudas, cana, arbusto, trepadeira), mais neve fina e fogo. O raio passava direto e acertava o chão atrás. O código de colocação já esperava o contrário — ele tem um ramo *"bloco substituível recebe no próprio lugar"* que **nunca era alcançado**. A regra não podia simplesmente cair, porque os outros dois usuários do raio são linha de visão de mob e de explosão, e uma flor não pode esconder o jogador de um creeper: virou opção (`RayOptions.replaceable`), ligada só na interação. Relato de campo: *"as plantas que encontro na grama, nenhuma delas consigo quebrar"*. |
 | 2026-09-14 | `game/interaction.ts` | **Um clique derrubava três blocos.** No criativo a quebra acontecia **uma vez por tick**: 50 ms por bloco, e um clique normal de 150 ms fazia uma fila de três. O sobrevivência tinha o mesmo caso para tudo que quebra em um tick — medido: **478 combinações bloco+ferramenta**, das quais 18 só com a mão. Entrou um intervalo de 5 ticks entre quebras dentro do **mesmo apertar**; soltar o botão o zera, então um clique é um bloco e quem clica rápido continua mandando no ritmo. Ele **não atrasa mineração normal**: só gate a conclusão, o progresso corre durante ele, e bloco comum termina muito depois dos 5 ticks. Relato de campo: *"é quase impossível quebrar só um bloco"*. |
 | 2026-09-14 | `input/touch.ts` | **No Modo A, colocar bloco mirava no centro da tela e quebrar mirava no dedo.** `onUp` definia a mira do toque curto, mas `update()` roda no **começo** de `Controls.update`, antes de alguém ler `state.hasAim` — e apagava a mira que o toque acabara de definir. O `placeRequested` sobrevivia sozinho, então o bloco ia para o crosshair. Os dois gestos do mesmo modo tinham alvos diferentes, o que de dentro do jogo é indistinguível de "funcionalidade bugada" (relato de campo: *"fiquei muito confuso se... ele irá fazer a ação onde estou clicando ou se sempre respeita o ponteiro branco de mira"*). O teste existente passava porque lia a mira **sem** chamar `update()` — ele não modelava a ordem do tick, e foi essa brecha que deixou o bug passar. |
@@ -995,18 +1054,24 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
    - **largar item** agora arremessa na direção do olhar, e o que foi jogado fora só volta a ser
      coletável depois de dois segundos. Vale largar olhando para o chão e para uma parede, que é
      onde o arremesso sozinho não resolveria.
-5. **Ligar o DualSense.** O suporte a controle foi escrito contra um `Gamepad` falso — nenhum
-   controle físico esteve na mesa. Em ordem de quanto pode estar errado:
-   - **Opções → Controle** primeiro, antes de entrar num mundo: a linha de estado diz se o jogo
-     vê o controle e qual família reconheceu. Se ela disser *"o navegador não reconheceu este
-     modelo"*, o mapeamento está vindo da rede de segurança — que é justamente o caminho não
-     verificado, e aí vale conferir botão por botão.
-   - **Navegar o menu só com o controle**, do título até dentro do mundo. É o caminho que não
-     existia; se ele funcionar, o resto é detalhe.
-   - **Os rótulos**: a dica na entrada do mundo precisa dizer `✕ ○ □ △`, e não `A B X Y`.
-   - **Duplo toque em `✕` no criativo** para voar, e `L3` para correr.
+5. **Voltar ao DualSense.** O reconhecimento por Bluetooth e a navegação básica já foram
+   confirmados em 2026-09-14; o que ainda não viu aparelho é a segunda passada. Em ordem de
+   quanto pode estar errado:
+   - **O cursor do analógico direito** com o inventário aberto. É o item novo e o mais fácil de
+     sair errado: conferir se a seta anda no ritmo certo (950 px/s — muito rápido cansa a mira,
+     muito lento irrita), se ela some ao usar o direcional, e se encostar numa casinha **foca** ela
+     de verdade. Se a velocidade incomodar, o número é `SPEED` em `input/uicursor.ts`.
+   - **`L2` como clique direito** num slot: com a mão vazia pega metade da pilha, com a mão cheia
+     solta uma unidade. É o que torna o inventário de controle utilizável para montar receita.
+   - **A navegação espacial**: da grade de criação, um toque para a direita tem que cair na
+     mochila. E, dentro da mochila, para baixo tem que descer a coluna e não pular de linha.
+   - **`□` abre a mochila** e não coloca mais bloco; colocar é `L2` e quebrar é `R2`.
+   - **`Start`**: um aperto, uma vez. É a correção mais direta da sessão e a mais fácil de
+     verificar.
    - **Cabo contra Bluetooth**: o mesmo controle pode reportar `id` diferente nos dois modos, e é
-     o `id` que escolhe o perfil. Vale conectar dos dois jeitos.
+     o `id` que escolhe o perfil. O Bluetooth já foi; falta o cabo.
+   - **Um controle de Xbox**, se aparecer um: a família inteira foi escrita sem nunca ter sido
+     ligada.
    - **No celular**, lembrar que ligar o áudio e a tela cheia exigem um toque na tela — o controle
      não serve de gesto para o navegador. O jogo avisa isso ao conectar.
 6. **Uma sessão longa de verdade.** É o **último critério da definição de pronto** que não foi

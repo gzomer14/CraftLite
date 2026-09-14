@@ -36,7 +36,7 @@ import { Controls } from './input/controls';
 import { Keybinds } from './input/keybinds';
 import { Gamepads } from './input/gamepad';
 import { profileById } from './data/gamepads';
-import { UiNavigator } from './input/uinav';
+import { NAV_STEP_MS, UiNavigator } from './input/uinav';
 import { Atlas } from './render/atlas';
 import { DynamicScale } from './render/dynamicscale';
 import { EntityAtlas, ARROW_LAYER, BOAT_LAYER, MINECART_LAYER } from './render/entityatlas';
@@ -1138,7 +1138,7 @@ function startUiNavLoop(gamepads: Gamepads, uiNav: UiNavigator, settings: Settin
    * depressa do que no lento. Amarrar ao relógio deixa o menu igual em
    * qualquer aparelho.
    */
-  const stepMs = 1000 / 20;
+  const stepMs = NAV_STEP_MS;
   let last = 0;
   const frame = (now: number): void => {
     requestAnimationFrame(frame);
@@ -1202,9 +1202,9 @@ function showHint(controls: Controls, isTouch: boolean, gamepads: Gamepads): voi
     if (!gamepads.connected) return;
     const l = gamepads.labels;
     hint.textContent = `${base}\n`
-      + `Controle: analógicos mover/olhar · ${l.jump} pular · ${l.sneak} agachar · `
-      + `${l.place} colocar · ${l.break} quebrar · ${l.drop} largar · `
-      + `${l.start} pausa · ${l.select} inventário`;
+      + `Controle: analógicos mover/olhar · ${l.faceDown} pular · ${l.faceRight} agachar · `
+      + `${l.l2} colocar · ${l.r2} quebrar · ${l.faceUp} largar · `
+      + `${l.l1}/${l.r1} trocar item · ${l.start} pausa · ${l.faceLeft} mochila`;
   };
   gamepads.onConnect(showPadHint);
   showPadHint();

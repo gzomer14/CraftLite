@@ -13,6 +13,7 @@ import {
   buildFields, buildKeybinds, menuButton, menuPanel, menuRoot, menuSection, type Field,
 } from './menu';
 import type { Keybinds } from '../../input/keybinds';
+import type { Gamepads } from '../../input/gamepad';
 import { BUSES, BUS_LABELS, BUS_SETTING } from '../../data/soundbuses';
 import type { SettingsStore } from '../../game/settings';
 
@@ -185,6 +186,39 @@ const CONTROLS: readonly Field[] = [
   { kind: 'toggle', key: 'leftHanded', label: 'Canhoto' },
   { kind: 'toggle', key: 'toggleSprint', label: 'Correr alterna' },
   { kind: 'toggle', key: 'toggleSneak', label: 'Agachar alterna' },
+];
+
+/**
+ * Controle (doc 09 §3).
+ *
+ * Fica em seção própria porque a lista de Controles já é a mais longa da tela,
+ * e porque nada aqui serve a quem joga de teclado ou de dedo.
+ */
+const GAMEPAD: readonly Field[] = [
+  {
+    kind: 'range', key: 'padSensitivity', label: 'Sensibilidade do analógico',
+    min: 0.3, max: 3, step: 0.1, format: (v) => `${v.toFixed(1).replace('.', ',')}×`,
+  },
+  {
+    /*
+     * Zona morta: é o que salva analógico gasto. Um controle com desgaste no
+     * centro reporta 0,1 parado e o jogador anda sozinho para um lado.
+     */
+    kind: 'range', key: 'padDeadZone', label: 'Zona morta',
+    min: 0.05, max: 0.4, step: 0.01,
+    format: (v) => `${Math.round(v * 100)}%`,
+  },
+  {
+    kind: 'choice', key: 'padProfile', label: 'Layout',
+    options: [
+      { value: 'auto', label: 'Detectar automaticamente' },
+      { value: 'dualsense', label: 'DualSense (PS5)' },
+      { value: 'dualshock4', label: 'DualShock 4 (PS4)' },
+      { value: 'xbox', label: 'Xbox' },
+      { value: 'switch', label: 'Nintendo Switch Pro' },
+      { value: 'generic', label: 'Genérico' },
+    ],
+  },
   { kind: 'toggle', key: 'vibration', label: 'Vibração' },
 ];
 
@@ -240,9 +274,15 @@ const GAMEPLAY: readonly Field[] = [
 export class OptionsScreen {
   private readonly root: HTMLDivElement;
   private readonly closeButton: HTMLButtonElement;
+  private readonly padStatus: HTMLParagraphElement;
+  private readonly gamepads: Gamepads | null;
   private onClose: (() => void) | null = null;
 
-  constructor(settings: SettingsStore, keybinds: Keybinds) {
+  constructor(settings: SettingsStore, keybinds: Keybinds, gamepads: Gamepads | null = null) {
+    this.gamepads = gamepads;
+    this.padStatus = document.createElement('p');
+    this.padStatus.className = 'menu-empty';
+    this.padStatus.setAttribute('role', 'status');
     this.root = menuRoot('options-screen');
     const { panel, body } = menuPanel('Opções');
 
@@ -250,6 +290,7 @@ export class OptionsScreen {
       ['Vídeo', VIDEO],
       ['Som', SOUND],
       ['Controles', CONTROLS],
+      ['Controle', GAMEPAD],
       ['Acessibilidade', ACCESSIBILITY],
       ['Jogo', GAMEPLAY],
     ];
@@ -260,6 +301,12 @@ export class OptionsScreen {
       // As teclas fecham a seção de Controles: elas são a lista mais longa, e
       // deixá-las no fim mantém os sliders no alto, onde se mexe mais.
       if (title === 'Controles') buildKeybinds(section, keybinds);
+      /*
+       * A primeira pergunta de quem liga um controle é "o jogo está vendo?".
+       * A linha de estado responde isso sem o jogador ter que entrar num mundo
+       * e tentar andar.
+       */
+      if (title === 'Controle') section.appendChild(this.padStatus);
     }
 
     const reset = menuButton('Restaurar padrões', () => {
@@ -288,7 +335,22 @@ export class OptionsScreen {
   show(onClose?: () => void): void {
     this.onClose = onClose ?? null;
     this.root.hidden = false;
+    this.refreshPadStatus();
     this.closeButton.focus();
+  }
+
+  /** Diz se há controle ligado, qual é, e se o navegador o normalizou. */
+  private refreshPadStatus(): void {
+    const pads = this.gamepads;
+    if (pads === null || !pads.connected) {
+      this.padStatus.textContent =
+        'Nenhum controle detectado. Conecte por cabo ou Bluetooth e aperte um botão dele.';
+      return;
+    }
+    const warning = pads.nonStandard
+      ? ' — o navegador não reconheceu este modelo, então o mapeamento é o da família.'
+      : '';
+    this.padStatus.textContent = `Conectado: ${pads.labels.family}${warning}`;
   }
 
   hide(): void {

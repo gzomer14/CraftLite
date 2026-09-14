@@ -9,7 +9,7 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-14 13:32 — **acabamento pós-M7: opções, fogo, morcego e boneco**
+**Última atualização:** 2026-09-14 14:11 — **controle: DualSense, Xbox e navegação de interface**
 
 ---
 
@@ -26,6 +26,7 @@
 | **M6** Profundidade | agricultura, reprodução, XP, encantamento, estruturas, clima, arco, conquistas | ✅ concluído | — |
 | **M7** Extras | redstone, Nether, trilhos, import/export, resource pack | ✅ concluído | multijogador P2P fora de escopo (ver abaixo) |
 | **Acabamento** pós-M7 | tabela de Vídeo e Acessibilidade completas, teclas remapeáveis, 9 sliders de som, fogo que se espalha, morcego, boneco do jogador, miniatura e tamanho do mundo, canto de escada, som no resource pack | ✅ concluído | **nada disso foi visto em aparelho ainda** |
+| **Controle** pós-M7 | perfis por família (DualSense, DualShock 4, Xbox, Switch Pro), mapeamento completo do doc 09 §3, navegação de interface por gamepad, opções de analógico | ✅ concluído | **não foi testado com controle físico** |
 
 **O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
 ele irá pesar muito o jogo e trazer muita complexidade por enquanto desnecessária"*. O
@@ -38,13 +39,13 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-14 13:32, com `npm test`, `npm run build` e
+Medidas em 2026-09-14 14:11, com `npm test`, `npm run build` e
 `SIZE_BUDGET_KB=350 npm run size`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **185,3 KB** | < 350 KB | `npm run size` |
-| Testes | **1269**, 70 arquivos | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **188,2 KB** | < 350 KB | `npm run size` |
+| Testes | **1316**, 72 arquivos | manter verde | `npm test` |
 | Camadas de atlas | **156** | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Memória de áudio | **3,26 MB** (era 3,95 com três sons a menos) | < 3,5 MB | `tests/audio.test.ts` |
 | Geração de chunk | 5,7–6,2 ms (mediana; varia muito com a carga da máquina) | < 25 ms | `tests/perf.test.ts` |
@@ -714,6 +715,73 @@ conta, incluindo as quatro consultas de vizinho, que só acontecem para escada.
 **desvia** da receita em vez de substituí-la, e um arquivo que o navegador não sabe ler cai de volta
 na síntese: ficar sem o som seria pior que ignorar a escolha do jogador.
 
+### Controle ✅ — 2026-09-14
+
+Pedido do usuário: jogar com um **DualSense (PS5)** conectado por cabo ou
+Bluetooth, no computador e no celular, com Xbox One também se não custasse
+muito. O gamepad existia desde o M0 e estava a meio caminho.
+
+**O que já funcionava e o que não.** Andar, olhar, pular, agachar, quebrar e
+colocar funcionavam. Do doc 09 §3 faltavam `Y` (soltar item) e `LT` (usar). E
+**pausa, inventário e rolagem de hotbar eram calculados e jogados fora**:
+`GamepadState` tinha os três campos desde o M3 e nada os consumia. Na prática,
+quem jogasse de controle não conseguia abrir a mochila nem pausar — e, como
+nenhuma tela respondia a gamepad, também não conseguia entrar num mundo.
+
+**Perfis, e por que eles quase não são sobre mapeamento.** Quando o navegador
+reconhece o aparelho (`mapping: 'standard'`) os índices de botão são iguais
+para todo controle — é o layout da especificação, e vale no Chrome e no Firefox,
+no computador e no Android. O que muda de verdade é o **nome do botão**: dizer
+"aperte `A`" a quem segura um DualSense manda o jogador procurar um botão que
+não existe. Cada família tem um perfil com os rótulos das oito teclas que a
+interface cita, e a dica da tela e o aviso do HUD passam a falar `✕ ○ □ △`.
+
+O perfil tem um segundo papel, de rede de segurança: quando o navegador **não**
+normaliza, os índices viram a ordem crua do HID, que num controle de PlayStation
+é `□ ✕ ○ △` — sem a tabela da família, apertar `□` faria o jogador pular. Esse
+caminho **não foi verificado em aparelho**; o normal é o padronizado.
+
+A detecção usa o par **fabricante/produto**, não o nome. É a armadilha da
+tabela: um Xbox reporta "Xbox Wireless Controller" e um DualShock 4 reporta
+"Wireless Controller", e casar por nome dá rótulos de PlayStation ao Xbox. Há
+teste para exatamente isso.
+
+**Navegação de interface (doc 08 §4.3).** Era a parte que faltava para o
+controle ser jogável e não só "mover o boneco": sem ela não se entra num mundo,
+não se abre o inventário e não se sai de uma tela. O alvo é o elemento com
+`role="dialog"` visível mais acima — e não uma lista de telas, porque o doc 08
+§4.4 já exige o atributo em todo modal, então tela nova entra sozinha. Três
+decisões: **esquerda/direita mexem no valor** do controle focado em vez de pular
+de campo (a tela de opções é quase toda slider); **voltar dispara `Escape`** na
+camada, que já sabe fechar uma de cada vez (doc 08 §4.1); e a repetição é de
+teclado — segurar anda com atraso inicial, senão a lista de opções passa vinte
+campos num piscar.
+
+**Dois laços, um controle.** A navegação roda em `requestAnimationFrame`
+próprio, porque a tela de título existe muito antes de haver um tick de jogo.
+Isso criou o risco de os dois laços **roubarem a borda de subida um do outro**,
+e foi resolvido separando as responsabilidades: `poll()` lê tudo e consome
+borda, e é chamado só pelo tick; `pollNav()` lê apenas estado segurado. Há
+teste para o caso.
+
+**O que o controle não consegue sozinho, e o jogo diz isso.** Ligar o áudio e
+entrar em tela cheia exigem um gesto do usuário, e aperto de botão de controle
+não conta como gesto em navegador nenhum. Conectar um controle com o áudio
+ainda desligado mostra a frase que resolve — tocar a tela ou apertar uma tecla
+uma vez.
+
+**Miudezas que faltavam para fechar:** `L3` corre, duplo toque no pulo alterna o
+voo no criativo (doc 06 §9 — sem isso metade do modo criativo é inacessível de
+controle), perder o foco zera o controle (senão volta-se quebrando o mundo
+sozinho), e a dica da tela some pelo relógio para quem joga só de controle no
+computador, que nunca trava o ponteiro.
+
+**Opções → Controle:** sensibilidade do analógico (multiplicador próprio, porque
+polegar e mouse não querem a mesma), **zona morta** (é ela que salva analógico
+gasto, que reporta desvio parado e faz o jogador andar sozinho para um lado),
+layout forçado e vibração. A seção mostra o que está conectado: é a primeira
+pergunta de quem liga um controle.
+
 ---
 
 ## 4. Correções fora de marco
@@ -723,6 +791,7 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-14 | `input/controls.ts`, `input/gamepad.ts` | **Pausa, inventário e rolagem de hotbar do controle eram calculados e jogados fora.** Os três campos existiam em `GamepadState` desde o M3, `poll()` os preenchia todo tick e **nada em `Controls` os lia**. Quem jogasse de controle andava, olhava, pulava e quebrava — e não conseguia abrir a mochila nem pausar o jogo. Do mapeamento do doc 09 §3 também faltavam `Y` (soltar item) e `LT` (usar), que nunca existiram. |
 | 2026-09-14 | `audio/synth.ts`, `audio/engine.ts` | **A tabela de sons renderizava tudo a 22 kHz, e metade das amostras guardava banda que o próprio filtro tinha jogado fora.** Um passo na areia é ruído com lowpass em 600 Hz: Nyquist diz que 11 kHz basta, com folga. `rateFor` deriva a taxa da **própria receita** — não de uma lista à mão, para som novo já nascer com a taxa certa e mexer num filtro não deixar anotação velha para trás. A conta de memória de áudio caiu de **3,95 para 3,26 MB acrescentando três sons** (morcego, trovão e o loop de chuva), e o teto do teste desceu de 4 para 3,5 MB. Em T0 isso é memória de verdade. |
 | 2026-09-14 | `world/physics.ts`, `world/mesh/shapes.ts` | **A colisão da escada teria divergido do desenho no primeiro canto.** O cabeçalho de `mesh/shapes.ts` promete desde o M1 que as duas saem da mesma tabela — *"duas tabelas divergiriam na primeira forma nova, e o jogador atravessaria a escada que enxerga"* —, mas `collisionBoxesFor` recebia só `(forma, estado)` e o canto depende do **vizinho**. A física passou a derivar o canto dos mesmos quatro vizinhos, pela mesma função. As consultas só acontecem para escada: pedra e terra, que são o caminho quente do sweep, saem antes. |
 | 2026-09-14 | `render/particles.ts` | **O controle de partículas não poderia funcionar para cima.** A capacidade era dimensionada pelo preset do tier no construtor, então um jogador de T0 que escolhesse "Todas" continuaria com 128 — a opção existiria e não faria nada. Os arrays passaram a ser alocados sempre no máximo (~36 KB de `TypedArray`) e o modo virou um teto vivo. Trinta quilobytes não valem uma opção que mente. |
@@ -870,7 +939,8 @@ No mesmo dia o usuário encerrou os outros dois itens que estavam abertos:
 
 **O que ficou, e é de outra natureza:** nada do que foi entregue em 2026-09-14 **rodou num
 aparelho**. Passe de nuvens, boneco, fogo, morcego e as vinte opções novas foram verificados por
-teste e por tipo, não por olho. Ver §6.
+teste e por tipo, não por olho — e o suporte a controle foi escrito contra um `Gamepad` falso, sem
+nenhum controle físico na mesa. Ver §6.
 
 **O que o Nether deixou pronto para quem vier depois:** `data/dimensions.ts` e o carimbo de
 dimensão no protocolo do worker são genéricos — uma terceira dimensão é uma entrada na tabela e um
@@ -898,15 +968,29 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      certa do corpo.
    - **Modo daltônico e contorno em alto contraste**, que são acessibilidade e só se avaliam
      olhando.
-2. **Uma sessão longa de verdade.** É o **último critério da definição de pronto** que não foi
+2. **Ligar o DualSense.** O suporte a controle foi escrito contra um `Gamepad` falso — nenhum
+   controle físico esteve na mesa. Em ordem de quanto pode estar errado:
+   - **Opções → Controle** primeiro, antes de entrar num mundo: a linha de estado diz se o jogo
+     vê o controle e qual família reconheceu. Se ela disser *"o navegador não reconheceu este
+     modelo"*, o mapeamento está vindo da rede de segurança — que é justamente o caminho não
+     verificado, e aí vale conferir botão por botão.
+   - **Navegar o menu só com o controle**, do título até dentro do mundo. É o caminho que não
+     existia; se ele funcionar, o resto é detalhe.
+   - **Os rótulos**: a dica na entrada do mundo precisa dizer `✕ ○ □ △`, e não `A B X Y`.
+   - **Duplo toque em `✕` no criativo** para voar, e `L3` para correr.
+   - **Cabo contra Bluetooth**: o mesmo controle pode reportar `id` diferente nos dois modos, e é
+     o `id` que escolhe o perfil. Vale conectar dos dois jeitos.
+   - **No celular**, lembrar que ligar o áudio e a tela cheia exigem um toque na tela — o controle
+     não serve de gesto para o navegador. O jogo avisa isso ao conectar.
+3. **Uma sessão longa de verdade.** É o **último critério da definição de pronto** que não foi
    cumprido: o PROMPT.md §11 pede *"2 horas sem crash, sem perda de progresso e sem travas"*, e a
    sessão de campo mais longa registrada tem 10 minutos. Não é teste de FPS — é teste de vazamento,
    de save e de fogo/mob acumulando. O F3 tem tudo que ele precisa: `mem`, a linha `C:` e agora
    `N fogo`.
-3. **Medir o tempo de abertura em 3G.** O critério 1 do PROMPT.md §11 tem metade cumprida — o
-   bundle está em 185 KB de 350 — e a outra metade nunca foi medida. O `throttling` do DevTools
+4. **Medir o tempo de abertura em 3G.** O critério 1 do PROMPT.md §11 tem metade cumprida — o
+   bundle está em 188 KB de 350 — e a outra metade nunca foi medida. O `throttling` do DevTools
    resolve; o que interessa é o tempo até a tela de título, com o atlas gerando no meio.
-4. Oportunidades pequenas que sobraram, agora curtas:
+5. Oportunidades pequenas que sobraram, agora curtas:
    - **`.clw` com miniatura** já funciona, mas nenhum arquivo real foi exportado e reimportado
      desde a mudança para a v2 — é um teste manual de cinco minutos;
    - **som no resource pack** foi testado por formato, nunca com um `.ogg` de verdade num
@@ -914,7 +998,9 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
    - **fogo em mob**: o `fireTicks` de `entity/mobs.ts` existe e a chama não o liga — mob atravessa
      o incêndio sem pegar fogo. O jogador queima, o zumbi não;
    - **variante de escada em quina de três**: o gênero tem um caso a mais (canto bloqueado por uma
-     terceira escada) que não foi implementado; ele aparece só em construção elaborada.
+     terceira escada) que não foi implementado; ele aparece só em construção elaborada;
+   - **segundo controle**: o jogo usa o primeiro conectado e ignora o resto. Enquanto não houver
+     multijogador local (fora de escopo, §1), não há o que fazer com o segundo.
 
 ---
 

@@ -12,6 +12,75 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-14 · 13:45 → 14:11 · Jogar de controle: DualSense, Xbox e menus navegáveis
+
+**Pedido:** *"implementar no jogo a compatibilidade de jogar com controle conectado tanto no
+computador quanto no celular, seja via bluetooth ou cabo"* — com um **DualSense (PS5)** em mãos, e
+*"seria interessante adicionar compatibilidade também para controle de Xbox One"*, com a ressalva
+de que, se a detecção de layout fosse complexa, dava para ficar só no DualSense.
+
+**Resultado:** quatro famílias reconhecidas (DualSense, DualShock 4, Xbox, Switch Pro), o
+mapeamento do doc 09 §3 completo, e **os menus navegáveis por controle** — que era o que faltava
+para o controle ser jogável e não só mover o boneco.
+
+**A detecção não era a parte difícil, e quase não é sobre mapeamento.** Quando o navegador
+reconhece o aparelho ele reporta `mapping: 'standard'` e os índices de botão são iguais para todo
+controle — é o layout da especificação, e vale no Chrome e no Firefox, no computador e no Android.
+O que muda de verdade é o **nome impresso no botão**: dizer "aperte `A`" a quem segura um DualSense
+manda o jogador procurar um botão que não existe no aparelho dele. Daí os perfis serem, antes de
+tudo, tabelas de rótulo.
+
+O segundo papel deles é rede de segurança: sem normalização os índices viram a ordem crua do HID,
+que num controle de PlayStation é `□ ✕ ○ △` — sem a tabela da família, apertar `□` faria o jogador
+pular. Esse caminho **não foi verificado em aparelho** e está marcado como tal no código e no
+doc 15 §6.
+
+**A armadilha da tabela foi casar por nome.** Um Xbox reporta "Xbox Wireless Controller" e um
+DualShock 4 reporta "Wireless Controller": a primeira versão da regra do DS4 tinha
+`wireless controller` e capturava o Xbox, dando rótulos de PlayStation a ele. A regra passou a
+valer pelo par fabricante/produto, e há teste para exatamente esse caso.
+
+**Três coisas estavam calculadas e jogadas fora.** `pause`, `inventory` e a rolagem de hotbar
+existiam em `GamepadState` desde o M3, eram preenchidas todo tick e **nada em `Controls` as lia**.
+Quem jogasse de controle não conseguia abrir a mochila nem pausar. Do doc 09 §3 também faltavam
+`Y` (soltar item) e `LT` (usar), que nunca existiram.
+
+**A navegação de interface era o buraco maior.** Sem ela não se entra num mundo, não se abre o
+inventário e não se sai de uma tela — o controle mexia no jogo e não na interface. O alvo é o
+elemento com `role="dialog"` visível mais acima, e não uma lista de telas: o doc 08 §4.4 já exige o
+atributo em todo modal, então tela nova entra sozinha. Esquerda/direita **mexem no valor** do
+controle focado em vez de pular de campo, porque a tela de opções é quase toda slider; voltar
+dispara `Escape` na camada, que já sabe fechar uma de cada vez.
+
+**Um risco que apareceu no meio do caminho.** A navegação precisa de laço próprio, porque a tela de
+título existe muito antes de haver um tick de jogo — e dois laços chamando o mesmo `poll()`
+**roubariam a borda de subida um do outro**, fazendo o aperto de colocar bloco sumir. Ficou
+`poll()` (tudo, consome borda, só no tick) e `pollNav()` (só estado segurado). Há teste.
+
+**O que o controle não consegue sozinho.** Ligar o áudio e entrar em tela cheia exigem um gesto do
+usuário, e aperto de botão de controle não conta como gesto em navegador nenhum. Em vez de deixar o
+jogador no mudo sem entender por quê, conectar um controle com o áudio desligado mostra a frase que
+resolve.
+
+**Portões:** 1316 testes (72 arquivos) verdes, lint limpo, build limpo, **188,2 KB gzip** de 350.
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `+` | `src/data/gamepads.ts` | Perfis por família: detecção por fabricante/produto, rótulos de botão e a ordem crua do HID como rede de segurança. Controle novo é uma entrada aqui. |
+| `+` | `src/input/uinav.ts` | Navegação de interface por controle (doc 08 §4.3): foco pela camada `role="dialog"` de cima, valor no slider com esquerda/direita, `Escape` no voltar, repetição de teclado. |
+| `+` | `tests/gamepad.test.ts` | 24 testes: os dois formatos de `id`, Xbox contra DualShock 4, rótulos, gatilho analógico, borda de subida, zona morta, layout cru e o `pollNav` que não rouba aperto. |
+| `+` | `tests/uinav.test.ts` | 18 testes: camada de cima vence, foco inicial, item escondido e desligado fora do caminho, repetição, slider e select, `Escape` na camada. |
+| `~` | `src/input/gamepad.ts` | Reescrito sobre os perfis: ações do doc 09 §3 completas, borda por **ação** e não por índice, gatilho analógico com limiar, `poll`/`pollNav` separados, `uiCapture`, ouvintes de conexão em lista. |
+| `~` | `src/input/controls.ts` | Consome pausa, inventário, hotbar, largar e correr; duplo toque no pulo alterna o voo; `reset()` zera o controle; sensibilidade de analógico própria. |
+| `~` | `src/game/settings.ts` | `padDeadZone`, `padSensitivity` e `padProfile`, com faixa e lista de valores válidos. |
+| `~` | `src/ui/screens/options.ts` | Seção **Controle** com sensibilidade, zona morta, layout e vibração, mais a linha de estado que diz o que está conectado. |
+| `~` | `src/ui/menuflow.ts` | Passa o controle para a tela de opções. |
+| `~` | `src/main.ts` | Controle e navegação nascem antes do mundo; laço de navegação a 20 Hz; aviso de conexão com o nome da família; dica com os rótulos do controle na mão; aviso de que o áudio precisa de um toque. |
+| `~` | `docs/09-controles-mobile.md` | §3.1 (perfis e o que muda de verdade entre eles) e §3.2 (navegação de interface), mais `L3`, duplo toque e direcional no mapeamento. |
+| `~` | `docs/15-status.md`, `README.md` | Panorama, métricas, detalhe da entrega, a correção fora de marco e o roteiro de teste com controle físico. |
+
+---
+
 ## 2026-09-14 · 12:31 → 13:32 · O resto do doc 08, o fogo, o morcego e o boneco
 
 **Pedido:** *"Pode atacar o ponto 2 e 4"* — os dois blocos que o doc 15 §6 carregava: as lacunas da

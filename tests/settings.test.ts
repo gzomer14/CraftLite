@@ -181,3 +181,44 @@ describe('storage hostil', () => {
     expect(settings.get('touchMode')).toBe('B'); // vale na sessão, só não persiste
   });
 });
+
+/**
+ * Opções de controle (doc 09 §3).
+ *
+ * A zona morta é a que mais importa: é ela que salva um analógico gasto, que
+ * reporta desvio parado e faz o jogador andar sozinho para um lado.
+ */
+describe('opções de controle', () => {
+  it('nascem no padrão do doc, com detecção automática de layout', () => {
+    const s = new SettingsStore();
+    expect(s.get('padDeadZone')).toBe(0.15);
+    expect(s.get('padSensitivity')).toBe(1);
+    expect(s.get('padProfile')).toBe('auto');
+  });
+
+  it('a zona morta tem piso e teto — zero deixaria o analógico gasto à solta', () => {
+    const s = new SettingsStore();
+    s.set('padDeadZone', 0);
+    expect(s.get('padDeadZone')).toBe(0.05);
+    s.set('padDeadZone', 0.9);
+    expect(s.get('padDeadZone')).toBe(0.4);
+  });
+
+  it('a sensibilidade do analógico tem faixa própria', () => {
+    const s = new SettingsStore();
+    s.set('padSensitivity', 99);
+    expect(s.get('padSensitivity')).toBe(3);
+    s.set('padSensitivity', 0);
+    expect(s.get('padSensitivity')).toBe(0.3);
+  });
+
+  it('layout desconhecido no armazenamento é descartado', () => {
+    store['craftlite.settings.v1'] = JSON.stringify({ padProfile: 'playstation-2' });
+    expect(new SettingsStore().get('padProfile')).toBe('auto');
+  });
+
+  it('layout conhecido sobrevive', () => {
+    store['craftlite.settings.v1'] = JSON.stringify({ padProfile: 'dualsense' });
+    expect(new SettingsStore().get('padProfile')).toBe('dualsense');
+  });
+});

@@ -116,7 +116,51 @@ Usar a Gamepad API. Mapeamento padrão:
 - Analógico esquerdo: mover · Analógico direito: câmera (com curva quadrática e dead zone 0.15)
 - `A`: pular · `B`: agachar · `X`: colocar/usar · `Y`: soltar item
 - `RT`/`LT`: quebrar/usar · `LB`/`RB`: rolar hotbar · `Start`: pausa · `Select`: inventário
-- Vibração leve ao quebrar bloco.
+- `L3`: correr · duplo toque em `A`: alternar voo no criativo (doc 06 §9)
+- Direcional: navegar a interface (ver §3.1) · Vibração leve ao quebrar bloco.
+
+### 3.1 Perfis de controle e o que realmente muda entre eles
+
+**O mapeamento quase não é o problema.** Quando o navegador reconhece o
+aparelho ele reporta `mapping: 'standard'`, e aí os índices de botão são os
+mesmos para DualSense, Xbox, Switch Pro e qualquer outro — é o layout que a
+especificação desenha. Esse é o caminho normal no Chrome e no Firefox, no
+computador e no Android.
+
+O que muda de verdade é o **nome impresso no botão**. Dizer "aperte `A` para
+colocar" a quem segura um DualSense manda o jogador procurar um botão que não
+existe no aparelho dele. Por isso cada família tem um perfil com os rótulos das
+oito teclas que a interface cita, e **toda mensagem que nomeia um botão usa o
+rótulo do controle conectado**.
+
+O perfil tem um segundo papel, de rede de segurança: quando o navegador **não**
+reconhece o aparelho, os índices viram a ordem crua do relatório HID, que é
+diferente por família — num controle de PlayStation as faces vêm na ordem
+`□ ✕ ○ △`. Sem a tabela da família, apertar `□` faria o jogador pular.
+
+A detecção usa o par fabricante/produto do `Gamepad.id`, **não o nome**: um
+Xbox reporta "Xbox Wireless Controller" e um DualShock 4 reporta "Wireless
+Controller", e casar por nome troca os dois. Controle fora da tabela continua
+jogável com os rótulos da especificação. A escolha é sobrescritível em
+Opções → Controle, pelo mesmo motivo que a Qualidade é: a detecção lê uma
+string escrita pelo fabricante e pode errar.
+
+### 3.2 Navegação de interface
+
+O doc 08 §4.3 pede que toda tela seja navegável por gamepad. Direcional (ou
+analógico esquerdo) move o foco, o botão de baixo confirma e o da direita
+volta — e **esquerda/direita mexem no valor do controle focado** em vez de
+pular de campo, porque a tela de opções é quase toda slider.
+
+O alvo da navegação é o elemento com `role="dialog"` visível mais acima, e não
+uma lista de telas: o doc 08 §4.4 já exige esse atributo em todo modal, então
+tela nova entra na navegação sozinha.
+
+> **O que o controle não consegue fazer sozinho.** Ligar o áudio e entrar em
+> tela cheia exigem um **gesto do usuário**, e aperto de botão de controle não
+> conta como gesto em navegador nenhum. Quem só tem o controle na mão precisa
+> tocar a tela ou apertar uma tecla uma vez; o jogo avisa isso quando um
+> controle conecta e o áudio ainda não subiu.
 
 ## 4. Acessibilidade de input
 

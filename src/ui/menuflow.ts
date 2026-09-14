@@ -21,6 +21,7 @@ import { TitleScreen } from './screens/title';
 import { WorldsScreen } from './screens/worlds';
 import type { SettingsStore } from '../game/settings';
 import type { Keybinds } from '../input/keybinds';
+import type { Gamepads } from '../input/gamepad';
 
 export interface MenuFlowCallbacks {
   /** Chamado quando o jogador escolhe um mundo para jogar. */
@@ -38,10 +39,10 @@ export class MenuFlow {
 
   constructor(
     db: SaveDatabase | null, settings: SettingsStore, keybinds: Keybinds,
-    callbacks: MenuFlowCallbacks,
+    gamepads: Gamepads | null, callbacks: MenuFlowCallbacks,
   ) {
     this.db = db;
-    this.options = new OptionsScreen(settings, keybinds);
+    this.options = new OptionsScreen(settings, keybinds, gamepads);
 
     this.worlds = new WorldsScreen({
       list: () => this.listWorlds(),

@@ -72,8 +72,13 @@ pendência de funcionalidade. Falta jogar em aparelho o que foi entregue depois 
   espalha** — o `flammable` da tabela de blocos estava lá desde o M1 sem ninguém lendo —, o
   **morcego**, o **boneco do jogador** no inventário, **miniatura e tamanho** na tela de mundos,
   **canto de escada** e **som no resource pack**.
+- **Controle:** DualSense, DualShock 4, Xbox e Switch Pro reconhecidos por fabricante/produto —
+  o que muda entre eles é sobretudo o **nome do botão**, e o jogo passa a dizer `✕ ○ □ △` a quem
+  segura um controle da Sony. Mapeamento completo do doc 09 §3, e **os menus navegáveis por
+  gamepad**, sem o que não dá nem para entrar num mundo só com o controle na mão. Funciona por cabo
+  ou Bluetooth, no computador e no celular.
 
-**185 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
+**188 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
 além de dois ícones de PWA de 6,7 KB, gerados por código.
 
 Validado em aparelho alvo (**Galaxy J7 Metal**, Android 7, 2 GB, Mali-T830) em 2026-09-12:
@@ -86,7 +91,7 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 1269 testes (vitest)
+npm test           # 1316 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
 npm run icons      # regenera os ícones do PWA
@@ -163,7 +168,7 @@ src/
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      1269 testes, incluindo orçamento de performance e de luz
+tests/                      1316 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios

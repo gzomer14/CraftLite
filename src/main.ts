@@ -34,6 +34,9 @@ import { Session } from './game/session';
 import { MAX_AIR } from './game/survival';
 import { Controls } from './input/controls';
 import { Keybinds } from './input/keybinds';
+import { Gamepads } from './input/gamepad';
+import { profileById } from './data/gamepads';
+import { UiNavigator } from './input/uinav';
 import { Atlas } from './render/atlas';
 import { DynamicScale } from './render/dynamicscale';
 import { EntityAtlas, ARROW_LAYER, BOAT_LAYER, MINECART_LAYER } from './render/entityatlas';
@@ -83,6 +86,14 @@ async function boot(): Promise<void> {
    * vai usar lá na frente — senão remapear no menu não valeria em jogo.
    */
   const keybinds = new Keybinds();
+  /*
+   * O controle e a navegação de interface também nascem antes do mundo: a tela
+   * de título é a primeira coisa que aparece, e ela precisa ser navegável por
+   * gamepad (doc 08 §4.3) sem depender de um mundo carregado.
+   */
+  const gamepads = new Gamepads();
+  const uiNav = new UiNavigator();
+  startUiNavLoop(gamepads, uiNav, settings);
   const pwa = registerServiceWorker();
   pwa.onUpdateAvailable = showUpdateToast;
 
@@ -163,7 +174,7 @@ async function boot(): Promise<void> {
   hideBootScreen();
 
   // --- fluxo de menus: título → mundos → jogo ------------------------------
-  const menu = new MenuFlow(db, settings, keybinds, {
+  const menu = new MenuFlow(db, settings, keybinds, gamepads, {
     start: (meta) => { void startGame(meta); },
   });
 
@@ -441,7 +452,7 @@ async function boot(): Promise<void> {
     // Largar o item da mão no chão (doc 08 §3.5). O `onDrop` do inventário já
     // vai parar na `Session`, que cria a entidade com o arremesso.
     onDropItem: (whole) => { inventory.dropSelected(whole); },
-  }, keybinds);
+  }, keybinds, gamepads);
 
   /** No criativo, `E` abre a paleta de itens; no sobrevivência, a mochila. */
   function toggleInventory(): void {
@@ -514,6 +525,25 @@ async function boot(): Promise<void> {
     for (const bus of BUSES) audio.setVolume(bus, settings.get(BUS_SETTING[bus]));
   }
 
+  /*
+   * Controle ligado: diz qual foi reconhecido, porque é a única forma de o
+   * jogador saber que o rótulo dos botões mudou — e porque um controle que o
+   * navegador **não** normalizou merece aviso, já que aí o mapeamento é
+   * palpite de família e não a especificação.
+   */
+  gamepads.onConnect((profile) => {
+    hud.showMessage(`Controle conectado: ${profile.labels.family}`, 80);
+    /*
+     * O som não liga sozinho aqui.
+     *
+     * A política de autoplay pede um **gesto do usuário**, e aperto de botão de
+     * controle não conta como gesto em navegador nenhum. Quem só tem o controle
+     * na mão jogaria mudo sem entender por quê, então o jogo avisa o que fazer.
+     */
+    if (!audioStarted) {
+      hud.showMessage('Toque na tela ou aperte uma tecla uma vez para ligar o som.', 120);
+    }
+  });
   audio.onSubtitle = (text, direction) => hud.showSubtitle(text, direction);
   for (const event of ['pointerdown', 'keydown'] as const) {
     window.addEventListener(event, startAudio, { once: false, passive: true });
@@ -534,7 +564,7 @@ async function boot(): Promise<void> {
     }
   }
 
-  showHint(controls, isTouchDevice);
+  showHint(controls, isTouchDevice, gamepads);
 
   const debugSource: DebugSource = {
     stats: undefined as never,
@@ -1002,6 +1032,10 @@ async function boot(): Promise<void> {
 
     session.weather.showFlashes = !settings.get('hideSkyFlashes');
 
+    // Layout de controle forçado (`auto` deixa a detecção decidir).
+    const forced = settings.get('padProfile');
+    gamepads.forcedProfile = forced === 'auto' ? null : profileById(forced);
+
     renderer.resize();
   }
   applyPlayfieldSettings();
@@ -1079,6 +1113,42 @@ function decodeDataUrl(url: string): Uint8Array | null {
   }
 }
 
+/**
+ * Laço da navegação de interface por controle.
+ *
+ * Roda em `requestAnimationFrame` próprio, e **não** no tick do jogo, porque a
+ * tela de título existe muito antes de haver um `GameLoop`: sem isto, quem só
+ * tem controle na mão não conseguiria nem entrar num mundo.
+ *
+ * Dentro do jogo ele continua rodando de graça — `tick` devolve `false` na
+ * hora quando não há tela aberta, e o polling do controle é o mesmo que o
+ * `Controls` já faria.
+ */
+function startUiNavLoop(gamepads: Gamepads, uiNav: UiNavigator, settings: SettingsStore): void {
+  /*
+   * A navegação anda a ~20 Hz, não a 120: a repetição de `UiNavigator` é
+   * contada em ticks, e num painel rápido a lista passaria seis vezes mais
+   * depressa do que no lento. Amarrar ao relógio deixa o menu igual em
+   * qualquer aparelho.
+   */
+  const stepMs = 1000 / 20;
+  let last = 0;
+  const frame = (now: number): void => {
+    requestAnimationFrame(frame);
+    if (now - last < stepMs) return;
+    last = now;
+    gamepads.deadZone = settings.get('padDeadZone');
+    gamepads.vibration = settings.get('vibration');
+    // `pollNav` e não `poll`: a borda de subida é consumida no tick do jogo, e
+    // lê-la aqui roubaria o aperto de lá.
+    gamepads.pollNav();
+    // Quem decide se o mundo recebe o analógico é esta linha: com uma tela
+    // aberta, o controle é da tela.
+    gamepads.uiCapture = uiNav.tick(gamepads.nav);
+  };
+  requestAnimationFrame(frame);
+}
+
 function updateDebugSource(
   source: DebugSource, renderer: Renderer, pipeline: ChunkPipeline, world: World, player: Player,
 ): void {
@@ -1107,19 +1177,38 @@ function updateDebugSource(
 }
 
 
-function showHint(controls: Controls, isTouch: boolean): void {
+function showHint(controls: Controls, isTouch: boolean, gamepads: Gamepads): void {
   const hint = document.createElement('div');
   hint.id = 'hint';
-  hint.textContent = isTouch
+  const base = isTouch
     ? 'Esquerda: joystick · Direita: arrastar para olhar, toque curto coloca, toque longo quebra'
     : 'Clique para jogar · WASD mover · Espaço pular · Shift agachar · Ctrl correr · '
       + 'botões do mouse quebrar/colocar · 1-9 e roda trocam de item · F3 debug';
+  hint.textContent = base;
+
+  /*
+   * A dica de controle só aparece quando há um ligado, e com os rótulos **do
+   * controle na mão**: dizer "aperte A" para quem segura um DualSense manda o
+   * jogador procurar um botão que não existe no aparelho dele.
+   */
+  const showPadHint = (): void => {
+    if (!gamepads.connected) return;
+    const l = gamepads.labels;
+    hint.textContent = `${base}\n`
+      + `Controle: analógicos mover/olhar · ${l.jump} pular · ${l.sneak} agachar · `
+      + `${l.place} colocar · ${l.break} quebrar · ${l.drop} largar · `
+      + `${l.start} pausa · ${l.select} inventário`;
+  };
+  gamepads.onConnect(showPadHint);
+  showPadHint();
+
   document.body.appendChild(hint);
   const style = document.createElement('style');
+  // `pre-line` porque a linha do controle entra como um segundo parágrafo.
   style.textContent = `#hint{position:fixed;left:50%;bottom:calc(30 * var(--px, 3px));
     transform:translateX(-50%);padding:6px 12px;background:#00000080;color:#fff;
     font:12px/1.4 ui-monospace,monospace;pointer-events:none;transition:opacity .3s;
-    text-align:center;max-width:90vw;z-index:5}`;
+    text-align:center;max-width:90vw;z-index:5;white-space:pre-line}`;
   document.head.appendChild(style);
 
   if (isTouch) {
@@ -1127,6 +1216,17 @@ function showHint(controls: Controls, isTouch: boolean): void {
     setTimeout(() => { hint.style.opacity = '0'; }, 6000);
   } else {
     controls.mouse.onLockChange = (locked) => { hint.style.opacity = locked ? '0' : '1'; };
+    /*
+     * Quem joga **só de controle** no computador nunca trava o ponteiro, e a
+     * dica ficaria na tela para sempre. Com um controle ligado ela some pelo
+     * relógio, como no toque — e um pouco mais devagar, porque ela tem uma
+     * linha a mais para ler.
+     */
+    gamepads.onConnect(() => {
+      setTimeout(() => {
+        if (!controls.mouse.locked) hint.style.opacity = '0';
+      }, 9000);
+    });
   }
 }
 

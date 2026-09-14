@@ -100,6 +100,25 @@ export interface Settings {
   toggleSprint: boolean;
   toggleSneak: boolean;
   /**
+   * Zona morta do analógico, 0,05–0,4 (doc 09 §3 sugere 0,15).
+   *
+   * É a opção que salva controle gasto: um analógico com desgaste no centro
+   * reporta 0,1 parado, e o jogador anda sozinho para um lado sem entender por
+   * quê. Subir a zona morta resolve, e ninguém além dele sabe de quanto precisa.
+   */
+  padDeadZone: number;
+  /** Multiplicador de sensibilidade do analógico direito, 0,3–3. */
+  padSensitivity: number;
+  /**
+   * Layout de controle forçado (`auto` detecta pelo id).
+   *
+   * Existe pelo mesmo motivo da Qualidade: a detecção lê uma string que o
+   * navegador escreve do jeito dele, e quando ela erra o jogador fica com os
+   * rótulos de botão de outra família — e, num controle não reconhecido pelo
+   * navegador, com o mapeamento errado.
+   */
+  padProfile: string;
+  /**
    * Volumes 0..1, um por barramento (doc 08 §3.11: nove sliders).
    *
    * `masterVolume` e `musicVolume` mantêm o nome antigo de propósito — eles já
@@ -170,6 +189,9 @@ const DEFAULTS: Settings = {
   maxFps: 0,
   toggleSprint: false,
   toggleSneak: false,
+  padDeadZone: 0.15,
+  padSensitivity: 1,
+  padProfile: 'auto',
   masterVolume: 0.8,
   musicVolume: 0.6,
   blockVolume: 1,
@@ -211,6 +233,7 @@ const CHOICES: Partial<Record<keyof Settings, readonly string[]>> = {
   particles: ['auto', 'min', 'reduced', 'all'],
   fog: ['off', 'near', 'far'],
   colorBlind: ['off', 'protanopia', 'deuteranopia', 'tritanopia'],
+  padProfile: ['auto', 'dualsense', 'dualshock4', 'xbox', 'switch', 'generic'],
 };
 
 /**
@@ -259,6 +282,8 @@ const RANGES: Partial<Record<keyof Settings, [number, number]>> = {
   renderDistance: [0, 32],
   simulationDistance: [0, 8],
   distortion: [0, 100],
+  padDeadZone: [0.05, 0.4],
+  padSensitivity: [0.3, 3],
   quality: [-1, 2],
   guiScale: [0, 4],
   maxFps: [0, 480],

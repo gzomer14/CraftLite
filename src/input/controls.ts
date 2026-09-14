@@ -42,7 +42,7 @@ export class Controls {
   readonly keyboard: Keyboard;
   readonly mouse: Mouse;
   readonly touch: TouchControls;
-  readonly gamepad = new Gamepads();
+  readonly gamepad: Gamepads;
   /** Mapa de teclas do jogador (doc 08 §3.11). */
   readonly keybinds: Keybinds;
 
@@ -62,18 +62,29 @@ export class Controls {
   private readonly look = new Float32Array(2);
   private readonly touchLook = new Float32Array(2);
   private readonly settings: SettingsStore;
+  private readonly callbacks: ControlsCallbacks;
   private mousePlacing = false;
   private mouseBreaking = false;
   /** Estados de "alternar em vez de segurar" (doc 09 §4). */
   private sprintLatched = false;
   private sneakLatched = false;
+  /** Instante do último pulo de controle, para o duplo toque do voo. */
+  private lastPadJump = 0;
 
   constructor(
     canvas: HTMLCanvasElement, settings: SettingsStore, callbacks: ControlsCallbacks,
-    keybinds: Keybinds = new Keybinds(),
+    keybinds: Keybinds = new Keybinds(), gamepads: Gamepads = new Gamepads(),
   ) {
     this.settings = settings;
     this.keybinds = keybinds;
+    /*
+     * O controle nasce **antes** do mundo, como as teclas: a tela de título é
+     * navegável por gamepad e precisa da mesma instância que o jogo vai usar
+     * depois — senão o polling da borda de subida recomeça do zero ao entrar
+     * no mundo e o primeiro aperto de botão se perde.
+     */
+    this.gamepad = gamepads;
+    this.callbacks = callbacks;
     this.keyboard = new Keyboard();
     this.mouse = new Mouse(canvas);
     this.touch = new TouchControls(canvas, settings);
@@ -178,8 +189,11 @@ export class Controls {
     // --- câmera: mouse + arraste de toque + analógico direito ---
     this.mouse.consume(this.look);
     this.touch.consumeLook(this.touchLook);
-    // O analógico entrega −1..1 por tick, não pixels: a escala é outra.
-    const padSens = this.settings.get('lookSensitivity') * 22;
+    // O analógico entrega −1..1 por tick, não pixels: a escala é outra, e ela
+    // tem multiplicador próprio — mão no mouse e polegar no analógico não
+    // querem a mesma sensibilidade.
+    const padSens = this.settings.get('lookSensitivity') * 22
+      * this.settings.get('padSensitivity');
     const yawDelta = this.look[0] + this.touchLook[0] - this.gamepad.state.lookX * padSens;
     const pitchDelta = this.look[1] + this.touchLook[1]
       + (this.settings.get('invertY') ? -1 : 1) * this.gamepad.state.lookY * padSens;
@@ -206,7 +220,7 @@ export class Controls {
     const jumpHeld = this.keyboard.isDown(keys.codeFor('jump')) || this.touch.buttons.jump || g.jump;
     const sneakHeld = this.keyboard.isDown(keys.codeFor('sneak'))
       || this.touch.buttons.sneak || g.sneak;
-    const sprintHeld = this.keyboard.isDown(keys.codeFor('sprint')) || t.sprint > 0;
+    const sprintHeld = this.keyboard.isDown(keys.codeFor('sprint')) || t.sprint > 0 || g.sprint;
 
     this.state.jump = jumpHeld;
     this.state.sneak = this.settings.get('toggleSneak')
@@ -218,7 +232,34 @@ export class Controls {
 
     if (this.mouse.locked && this.mousePlacing) this.placeRequested = true;
     if (this.touch.consumePlace()) this.placeRequested = true;
-    if (g.placing) this.placeRequested = true;
+    // `place` e `use` do doc 09 §3 caem os dois em "colocar/usar", que é uma
+    // ação só no resto do jogo: o botão de face e o gatilho esquerdo servem à
+    // mesma mão, e ter dois caminhos para o mesmo pedido não muda nada.
+    if (g.placing || g.using) this.placeRequested = true;
+
+    /*
+     * As ações de borda do controle, que até aqui eram **calculadas e jogadas
+     * fora**: pausa, inventário e rolagem de hotbar existiam em `GamepadState`
+     * desde o M3 e nada as consumia. Na prática, quem jogasse de controle
+     * andava, olhava, pulava e quebrava — e não conseguia abrir a mochila nem
+     * pausar o jogo.
+     */
+    const cb = this.callbacks;
+    /*
+     * Duplo toque no pulo alterna o voo no criativo (doc 06 §9) — a mesma
+     * regra do teclado. Sem isto, quem joga de controle no criativo não voa,
+     * e voar é metade do modo.
+     */
+    if (g.jumpPressed) {
+      const now = performance.now();
+      if (now - this.lastPadJump < 300) cb.onToggleFly();
+      this.lastPadJump = now;
+    }
+    if (g.pause) cb.onPause();
+    if (g.inventory) cb.onInventory();
+    if (g.hotbarPrev) cb.onHotbarScroll(-1);
+    if (g.hotbarNext) cb.onHotbarScroll(1);
+    if (g.drop) cb.onDropItem(false);
 
     // --- mira ---
     this.hasAim = t.hasAim;
@@ -254,6 +295,10 @@ export class Controls {
   /** Solta tudo — usado ao pausar, perder foco ou esconder a aba. */
   reset(): void {
     this.touch.reset();
+    // Perder o foco com o gatilho apertado deixaria o jogador quebrando o
+    // mundo sozinho ao voltar — e a borda de subida guardada faria o primeiro
+    // aperto de volta ser engolido.
+    this.gamepad.reset();
     this.mouseBreaking = false;
     this.mousePlacing = false;
     this.state.forward = 0;

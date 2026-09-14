@@ -27,6 +27,20 @@ export class Camera {
   /** Posição interpolada usada no frame atual — lida pelo debug e pelo fog. */
   renderX = 0; renderY = 0; renderZ = 0;
 
+  /**
+   * Balanço da câmera ao andar (doc 08 §3.11).
+   *
+   * `bobPhase` é a distância andada acumulada, em blocos — quem a alimenta é o
+   * tick, porque é lá que se sabe o quanto o jogador andou. `bobStrength` é
+   * 0..1 e sai da opção: zero desliga sem custar um `if` por frame no chamador.
+   *
+   * O balanço mexe **na posição do olho**, não na projeção: girar a câmera
+   * (roll) exigiria um eixo a mais em `lookYawPitch` e embrulha mais gente do
+   * que agrada.
+   */
+  bobPhase = 0;
+  bobStrength = 0;
+
   /** Inversa da view-projection, recalculada junto com as matrizes do frame. */
   private readonly invViewProj: Mat4 = createMat4();
   private invValid = false;
@@ -51,7 +65,20 @@ export class Camera {
     const pitch = this.prevPitch + (this.pitch - this.prevPitch) * alpha;
 
     perspective(this.proj, this.fovDeg * DEG2RAD, aspect, this.near, this.far);
-    lookYawPitch(this.view, this.renderX, this.renderY, this.renderZ, yaw, pitch);
+
+    // Balanço: sobe e desce no dobro da frequência do passo (dois pés por
+    // ciclo) e oscila de lado no tempo do passo.
+    let eyeX = this.renderX;
+    let eyeY = this.renderY;
+    let eyeZ = this.renderZ;
+    if (this.bobStrength > 0) {
+      const amount = Math.min(1, this.bobStrength);
+      eyeY += Math.sin(this.bobPhase * 2) * 0.055 * amount;
+      const side = Math.cos(this.bobPhase) * 0.045 * amount;
+      eyeX += Math.cos(yaw) * side;
+      eyeZ += -Math.sin(yaw) * side;
+    }
+    lookYawPitch(this.view, eyeX, eyeY, eyeZ, yaw, pitch);
     multiply(this.viewProj, this.proj, this.view);
     this.frustum.fromMatrix(this.viewProj);
     this.invValid = invert(this.invViewProj, this.viewProj);

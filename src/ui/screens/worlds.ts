@@ -24,6 +24,8 @@ export interface WorldsCallbacks {
   exportWorld?: (meta: WorldMeta) => Promise<void>;
   /** Lê um arquivo e cria o mundo a partir dele; devolve o nome importado. */
   importWorld?: (file: File) => Promise<string>;
+  /** Miniatura do mundo em PNG, ou `undefined` se ele ainda não tem uma. */
+  thumbnail?: (worldId: string) => Promise<Uint8Array | undefined>;
   back: () => void;
 }
 
@@ -154,6 +156,8 @@ export class WorldsScreen {
 
   private renderList(): void {
     this.list.textContent = '';
+    for (const url of this.thumbUrls) URL.revokeObjectURL(url);
+    this.thumbUrls.length = 0;
     if (this.worlds.length === 0) {
       const empty = document.createElement('p');
       empty.className = 'menu-empty';
@@ -171,6 +175,17 @@ export class WorldsScreen {
       entry.setAttribute('aria-selected', String(world.id === this.selected));
       if (world.id === this.selected) entry.classList.add('selected');
 
+      /*
+       * Miniatura (doc 08 §3.2). O store `thumbs` existia desde o M4 e estava
+       * **vazio**: a tela listava três mundos com o mesmo texto cinza e nenhum
+       * jeito de saber qual era qual sem entrar. Carrega sob demanda, uma por
+       * entrada, e o quadro vazio fica para o mundo que ainda não foi salvo.
+       */
+      const thumb = document.createElement('div');
+      thumb.className = 'thumb';
+      entry.appendChild(thumb);
+      void this.fillThumbnail(thumb, world.id);
+
       const info = document.createElement('div');
       info.className = 'info';
       const name = document.createElement('span');
@@ -180,7 +195,8 @@ export class WorldsScreen {
       meta.className = 'meta';
       meta.textContent = `${world.gameMode === 'creative' ? 'Criativo' : 'Sobrevivência'}`
         + ` · seed ${world.seed || world.seedHash}`
-        + ` · ${formatDate(world.lastPlayed)}`;
+        + ` · ${formatDate(world.lastPlayed)}`
+        + ` · ${formatSize(world.sizeBytes)}`;
       info.append(name, meta);
       entry.appendChild(info);
 
@@ -193,6 +209,30 @@ export class WorldsScreen {
     }
     this.updateButtons();
   }
+
+  /**
+   * Põe a miniatura do mundo no quadro, se houver uma no banco.
+   *
+   * As URLs de blob criadas aqui são revogadas na próxima montagem da lista:
+   * sem isso, abrir e fechar a tela vinte vezes vazaria vinte imagens.
+   */
+  private async fillThumbnail(target: HTMLElement, worldId: string): Promise<void> {
+    const load = this.callbacks.thumbnail;
+    if (load === undefined) return;
+    try {
+      const png = await load(worldId);
+      if (png === undefined) return;
+      const url = URL.createObjectURL(new Blob([png as BlobPart], { type: 'image/png' }));
+      this.thumbUrls.push(url);
+      target.style.backgroundImage = `url(${url})`;
+      target.classList.add('has-image');
+    } catch {
+      // Sem miniatura a entrada fica com o quadro vazio, que é o que era.
+    }
+  }
+
+  /** URLs de blob vivas das miniaturas, para revogar ao redesenhar. */
+  private readonly thumbUrls: string[] = [];
 
   private updateButtons(): void {
     const has = this.selected !== null;
@@ -285,6 +325,21 @@ function labelled(label: string, control: HTMLElement): HTMLLabelElement {
 }
 
 /** Mensagem de erro legível, com um fallback para o que não é `Error`. */
+/**
+ * Tamanho do mundo em disco (doc 11 §5).
+ *
+ * "—" enquanto ele nunca foi medido, que é o caso de um mundo recém-criado: o
+ * número só existe depois do primeiro `saveAll`.
+ */
+export function formatSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '—';
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${Math.round(kb)} KB`;
+  const mb = kb / 1024;
+  return `${mb < 10 ? mb.toFixed(1).replace('.', ',') : Math.round(mb)} MB`;
+}
+
 function formatDate(timestamp: number): string {
   if (timestamp <= 0) return 'nunca jogado';
   const date = new Date(timestamp);

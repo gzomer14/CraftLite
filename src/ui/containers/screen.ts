@@ -17,6 +17,7 @@ import {
 } from '../../game/inventory';
 import { ENCHANT_ITEM, ENCHANT_LAPIS, Furnace, type ContainerView } from '../../game/container';
 import { RecipeBookPanel } from './recipebook';
+import { DOLL_WIDTH_UNITS, PaperDoll } from './paperdoll';
 import { ItemTooltip } from './tooltip';
 import type { RecipeEntry } from '../../game/crafting';
 
@@ -69,6 +70,9 @@ export interface ContainerScreenCallbacks {
   onFurnaceOutput?: (furnace: Furnace, item: number) => void;
 }
 
+/** Cores das quatro peças vestidas, reusado a cada `refresh` para não alocar. */
+const DOLL_ARMOR: (string | null)[] = [null, null, null, null];
+
 export class ContainerScreen {
   private readonly root: HTMLDivElement;
   private readonly panel: HTMLDivElement;
@@ -79,6 +83,11 @@ export class ContainerScreen {
   private readonly cursorEl: HTMLDivElement;
   private readonly tooltip = new ItemTooltip();
   private readonly slots: SlotView[] = [];
+  /**
+   * Boneco do jogador, criado só quando a tela de inventário é montada e
+   * mantido daí em diante — recriar o canvas a cada abertura regeraria a skin.
+   */
+  private doll: PaperDoll | null = null;
   private readonly book: RecipeBookPanel | null;
   private readonly bookToggle: HTMLButtonElement;
   /** Rodapé com o botão de fechar — a única saída sem teclado. */
@@ -309,6 +318,7 @@ export class ContainerScreen {
         'inv', undefined,
         ['Elmo', 'Peito', 'Calça', 'Bota', 'Mão'],
       );
+      this.addPaperDoll();
       this.addSection('Criação', 2, [CRAFT_START, CRAFT_START + 1, CRAFT_START + 2, CRAFT_START + 3], 'inv');
       this.addResultSlot();
     } else if (this.kind === 'crafting') {
@@ -373,6 +383,34 @@ export class ContainerScreen {
     }
     section.appendChild(row);
     this.column.appendChild(section);
+  }
+
+  /**
+   * O boneco do jogador ao lado dos slots de armadura (doc 08 §3.5).
+   *
+   * Ele não é enfeite: a fileira de slots diz o que está **guardado** ali, e o
+   * boneco diz o que está **vestido**. Com quatro peças de materiais parecidos,
+   * a diferença entre "tenho o peitoral" e "estou com o peitoral" só aparecia
+   * na linha de armadura do HUD, que é um número.
+   */
+  private addPaperDoll(): void {
+    if (this.doll === null) this.doll = new PaperDoll();
+    const section = document.createElement('div');
+    section.className = 'section doll';
+    section.appendChild(this.doll.element);
+    this.column.appendChild(section);
+  }
+
+  /** Redesenha o boneco com as peças vestidas agora. */
+  private refreshPaperDoll(): void {
+    const doll = this.doll;
+    const inventory = this.inventory;
+    if (doll === null || inventory === null || this.kind !== 'inventory') return;
+    for (let i = 0; i < 4; i++) {
+      const stack = inventory.get(ARMOR_START + i);
+      DOLL_ARMOR[i] = stack === null ? null : (this.callbacks.colorOf?.(stack.item) ?? null);
+    }
+    doll.draw(DOLL_ARMOR);
   }
 
   private addResultSlot(): void {
@@ -668,6 +706,8 @@ export class ContainerScreen {
       );
     }
 
+    this.refreshPaperDoll();
+
     const cursor = this.inventory.cursor;
     this.cursorEl.hidden = cursor === null;
     if (cursor !== null) {
@@ -897,6 +937,10 @@ function injectStyle(): void {
   #container-screen .grid{flex-flow:row wrap;align-items:flex-start;
     column-gap:calc(6 * var(--px,3px))}
 }
+/* Boneco: largura em unidades de modelo, para acompanhar a escala da GUI. */
+#container-screen .section.doll{align-items:flex-start}
+#container-screen .paperdoll{width:calc(${DOLL_WIDTH_UNITS} * var(--px,3px));height:auto;
+  image-rendering:pixelated;touch-action:none}
 #container-screen .slots{display:grid;grid-template-columns:repeat(var(--cols),auto);
   gap:calc(1 * var(--px,3px));justify-content:start;margin-bottom:calc(2 * var(--px,3px))}
 #container-screen .slots.result{grid-template-columns:auto auto;align-items:center;

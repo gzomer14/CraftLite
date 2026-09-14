@@ -61,6 +61,8 @@ export interface PipelineOptions {
   workers: number;
   renderDistance: number;
   packed: boolean;
+  /** Iluminação suave (AO) no mesh. Ver `GreedyMesher.smoothLighting`. */
+  smoothLighting?: boolean;
   /** FPS alvo do preset. Define quanto do frame o despacho pode gastar. */
   targetFps?: number;
   /** Teto de pedidos em voo. O padrão é `workers * 16`. */
@@ -123,6 +125,7 @@ export class ChunkPipeline {
   private centerX = 0;
   private centerZ = 0;
   private readonly packed: boolean;
+  private readonly smoothLighting: boolean;
 
   readonly stats: PipelineStats = {
     loaded: 0, queued: 0, generating: 0, meshing: 0, genMs: 0, meshMs: 0,
@@ -132,6 +135,7 @@ export class ChunkPipeline {
     this.world = world;
     this.renderDistance = options.renderDistance;
     this.packed = options.packed;
+    this.smoothLighting = options.smoothLighting ?? true;
     /*
      * Dezesseis por worker, não dois.
      *
@@ -155,7 +159,10 @@ export class ChunkPipeline {
     for (let i = 0; i < options.workers; i++) {
       const worker = create(i);
       worker.onmessage = (event) => this.onWorkerMessage(event.data);
-      worker.postMessage({ type: 'init', seed: world.seed, packed: this.packed } as WorkerRequest);
+      worker.postMessage({
+        type: 'init', seed: world.seed, packed: this.packed,
+        smoothLighting: this.smoothLighting,
+      } as WorkerRequest);
       this.pool.push(worker);
       this.inFlight.push(0);
     }

@@ -9,7 +9,11 @@
  * uma opção é uma linha nas listas abaixo.
  */
 
-import { buildFields, menuButton, menuPanel, menuRoot, menuSection, type Field } from './menu';
+import {
+  buildFields, buildKeybinds, menuButton, menuPanel, menuRoot, menuSection, type Field,
+} from './menu';
+import type { Keybinds } from '../../input/keybinds';
+import { BUSES, BUS_LABELS, BUS_SETTING } from '../../data/soundbuses';
 import type { SettingsStore } from '../../game/settings';
 
 const percent = (value: number): string => `${Math.round(value * 100)}%`;
@@ -49,6 +53,50 @@ const VIDEO: readonly Field[] = [
   },
   {
     /*
+     * Distância de **simulação**: o raio em que mob nasce e continua vivo
+     * (doc 07 §4). É outra coisa da distância de render, e num aparelho fraco
+     * baixá-la vale mais que baixar a de render — mob custa tick, não pixel.
+     */
+    kind: 'range', key: 'simulationDistance', label: 'Distância de simulação',
+    min: 0, max: 8, step: 1,
+    format: (v) => (v === 0 ? 'automática' : `${v} chunks`),
+  },
+  {
+    kind: 'choice', key: 'graphics', label: 'Gráficos',
+    options: [
+      { value: 'auto', label: 'Do aparelho' },
+      { value: 'fast', label: 'Rápido — ajusta tudo para baixo' },
+      { value: 'fancy', label: 'Bonito — ajusta tudo para cima' },
+    ],
+  },
+  {
+    kind: 'choice', key: 'clouds', label: 'Nuvens',
+    options: [
+      { value: 'auto', label: 'Do aparelho' },
+      { value: 'off', label: 'Desligadas' },
+      { value: 'fast', label: 'Rápidas' },
+      { value: 'fancy', label: 'Bonitas' },
+    ],
+  },
+  {
+    kind: 'choice', key: 'particles', label: 'Partículas',
+    options: [
+      { value: 'auto', label: 'Do aparelho' },
+      { value: 'min', label: 'Mínimo' },
+      { value: 'reduced', label: 'Reduzido' },
+      { value: 'all', label: 'Todas' },
+    ],
+  },
+  {
+    kind: 'choice', key: 'fog', label: 'Névoa',
+    options: [
+      { value: 'far', label: 'Distante' },
+      { value: 'near', label: 'Próxima' },
+      { value: 'off', label: 'Mínima' },
+    ],
+  },
+  {
+    /*
      * Passo de meio, não de um.
      *
      * Com passo 1 o vizinho de "automática" era 1×, e num celular cuja
@@ -77,11 +125,37 @@ const VIDEO: readonly Field[] = [
   { kind: 'toggle', key: 'dynamicResolution', label: 'Resolução dinâmica' },
   { kind: 'toggle', key: 'entityShadows', label: 'Sombra de criaturas' },
   { kind: 'toggle', key: 'handItem', label: 'Item na mão' },
+  { kind: 'toggle', key: 'cameraBob', label: 'Balanço da câmera' },
+  { kind: 'toggle', key: 'showFps', label: 'Mostrar FPS' },
+  {
+    // Desligar encolhe o mesh além de tirar a sombra de canto — ver
+    // `GreedyMesher.smoothLighting`.
+    kind: 'toggle', key: 'smoothLighting', label: 'Iluminação suave (recarrega)',
+  },
+  {
+    /*
+     * No navegador não se desliga o vsync: quem apresenta o quadro é o
+     * compositor. O que este controle mexe é `desynchronized` — ver
+     * `game/settings.ts` e `render/gl.ts`. Desligar já causou piscada num
+     * painel de taxa variável, então o rótulo avisa.
+     */
+    kind: 'toggle', key: 'vsync', label: 'VSync (recarrega)',
+  },
 ];
 
+/**
+ * Som: os **nove** sliders do doc 08 §3.11.
+ *
+ * Existiam dois (geral e música) porque o motor só tinha cinco barramentos e
+ * nenhum deles separava mob hostil de mob amigável. A lista é montada a partir
+ * de `data/soundbuses.ts`, então barramento novo aparece aqui sozinho.
+ */
 const SOUND: readonly Field[] = [
-  { kind: 'range', key: 'masterVolume', label: 'Volume geral', min: 0, max: 1, step: 0.05, format: percent },
-  { kind: 'range', key: 'musicVolume', label: 'Música', min: 0, max: 1, step: 0.05, format: percent },
+  { kind: 'range', key: 'masterVolume', label: 'Principal', min: 0, max: 1, step: 0.05, format: percent },
+  ...BUSES.map((bus): Field => ({
+    kind: 'range', key: BUS_SETTING[bus], label: BUS_LABELS[bus],
+    min: 0, max: 1, step: 0.05, format: percent,
+  })),
   { kind: 'toggle', key: 'subtitles', label: 'Legendas de som' },
 ];
 
@@ -122,11 +196,32 @@ const CONTROLS: readonly Field[] = [
  */
 const ACCESSIBILITY: readonly Field[] = [
   { kind: 'toggle', key: 'highContrast', label: 'Alto contraste' },
+  { kind: 'toggle', key: 'highContrastOutline', label: 'Contorno de bloco em alto contraste' },
   {
     kind: 'range', key: 'textScale', label: 'Tamanho do texto',
     min: 80, max: 150, step: 10, format: (v) => `${v}%`,
   },
+  {
+    kind: 'choice', key: 'colorBlind', label: 'Modo daltônico',
+    options: [
+      { value: 'off', label: 'Desligado' },
+      { value: 'protanopia', label: 'Protanopia' },
+      { value: 'deuteranopia', label: 'Deuteranopia' },
+      { value: 'tritanopia', label: 'Tritanopia' },
+    ],
+  },
   { kind: 'toggle', key: 'damageFlash', label: 'Clarão ao levar dano' },
+  { kind: 'toggle', key: 'hideSkyFlashes', label: 'Esconder flashes do céu' },
+  {
+    /*
+     * Distorção: hoje é o "puxão" de campo de visão ao correr. Em 0% a câmera
+     * não mexe — que é o que quem tem enjoo de movimento precisa — e o balanço
+     * tem o interruptor próprio, logo acima, em Vídeo.
+     */
+    kind: 'range', key: 'distortion', label: 'Efeitos de distorção',
+    min: 0, max: 100, step: 10, format: (v) => `${v}%`,
+  },
+  { kind: 'toggle', key: 'cameraBob', label: 'Balanço da câmera' },
   { kind: 'toggle', key: 'subtitles', label: 'Legendas de som' },
 ];
 
@@ -147,7 +242,7 @@ export class OptionsScreen {
   private readonly closeButton: HTMLButtonElement;
   private onClose: (() => void) | null = null;
 
-  constructor(settings: SettingsStore) {
+  constructor(settings: SettingsStore, keybinds: Keybinds) {
     this.root = menuRoot('options-screen');
     const { panel, body } = menuPanel('Opções');
 
@@ -162,6 +257,9 @@ export class OptionsScreen {
       const section = menuSection(title);
       buildFields(section, settings, fields);
       body.appendChild(section);
+      // As teclas fecham a seção de Controles: elas são a lista mais longa, e
+      // deixá-las no fim mantém os sliders no alto, onde se mexe mais.
+      if (title === 'Controles') buildKeybinds(section, keybinds);
     }
 
     const reset = menuButton('Restaurar padrões', () => {

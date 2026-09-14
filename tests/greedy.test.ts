@@ -222,3 +222,49 @@ describe('GreedyMesher', () => {
     expect(litVerts).toBe(4); // exatamente os 4 vértices da face de topo
   });
 });
+
+/**
+ * Iluminação suave desligada (doc 08 §3.11).
+ *
+ * Não é só tirar a sombra de canto: com o AO uniforme o merge greedy deixa de
+ * quebrar nas bordas, e a mesma section rende **menos** vértices. É o caminho
+ * de fuga de quem precisa de cada vértice, e é essa a propriedade que precisa
+ * continuar valendo.
+ */
+describe('iluminação suave', () => {
+  /** Um degrau: quinas o bastante para o AO ter o que escurecer. */
+  function stepWorld(): { blocks: Uint16Array; light: Uint8Array } {
+    const blocks = new Uint16Array(NB_SIDE * NB_SIDE * NB_SIDE);
+    const light = new Uint8Array(NB_SIDE * NB_SIDE * NB_SIDE).fill(0xf0);
+    for (let z = 0; z < 18; z++) {
+      for (let x = 0; x < 18; x++) {
+        const height = x < 9 ? 4 : 8;
+        for (let y = 0; y < height; y++) blocks[nbIndex(x - 1, y - 1, z - 1)] = makeState(STONE);
+      }
+    }
+    return { blocks, light };
+  }
+
+  it('desligada, o mesh não fica maior — e costuma ficar menor', () => {
+    const { blocks, light } = stepWorld();
+    const smooth = new GreedyMesher(tables, false, true).mesh(blocks, light);
+    const smoothQuads = countQuads(smooth);
+    const flat = new GreedyMesher(tables, false, false).mesh(blocks, light);
+    expect(countQuads(flat)).toBeLessThanOrEqual(smoothQuads);
+  });
+
+  it('desligada, nenhum vértice sai sombreado', () => {
+    const { blocks, light } = stepWorld();
+    const mesher = new GreedyMesher(tables, false, false);
+    mesher.mesh(blocks, light);
+    // Com AO uniforme, o merge nunca é interrompido por variação de canto.
+    const smooth = new GreedyMesher(tables, false, true);
+    smooth.mesh(blocks, light);
+    expect(mesher.quads).toBeLessThanOrEqual(smooth.quads);
+  });
+});
+
+/** Quads do passe opaco — o único que este cenário de pedra produz. */
+function countQuads(mesh: { opaque: { vertexCount: number } | null }): number {
+  return (mesh.opaque?.vertexCount ?? 0) / 4;
+}

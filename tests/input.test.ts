@@ -152,6 +152,7 @@ describe('pointer lock não é pedido por toque', () => {
     new Controls(fake as unknown as HTMLCanvasElement, store, {
       onHotbarSelect: () => {}, onHotbarScroll: () => {}, onPickBlock: () => {},
       onToggleDebug: () => {}, onToggleFly: () => {}, onPause: () => {}, onInventory: () => {},
+      onDropItem: () => {},
     });
     return counter;
   };

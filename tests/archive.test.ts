@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
-  ARCHIVE_VERSION, ArchiveError, archiveFileName, exportWorld, importWorld, packArchive,
+  ARCHIVE_VERSION, MAGIC, ArchiveError, archiveFileName, exportWorld, importWorld, packArchive,
   unpackArchive, uniqueName, type WorldArchive,
 } from '../src/save/archive';
 import {
@@ -46,6 +46,12 @@ function fakeDb() {
       for (const [cx, cz, data] of entries) {
         storeOf('chunks').set(keyOf([dimensionId, cx, cz]), data);
       }
+    },
+    async saveThumbnail(worldId: string, png: Uint8Array): Promise<void> {
+      storeOf('thumbs').set(keyOf(worldId), png);
+    },
+    async loadThumbnail(worldId: string): Promise<Uint8Array | undefined> {
+      return storeOf('thumbs').get(keyOf(worldId)) as Uint8Array | undefined;
     },
     async allChunks(dimensionId: string): Promise<{ cx: number; cz: number; data: Uint8Array }[]> {
       const out: { cx: number; cz: number; data: Uint8Array }[] = [];
@@ -180,6 +186,52 @@ describe('nome único', () => {
   it('acrescenta o contador quando já existe', () => {
     expect(uniqueName('Casa', ['Casa'])).toBe('Casa (2)');
     expect(uniqueName('Casa', ['Casa', 'Casa (2)'])).toBe('Casa (3)');
+  });
+});
+
+describe('miniatura no arquivo (v2)', () => {
+  it('a miniatura sobrevive ao empacotar e desempacotar', () => {
+    const archive = sampleArchive();
+    archive.thumbnail = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 42]);
+    const back = unpackArchive(packArchive(archive));
+    expect(back.version).toBe(ARCHIVE_VERSION);
+    expect(Array.from(back.thumbnail ?? [])).toEqual(Array.from(archive.thumbnail));
+  });
+
+  it('mundo sem miniatura empacota e volta sem ela, não com uma vazia', () => {
+    const back = unpackArchive(packArchive(sampleArchive()));
+    expect(back.thumbnail).toBeUndefined();
+  });
+
+  it('arquivo da v1 continua abrindo, sem miniatura', () => {
+    /*
+     * Compatibilidade para trás de verdade: monta os bytes de um arquivo v1 à
+     * mão — cabeçalho v1 e **nada** depois das dimensões — e confere que o
+     * leitor atual não tropeça procurando o campo novo.
+     */
+    const v2 = packArchive(sampleArchive());
+    // O último byte de um v2 sem miniatura é o varint 0 do tamanho dela.
+    expect(v2[v2.length - 1]).toBe(0);
+    const v1 = v2.slice(0, v2.length - 1);
+    v1[MAGIC.length] = 1;
+    const back = unpackArchive(v1);
+    expect(back.version).toBe(1);
+    expect(back.thumbnail).toBeUndefined();
+    expect(back.dimensions.length).toBe(sampleArchive().dimensions.length);
+  });
+
+  it('a miniatura acompanha o mundo exportado e o importado', async () => {
+    const db = fakeDb();
+    const meta = newWorldMeta('Com foto', 'seed', 'survival', 2);
+    await db.put(STORE_WORLDS, meta);
+    await db.putChunks(dimensionIdFor(meta.id, 0), [[0, 0, new Uint8Array([9])]]);
+    const png = new Uint8Array([137, 80, 78, 71, 1, 2, 3]);
+    await db.saveThumbnail(meta.id, png);
+
+    const bytes = await exportWorld(asDb(db), meta.id);
+    const imported = await importWorld(asDb(db), bytes);
+    const copy = await db.loadThumbnail(imported.id);
+    expect(Array.from(copy ?? [])).toEqual(Array.from(png));
   });
 });
 

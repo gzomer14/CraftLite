@@ -20,6 +20,7 @@ import { PacksScreen, type PackSummary } from './screens/packs';
 import { TitleScreen } from './screens/title';
 import { WorldsScreen } from './screens/worlds';
 import type { SettingsStore } from '../game/settings';
+import type { Keybinds } from '../input/keybinds';
 
 export interface MenuFlowCallbacks {
   /** Chamado quando o jogador escolhe um mundo para jogar. */
@@ -35,9 +36,12 @@ export class MenuFlow {
   /** Mundos em memória, quando não há banco. */
   private readonly transient: WorldMeta[] = [];
 
-  constructor(db: SaveDatabase | null, settings: SettingsStore, callbacks: MenuFlowCallbacks) {
+  constructor(
+    db: SaveDatabase | null, settings: SettingsStore, keybinds: Keybinds,
+    callbacks: MenuFlowCallbacks,
+  ) {
     this.db = db;
-    this.options = new OptionsScreen(settings);
+    this.options = new OptionsScreen(settings, keybinds);
 
     this.worlds = new WorldsScreen({
       list: () => this.listWorlds(),
@@ -49,6 +53,7 @@ export class MenuFlow {
       remove: (meta) => this.removeWorld(meta),
       exportWorld: (meta) => this.exportWorld(meta),
       importWorld: (file) => this.importWorld(file),
+      thumbnail: (worldId) => this.db?.loadThumbnail(worldId) ?? Promise.resolve(undefined),
       back: () => {
         this.worlds.hide();
         this.title.show();
@@ -110,7 +115,10 @@ export class MenuFlow {
     const pack = await loadPack(this.db);
     return pack === null
       ? null
-      : { name: pack.name, accepted: pack.textures.size, ignored: 0 };
+      : {
+        name: pack.name, accepted: pack.textures.size, ignored: 0,
+        sounds: pack.sounds?.size ?? 0,
+      };
   }
 
   /**
@@ -126,7 +134,10 @@ export class MenuFlow {
     const name = file.name.replace(/\.zip$/i, '');
     const { pack, ignored } = await readPack(name, bytes, decodeImage);
     await savePack(this.db, pack);
-    return { name: pack.name, accepted: pack.textures.size, ignored: ignored.length };
+    return {
+      name: pack.name, accepted: pack.textures.size, ignored: ignored.length,
+      sounds: pack.sounds?.size ?? 0,
+    };
   }
 
   private async removePack(): Promise<void> {

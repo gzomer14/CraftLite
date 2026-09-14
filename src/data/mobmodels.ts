@@ -138,6 +138,25 @@ export const MODELS: Record<string, ModelDef> = {
     ],
   },
 
+  /**
+   * Morcego (doc 07 §4, categoria `ambient`).
+   *
+   * Corpo pequeno, cabeça com orelhas e duas asas que batem no tempo da idade
+   * (`flap`). As orelhas são duas caixas de 1×2×1: sem elas a silhueta a cinco
+   * blocos de distância é um rato voando.
+   */
+  bat: {
+    skinSize: 64, height: 9,
+    parts: [
+      { name: 'body', pivot: [0, 3, 0], box: [-2, 0, -1.5, 4, 6, 3], uv: [0, 32] },
+      { name: 'head', pivot: [0, 9, 0], box: [-2, -2, -2, 4, 4, 4], uv: [0, 0], anim: 'head' },
+      { name: 'earRight', pivot: [-1.5, 11, 0], box: [-1, 0, -0.5, 1, 2, 1], uv: [24, 0], anim: 'head' },
+      { name: 'earLeft', pivot: [1.5, 11, 0], box: [0, 0, -0.5, 1, 2, 1], uv: [24, 0], mirror: true, anim: 'head' },
+      { name: 'wingRight', pivot: [-2, 8, 0], box: [-7, -5, -0.5, 7, 6, 1], uv: [32, 16], anim: 'flap', axis: 2, amp: 1.1 },
+      { name: 'wingLeft', pivot: [2, 8, 0], box: [0, -5, -0.5, 7, 6, 1], uv: [32, 16], mirror: true, anim: 'flap', axis: 2, amp: -1.1 },
+    ],
+  },
+
   wolf: {
     skinSize: 64, height: 14,
     parts: [

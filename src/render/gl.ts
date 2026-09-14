@@ -55,15 +55,24 @@ const CONTEXT_ATTRS: WebGLContextAttributes = {
   desynchronized: false,
 };
 
-export function createContext(canvas: HTMLCanvasElement): GlContext {
+/**
+ * Cria o contexto. `vsync` é a opção do doc 08 §3.11 — ver o comentário de
+ * `desynchronized` acima: ligado (padrão) é o caminho seguro, desligado é o que
+ * piscou no S24 Ultra. Só se decide aqui porque atributo de contexto não muda
+ * depois de o contexto existir.
+ */
+export function createContext(canvas: HTMLCanvasElement, vsync = true): GlContext {
+  const attrs: WebGLContextAttributes = vsync
+    ? CONTEXT_ATTRS
+    : { ...CONTEXT_ATTRS, desynchronized: true };
   // `?gl1` força o caminho de fallback — é como se testa WebGL1 sem um aparelho
   // que só tenha WebGL1 (faz parte da matriz de teste manual de cada marco).
   const forceGl1 = location.search.indexOf('gl1') >= 0;
   const gl2 = forceGl1
     ? null
-    : (canvas.getContext('webgl2', CONTEXT_ATTRS) as WebGL2RenderingContext | null);
+    : (canvas.getContext('webgl2', attrs) as WebGL2RenderingContext | null);
   const gl: AnyGL | null =
-    gl2 ?? (canvas.getContext('webgl', CONTEXT_ATTRS) as WebGLRenderingContext | null);
+    gl2 ?? (canvas.getContext('webgl', attrs) as WebGLRenderingContext | null);
 
   if (gl === null) {
     throw new Error('WebGL indisponível neste navegador.');

@@ -47,6 +47,7 @@ import { Player } from '../entity/player';
 import { plantSeed, tillSoil } from './farming';
 import { Fluids } from '../world/fluids';
 import { Growth } from '../world/growth';
+import { Fire } from '../world/fire';
 import { Redstone } from '../world/redstone';
 import { Travel } from './travel';
 import { extinguishPortal, ignitePortal, isPortalBlock } from './portal';
@@ -166,6 +167,7 @@ export class Session {
   readonly lighting: Lighting;
   readonly fluids: Fluids;
   readonly growth: Growth;
+  readonly fire: Fire;
   readonly redstone: Redstone;
   readonly rails: Rails;
   readonly travel: Travel;
@@ -272,7 +274,18 @@ export class Session {
       else if (kind === 'rain') this.events.onMessage?.('Começou a chover');
     };
 
+    this.fire = new Fire(world, {
+      // O que queima solta o que soltaria ao ser quebrado? **Não.** Queimar
+      // consome: é o que separa derrubar a floresta com machado de tocar fogo
+      // nela. O som e a luz, sim, são os mesmos de qualquer mudança de bloco.
+      onBurned: (x, y, z) => { this.events.onSound?.('block/fire', x, y, z); },
+      onIgnited: (x, y, z) => {
+        this.lighting.onBlockChanged(x, y, z, AIR, this.world.getBlock(x, y, z));
+      },
+    });
+
     this.growth.attach();
+    this.fire.attach();
     this.redstone.attach();
     this.rails.attach();
     this.fluids.onEvaporate = (x, y, z) => {
@@ -434,9 +447,13 @@ export class Session {
     const headBlock = defOf(this.world.getBlock(bx, head, bz));
 
     if (this.player.mode === 'survival') {
+      // Pés ou cabeça dentro da chama: o corpo inteiro conta, senão dava para
+      // atravessar o incêndio agachado.
+      const feet = defOf(this.world.getBlock(bx, Math.floor(this.player.y), bz));
       this.survival.tick({
         submerged: headBlock.name === 'water',
         inLava: this.player.inLava,
+        onFire: feet.name === 'fire' || headBlock.name === 'fire',
         suffocating: headBlock.opaque && headBlock.solid,
         y: this.player.y,
       });
@@ -451,6 +468,9 @@ export class Session {
     this.syncRider();
     this.fluids.tick();
     this.growth.tick();
+    // A chuva apaga o fogo (doc 03 §8); quem sabe se chove é o clima.
+    this.fire.raining = this.weather.isRaining;
+    this.fire.tick();
     this.tickRedstone();
     this.travel.tick(this.player.x, this.player.y, this.player.z);
     this.tickFurnaces();
@@ -971,16 +991,32 @@ export class Session {
     const y = target.y + target.ny;
     const z = target.z + target.nz;
     const area = ignitePortal(this.world, x, y, z);
-    if (area === null) return false;
-
-    this.lighting.onBlockChanged(x, y, z, AIR, this.world.getBlock(x, y, z));
-    this.events.onSound?.('block/portal', x, y, z);
-    if (this.player.mode === 'survival') {
-      const def = itemDef(held.item);
-      if (def?.durability !== undefined) this.inventory.damageHeld(1, def.durability);
+    if (area !== null) {
+      this.lighting.onBlockChanged(x, y, z, AIR, this.world.getBlock(x, y, z));
+      this.events.onSound?.('block/portal', x, y, z);
+      this.wearLighter(held.item);
+      this.achievements.event('light_portal');
+      return true;
     }
-    this.achievements.event('light_portal');
+
+    /*
+     * Não era moldura de portal: acende fogo ali mesmo.
+     *
+     * Até aqui o isqueiro só servia para portal, e clicar com ele em qualquer
+     * outro lugar não fazia nada — um item que só funciona num lugar do mundo
+     * inteiro e não explica isso em lugar nenhum.
+     */
+    if (!this.fire.ignite(x, y, z)) return false;
+    this.events.onSound?.('block/fire', x, y, z);
+    this.wearLighter(held.item);
     return true;
+  }
+
+  /** Gasta um ponto de durabilidade do isqueiro, no sobrevivência. */
+  private wearLighter(item: number): void {
+    if (this.player.mode !== 'survival') return;
+    const def = itemDef(item);
+    if (def?.durability !== undefined) this.inventory.damageHeld(1, def.durability);
   }
 
   /**
@@ -1575,6 +1611,7 @@ export class Session {
   onChunkLoaded(chunk: ChunkColumn): void {
     this.spawner.populateChunk(chunk);
     this.growth.scanChunk(chunk);
+    this.fire.scanChunk(chunk);
     this.redstone.scanChunk(chunk);
     this.rails.scanChunk(chunk);
     this.applyStructures(chunk);
@@ -1583,6 +1620,7 @@ export class Session {
   /** Chunk saindo de alcance: para de crescer o que estava registrado nele. */
   onChunkUnloaded(chunk: ChunkColumn): void {
     this.growth.forgetChunk(chunk.cx, chunk.cz);
+    this.fire.forgetChunk(chunk.cx, chunk.cz);
     this.forgetSpawners(chunk.cx, chunk.cz);
   }
 

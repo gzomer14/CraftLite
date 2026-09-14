@@ -13,11 +13,22 @@
 
 import { menuButton, menuPanel, menuRoot, menuRow, messageOf } from './menu';
 
+/** "12 imagens e 3 sons", ou só a metade que existe. */
+function describeContents(summary: PackSummary): string {
+  const images = `${summary.accepted} ${summary.accepted === 1 ? 'imagem' : 'imagens'}`;
+  const count = summary.sounds ?? 0;
+  if (count === 0) return images;
+  const sounds = `${count} ${count === 1 ? 'som' : 'sons'}`;
+  return summary.accepted === 0 ? sounds : `${images} e ${sounds}`;
+}
+
 /** Resumo de uma importação, para a tela contar ao jogador. */
 export interface PackSummary {
   name: string;
   accepted: number;
   ignored: number;
+  /** Amostras de som aceitas. Zero no pacote que só traz arte. */
+  sounds?: number;
 }
 
 export interface PacksCallbacks {
@@ -115,7 +126,7 @@ export class PacksScreen {
     }
     this.current.textContent = pack === null
       ? 'Nenhum pacote — o jogo está usando a arte que ele mesmo gera.'
-      : `Pacote atual: "${pack.name}", ${pack.accepted} imagens.`;
+      : `Pacote atual: "${pack.name}", ${describeContents(pack)}.`;
     this.removeButton.hidden = pack === null;
   }
 
@@ -131,7 +142,7 @@ export class PacksScreen {
       const ignored = summary.ignored > 0
         ? ` ${summary.ignored} ignoradas (nome sem correspondente no jogo).`
         : '';
-      this.setStatus(`${summary.accepted} imagens aceitas.${ignored}`);
+      this.setStatus(`${describeContents(summary)} aceitos.${ignored}`);
       this.applyButton.hidden = false;
       this.applyButton.focus();
       await this.refresh();

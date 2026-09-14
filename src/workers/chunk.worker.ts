@@ -39,7 +39,7 @@ self.onmessage = (event: MessageEvent<WorkerRequest>): void => {
       seed = message.seed;
       noise = new TerrainNoise(seed);
       netherNoise = null;
-      mesher = new GreedyMesher(tables, message.packed);
+      mesher = new GreedyMesher(tables, message.packed, message.smoothLighting !== false);
       break;
     case 'gen':
       reply(handleGen(message.cx, message.cz, message.dim));

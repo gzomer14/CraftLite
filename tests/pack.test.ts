@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
-  PackError, canonicalName, overridesFor, readPack, resample, targetSizeOf,
+  PackError, canonicalName, overridesFor, readPack, resample, soundOverridesFor, targetSizeOf,
   type PackImage, type ResourcePack,
 } from '../src/render/pack';
 import { buildItemSheet } from '../src/render/itemsprites';
@@ -251,3 +251,54 @@ function flat(side: number, rgba: readonly number[]): Uint8ClampedArray {
   }
   return data;
 }
+
+/**
+ * Som no pacote (doc 13 §7 + doc 10).
+ *
+ * É o único item do pack que não é imagem, e o único que entra no jogo **como
+ * veio**: o motor gera onda, e a amostra do jogador desvia da receita em vez de
+ * substituí-la.
+ */
+describe('som no pacote', () => {
+  it('reconhece o caminho de som com os dois segmentos do nome', () => {
+    expect(canonicalName('sound/mob/zombie_ambient.ogg')).toBe('sound/mob/zombie_ambient');
+    expect(canonicalName('assets/meu/sounds/sound/ui/click.mp3')).toBe('sound/ui/click');
+    expect(canonicalName('sound/click.ogg'), 'nome de um segmento não existe').toBeNull();
+    expect(canonicalName('musica/tema.ogg'), 'fora da pasta sound não vale').toBeNull();
+  });
+
+  it('aceita a amostra de um som que existe e recusa a de um que não existe', async () => {
+    const zip = buildZip([
+      ['sound/mob/zombie_ambient.ogg', new Uint8Array([1, 2, 3, 4])],
+      ['sound/mob/dragao_ambient.ogg', new Uint8Array([5, 6])],
+    ]);
+    const report = await readPack('com som', zip, fakeDecode);
+    expect(report.pack.sounds?.size).toBe(1);
+    expect(report.pack.sounds?.get('mob/zombie_ambient')).toEqual(new Uint8Array([1, 2, 3, 4]));
+    expect(report.ignored).toContain('sound/mob/dragao_ambient.ogg');
+  });
+
+  it('um pacote só de som é válido — não precisa trazer imagem', async () => {
+    const zip = buildZip([['sound/ui/click.wav', new Uint8Array([9, 9, 9])]]);
+    const report = await readPack('só som', zip, fakeDecode);
+    expect(report.pack.textures.size).toBe(0);
+    expect(report.pack.sounds?.size).toBe(1);
+  });
+
+  it('recusa um pacote de áudio grande demais para a cota do doc 11 §4', async () => {
+    const big = new Uint8Array(1024 * 1024 + 1);
+    const zip = buildZip([
+      ['sound/ui/click.ogg', big],
+      ['sound/ui/xp.ogg', big],
+      ['sound/ui/enchant.ogg', big],
+    ]);
+    await expect(readPack('gigante', zip, fakeDecode)).rejects.toThrow(PackError);
+  });
+
+  it('pacote guardado antes do som volta do banco sem quebrar', () => {
+    // `sounds` é opcional justamente para isto: nada de migração de banco.
+    const old = { name: 'antigo', importedAt: 0, textures: new Map() };
+    expect(soundOverridesFor(old as never).size).toBe(0);
+    expect(soundOverridesFor(null).size).toBe(0);
+  });
+});

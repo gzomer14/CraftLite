@@ -66,6 +66,23 @@ const CAUSE_MESSAGES: Record<DamageCause, string> = {
  */
 const ARMOR_BYPASS: readonly DamageCause[] = ['starve', 'void', 'drown', 'suffocate'];
 
+/**
+ * O que o ambiente faz ao jogador neste tick.
+ *
+ * `onFire` estava prometido no comentário de `tick` desde o M4 e **não existia
+ * no tipo**: não havia fogo no jogo para ligar nele.
+ */
+export interface SurvivalContext {
+  /** Cabeça debaixo d'água. */
+  submerged: boolean;
+  inLava: boolean;
+  /** Corpo dentro de um bloco de fogo (`world/fire.ts`). */
+  onFire: boolean;
+  /** Cabeça dentro de bloco sólido e opaco. */
+  suffocating: boolean;
+  y: number;
+}
+
 export class Survival {
   health = MAX_HEALTH;
   hunger = MAX_HUNGER;
@@ -92,6 +109,8 @@ export class Survival {
   private starveTimer = 0;
   private drownTimer = 0;
   private suffocateTimer = 0;
+  /** Ticks dentro do fogo desde o último dano. */
+  private fireTimer = 0;
 
   /** Chamado ao morrer. */
   onDeath: ((cause: DamageCause) => void) | null = null;
@@ -121,7 +140,7 @@ export class Survival {
    * Um tick de sobrevivência.
    * `submerged` = cabeça debaixo d'água; `inLava`/`onFire` para o dano contínuo.
    */
-  tick(context: { submerged: boolean; inLava: boolean; suffocating: boolean; y: number }): void {
+  tick(context: SurvivalContext): void {
     if (this.invulnerable > 0) this.invulnerable--;
     if (this.isDead) return;
 
@@ -175,9 +194,7 @@ export class Survival {
     if (this.health > floor) this.damage(1, 'starve', true);
   }
 
-  private tickEnvironment(context: {
-    submerged: boolean; inLava: boolean; suffocating: boolean; y: number;
-  }): void {
+  private tickEnvironment(context: SurvivalContext): void {
     // Afogamento: o ar só volta fora d'água.
     if (context.submerged) {
       if (this.air > 0) {
@@ -205,6 +222,22 @@ export class Survival {
     }
 
     if (context.inLava) this.damage(4, 'lava');
+    /*
+     * Fogo: metade do dano da lava e a cada meio segundo, não a cada tick.
+     *
+     * O contrato dele é **poder escapar**: atravessar uma chama correndo custa
+     * caro, ficar parado nela mata. Com dano por tick, um bloco de fogo era
+     * morte instantânea e o incêndio deixava de ser jogável.
+     */
+    if (context.onFire) {
+      this.fireTimer++;
+      if (this.fireTimer >= 10) {
+        this.fireTimer = 0;
+        this.damage(2, 'fire');
+      }
+    } else {
+      this.fireTimer = 0;
+    }
     // Void: abaixo de Y=−5, ignora invulnerabilidade e armadura.
     if (context.y < -5) this.damage(4, 'void', true);
   }

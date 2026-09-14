@@ -8,7 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import { Survival, EXHAUSTION, MAX_HEALTH, MAX_HUNGER } from '../src/game/survival';
 
-const CALM = { submerged: false, inLava: false, suffocating: false, y: 64 };
+const CALM = { submerged: false, inLava: false, onFire: false, suffocating: false, y: 64 };
 
 function run(s: Survival, ticks: number, context = CALM): void {
   for (let i = 0; i < ticks; i++) s.tick(context);
@@ -287,5 +287,46 @@ describe('respawn', () => {
     expect(s.hunger).toBe(MAX_HUNGER);
     expect(s.isDead).toBe(false);
     expect(s.lastCause).toBeNull();
+  });
+});
+
+/**
+ * Fogo (doc 04 `flammable` + `world/fire.ts`).
+ *
+ * O contrato é **poder escapar**: atravessar uma chama custa caro, ficar
+ * parado nela mata. Com dano por tick um único bloco de fogo seria morte
+ * instantânea, e um incêndio deixaria de ser algo com que se convive.
+ */
+describe('dano de fogo', () => {
+  const BURNING = { ...CALM, onFire: true };
+
+  it('não mata em um tick — dá para atravessar a chama', () => {
+    const s = new Survival();
+    s.tick(BURNING);
+    expect(s.health).toBe(MAX_HEALTH);
+  });
+
+  it('cobra a cada meio segundo enquanto o jogador ficar dentro', () => {
+    const s = new Survival();
+    run(s, 10, BURNING);
+    expect(s.health).toBeLessThan(MAX_HEALTH);
+    const afterFirst = s.health;
+    run(s, 10, BURNING);
+    expect(s.health).toBeLessThan(afterFirst);
+  });
+
+  it('sair do fogo zera a conta: dez ticks dentro e dez fora não machucam', () => {
+    const s = new Survival();
+    for (let i = 0; i < 5; i++) s.tick(BURNING);
+    for (let i = 0; i < 20; i++) s.tick(CALM);
+    for (let i = 0; i < 5; i++) s.tick(BURNING);
+    expect(s.health).toBe(MAX_HEALTH);
+  });
+
+  it('a causa da morte é a do doc', () => {
+    const s = new Survival();
+    run(s, 400, BURNING);
+    expect(s.isDead).toBe(true);
+    expect(s.lastCause).toBe('fire');
   });
 });

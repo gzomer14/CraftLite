@@ -11,12 +11,10 @@
  *    é o `PannerNode`, então eles são reusados em vez de recriados.
  */
 
-import { SOUNDS, buildGraph, durationOf, type Recipe } from './synth';
+import { SOUNDS, buildGraph, durationOf, rateFor, type Recipe } from './synth';
+import { BUSES, busFor, type Bus } from '../data/soundbuses';
 
-/** Barramentos do doc 10 §1. */
-export type Bus = 'block' | 'mob' | 'ambient' | 'ui' | 'music';
-
-const BUSES: readonly Bus[] = ['block', 'mob', 'ambient', 'ui', 'music'];
+export type { Bus };
 
 /** Alcance de um som posicional, em blocos (doc 10 §1). */
 const MAX_DISTANCE = 16;
@@ -36,6 +34,15 @@ export interface AudioOptions {
   voices?: number;
   /** Taxa de amostragem do render offline; 22050 corta o custo pela metade. */
   sampleRate?: number;
+  /**
+   * Amostras do resource pack do jogador (`render/pack.ts`), por nome de som.
+   *
+   * Elas **desviam** da receita em vez de substituí-la: quem tem uma amostra é
+   * decodificado pelo navegador, quem não tem continua sendo sintetizado. Um
+   * arquivo que o navegador não sabe ler cai de volta na receita, porque
+   * ficar sem o som seria pior que ignorar a escolha do jogador.
+   */
+  soundOverrides?: ReadonlyMap<string, Uint8Array>;
 }
 
 export class AudioEngine {
@@ -52,8 +59,17 @@ export class AudioEngine {
 
   /** Volumes 0..1, aplicados assim que o contexto existir. */
   private readonly volumes: Record<Bus | 'master', number> = {
-    master: 1, block: 1, mob: 1, ambient: 1, ui: 1, music: 0.6,
+    master: 1, block: 1, hostile: 1, friendly: 1, player: 1, ambient: 1,
+    weather: 1, ui: 1, music: 0.6,
   };
+
+  /**
+   * Sons em loop (chuva), por nome. Um `AudioBufferSourceNode` com
+   * `loop = true` por som, criado uma vez e mantido tocando — o ganho é que
+   * sobe e desce. Recriar a fonte a cada mudança de intensidade daria um
+   * estalo a cada tick de clima.
+   */
+  private readonly loops = new Map<string, { source: AudioBufferSourceNode; gain: GainNode }>();
 
   /** Legendas de som (doc 10 §4): `(texto, direção)`. */
   onSubtitle: ((text: string, direction: number) => void) | null = null;
@@ -65,9 +81,20 @@ export class AudioEngine {
   private listenerZ = 0;
   private listenerYaw = 0;
 
+  /** Amostras do pack do jogador, por nome de som. */
+  private readonly overrides: ReadonlyMap<string, Uint8Array>;
+  /** Quantos sons vieram do pack em vez da síntese — o relatório da tela. */
+  private overridden = 0;
+
   constructor(options: AudioOptions = {}) {
     this.voiceCount = options.voices ?? 16;
     this.sampleRate = options.sampleRate ?? 22050;
+    this.overrides = options.soundOverrides ?? new Map();
+  }
+
+  /** Sons substituídos pelo pack do jogador. */
+  get packSounds(): number {
+    return this.overridden;
   }
 
   get enabled(): boolean {
@@ -159,20 +186,53 @@ export class AudioEngine {
   }
 
   /** Toca um som posicional. Fora de alcance ou sem contexto: não faz nada. */
-  play(name: string, x: number, y: number, z: number, gain = 1, bus: Bus = 'block'): void {
+  play(name: string, x: number, y: number, z: number, gain = 1, bus?: Bus): void {
     if (!this.enabled) return;
+    const target = bus ?? busFor(name);
     const dx = x - this.listenerX;
     const dy = y - this.listenerY;
     const dz = z - this.listenerZ;
     if (dx * dx + dy * dy + dz * dz > MAX_DISTANCE * MAX_DISTANCE * 4) return;
-    this.playBuffer(name, gain, bus, x, y, z);
+    this.playBuffer(name, gain, target, x, y, z);
     this.emitSubtitle(name, dx, dz);
   }
 
   /** Toca sem posição — interface, dano no próprio jogador. */
-  playUi(name: string, gain = 1, bus: Bus = 'ui'): void {
+  playUi(name: string, gain = 1, bus?: Bus): void {
     if (!this.enabled) return;
-    this.playBuffer(name, gain, bus, null, null, null);
+    this.playBuffer(name, gain, bus ?? busFor(name), null, null, null);
+  }
+
+  /**
+   * Volume de um som em loop, 0..1. Zero silencia sem parar a fonte — parar e
+   * recomeçar custaria um estalo e um `AudioBufferSourceNode` novo, que não
+   * pode ser reusado depois de `stop()`.
+   *
+   * A fonte nasce na primeira chamada com volume > 0; antes disso o loop nem
+   * existe, então um mundo que nunca chove não paga nada.
+   */
+  setLoop(name: string, level: number, bus: Bus = 'weather'): void {
+    const ctx = this.ctx;
+    const clamped = Math.max(0, Math.min(1, level));
+    const existing = this.loops.get(name);
+    if (existing !== undefined) {
+      existing.gain.gain.value = clamped;
+      return;
+    }
+    if (clamped <= 0 || !this.enabled || ctx === null) return;
+    const buffer = this.buffers.get(name);
+    const target = this.busGains.get(bus);
+    if (buffer === undefined || target === undefined) return;
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    const gain = ctx.createGain();
+    gain.gain.value = clamped;
+    source.connect(gain);
+    gain.connect(target);
+    source.start();
+    this.loops.set(name, { source, gain });
   }
 
   private playBuffer(
@@ -247,8 +307,36 @@ export class AudioEngine {
   private async renderAll(): Promise<void> {
     const names = Object.keys(SOUNDS);
     for (const name of names) {
-      const buffer = await renderRecipe(SOUNDS[name], this.sampleRate);
+      // Cada receita renderiza na taxa de que precisa (`rateFor`): o passo na
+      // areia não guarda banda que o próprio lowpass jogou fora. Vale ~28% da
+      // memória de áudio, que em T0 é memória de verdade.
+      const recipe = SOUNDS[name];
+      const sample = await this.decodeOverride(name);
+      if (sample !== null) {
+        this.buffers.set(name, sample);
+        this.overridden++;
+        continue;
+      }
+      const buffer = await renderRecipe(recipe, rateFor(recipe, this.sampleRate));
       if (buffer !== null) this.buffers.set(name, buffer);
+    }
+  }
+
+  /**
+   * Amostra do pack decodificada, ou `null` se não há uma — ou se ela não
+   * abriu. Falhar aqui volta para a receita, em silêncio: o jogo não fica mudo
+   * porque o `.ogg` do jogador está corrompido.
+   */
+  private async decodeOverride(name: string): Promise<AudioBuffer | null> {
+    const bytes = this.overrides.get(name);
+    const ctx = this.ctx;
+    if (bytes === undefined || ctx === null) return null;
+    try {
+      // `slice()` porque `decodeAudioData` **assume a posse** do buffer e o
+      // deixa destacado: os bytes originais moram no pack, que continua vivo.
+      return await ctx.decodeAudioData(bytes.slice().buffer as ArrayBuffer);
+    } catch {
+      return null;
     }
   }
 

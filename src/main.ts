@@ -10,6 +10,7 @@
  */
 
 import { AudioEngine } from './audio/engine';
+import { BUSES, BUS_SETTING } from './data/soundbuses';
 import { Music } from './audio/music';
 import { blockSound } from './audio/synth';
 import { GameLoop } from './core/loop';
@@ -32,6 +33,7 @@ import { SettingsStore } from './game/settings';
 import { Session } from './game/session';
 import { MAX_AIR } from './game/survival';
 import { Controls } from './input/controls';
+import { Keybinds } from './input/keybinds';
 import { Atlas } from './render/atlas';
 import { DynamicScale } from './render/dynamicscale';
 import { EntityAtlas, ARROW_LAYER, BOAT_LAYER, MINECART_LAYER } from './render/entityatlas';
@@ -40,7 +42,7 @@ import { ItemRenderer } from './render/itemrender';
 import { HandRenderer } from './render/hand';
 import { ItemSprites, SPRITE_SIZE } from './render/itemsprites';
 import { HD_SPRITE_SIZE } from './render/itemart3d';
-import { loadPack, overridesFor } from './render/pack';
+import { loadPack, overridesFor, soundOverridesFor } from './render/pack';
 import { MobRenderer } from './render/mobrender';
 import { Renderer } from './render/renderer';
 import { SaveDatabase, isAvailable as saveAvailable, type WorldMeta } from './save/db';
@@ -75,11 +77,17 @@ async function boot(): Promise<void> {
   const canvas: HTMLCanvasElement = view;
 
   const settings = new SettingsStore();
+  /*
+   * As teclas nascem **antes** do mundo, como as opções: a tela de opções é
+   * alcançável pelo título, e ela precisa da mesma instância que o `Controls`
+   * vai usar lá na frente — senão remapear no menu não valeria em jogo.
+   */
+  const keybinds = new Keybinds();
   const pwa = registerServiceWorker();
   pwa.onUpdateAvailable = showUpdateToast;
 
   progress(0.1, 'criando contexto gráfico…');
-  const ctx = createContext(canvas);
+  const ctx = createContext(canvas, settings.get('vsync'));
 
   const device = readDeviceInfo(ctx.caps);
   /*
@@ -141,7 +149,10 @@ async function boot(): Promise<void> {
   const mobRenderer = new MobRenderer(ctx, entityAtlas, preset.tier === 0 ? 320 : 768);
   renderer.mobRenderer = mobRenderer;
   // Áudio só nasce no primeiro gesto (doc 10 §1); até lá tudo é descartado.
-  const audio = new AudioEngine({ voices: preset.tier === 0 ? 8 : 16 });
+  const audio = new AudioEngine({
+    voices: preset.tier === 0 ? 8 : 16,
+    soundOverrides: soundOverridesFor(pack),
+  });
   audio.subtitlesEnabled = settings.get('subtitles');
   let music: Music | null = null;
   const dynamicScale = new DynamicScale(preset.targetFps);
@@ -152,7 +163,7 @@ async function boot(): Promise<void> {
   hideBootScreen();
 
   // --- fluxo de menus: título → mundos → jogo ------------------------------
-  const menu = new MenuFlow(db, settings, {
+  const menu = new MenuFlow(db, settings, keybinds, {
     start: (meta) => { void startGame(meta); },
   });
 
@@ -184,6 +195,8 @@ async function boot(): Promise<void> {
     workers: preset.workers,
     renderDistance: preset.renderDistance,
     packed: ctx.gl2 !== null,
+    // Recarrega, como a qualidade: o AO é assado no mesh de cada section.
+    smoothLighting: settings.get('smoothLighting'),
     targetFps: preset.targetFps,
   });
   pipeline.onChunkUnloaded = (chunk) => {
@@ -282,7 +295,9 @@ async function boot(): Promise<void> {
       if (settings.get('vibration')) navigator.vibrate?.(6);
       audio.playUi('player/pickup', 0.5);
     },
-    onSound: (name, x, y, z) => audio.play(name, x, y, z, 1, name.startsWith('mob/') ? 'mob' : 'block'),
+    // O barramento sai do nome do som (`data/soundbuses.ts`); quem dispara não
+    // precisa saber em qual slider de volume ele cai.
+    onSound: (name, x, y, z) => audio.play(name, x, y, z),
     onMessage: (text) => hud.showMessage(text),
     onAchievement: (title, description) => hud.showAchievement(title, description),
     onHurt: () => {
@@ -296,6 +311,11 @@ async function boot(): Promise<void> {
     simulationDistance: preset.simulationDistance,
   });
   const dayNight = session.dayNight;
+  /*
+   * Trovão: o único som do jogo que não vem de perto do jogador. Toca sem
+   * posição, porque um raio a 300 blocos continua sendo ouvido.
+   */
+  session.weather.onLightning = () => { audio.playUi('weather/thunder', 0.9, 'weather'); };
   session.survival.difficulty = meta.difficulty;
   const inventory = session.inventory;
   const interaction = session.interaction;
@@ -307,10 +327,40 @@ async function boot(): Promise<void> {
   renderer.handRenderer = handRenderer;
 
   // --- persistência (doc 11) ------------------------------------------------
+  /*
+   * Miniatura do mundo (doc 08 §3.2).
+   *
+   * O contexto nasce com `preserveDrawingBuffer: false` — ligá-lo custaria uma
+   * cópia do backbuffer **todo frame** —, então o canvas só pode ser lido
+   * dentro do mesmo quadro em que foi desenhado. Daí o desenho em duas partes:
+   * o render copia para um canvas pequeno logo depois de desenhar, e o save
+   * pega os bytes quando precisar deles.
+   */
+  const thumbCanvas = document.createElement('canvas');
+  thumbCanvas.width = 160;
+  thumbCanvas.height = 90;
+  const thumbCtx = thumbCanvas.getContext('2d');
+  let thumbPending = true;
+  let thumbData = '';
+
+  /** Copia o quadro recém-desenhado para o canvas pequeno. */
+  function grabThumbnail(): void {
+    if (!thumbPending || thumbCtx === null) return;
+    thumbPending = false;
+    try {
+      thumbCtx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+      thumbData = thumbCanvas.toDataURL('image/png');
+    } catch {
+      // Canvas "sujo" ou contexto perdido: o mundo fica sem miniatura.
+      thumbData = '';
+    }
+  }
+
   const save = db === null
     ? null
     : new SaveGame(new SaveManager(db, meta.id), session, player, meta, {
       onError: (message) => hud.showMessage(`Falha ao salvar: ${message}`, 120),
+      captureThumbnail: () => decodeDataUrl(thumbData),
     });
 
   let restored = false;
@@ -388,7 +438,10 @@ async function boot(): Promise<void> {
       else togglePause();
     },
     onInventory: () => toggleInventory(),
-  });
+    // Largar o item da mão no chão (doc 08 §3.5). O `onDrop` do inventário já
+    // vai parar na `Session`, que cria a entidade com o arremesso.
+    onDropItem: (whole) => { inventory.dropSelected(whole); },
+  }, keybinds);
 
   /** No criativo, `E` abre a paleta de itens; no sobrevivência, a mochila. */
   function toggleInventory(): void {
@@ -450,12 +503,17 @@ async function boot(): Promise<void> {
     if (audioStarted) return;
     audioStarted = true;
     void audio.start().then(() => {
-      audio.setVolume('master', settings.get('masterVolume'));
-      audio.setVolume('music', settings.get('musicVolume'));
+      applyVolumes();
       music = new Music(audio.context, audio.busNode('music'));
       music.enabled = settings.get('musicVolume') > 0;
     });
   }
+  /** Os nove sliders de volume do doc 08 §3.11, em uma passada. */
+  function applyVolumes(): void {
+    audio.setVolume('master', settings.get('masterVolume'));
+    for (const bus of BUSES) audio.setVolume(bus, settings.get(BUS_SETTING[bus]));
+  }
+
   audio.onSubtitle = (text, direction) => hud.showSubtitle(text, direction);
   for (const event of ['pointerdown', 'keydown'] as const) {
     window.addEventListener(event, startAudio, { once: false, passive: true });
@@ -493,6 +551,7 @@ async function boot(): Promise<void> {
     skyLight: 15,
     entities: { mobs: 0, items: 0, arrows: 0, paths: 0 },
     redstone: 0,
+    fire: 0,
     clock: '00:00',
     sounds: 0,
   };
@@ -717,6 +776,22 @@ async function boot(): Promise<void> {
       }
       modeBPlace = false;
 
+      /*
+       * Balanço da câmera: a fase avança com a distância andada no chão.
+       *
+       * Ligar pelo tempo em vez da distância faria a câmera balançar parada de
+       * costas para a parede, empurrando contra ela.
+       */
+      const camera = renderer.camera;
+      if (settings.get('cameraBob') && player.onGround) {
+        const walked = Math.hypot(player.x - player.prevX, player.z - player.prevZ);
+        camera.bobPhase += walked * 2.4;
+        // A intensidade acompanha a velocidade: passo lento balança pouco.
+        camera.bobStrength = Math.min(1, walked * 5);
+      } else {
+        camera.bobStrength = 0;
+      }
+
       renderer.particles.tick();
       // Chuva: um punhado de gotas por tick em volta do jogador, no mesmo pool
       // das outras partículas (doc 03 §8).
@@ -726,7 +801,17 @@ async function boot(): Promise<void> {
           renderer.particles.emitRain(player.x, player.y, player.z, 10, drops);
         }
       }
+      /*
+       * Chuva no ouvido: um loop só, com o ganho seguindo a intensidade.
+       *
+       * Fica embaixo de telhado? Continua chovendo — o som atravessa, e medir
+       * cobertura por raycast a cada tick custaria mais do que o realismo vale.
+       */
+      audio.setLoop('weather/rain', session.weather.intensity * 0.9);
       save?.tick();
+      // Uma foto nova a cada 30 s, para a tela de seleção mostrar o mundo como
+      // ele está e não como estava na primeira vez que foi salvo.
+      if (loop.stats.tick % 600 === 0) thumbPending = true;
       tickFootsteps();
       music?.tick();
       hud.tick();
@@ -787,12 +872,26 @@ async function boot(): Promise<void> {
         world.getSkyLight(eyeX, eyeY, eyeZ) * dayNight.dayFactor,
       ) / 15;
 
+      /*
+       * Campo de visão: o valor das opções mais o "puxão" de correr, escalado
+       * pelo controle de distorção da Acessibilidade (doc 08 §6). Em 0% a
+       * câmera não mexe — que é exatamente o que quem tem enjoo de movimento
+       * precisa —, em 100% ela abre 12% ao correr.
+       */
+      const distortion = settings.get('distortion') / 100;
+      const wantFov = settings.get('fov') * (controls.state.sprint ? 1 + 0.12 * distortion : 1);
+      // Interpolação por frame: um salto de FOV é mais desagradável que o efeito.
+      camera.fovDeg += (wantFov - camera.fovDeg) * 0.18;
+
+      renderer.skyFlash = session.weather.flash;
       renderer.setDayTime(dayNight.time, dayNight.dayFactor, session.weather.intensity);
       audio.setListener(camera.x, camera.y, camera.z, player.yaw);
       if (music !== null) {
         music.mood = player.y < SEA_LEVEL - 6 ? 'underground' : 'surface';
       }
       renderer.render(alpha);
+      // Ainda no mesmo quadro: depois disto o navegador descarta o backbuffer.
+      grabThumbnail();
 
       if (settings.get('dynamicResolution')) {
         // Enquanto há chunk na fila, o frame time mede carregamento, não o
@@ -809,6 +908,7 @@ async function boot(): Promise<void> {
         session.armorPoints,
       );
       hud.setExperience(session.xp.level, session.xp.progress);
+      hud.setFps(loop.stats.fps, settings.get('showFps'));
       if (isTouchDevice) {
         const stick = controls.touch.joystick;
         const aimX = ((controls.aimNdcX + 1) / 2) * window.innerWidth;
@@ -828,6 +928,7 @@ async function boot(): Promise<void> {
         debugSource.entities.arrows = session.projectiles.active;
         debugSource.entities.paths = session.mobs.pathsComputed;
         debugSource.redstone = session.redstone.lastUpdates;
+        debugSource.fire = session.fire.burning;
         debugSource.clock = dayNight.clock;
         debugSource.sounds = audio.loadedSounds;
         updateDebugSource(debugSource, renderer, pipeline, world, player);
@@ -873,21 +974,41 @@ async function boot(): Promise<void> {
   function applyPlayfieldSettings(): void {
     applyRenderDistance();
     player.autoJump = settings.get('autoJump');
-    renderer.camera.fovDeg = settings.get('fov');
     // Brilho 0–100 → piso de luz ambiente do shader. 50 mantém o 0.06 de antes,
     // e o topo clareia a caverna sem apagar a diferença entre dia e noite.
     renderer.minSkyLight = 0.02 + (settings.get('brightness') / 100) * 0.16;
     hud.applyAccessibility(
       settings.get('highContrast'), settings.get('textScale'), settings.get('damageFlash'),
+      settings.get('colorBlind'),
     );
+
+    /*
+     * O resto da tabela de Vídeo do doc 08 §3.11.
+     *
+     * Tudo que é `auto` cai no preset do tier (`core/tier.ts`), que continua
+     * sendo o padrão do aparelho; o jogador só sobrescreve o que quiser.
+     */
+    const clouds = settings.get('clouds');
+    renderer.clouds.mode = clouds === 'auto' ? preset.clouds : clouds;
+    const particles = settings.get('particles');
+    renderer.particles.setMode(particles === 'auto' ? preset.particles : particles);
+    renderer.fogMode = settings.get('fog');
+    renderer.applyFog();
+    renderer.highContrastOutline = settings.get('highContrastOutline');
+
+    // Distância de simulação: é o raio em que mob nasce e some (doc 07 §4).
+    const simulation = settings.get('simulationDistance');
+    session.spawner.simulationDistance = simulation > 0 ? simulation : preset.simulationDistance;
+
+    session.weather.showFlashes = !settings.get('hideSkyFlashes');
+
     renderer.resize();
   }
   applyPlayfieldSettings();
   refreshObjective();
   settings.onChange((next) => {
     loop.maxFps = next.maxFps;
-    audio.setVolume('master', next.masterVolume);
-    audio.setVolume('music', next.musicVolume);
+    applyVolumes();
     audio.subtitlesEnabled = next.subtitles;
     session.survival.difficulty = next.difficulty as 0 | 1 | 2 | 3;
     if (music !== null) music.enabled = next.musicVolume > 0;
@@ -938,6 +1059,23 @@ async function boot(): Promise<void> {
       containerScreen, creativeScreen, deathScreen, pauseMenu,
     },
   });
+  }
+}
+
+/**
+ * `data:image/png;base64,…` → bytes. Sem `fetch`, que é assíncrono e teria que
+ * esperar por um dado que já está na mão.
+ */
+function decodeDataUrl(url: string): Uint8Array | null {
+  const comma = url.indexOf(',');
+  if (comma < 0 || !url.startsWith('data:image/png;base64,')) return null;
+  try {
+    const binary = atob(url.slice(comma + 1));
+    const out = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+    return out;
+  } catch {
+    return null;
   }
 }
 

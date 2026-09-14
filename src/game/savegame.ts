@@ -45,6 +45,14 @@ export interface TileRecord {
 export interface SaveGameOptions {
   /** Chamado quando a gravação falha, para a UI avisar. */
   onError?: (message: string) => void;
+  /**
+   * Miniatura do mundo em PNG, ou `null` se não houver uma pronta.
+   *
+   * Quem tira a foto é o render (o canvas precisa estar desenhado no mesmo
+   * quadro, ver `main.ts`); o save só a guarda. Fica como callback para este
+   * módulo continuar testável sem canvas nenhum.
+   */
+  captureThumbnail?: () => Uint8Array | null;
 }
 
 export class SaveGame {
@@ -295,7 +303,12 @@ export class SaveGame {
       await this.manager.savePlayer(this.snapshot());
       await this.manager.saveTiles(this.session.tileEntities.map(tileFrom));
       await this.manager.saveVehicles(this.session.vehicleSnapshot());
+      // Mede **depois** de gravar os chunks: senão o número seria o do mundo
+      // de antes deste save.
+      await this.manager.measureWorld(this.meta);
       await this.manager.saveWorldMeta(this.meta);
+      const png = this.options.captureThumbnail?.() ?? null;
+      if (png !== null) await this.manager.saveThumbnail(png);
     } catch (error) {
       this.options.onError?.(error instanceof Error ? error.message : String(error));
     }

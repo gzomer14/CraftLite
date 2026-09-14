@@ -87,10 +87,21 @@ export class Particles {
   private readonly capacity: number;
   private count = 0;
 
+  /**
+   * Teto vivo de partículas, do controle "Partículas" do doc 08 §3.11.
+   *
+   * Os arrays são alocados **sempre no máximo** (1024 posições, ~36 KB de
+   * `TypedArray` somando tudo) e o modo mexe só neste número. Dimensionar o
+   * array pelo preset economizaria 30 KB num aparelho de 2 GB e, em troca,
+   * faria o jogador de T0 que escolhe "Todas" não ver diferença nenhuma — o
+   * controle mentiria. Trinta quilobytes não valem uma opção que não funciona.
+   */
+  limit: number;
+
   constructor(ctx: GlContext, preset: Preset) {
     this.ctx = ctx;
-    // Menos partículas em T0: o preset já diz o quanto o aparelho aguenta.
-    this.capacity = preset.particles === 'min' ? 128 : preset.particles === 'reduced' ? 384 : 1024;
+    this.capacity = MAX_PARTICLES;
+    this.limit = limitFor(preset.particles);
 
     this.px = new Float32Array(this.capacity);
     this.py = new Float32Array(this.capacity);
@@ -121,6 +132,12 @@ export class Particles {
     return this.count;
   }
 
+  /** Aplica o modo escolhido nas opções. */
+  setMode(mode: 'min' | 'reduced' | 'all'): void {
+    this.limit = limitFor(mode);
+    if (this.count > this.limit) this.count = this.limit;
+  }
+
   /**
    * Emite `n` partículas saindo de um bloco, com a cor média da textura dele
    * (doc 06 §4). A cor vem pronta do chamador para não ler textura no tick.
@@ -129,7 +146,7 @@ export class Particles {
     x: number, y: number, z: number, n: number, r: number, g: number, b: number,
   ): void {
     for (let i = 0; i < n; i++) {
-      if (this.count >= this.capacity) return;
+      if (this.count >= this.limit) return;
       const s = this.count++;
       this.px[s] = x + Math.random();
       this.py[s] = y + Math.random();
@@ -154,7 +171,7 @@ export class Particles {
    * se o pool encher, que é exatamente o comportamento desejado em T0.
    */
   emitGlow(x: number, y: number, z: number, r: number, g: number, b: number): void {
-    if (this.count >= this.capacity) return;
+    if (this.count >= this.limit) return;
     const s = this.count++;
     this.px[s] = x;
     this.py[s] = y;
@@ -180,7 +197,7 @@ export class Particles {
    */
   emitRain(x: number, y: number, z: number, radius: number, budget: number): void {
     for (let i = 0; i < budget; i++) {
-      if (this.count >= this.capacity) return;
+      if (this.count >= this.limit) return;
       const s = this.count++;
       this.px[s] = x + (Math.random() - 0.5) * radius * 2;
       this.py[s] = y + 6 + Math.random() * 4;
@@ -294,4 +311,12 @@ export class Particles {
     gl.deleteBuffer(this.instanceBuffer);
     gl.deleteProgram(this.program);
   }
+}
+
+/** Teto absoluto de partículas vivas — o tamanho dos arrays. */
+const MAX_PARTICLES = 1024;
+
+/** Quantas partículas cada modo do doc 08 §3.11 deixa viver. */
+function limitFor(mode: 'min' | 'reduced' | 'all'): number {
+  return mode === 'min' ? 128 : mode === 'reduced' ? 384 : MAX_PARTICLES;
 }

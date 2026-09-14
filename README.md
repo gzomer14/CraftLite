@@ -4,7 +4,8 @@ Este repositório contém **a especificação completa** de um jogo de mundo abe
 navegador — um jogo de minerar-e-construir que roda em praticamente qualquer máquina, incluindo
 celulares antigos — e a **implementação em andamento**.
 
-**Estado atual: os oito marcos, de M0 a M7, estão concluídos — M0 a M6 validados no aparelho-alvo. Falta jogar o M7 no J7 Metal.**
+**Estado atual: os oito marcos, de M0 a M7, estão concluídos, e nenhum documento normativo tem mais
+pendência de funcionalidade. Falta jogar em aparelho o que foi entregue depois do M7.**
 
 - **M0 — esqueleto:** Vite + TypeScript strict, renderer WebGL2 próprio com fallback WebGL1,
   detecção de tier, loop de 20 Hz com interpolação, gerador procedural de texturas alimentando um
@@ -63,8 +64,16 @@ celulares antigos — e a **implementação em andamento**.
   quadriculada, com volume, especular por material e contorno. Não é resource pack e não baixa
   nada: são os mesmos desenhos, iluminados. Custo em jogo: zero dos dois lados, porque só muda os
   bytes gerados no boot.
+- **Acabamento pós-M7:** a tabela de Vídeo e a de Acessibilidade do doc 08 ficaram inteiras —
+  distância de simulação, gráficos Rápido/Bonito, **nuvens** (um plano no céu com a forma feita no
+  shader, uma draw call), partículas, névoa, iluminação suave, balanço da câmera, contador de FPS,
+  vsync, modo daltônico, contorno em alto contraste, distorção e flashes do céu. Mais **teclas
+  remapeáveis**, **nove sliders de som** (o motor ganhou os barramentos que faltavam), **fogo que se
+  espalha** — o `flammable` da tabela de blocos estava lá desde o M1 sem ninguém lendo —, o
+  **morcego**, o **boneco do jogador** no inventário, **miniatura e tamanho** na tela de mundos,
+  **canto de escada** e **som no resource pack**.
 
-**175 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
+**185 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
 além de dois ícones de PWA de 6,7 KB, gerados por código.
 
 Validado em aparelho alvo (**Galaxy J7 Metal**, Android 7, 2 GB, Mali-T830) em 2026-09-12:
@@ -77,7 +86,7 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 1179 testes (vitest)
+npm test           # 1269 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
 npm run icons      # regenera os ícones do PWA
@@ -154,7 +163,7 @@ src/
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      1179 testes, incluindo orçamento de performance e de luz
+tests/                      1269 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios

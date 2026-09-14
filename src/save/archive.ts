@@ -25,6 +25,7 @@
  *      varint  tamanho do JSON de veículos  + bytes
  *      varint  número de chunks
  *        por chunk: i32 cx, i32 cz, varint tamanho + bytes (já comprimidos)
+ *  miniatura (v2+): varint tamanho + bytes do PNG (0 = sem miniatura)
  * ```
  *
  * Este módulo é **puro** no que dá: `packArchive` e `unpackArchive` só mexem em
@@ -39,8 +40,16 @@ import {
 
 /** Assinatura do arquivo. Nove bytes, legíveis num editor hexadecimal. */
 export const MAGIC = 'CRAFTLITE';
-/** Versão do formato. Subir aqui obriga a tratar as anteriores em `unpack`. */
-export const ARCHIVE_VERSION = 1;
+/**
+ * Versão do formato. Subir aqui obriga a tratar as anteriores em `unpack`.
+ *
+ * **v2** acrescenta a miniatura no **fim** do arquivo, depois das dimensões.
+ * No fim de propósito: um leitor de v1 encontra tudo que conhece na mesma
+ * ordem e nos mesmos offsets, e o campo novo é lido só quando a versão pede.
+ */
+export const ARCHIVE_VERSION = 2;
+/** Primeira versão com miniatura. */
+const VERSION_WITH_THUMBNAIL = 2;
 /** Extensão sugerida ao jogador. */
 export const ARCHIVE_EXTENSION = '.clw';
 
@@ -63,6 +72,8 @@ export interface WorldArchive {
   meta: WorldMeta;
   players: PlayerSave[];
   dimensions: ArchiveDimension[];
+  /** Miniatura do mundo em PNG (v2+); ausente quando o mundo não tem uma. */
+  thumbnail?: Uint8Array;
 }
 
 const encoder = new TextEncoder();
@@ -93,6 +104,10 @@ export function packArchive(archive: WorldArchive): Uint8Array {
       writer.bytes(chunk.data);
     }
   }
+
+  const thumbnail = archive.thumbnail;
+  writer.varint(thumbnail?.length ?? 0);
+  if (thumbnail !== undefined && thumbnail.length > 0) writer.bytes(thumbnail);
   return writer.finish();
 }
 
@@ -129,7 +144,18 @@ export function unpackArchive(data: Uint8Array): WorldArchive {
     }
     dimensions.push({ dimension, chunks, tiles, vehicles });
   }
-  return { version, meta, players, dimensions };
+
+  /*
+   * Miniatura: só existe da v2 em diante. Ler incondicionalmente faria um
+   * arquivo v1 — que acaba exatamente aqui — estourar em "truncado".
+   */
+  if (version < VERSION_WITH_THUMBNAIL || reader.remaining === 0) {
+    return { version, meta, players, dimensions };
+  }
+  const thumbLength = reader.varint();
+  if (thumbLength === 0) return { version, meta, players, dimensions };
+  if (thumbLength > reader.remaining) throw new ArchiveError('Arquivo truncado.');
+  return { version, meta, players, dimensions, thumbnail: reader.bytes(thumbLength).slice() };
 }
 
 function writeJson(writer: ByteWriter, value: unknown): void {
@@ -174,7 +200,11 @@ export async function exportWorld(db: SaveDatabase, worldId: string): Promise<Ui
     dimensions.push({ dimension, chunks, tiles, vehicles });
   }
 
-  return packArchive({ version: ARCHIVE_VERSION, meta, players, dimensions });
+  const thumbnail = await db.loadThumbnail(worldId);
+  return packArchive({
+    version: ARCHIVE_VERSION, meta, players, dimensions,
+    ...(thumbnail !== undefined ? { thumbnail } : {}),
+  });
 }
 
 /**
@@ -207,6 +237,11 @@ export async function importWorld(db: SaveDatabase, data: Uint8Array): Promise<W
 
   for (const player of archive.players) {
     await db.put(STORE_PLAYERS, { ...player, worldId: meta.id }, [meta.id, player.playerId]);
+  }
+  // A miniatura viaja junto: sem ela, o mundo importado abriria a lista com o
+  // quadro vazio até o jogador entrar nele e salvar uma vez.
+  if (archive.thumbnail !== undefined && archive.thumbnail.length > 0) {
+    await db.saveThumbnail(meta.id, archive.thumbnail);
   }
   await db.put(STORE_WORLDS, meta);
   return meta;

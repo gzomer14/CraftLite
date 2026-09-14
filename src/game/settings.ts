@@ -13,6 +13,15 @@ const STORAGE_KEY = 'craftlite.settings.v1';
 /** Modo de interação por toque (doc 09 §2.2). O A é o padrão. */
 export type TouchMode = 'A' | 'B';
 
+/** Umbrella de qualidade do doc 08 §3.11. `auto` segue o preset do tier. */
+export type GraphicsMode = 'auto' | 'fast' | 'fancy';
+/** Nuvens, partículas e névoa: `auto` segue o preset do tier (doc 02 §1). */
+export type CloudsMode = 'auto' | 'off' | 'fast' | 'fancy';
+export type ParticlesMode = 'auto' | 'min' | 'reduced' | 'all';
+export type FogMode = 'off' | 'near' | 'far';
+/** Modo daltônico (doc 08 §6): remapeia a paleta do HUD. */
+export type ColorBlindMode = 'off' | 'protanopia' | 'deuteranopia' | 'tritanopia';
+
 export interface Settings {
   /** Radianos por pixel de arraste/movimento do mouse. */
   lookSensitivity: number;
@@ -50,14 +59,62 @@ export interface Settings {
   /** Escala de GUI em passos de meio, 0,5–4; 0 = automática pela resolução. */
   guiScale: number;
   dynamicResolution: boolean;
+  /** Distância de simulação em chunks; 0 = automática pelo tier (doc 08 §3.11). */
+  simulationDistance: number;
+  /**
+   * VSync (doc 08 §3.11).
+   *
+   * No navegador não existe "desligar o vsync": quem apresenta o quadro é o
+   * compositor. O que existe é `desynchronized`, o atributo de contexto que
+   * tira o canvas da sincronia com ele — e é exatamente isso que esta opção
+   * liga e desliga. **O padrão é ligado (sincronizado)** porque desligado
+   * causou piscada num painel de taxa variável (ver `render/gl.ts`); quem quiser
+   * os poucos ms de latência a menos escolhe, sabendo do risco. Vale no próximo
+   * carregamento: atributo de contexto só se escolhe ao criar o contexto.
+   */
+  vsync: boolean;
+  /**
+   * Umbrella Rápido/Bonito. Escolher um dos dois **reescreve** nuvens,
+   * partículas, névoa e sombras de uma vez — é um botão só para quem não quer
+   * mexer em seis. Depois disso os controles individuais continuam valendo.
+   */
+  graphics: GraphicsMode;
+  clouds: CloudsMode;
+  particles: ParticlesMode;
+  fog: FogMode;
+  /**
+   * Iluminação suave (AO) no mesh (doc 08 §3.11).
+   *
+   * Vale no próximo carregamento: o AO entra nos vértices quando a section é
+   * meshada, e trocá-lo ao vivo significa remesar o mundo todo. Desligado o
+   * mesh também **encolhe**, porque o merge greedy deixa de quebrar nas bordas.
+   */
+  smoothLighting: boolean;
+  /** Balanço da câmera ao andar (doc 08 §3.11 e §6). */
+  cameraBob: boolean;
+  /** Contador de FPS no canto do HUD, sem abrir o F3. */
+  showFps: boolean;
   /** Teto de FPS; 0 = seguir a taxa de atualização do display. */
   maxFps: number;
   /** "Toque para alternar" em vez de "segurar" (doc 09 §4). */
   toggleSprint: boolean;
   toggleSneak: boolean;
-  /** Volumes 0..1 (doc 10 §1). */
+  /**
+   * Volumes 0..1, um por barramento (doc 08 §3.11: nove sliders).
+   *
+   * `masterVolume` e `musicVolume` mantêm o nome antigo de propósito — eles já
+   * estão no `localStorage` de quem joga, e renomear zeraria a preferência de
+   * todo mundo por nada.
+   */
   masterVolume: number;
   musicVolume: number;
+  blockVolume: number;
+  hostileVolume: number;
+  friendlyVolume: number;
+  playerVolume: number;
+  ambientVolume: number;
+  weatherVolume: number;
+  uiVolume: number;
   /** Legendas de som com direção (doc 10 §4). */
   subtitles: boolean;
   /** Sombra de entidade; desligada em T0 pelo preset. */
@@ -78,6 +135,14 @@ export interface Settings {
   textScale: number;
   /** Clarão vermelho ao levar dano; desligável por acessibilidade. */
   damageFlash: boolean;
+  /** Modo daltônico: remapeia a paleta do HUD (doc 08 §6). */
+  colorBlind: ColorBlindMode;
+  /** Contorno do bloco mirado em alto contraste (doc 08 §6). */
+  highContrastOutline: boolean;
+  /** Esconde o clarão do relâmpago na tempestade (doc 08 §6). */
+  hideSkyFlashes: boolean;
+  /** Intensidade dos efeitos de distorção de câmera, 0–100 (doc 08 §6). */
+  distortion: number;
 }
 
 const DEFAULTS: Settings = {
@@ -93,11 +158,27 @@ const DEFAULTS: Settings = {
   textureStyle: 'nitido',
   guiScale: 0,
   dynamicResolution: true,
+  simulationDistance: 0,
+  vsync: true,
+  graphics: 'auto',
+  clouds: 'auto',
+  particles: 'auto',
+  fog: 'far',
+  smoothLighting: true,
+  cameraBob: true,
+  showFps: false,
   maxFps: 0,
   toggleSprint: false,
   toggleSneak: false,
   masterVolume: 0.8,
   musicVolume: 0.6,
+  blockVolume: 1,
+  hostileVolume: 1,
+  friendlyVolume: 1,
+  playerVolume: 1,
+  ambientVolume: 1,
+  weatherVolume: 1,
+  uiVolume: 1,
   subtitles: false,
   entityShadows: true,
   handItem: true,
@@ -109,6 +190,51 @@ const DEFAULTS: Settings = {
   highContrast: false,
   textScale: 100,
   damageFlash: true,
+  colorBlind: 'off',
+  highContrastOutline: false,
+  hideSkyFlashes: false,
+  distortion: 100,
+};
+
+/**
+ * Valores aceitos das opções de texto. Fica ao lado de `RANGES` e cumpre o
+ * mesmo papel: o que vier do `localStorage` fora da lista é descartado.
+ *
+ * Antes eram dois `if` soltos dentro de `loadStored`, um por opção — e a
+ * terceira opção de texto teria virado o terceiro `if`.
+ */
+const CHOICES: Partial<Record<keyof Settings, readonly string[]>> = {
+  touchMode: ['A', 'B'],
+  textureStyle: ['classico', 'nitido'],
+  graphics: ['auto', 'fast', 'fancy'],
+  clouds: ['auto', 'off', 'fast', 'fancy'],
+  particles: ['auto', 'min', 'reduced', 'all'],
+  fog: ['off', 'near', 'far'],
+  colorBlind: ['off', 'protanopia', 'deuteranopia', 'tritanopia'],
+};
+
+/**
+ * O que "Rápido" e "Bonito" escrevem nos controles individuais (doc 08 §3.11).
+ *
+ * A umbrella não é um valor que o render consulta: ela **mexe nos outros
+ * controles**, como no gênero. Assim não existe estado inconsistente do tipo
+ * "Gráficos: Rápido, Nuvens: Bonitas" — o jogador vê nos sliders o que
+ * escolheu no atalho.
+ */
+const GRAPHICS_PRESETS: Record<'fast' | 'fancy', Partial<Settings>> = {
+  /*
+   * A umbrella **não** mexe em `smoothLighting` nem em `vsync`: os dois só
+   * valem no próximo carregamento, e um atalho que muda alguma coisa agora e
+   * outra daqui a um reinício é pior que não mexer nas duas.
+   */
+  fast: {
+    clouds: 'off', particles: 'min', fog: 'near',
+    entityShadows: false, cameraBob: false,
+  },
+  fancy: {
+    clouds: 'fancy', particles: 'all', fog: 'far',
+    entityShadows: true, cameraBob: true,
+  },
 };
 
 /**
@@ -131,11 +257,20 @@ const RANGES: Partial<Record<keyof Settings, [number, number]>> = {
   longPressMs: [150, 1000],
   touchButtonScale: [0.7, 1.5],
   renderDistance: [0, 32],
+  simulationDistance: [0, 8],
+  distortion: [0, 100],
   quality: [-1, 2],
   guiScale: [0, 4],
   maxFps: [0, 480],
   masterVolume: [0, 1],
   musicVolume: [0, 1],
+  blockVolume: [0, 1],
+  hostileVolume: [0, 1],
+  friendlyVolume: [0, 1],
+  playerVolume: [0, 1],
+  ambientVolume: [0, 1],
+  weatherVolume: [0, 1],
+  uiVolume: [0, 1],
   difficulty: [0, 3],
   fov: [30, 110],
   brightness: [0, 100],
@@ -166,6 +301,11 @@ export class SettingsStore {
     }
     if (this.values[key] === next) return;
     this.values[key] = next;
+    // A umbrella de gráficos escreve os controles que ela resume, antes de
+    // avisar quem ouve: um aviso só, com tudo já no lugar.
+    if (key === 'graphics' && (next === 'fast' || next === 'fancy')) {
+      Object.assign(this.values, GRAPHICS_PRESETS[next as 'fast' | 'fancy']);
+    }
     this.save();
     for (const fn of this.listeners) fn(this.values);
   }
@@ -220,8 +360,8 @@ function loadStored(): Partial<Settings> {
     if (range !== undefined && typeof value === 'number') {
       if (!Number.isFinite(value) || value < range[0] || value > range[1]) continue;
     }
-    if (key === 'touchMode' && value !== 'A' && value !== 'B') continue;
-    if (key === 'textureStyle' && value !== 'classico' && value !== 'nitido') continue;
+    const choices = CHOICES[key];
+    if (choices !== undefined && (typeof value !== 'string' || !choices.includes(value))) continue;
     out[key] = value as never;
   }
   return out;

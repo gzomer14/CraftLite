@@ -11,6 +11,8 @@
  */
 
 import type { Settings, SettingsStore } from '../../game/settings';
+import { KEYBINDS, keyLabel, type ActionId } from '../../data/keybinds';
+import type { Keybinds } from '../../input/keybinds';
 
 /** Um campo de opção ligado a uma chave de `Settings`. */
 export type Field =
@@ -145,6 +147,78 @@ export function buildFields(
   }
 }
 
+/**
+ * Lista de teclas remapeáveis (doc 08 §3.11: "clicar → pressionar tecla;
+ * conflito fica em vermelho").
+ *
+ * Não é um `Field`: o controle não é um input do HTML, é um botão que entra em
+ * modo de escuta e captura o próximo `keydown` **antes** de qualquer outro
+ * ouvinte — inclusive o do jogo, que está por baixo da tela e continuaria
+ * agachando enquanto o jogador escolhe a tecla de agachar.
+ */
+export function buildKeybinds(target: HTMLElement, keybinds: Keybinds): void {
+  const buttons = new Map<ActionId, HTMLButtonElement>();
+  /** Ação em escuta, e como parar de escutar. */
+  let listening: ActionId | null = null;
+  let stopListening: (() => void) | null = null;
+
+  const refresh = (): void => {
+    for (const [id, button] of buttons) {
+      const conflicted = keybinds.conflicts(id).length > 0;
+      button.textContent = id === listening ? 'pressione…' : keyLabel(keybinds.codeFor(id));
+      button.classList.toggle('conflict', conflicted && id !== listening);
+      button.classList.toggle('listening', id === listening);
+      button.setAttribute(
+        'aria-label',
+        `${KEYBINDS.find((b) => b.id === id)?.label ?? id}: ${keyLabel(keybinds.codeFor(id))}`
+        + (conflicted ? ' (em conflito)' : ''),
+      );
+    }
+  };
+
+  const cancel = (): void => {
+    stopListening?.();
+    stopListening = null;
+    listening = null;
+    refresh();
+  };
+
+  const listen = (id: ActionId): void => {
+    cancel();
+    listening = id;
+    const onKey = (e: KeyboardEvent): void => {
+      // Sempre engole a tecla: ela é a escolha do jogador, não um comando.
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.code !== 'Escape') keybinds.set(id, e.code);
+      cancel();
+    };
+    window.addEventListener('keydown', onKey, { capture: true });
+    stopListening = () => window.removeEventListener('keydown', onKey, { capture: true });
+    refresh();
+  };
+
+  for (const bind of KEYBINDS) {
+    const row = document.createElement('div');
+    row.className = 'menu-field';
+    const span = document.createElement('span');
+    span.textContent = bind.label;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'keybind';
+    button.addEventListener('click', () => listen(bind.id));
+    buttons.set(bind.id, button);
+    row.append(span, button);
+    target.appendChild(row);
+  }
+
+  const reset = menuButton('Restaurar teclas', () => { cancel(); keybinds.reset(); }, 'normal');
+  target.appendChild(menuRow(reset));
+
+  keybinds.onChange(refresh);
+  refresh();
+}
+
 /** Seção com título dentro de um painel. */
 export function menuSection(title: string): HTMLDivElement {
   const section = document.createElement('div');
@@ -190,6 +264,13 @@ function injectMenuStyle(): void {
 .menu-field select{flex:0 0 42%;min-height:36px;background:#0e141b;color:#fff;
   border:2px solid #000;padding:6px;font:13px/1 ui-monospace,monospace}
 .menu-field output{flex:0 0 64px;text-align:right;opacity:.8}
+/* Tecla remapeável: o botão mostra a tecla atual, fica amarelo enquanto espera
+   e vermelho quando duas ações dividem a mesma tecla (doc 08 §3.11). */
+.menu-screen button.keybind{flex:0 0 42%;min-width:120px;min-height:36px;padding:6px 8px;
+  background:#0e141b;font-size:12px}
+.menu-screen button.keybind.listening{background:#7d6a2f;color:#fff}
+.menu-screen button.keybind.conflict{background:#7d3f3f;
+  box-shadow:inset 0 0 0 2px #ff9a9a}
 .menu-section{display:flex;flex-direction:column;gap:6px}
 .menu-list{display:flex;flex-direction:column;gap:6px;max-height:46vh;overflow:auto;
   margin-bottom:8px}
@@ -199,6 +280,11 @@ function injectMenuStyle(): void {
 .menu-list .entry .name{font-size:14px}
 .menu-list .entry .meta{font-size:11px;opacity:.65}
 .menu-list .entry .info{flex:1 1 auto;display:flex;flex-direction:column;gap:2px}
+/* Miniatura do mundo: proporção 16:9, quadro vazio enquanto não há foto. */
+.menu-list .entry .thumb{flex:0 0 auto;width:64px;aspect-ratio:16/9;background:#050a0f;
+  border:2px solid #000;background-size:cover;background-position:center;
+  image-rendering:auto}
+.menu-list .entry .thumb.has-image{border-color:#2c3a4a}
 .menu-empty{opacity:.6;font-size:13px;text-align:center;padding:18px 0}
 @media (prefers-reduced-motion:reduce){.menu-screen *{transition:none!important}}
 `;

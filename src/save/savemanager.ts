@@ -204,6 +204,34 @@ export class SaveManager {
     await this.db.put(STORE_WORLDS, meta);
   }
 
+  /**
+   * Mede o mundo no banco e grava o número na meta (doc 11 §5).
+   *
+   * `sizeBytes` nascia 0 e ficava 0 para sempre: a tela de seleção mostrava
+   * "—" em todo mundo, e não havia como o jogador saber qual apagar quando o
+   * aviso de cota do doc 11 §4 aparecesse. A medição é uma varredura, então
+   * acontece junto do `saveAll` e não a cada autosave de chunk.
+   *
+   * Falhar aqui não pode derrubar o salvamento: o tamanho é informação, o
+   * mundo é o dado.
+   */
+  async measureWorld(meta: WorldMeta): Promise<void> {
+    try {
+      meta.sizeBytes = await this.db.worldSize(this.worldId);
+    } catch {
+      // Banco ocupado ou indisponível: fica com o número anterior.
+    }
+  }
+
+  /** Grava a miniatura do mundo (PNG). Falha em silêncio: é enfeite. */
+  async saveThumbnail(png: Uint8Array): Promise<void> {
+    try {
+      await this.db.saveThumbnail(this.worldId, png);
+    } catch {
+      // Sem miniatura a tela de seleção mostra o quadro vazio de sempre.
+    }
+  }
+
   async savePlayer(player: PlayerSave): Promise<void> {
     await this.db.put(STORE_PLAYERS, player, playerKeyFor(this.worldId, player.playerId));
     this.writeEmergency(player);

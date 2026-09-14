@@ -44,6 +44,8 @@ export interface DebugSource {
   entities: { mobs: number; items: number; arrows: number; paths: number };
   /** Posições de circuito reavaliadas no último tick (M7). */
   redstone: number;
+  /** Chamas vivas (`world/fire.ts`). Zero some da linha. */
+  fire: number;
   /** Hora do dia, do ciclo dia/noite. */
   clock: string;
   /** Sons já sintetizados; 0 = áudio ainda não ligou. */
@@ -187,6 +189,8 @@ export class DebugOverlay {
       `E: ${e.mobs} mobs, ${e.items} itens, ${e.arrows} flechas, ${e.paths} caminhos/tick` +
       // Só aparece quando há circuito rodando: linha curta é linha lida.
       (src.redstone > 0 ? `, ${src.redstone} redstone` : '') +
+      // Idem: o teto de chamas é o que importa quando a floresta pega fogo.
+      (src.fire > 0 ? `, ${src.fire} fogo` : '') +
       `   ${src.clock}` + (src.sounds > 0 ? `   ${src.sounds} sons` : '');
     l[8] =
       `T: tick ${s.tickMs.toFixed(1)}ms  mesh-upload ${s.pumpMs.toFixed(1)}ms  ` +

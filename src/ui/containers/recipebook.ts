@@ -33,6 +33,17 @@ export interface RecipeBookCallbacks {
 export class RecipeBookPanel {
   readonly element: HTMLDivElement;
   private readonly list: HTMLDivElement;
+  /**
+   * Prévia da **grade** da receita (doc 08 §3.5).
+   *
+   * O livro mostrava só o resultado: para saber o que entra numa bancada de
+   * ferro era preciso clicar e ver a grade se preencher — e, se faltasse
+   * ingrediente, o clique não fazia nada e o jogador continuava sem saber o
+   * que faltava. A prévia mostra as células, com o que falta em vermelho.
+   *
+   * É um painel só, reusado: montar um por receita encheria a lista de nós.
+   */
+  private readonly preview: HTMLDivElement;
   private readonly search: HTMLInputElement;
   private readonly onlyAvailable: HTMLInputElement;
   private readonly callbacks: RecipeBookCallbacks;
@@ -83,7 +94,70 @@ export class RecipeBookPanel {
     this.list = document.createElement('div');
     this.list.className = 'list';
 
-    this.element.append(header, this.list);
+    this.preview = document.createElement('div');
+    this.preview.className = 'preview';
+    this.preview.hidden = true;
+
+    this.element.append(header, this.list, this.preview);
+  }
+
+  /**
+   * Preenche a prévia com a grade da receita e a mostra.
+   *
+   * Célula vazia fica apagada; célula cujo ingrediente falta na mochila ganha
+   * borda vermelha. Receita sem forma (`shapeless`) sai como uma fileira só,
+   * que é o que ela é.
+   */
+  private showPreview(entry: RecipeEntry, name: string): void {
+    const counts = this.countInventory();
+    this.preview.textContent = '';
+
+    const title = document.createElement('div');
+    title.className = 'title';
+    title.textContent = entry.resultCount > 1 ? `${name} ×${entry.resultCount}` : name;
+    this.preview.appendChild(title);
+
+    const grid = document.createElement('div');
+    grid.className = 'grid';
+    const columns = entry.shapeless ? entry.cells.length : entry.width;
+    grid.style.gridTemplateColumns = `repeat(${Math.max(1, columns)}, auto)`;
+
+    // O mesmo contador do `canCraft`: um ingrediente já gasto não conta duas
+    // vezes, senão duas tábuas na receita ficariam verdes com uma na mochila.
+    const used = new Map<number, number>();
+    for (const cell of entry.cells) {
+      const slot = document.createElement('div');
+      slot.className = 'cell';
+      if (cell === null || cell === undefined || cell.length === 0) {
+        grid.appendChild(slot);
+        continue;
+      }
+      const chosen = pickAvailable(cell, counts, used);
+      const item = chosen ?? cell[0];
+      const sprite = this.callbacks.spriteOf?.(item) ?? null;
+      if (sprite !== null) {
+        slot.classList.add('sprite');
+        slot.style.backgroundPosition = sprite;
+      } else {
+        slot.textContent = (itemDef(item)?.display ?? '').slice(0, 2);
+      }
+      if (chosen === null) slot.classList.add('missing');
+      slot.title = itemDef(item)?.display ?? '';
+      grid.appendChild(slot);
+    }
+
+    this.preview.appendChild(grid);
+    if (entry.shapeless) {
+      const note = document.createElement('div');
+      note.className = 'note';
+      note.textContent = 'em qualquer posição';
+      this.preview.appendChild(note);
+    }
+    this.preview.hidden = false;
+  }
+
+  private hidePreview(): void {
+    this.preview.hidden = true;
   }
 
   get isOpen(): boolean {
@@ -111,6 +185,7 @@ export class RecipeBookPanel {
 
   private render(): void {
     this.list.textContent = '';
+    this.hidePreview();
     const counts = this.countInventory();
     const query = this.search.value.trim().toLowerCase();
     let shown = 0;
@@ -170,19 +245,24 @@ export class RecipeBookPanel {
     }
 
     const hint = this.callbacks.onHint;
-    if (hint !== undefined) {
-      // Mesma divisão de trabalho dos slots: no toque quem avisa é o
-      // `pointerdown`; só o mouse tem entrar e sair.
-      button.addEventListener('pointerdown', (e) => {
-        if (e.pointerType !== 'mouse') hint(button.title, e.clientX, e.clientY, true);
-      });
-      button.addEventListener('pointerenter', (e) => {
-        if (e.pointerType === 'mouse') hint(button.title, e.clientX, e.clientY, false);
-      });
-      button.addEventListener('pointerleave', (e) => {
-        if (e.pointerType === 'mouse') hint(null, e.clientX, e.clientY, false);
-      });
-    }
+    // Mesma divisão de trabalho dos slots: no toque quem avisa é o
+    // `pointerdown`; só o mouse tem entrar e sair. A prévia da grade segue os
+    // mesmos gestos — no dedo ela aparece ao tocar e fica até tocar em outra.
+    button.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'mouse') hint?.(button.title, e.clientX, e.clientY, true);
+      this.showPreview(entry, name);
+    });
+    button.addEventListener('pointerenter', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      hint?.(button.title, e.clientX, e.clientY, false);
+      this.showPreview(entry, name);
+    });
+    button.addEventListener('pointerleave', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      hint?.(null, e.clientX, e.clientY, false);
+      this.hidePreview();
+    });
+    button.addEventListener('focus', () => this.showPreview(entry, name));
 
     button.addEventListener('click', () => {
       if (this.callbacks.onPick(entry)) this.render();
@@ -202,6 +282,25 @@ export class RecipeBookPanel {
     }
     return counts;
   }
+}
+
+/**
+ * Primeiro candidato da célula que ainda sobra na mochila, ou `null`.
+ *
+ * `used` é compartilhado entre as células da mesma receita: sem ele, uma
+ * receita que pede duas tábuas apareceria completa com uma só na mochila.
+ */
+function pickAvailable(
+  cell: readonly number[], counts: Map<number, number>, used: Map<number, number>,
+): number | null {
+  for (const candidate of cell) {
+    const have = counts.get(candidate) ?? 0;
+    const spent = used.get(candidate) ?? 0;
+    if (have - spent <= 0) continue;
+    used.set(candidate, spent + 1);
+    return candidate;
+  }
+  return null;
 }
 
 /** true se cada célula da receita tem um ingrediente disponível. */
@@ -253,6 +352,24 @@ function injectStyle(): void {
 .recipe-book .recipe.missing{filter:grayscale(1) brightness(.7)}
 .recipe-book .recipe:hover,.recipe-book .recipe:focus-visible{outline:2px solid #7b94c7}
 .recipe-book .recipe span{padding:0 var(--px,3px)}
+/* Prévia da grade: fica embaixo da lista, para não tapar as receitas. */
+.recipe-book .preview{display:flex;flex-direction:column;gap:calc(1 * var(--px,3px));
+  align-items:flex-start;border-top:var(--px,3px) solid #555;
+  padding-top:calc(2 * var(--px,3px));color:#3f3f3f}
+.recipe-book .preview .title{font:calc(4.5 * var(--px,3px))/1.2 ui-monospace,monospace}
+.recipe-book .preview .note{font:calc(4 * var(--px,3px))/1.2 ui-monospace,monospace;opacity:.7}
+.recipe-book .preview .grid{display:grid;gap:calc(1 * var(--px,3px))}
+.recipe-book .preview .cell{width:calc(16 * var(--px,3px));height:calc(16 * var(--px,3px));
+  min-width:26px;min-height:26px;background:#8b8b8b;
+  border-top:var(--px,3px) solid #373737;border-left:var(--px,3px) solid #373737;
+  border-right:var(--px,3px) solid #fff;border-bottom:var(--px,3px) solid #fff;
+  display:grid;place-items:center;color:#fff;
+  font:calc(4 * var(--px,3px))/1 ui-monospace,monospace;
+  text-shadow:0 0 2px #000}
+.recipe-book .preview .cell.sprite{background-image:var(--item-sheet);
+  background-size:var(--item-sheet-size);background-repeat:no-repeat;image-rendering:pixelated}
+/* Falta na mochila: vermelho e apagado, que é o que o jogador precisa ver. */
+.recipe-book .preview .cell.missing{border-color:#a33;filter:grayscale(1) brightness(.75)}
 `;
   document.head.appendChild(css);
 }

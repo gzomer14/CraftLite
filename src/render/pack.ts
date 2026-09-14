@@ -15,6 +15,14 @@
  * - `block/<textura>` — camada do atlas de blocos, 16×16 (`data/textures.ts`).
  * - `item/<item>` — tile da folha de sprites, 16×16 (`data/items.ts`).
  * - `entity/<skin>` — camada do atlas de entidades, 64×64 (`data/mobs.ts`).
+ * - `sound/<som>` — **amostra** no lugar da síntese (`audio/synth.ts`).
+ *
+ * O som é o único que não é imagem, e por isso segue outro caminho: o jogo
+ * gera onda, não toca amostra (doc 10 §1), então o arquivo do jogador não
+ * substitui uma receita — ele **desvia** dela. Quem decodifica é o
+ * `AudioContext` do navegador, no mesmo lugar em que as receitas são
+ * renderizadas, e o resto do motor não sabe a diferença: o que sai dos dois
+ * caminhos é um `AudioBuffer`.
  *
  * Imagem de outro tamanho é **reamostrada no import**, não no boot: o jogador
  * paga uma vez, e o que vai para o banco já está pronto para subir na GPU.
@@ -28,6 +36,7 @@
  * invalidação inteiro para um botão que se aperta uma vez por mês.
  */
 
+import { SOUNDS as SOUND_RECIPES } from '../audio/synth';
 import { TEXTURES } from '../data/textures';
 import { ITEM_BY_NAME } from '../data/items';
 import { STORE_SETTINGS, type SaveDatabase } from '../save/db';
@@ -41,6 +50,16 @@ export const PACK_KEY = 'resourcepack';
 const SKIN_SIZE = 64;
 /** Teto de imagens aceitas. Um pack maior que isto não é um pack, é engano. */
 const MAX_IMAGES = 512;
+/**
+ * Teto de bytes de som no pacote.
+ *
+ * Som é o único item do pack que entra **como veio**, sem reamostragem: uma
+ * pasta de `.ogg` de música encheria a cota do doc 11 §4 sozinha. Dois
+ * megabytes cobrem dezenas de efeitos curtos, que é o que a convenção pede.
+ */
+const MAX_SOUND_BYTES = 2 * 1024 * 1024;
+/** Extensões de áudio aceitas. O decodificador é o do navegador. */
+const SOUND_EXTENSIONS = ['.ogg', '.mp3', '.wav', '.m4a'];
 
 export interface PackImage {
   width: number;
@@ -62,6 +81,13 @@ export interface ResourcePack {
    * como está: nada é reserializado para guardar nem para ler de volta.
    */
   textures: Map<string, Uint8ClampedArray>;
+  /**
+   * Nome do som → bytes do arquivo, como vieram do `.zip`.
+   *
+   * Opcional: pacote guardado antes de o som existir volta do banco sem o
+   * campo, e continua valendo — sem migração, como o resto do save.
+   */
+  sounds?: Map<string, Uint8Array>;
 }
 
 export interface PackReport {
@@ -85,13 +111,34 @@ export async function readPack(
 ): Promise<PackReport> {
   const files = await readZip(bytes);
   const textures = new Map<string, Uint8ClampedArray>();
+  const sounds = new Map<string, Uint8Array>();
   const ignored: string[] = [];
+  let soundBytes = 0;
 
   for (const [path, data] of files) {
-    if (!path.toLowerCase().endsWith('.png')) continue;
     const canonical = canonicalName(path);
-    const size = canonical === null ? 0 : targetSizeOf(canonical);
-    if (canonical === null || size === 0) {
+    if (canonical === null) {
+      if (isCandidate(path)) ignored.push(path);
+      continue;
+    }
+
+    if (canonical.startsWith('sound/')) {
+      if (!SOUNDS_BY_NAME.has(canonical.slice(6))) {
+        ignored.push(path);
+        continue;
+      }
+      soundBytes += data.length;
+      if (soundBytes > MAX_SOUND_BYTES) {
+        throw new PackError(
+          `Pack com som demais: mais de ${Math.round(MAX_SOUND_BYTES / 1024)} KB de áudio.`,
+        );
+      }
+      sounds.set(canonical.slice(6), data);
+      continue;
+    }
+
+    const size = targetSizeOf(canonical);
+    if (size === 0) {
       ignored.push(path);
       continue;
     }
@@ -108,10 +155,16 @@ export async function readPack(
     textures.set(canonical, resample(image, size));
   }
 
-  if (textures.size === 0) {
-    throw new PackError('Nenhuma imagem reconhecida. Veja a convenção de nomes.');
+  if (textures.size === 0 && sounds.size === 0) {
+    throw new PackError('Nada reconhecido no arquivo. Veja a convenção de nomes.');
   }
-  return { pack: { name, importedAt: Date.now(), textures }, ignored };
+  return { pack: { name, importedAt: Date.now(), textures, sounds }, ignored };
+}
+
+/** true se o caminho **parecia** ser conteúdo de pack, para entrar no relatório. */
+function isCandidate(path: string): boolean {
+  const lower = path.toLowerCase();
+  return lower.endsWith('.png') || SOUND_EXTENSIONS.some((ext) => lower.endsWith(ext));
 }
 
 /**
@@ -119,14 +172,31 @@ export async function readPack(
  * `null` quando o caminho não tem os dois segmentos de que precisamos.
  */
 export function canonicalName(path: string): string | null {
-  const clean = path.replace(/^\/+/, '').replace(/\.png$/i, '');
+  const clean = path.replace(/^\/+/, '').replace(/\.(png|ogg|mp3|wav|m4a)$/i, '');
   const parts = clean.split('/').filter((p) => p !== '' && p !== '.');
   if (parts.length < 2) return null;
   const folder = parts[parts.length - 2].toLowerCase();
   const file = parts[parts.length - 1];
+  const lower = path.toLowerCase();
+
+  /*
+   * O som tem **dois** segmentos de nome (`mob/zombie_ambient`), não um: a
+   * tabela de `audio/synth.ts` é indexada assim. Por isso ele não cabe na
+   * regra dos "dois últimos segmentos" das imagens e é tratado antes dela.
+   */
+  if (SOUND_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
+    const at = parts.indexOf('sound');
+    if (at < 0 || at + 2 > parts.length - 1) return null;
+    return `sound/${parts.slice(at + 1).join('/')}`;
+  }
+
+  if (!lower.endsWith('.png')) return null;
   if (folder !== 'block' && folder !== 'item' && folder !== 'entity') return null;
   return `${folder}/${file}`;
 }
+
+/** Nomes de som que o jogo conhece. Nome fora daqui não tem onde tocar. */
+const SOUNDS_BY_NAME = new Set(Object.keys(SOUND_RECIPES));
 
 /** Lado da imagem no destino, ou 0 se o jogo não tem nada com esse nome. */
 export function targetSizeOf(canonical: string): number {
@@ -193,6 +263,16 @@ export function resample(image: PackImage, size: number): Uint8ClampedArray {
  * `diamond` e `zombie`. É a única assimetria da convenção, e ela está aqui
  * justamente para não vazar para o atlas nem para a folha de sprites.
  */
+/**
+ * Amostras que substituem a síntese, por nome de som.
+ *
+ * Vazio quando não há pack ou quando ele só traz imagem — e é o caso normal,
+ * então o motor de áudio não paga nada por esta possibilidade existir.
+ */
+export function soundOverridesFor(pack: ResourcePack | null): ReadonlyMap<string, Uint8Array> {
+  return pack?.sounds ?? new Map<string, Uint8Array>();
+}
+
 export function overridesFor(
   pack: ResourcePack | null, folder: 'block' | 'item' | 'entity',
 ): ReadonlyMap<string, Uint8ClampedArray> {

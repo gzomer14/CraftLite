@@ -17,6 +17,7 @@ import { ChunkColumn, SEA_LEVEL } from '../src/world/chunk';
 import { Redstone } from '../src/world/redstone';
 import { NetherNoise, generateNetherChunk } from '../src/world/gen/nether';
 import { BLOCK_BY_NAME, STONE, makeState } from '../src/data/blocks';
+import { Fire, MAX_FIRES } from '../src/world/fire';
 import { MOUNT_FLOOR } from '../src/world/mesh/shapes';
 import { TEXTURES } from '../src/data/textures';
 import { blockFinishOf } from '../src/data/texturestyle';
@@ -172,6 +173,46 @@ describe('orçamento de performance', () => {
    * ruído de máquina, e teste que falha por ruído vira teste ignorado. A folha
    * já custou 89 ms — é esse tipo de salto que estes dois pegam.
    */
+  /**
+   * Fogo: o incêndio no teto, com a lista cheia.
+   *
+   * É o mesmo contrato do crescimento e dos fluidos — teto duro por tick, custo
+   * independente do tamanho do incêndio. Se alguém trocar o registro por um
+   * random tick por section, este teste é quem avisa.
+   */
+  it('um tick de fogo com o teto de chamas custa menos de 2 ms', () => {
+    const world = new World(SEED);
+    for (let cx = -1; cx <= 1; cx++) {
+      for (let cz = -1; cz <= 1; cz++) {
+        const chunk = new ChunkColumn(cx, cz);
+        for (let x = 0; x < 16; x++) {
+          for (let z = 0; z < 16; z++) {
+            chunk.setBlock(x, 63, z, makeState(STONE));
+            chunk.setBlock(x, 65, z, makeState(BLOCK_BY_NAME.get('oak_planks')!.id));
+          }
+        }
+        world.addChunk(chunk);
+      }
+    }
+    const fire = new Fire(world);
+    fire.random = () => 0.5;
+    fire.attach();
+    for (let x = 0; x < 20 && fire.burning < MAX_FIRES; x++) {
+      for (let z = 0; z < 20 && fire.burning < MAX_FIRES; z++) fire.ignite(x, 64, z);
+    }
+    expect(fire.burning).toBe(MAX_FIRES);
+
+    const samples: number[] = [];
+    for (let i = 0; i < 40; i++) {
+      const t0 = performance.now();
+      fire.tick();
+      samples.push(performance.now() - t0);
+    }
+    const ms = median(samples);
+    console.log(`  fogo: ${ms.toFixed(2)} ms/tick (${MAX_FIRES} chamas, mediana de 40)`);
+    expect(ms).toBeLessThan(2);
+  });
+
   it('o acabamento do estilo Nítido custa menos de 60 ms no atlas inteiro', () => {
     const nomes = Object.keys(TEXTURES);
     const tiles = nomes.map(() => {

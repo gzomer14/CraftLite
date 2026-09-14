@@ -9,7 +9,27 @@
  */
 
 import { itemDef, type ItemStack } from '../data/items';
-import type { SettingsStore } from '../game/settings';
+import type { ColorBlindMode, SettingsStore } from '../game/settings';
+
+/** As quatro cores que o HUD usa como **única** portadora de informação. */
+const PALETTE_KEYS = ['hearts', 'hunger', 'air', 'xp'] as const;
+type PaletteKey = (typeof PALETTE_KEYS)[number];
+
+/**
+ * Paletas do modo daltônico (doc 08 §6), da família Okabe-Ito.
+ *
+ * `off` são as cores do doc 08 §2, repetidas aqui para que desligar o modo as
+ * devolva sem recarregar a página.
+ */
+const COLORBLIND_PALETTES: Record<ColorBlindMode, Record<PaletteKey, string>> = {
+  off: { hearts: '#dc0000', hunger: '#c68a45', air: '#8ecbff', xp: '#7bd63b' },
+  // Protan e deutan perdem o eixo vermelho–verde: vida e XP viram vermelhão e
+  // azul, que são os dois extremos que sobram.
+  protanopia: { hearts: '#d55e00', hunger: '#f0e442', air: '#56b4e9', xp: '#0072b2' },
+  deuteranopia: { hearts: '#d55e00', hunger: '#f0e442', air: '#56b4e9', xp: '#0072b2' },
+  // Tritan perde o eixo azul–amarelo: o ar sai do azul e a fome sai do amarelo.
+  tritanopia: { hearts: '#d55e00', hunger: '#cc79a7', air: '#8f8f8f', xp: '#009e73' },
+};
 
 export const HOTBAR_SLOTS = 9;
 
@@ -55,6 +75,9 @@ export class Hud {
   private readonly damage: HTMLDivElement;
   private damageFlashEnabled = true;
   private readonly subtitle: HTMLDivElement;
+  /** Contador de FPS do doc 08 §3.11, sem precisar abrir o F3. */
+  private readonly fps: HTMLDivElement;
+  private lastFps = -1;
   private readonly achievement: HTMLDivElement;
   private readonly xpBar: HTMLDivElement;
   private readonly xpFill: HTMLElement;
@@ -118,6 +141,17 @@ export class Hud {
      */
     this.objective = document.createElement('div');
     this.objective.className = 'objective';
+
+    /*
+     * Contador de FPS solto.
+     *
+     * O F3 já mostra o número, mas ele traz vinte linhas junto e tapa o canto
+     * da tela — quem só quer conferir se o celular está segurando os 30 não
+     * deveria ter que ler a telemetria inteira.
+     */
+    this.fps = document.createElement('div');
+    this.fps.className = 'fps';
+    this.fps.hidden = true;
     this.objective.setAttribute('role', 'status');
     this.objective.hidden = true;
 
@@ -180,7 +214,7 @@ export class Hud {
     }
 
     this.root.append(
-      this.damage, crosshair, this.objective, this.armor, bars, this.xpBar, hotbar,
+      this.damage, crosshair, this.objective, this.fps, this.armor, bars, this.xpBar, hotbar,
       this.toast, this.subtitle, this.achievement,
     );
     document.body.appendChild(this.root);
@@ -381,10 +415,42 @@ export class Hud {
    * do texto. O contorno por sombra some contra céu claro e contra neve, e
    * 7 px de fonte a escala 2 é pequeno para muita gente.
    */
-  applyAccessibility(highContrast: boolean, textScale: number, damageFlash: boolean): void {
+  applyAccessibility(
+    highContrast: boolean, textScale: number, damageFlash: boolean,
+    colorBlind: ColorBlindMode = 'off',
+  ): void {
     this.root.classList.toggle('high-contrast', highContrast);
     document.documentElement.style.setProperty('--hud-text', String(textScale / 100));
     this.damageFlashEnabled = damageFlash;
+    this.applyPalette(colorBlind);
+  }
+
+  /**
+   * Modo daltônico (doc 08 §6): troca as cores do HUD por uma paleta que se
+   * distingue sem depender do eixo que falta.
+   *
+   * O HUD codifica quatro informações **só por cor** — vida, fome, ar e
+   * experiência —, e três delas (vermelho, laranja, verde) caem no mesmo eixo
+   * que protanopia e deuteranopia perdem: para 8% dos homens, a barra de vida e
+   * a de experiência eram a mesma cor. As substitutas saem da paleta de
+   * Okabe-Ito, desenhada justamente para isso.
+   */
+  private applyPalette(mode: ColorBlindMode): void {
+    const palette = COLORBLIND_PALETTES[mode];
+    const style = document.documentElement.style;
+    for (const key of PALETTE_KEYS) {
+      style.setProperty(`--hud-${key}`, palette[key]);
+    }
+  }
+
+  /** Contador de FPS. Só mexe no DOM quando o número inteiro muda. */
+  setFps(value: number, visible: boolean): void {
+    if (this.fps.hidden === visible) this.fps.hidden = !visible;
+    if (!visible) return;
+    const rounded = Math.round(value);
+    if (rounded === this.lastFps) return;
+    this.lastFps = rounded;
+    this.fps.textContent = `${rounded} FPS`;
   }
 
   /**
@@ -481,10 +547,10 @@ function injectStyle(): void {
   bottom:calc(27 * var(--px) + env(safe-area-inset-bottom,0px));
   width:calc(182 * var(--px));max-width:calc(100vw - 16px);height:calc(5 * var(--px));
   background:#1c1c1cCC;overflow:visible;pointer-events:none}
-#hud .xp i{display:block;height:100%;background:#7bd63b;transform-origin:left center;
+#hud .xp i{display:block;height:100%;background:var(--hud-xp,#7bd63b);transform-origin:left center;
   transform:scaleX(0)}
 #hud .xp span{position:absolute;left:50%;top:calc(-5 * var(--px));transform:translateX(-50%);
-  color:#7bd63b;font:calc(7 * var(--px) * var(--hud-text,1))/1 ui-monospace,monospace;
+  color:var(--hud-xp,#7bd63b);font:calc(7 * var(--px) * var(--hud-text,1))/1 ui-monospace,monospace;
   text-shadow:var(--px) var(--px) 0 #000,calc(-1 * var(--px)) 0 0 #000}
 #hud .achievement{position:absolute;top:calc(4 * var(--px) + env(safe-area-inset-top,0px));
   right:calc(4 * var(--px) + env(safe-area-inset-right,0px));
@@ -497,10 +563,16 @@ function injectStyle(): void {
 #hud .achievement strong{color:#f7d94c;font-weight:700}
 #hud .achievement span{color:#d8d0e0;font-size:calc(4.5 * var(--px))}
 @media (prefers-reduced-motion:reduce){#hud .achievement{transition:none}}
-#hud .hearts{color:#dc0000}
+#hud .fps{position:absolute;right:calc(4 * var(--px));
+  top:calc(4 * var(--px) + env(safe-area-inset-top,0px));
+  font:calc(5 * var(--px) * var(--hud-text,1))/1 ui-monospace,monospace;color:#e8e2c8;
+  text-shadow:var(--px) var(--px) 0 #000;pointer-events:none}
+#hud.high-contrast .fps{text-shadow:none;background:#000000cc;
+  padding:calc(1 * var(--px)) calc(2 * var(--px))}
+#hud .hearts{color:var(--hud-hearts,#dc0000)}
 #hud .hearts.critical{animation:hud-shake .5s infinite}
-#hud .hunger{color:#c68a45}
-#hud .air{color:#8ecbff}
+#hud .hunger{color:var(--hud-hunger,#c68a45)}
+#hud .air{color:var(--hud-air,#8ecbff)}
 @keyframes hud-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-1px)}
   75%{transform:translateX(1px)}}
 @media (prefers-reduced-motion:reduce){#hud .hearts.critical{animation:none}}

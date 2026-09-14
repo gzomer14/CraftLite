@@ -11,7 +11,7 @@ import { ChunkColumn } from '../src/world/chunk';
 import { World } from '../src/world/world';
 import { Mobs, rayBoxDistance } from '../src/entity/mobs';
 import { FLAG_ANGRY, FLAG_PERSISTENT } from '../src/entity/mobstore';
-import { MOB_BY_NAME, mobDef } from '../src/data/mobs';
+import { MOBS_BY_CATEGORY, MOB_BY_NAME, mobDef, spawnRuleOf } from '../src/data/mobs';
 import { BLOCK_BY_NAME, makeState } from '../src/data/blocks';
 import { ITEM_BY_NAME } from '../src/data/items';
 
@@ -98,10 +98,41 @@ function seeded(seed = 20260913): () => number {
   return () => rng.nextFloat();
 }
 
+describe('morcego (categoria ambient)', () => {
+  it('a categoria ambient deixou de ser a única linha vazia da tabela', () => {
+    // O `MobSpawner` tem cap de `ambient` desde o M5 e nenhum mob o usava:
+    // era a única categoria do doc 07 §4 sem ninguém atrás dela.
+    expect(MOBS_BY_CATEGORY.ambient.length).toBeGreaterThan(0);
+    for (const id of MOBS_BY_CATEGORY.ambient) {
+      expect(spawnRuleOf(mobDef(id).name), mobDef(id).name).toBeDefined();
+    }
+  });
+
+  it('é ambientação, não ameaça: não ataca, não dropa e não dá XP', () => {
+    const bat = MOB_BY_NAME.get('bat');
+    expect(bat).toBeDefined();
+    expect(bat?.attack).toBeUndefined();
+    expect(bat?.drops).toEqual([]);
+    expect(bat?.xp).toEqual([0, 0]);
+    expect(bat?.despawnable).toBe(true);
+    expect(bat?.goals).not.toContain('attackMelee');
+  });
+
+  it('voa e nasce no escuro, abaixo do nível do mar', () => {
+    const bat = MOB_BY_NAME.get('bat');
+    expect(bat?.traits.flies).toBe(true);
+    // Não pega fogo no sol: ele sai da caverna de madrugada e isso não é morte.
+    expect(bat?.traits.burnsInSunlight).toBeUndefined();
+    const rule = spawnRuleOf('bat');
+    expect(rule?.light).toBe('dark');
+    expect(rule?.maxY).toBeLessThan(62);
+  });
+});
+
 describe('tabela de mobs', () => {
-  it('tem os 12 mobs do MVP, o aldeão e os dois do Nether, com modelo e skin válidos', () => {
-    // 12 do MVP + aldeão (M6) + porco zumbi e ghast (M7).
-    expect(MOB_BY_NAME.size).toBe(15);
+  it('tem os 12 mobs do MVP, o aldeão, os dois do Nether e o morcego', () => {
+    // 12 do MVP + aldeão (M6) + porco zumbi e ghast (M7) + morcego.
+    expect(MOB_BY_NAME.size).toBe(16);
     for (const name of MOB_BY_NAME.keys()) {
       const def = MOB_BY_NAME.get(name)!;
       expect(def.model.length).toBeGreaterThan(0);

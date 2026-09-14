@@ -759,6 +759,18 @@ export const TEXTURES: Record<string, TexRecipe> = {
     ops: [speckle([196, 132, 246], 0.2, 1), dither(0.08)],
   },
 
+  /*
+   * Fogo: cruz com a base laranja e a ponta amarela, animada em 4 quadros.
+   *
+   * A máscara de cruz é a mesma da tocha; o que muda é a paleta quente e o
+   * número de quadros, que é o que faz a chama tremer sem ninguém desenhar
+   * quadro nenhum.
+   */
+  'block/fire': {
+    base: [226, 106, 24], noise: 'value', scale: 3, variance: 0.34, frames: 4,
+    ops: [alphaMask('cross', 0), blobs([252, 220, 96], 3, 2)],
+  },
+
   // --- utilidade ----------------------------------------------------------
   ...crackStages(),
 

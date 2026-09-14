@@ -49,7 +49,16 @@ export class Keyboard {
   }
 
   bind(code: string, action: KeyAction): void {
+    if (code === '') return;
     this.actions.set(code, action);
+  }
+
+  /**
+   * Desfaz um `bind`. É o que o remapeamento precisa: sem isto, trocar a tecla
+   * de inventário de `E` para `I` deixaria as duas abrindo o inventário.
+   */
+  unbind(code: string): void {
+    this.actions.delete(code);
   }
 
   dispose(target: EventTarget = window): void {

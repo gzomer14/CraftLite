@@ -151,6 +151,12 @@ export const SPAWN_RULES: Record<string, SpawnRule> = {
   skeleton: { light: 'dark', ground: [], minY: 0, maxY: 127, biomes: [], packMin: 1, packMax: 3, weight: 10 },
   creeper: { light: 'dark', ground: [], minY: 0, maxY: 127, biomes: [], packMin: 1, packMax: 2, weight: 8 },
   slime: { light: 'any', ground: [], minY: 0, maxY: 40, biomes: [], packMin: 1, packMax: 3, weight: 4, nightOnly: false },
+  /*
+   * Morcego: a única regra da categoria `ambient`, que tinha cap no spawner
+   * desde o M5 e nenhum mob atrás dela. Nasce no escuro e abaixo do nível do
+   * mar — ele é o que diz "você está numa caverna" antes de o zumbi dizer.
+   */
+  bat: { light: 'dark', ground: [], minY: 0, maxY: 58, biomes: [], packMin: 1, packMax: 2, weight: 10 },
 
   // --- Nether (M7): luz não filtra nada aqui, porque lá tudo é escuro ------
   zombified_piglin: { light: 'any', ground: ['netherrack', 'soul_sand', 'nether_bricks'], minY: 32, maxY: 120, biomes: [], packMin: 2, packMax: 4, weight: 12, dimension: 1 },
@@ -321,6 +327,22 @@ const SPECS: MobSpec[] = [
     goals: ['floatInWater', 'panic', 'wander', 'lookAtPlayer'],
     model: 'humanoid', skin: 'villager', sound: 'villager',
     despawnable: false, traits: {},
+  },
+
+  /*
+   * Morcego: `ambient` de verdade — não ataca, não dropa nada, não dá XP e
+   * some longe do jogador. O valor dele é de ambientação, e é por isso que a
+   * categoria existe com cap próprio (doc 07 §4): ele não pode competir com
+   * hostil pelo orçamento de mobs do aparelho.
+   */
+  {
+    id: 15, name: 'bat', display: 'Morcego', category: 'ambient',
+    health: 6, width: 0.5, height: 0.6, speed: 2.6,
+    followRange: 10, xp: [0, 0],
+    drops: [],
+    goals: ['wander', 'lookAtPlayer'],
+    model: 'bat', skin: 'bat', sound: 'bat',
+    despawnable: true, traits: { flies: true },
   },
 
   // --- Nether (M7) --------------------------------------------------------

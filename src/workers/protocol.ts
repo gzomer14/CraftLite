@@ -35,6 +35,11 @@ export interface InitRequest {
   seed: number;
   /** true = formato de vértice comprimido (WebGL2). */
   packed: boolean;
+  /**
+   * Iluminação suave (AO). Vai no `init` e não na requisição: ela é assada no
+   * mesh, e trocá-la exige remesar tudo — que é o que "recarrega" faz.
+   */
+  smoothLighting: boolean;
 }
 
 export interface GenRequest {

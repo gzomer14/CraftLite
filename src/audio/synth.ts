@@ -21,6 +21,15 @@ export type Recipe =
     attack: number; decay: number;
     filter?: 'lowpass' | 'highpass' | 'bandpass';
     freq?: number; freqTo?: number; q?: number;
+    /**
+     * Ganho **constante** em vez de envelope, para o buffer poder ser tocado
+     * em `loop` sem pulsar. É o que a chuva do doc 10 §2 precisa: um envelope
+     * que morre no fim do buffer viraria um "chhh… chhh…" a cada volta.
+     *
+     * `lfo` acrescenta a ondulação lenta de amplitude que o doc pede — ela é
+     * periódica dentro do buffer, então a volta continua costurada.
+     */
+    sustain?: boolean; lfo?: number;
   }
   /** Um ou mais osciladores com decaimento próprio — vidro, sino, coleta. */
   | {
@@ -40,6 +49,47 @@ export type Recipe =
   }
   /** Arpejo de senoides — subir de nível, UI de confirmação. */
   | { kind: 'arpeggio'; notes: readonly number[]; step: number; gain: number; decay: number };
+
+/**
+ * Taxa de amostragem suficiente para a receita, a partir de `base`.
+ *
+ * Renderizar tudo a 22 kHz é desperdício: um passo na areia é ruído com
+ * lowpass em 600 Hz, e metade das amostras guarda banda que o filtro já jogou
+ * fora. Nyquist diz o que basta — o dobro da maior frequência que a receita
+ * pode produzir, com folga para a saia do filtro.
+ *
+ * É derivado da própria receita, não de uma lista à mão: som novo já nasce com
+ * a taxa certa, e mexer num filtro não deixa uma anotação velha para trás.
+ */
+export function rateFor(recipe: Recipe, base: number): number {
+  const top = topFrequencyOf(recipe);
+  // Metade da taxa cobre até `base / 4`; a folga de 1,4 evita comer a saia do
+  // filtro, que não corta em vertical.
+  return top * 1.4 <= base / 4 ? Math.round(base / 2) : base;
+}
+
+/** Maior frequência que a receita pode produzir, em Hz. */
+function topFrequencyOf(recipe: Recipe): number {
+  switch (recipe.kind) {
+    case 'noise': {
+      // Highpass e bandpass deixam passar a banda alta inteira do ruído.
+      if (recipe.filter !== 'lowpass') return Infinity;
+      return Math.max(recipe.freq ?? Infinity, recipe.freqTo ?? 0);
+    }
+    case 'tones':
+      return Math.max(...recipe.freqs, recipe.freqTo ?? 0);
+    case 'voice': {
+      // O oscilador é serra/quadrada: os harmônicos vão muito acima da
+      // fundamental, e quem os limita é o formante mais agudo.
+      if (recipe.formants === undefined) return Infinity;
+      return Math.max(recipe.formants[0], recipe.formants[1]) * 2;
+    }
+    case 'clicks':
+      return recipe.filter === 'bandpass' ? Infinity : Infinity;
+    default:
+      return Math.max(...recipe.notes) * 4;
+  }
+}
 
 /** Duração total da receita, em segundos. */
 export function durationOf(recipe: Recipe): number {
@@ -80,10 +130,36 @@ function buildNoise(ctx: BaseAudioContext, r: Extract<Recipe, { kind: 'noise' }>
     node = filter;
   }
 
-  const gain = envelope(ctx, r.gain, r.attack, r.decay, r.duration);
+  const gain = r.sustain === true
+    ? sustained(ctx, r.gain, r.lfo ?? 0, r.duration)
+    : envelope(ctx, r.gain, r.attack, r.decay, r.duration);
   node.connect(gain);
   gain.connect(ctx.destination);
   source.start(0);
+}
+
+/**
+ * Ganho constante com ondulação opcional, para som de loop.
+ *
+ * A ondulação é escrita como rampas dentro do buffer em vez de um
+ * `OscillatorNode` de LFO porque o buffer precisa **fechar** no mesmo valor em
+ * que abriu — um LFO livre pararia em fase qualquer e daria um degrau na volta.
+ */
+function sustained(
+  ctx: BaseAudioContext, peak: number, lfo: number, duration: number,
+): GainNode {
+  const gain = ctx.createGain();
+  if (lfo <= 0) {
+    gain.gain.value = peak;
+    return gain;
+  }
+  const steps = 16;
+  for (let i = 0; i <= steps; i++) {
+    const t = (i / steps) * duration;
+    const wave = Math.sin((i / steps) * Math.PI * 2);
+    gain.gain.linearRampToValueAtTime(peak * (1 + lfo * wave), t);
+  }
+  return gain;
 }
 
 function buildTones(ctx: BaseAudioContext, r: Extract<Recipe, { kind: 'tones' }>): void {
@@ -271,6 +347,8 @@ const MOB_VOICES: Record<string, VoiceSpec> = {
   slime: { freq: 130, type: 'sine', formants: [300, 620], noise: 0.5 },
   // O "hmmm" do aldeão: fundamental baixa, formante de vogal fechada (M6).
   villager: { freq: 130, type: 'sawtooth', formants: [500, 1100], vibrato: 0.02, noise: 0.12 },
+  // O guincho do morcego: curto, muito agudo e quase sem corpo.
+  bat: { freq: 900, type: 'triangle', formants: [2400, 4200], vibrato: 0.06, noise: 0.22 },
   // O choro do ghast (M7): agudo, trêmulo e fino — ele é ouvido antes de visto.
   ghast: { freq: 520, type: 'sine', formants: [900, 2100], vibrato: 0.08, noise: 0.18 },
 };
@@ -328,8 +406,30 @@ const BASE_SOUNDS: Record<string, Recipe> = {
   'block/piston': { kind: 'noise', duration: 0.18, color: 'pink', gain: 0.32, attack: 0.004, decay: 0.16, filter: 'bandpass', freq: 420, freqTo: 900, q: 1.2 },
   // O portal acendendo: um sopro grave que sobe, sem nota definida.
   'block/portal': { kind: 'noise', duration: 0.9, color: 'brown', gain: 0.3, attack: 0.06, decay: 0.8, filter: 'lowpass', freq: 240, freqTo: 1400 },
+  // Fogo: o estalo de alguma coisa pegando. Curto, para poder repetir sem
+  // cansar enquanto o incêndio anda.
+  'block/fire': { kind: 'noise', duration: 0.35, color: 'pink', gain: 0.3, attack: 0.004, decay: 0.3, filter: 'bandpass', freq: 1100, freqTo: 480, q: 1.1 },
   // Água virando vapor no Nether: chiado agudo que morre rápido.
   'block/evaporate': { kind: 'noise', duration: 0.35, color: 'white', gain: 0.3, attack: 0.002, decay: 0.32, filter: 'highpass', freq: 2400, freqTo: 5200 },
+
+  /*
+   * Chuva (doc 10 §2), o único som de loop do jogo.
+   *
+   * Dois segundos de ruído branco com lowpass em 4 kHz e uma ondulação lenta de
+   * amplitude. Ruído não tem fase, então a emenda do loop é inaudível; a
+   * ondulação é que precisa fechar o ciclo dentro do buffer, e fecha.
+   *
+   * Ele existe porque o slider "Clima" do doc 08 precisa mandar em alguma
+   * coisa — e porque a tempestade sem som nenhum nunca passou de um filtro de
+   * cor no céu.
+   */
+  /*
+   * Trovão: estouro grave e longo, com a varredura do lowpass fazendo o rolar.
+   * É o único som que o jogador ouve **sem nada ter acontecido perto dele**.
+   */
+  'weather/thunder': { kind: 'noise', duration: 1.4, color: 'brown', gain: 0.55, attack: 0.01, decay: 1.3, filter: 'lowpass', freq: 400, freqTo: 70 },
+
+  'weather/rain': { kind: 'noise', duration: 2, color: 'white', gain: 0.22, attack: 0.05, decay: 0, filter: 'lowpass', freq: 4000, sustain: true, lfo: 0.18 },
 };
 
 /** Tabela final: sons de bloco/UI + as quatro vozes de cada mob. */

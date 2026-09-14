@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { autoGuiScale } from '../src/ui/hud';
+import { formatSize } from '../src/ui/screens/worlds';
 import { ACHIEVEMENTS, isUnlocked, nextObjective, objectiveFor } from '../src/data/achievements';
 import { ITEM_BY_NAME } from '../src/data/items';
 import { MOB_BY_NAME } from '../src/data/mobs';
@@ -235,5 +236,28 @@ describe('painel não vaza, e a escala responde', () => {
     // `updateScale` só rodava no boot e no `resize`: mexer no slider trocava o
     // rótulo e não mudava nada na tela.
     expect(hudSrc).toContain('settings?.onChange(() => this.updateScale())');
+  });
+});
+
+/**
+ * Tamanho do mundo na tela de seleção (doc 11 §5).
+ *
+ * `sizeBytes` nasceu 0 e ficou 0 para sempre: a lista mostrava o mesmo nada
+ * para todos os mundos, justo quando o aviso de cota do doc 11 §4 pede que o
+ * jogador escolha qual apagar.
+ */
+describe('8. tamanho do mundo', () => {
+  it('mundo nunca medido mostra travessão, não "0 B"', () => {
+    expect(formatSize(0)).toBe('—');
+    expect(formatSize(-1)).toBe('—');
+    expect(formatSize(Number.NaN)).toBe('—');
+  });
+
+  it('muda de unidade sem virar número ilegível', () => {
+    expect(formatSize(512)).toBe('512 B');
+    expect(formatSize(2048)).toBe('2 KB');
+    expect(formatSize(1024 * 1024 * 3.5)).toBe('3,5 MB');
+    // Acima de 10 MB a casa decimal não informa nada e só ocupa espaço.
+    expect(formatSize(1024 * 1024 * 42)).toBe('42 MB');
   });
 });

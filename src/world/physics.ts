@@ -14,7 +14,10 @@
  */
 
 import { defOf, stateBitsOf, type BlockDef } from '../data/blocks';
-import { BOX_STRIDE, MAX_BOXES, SHAPE_BY_NAME, collisionBoxesFor } from './mesh/shapes';
+import {
+  BOX_STRIDE, MAX_BOXES, NOT_STAIRS, SHAPE_BY_NAME, SHAPE_STAIRS, collisionBoxesFor,
+  stairCornerFrom,
+} from './mesh/shapes';
 import { WORLD_HEIGHT } from './chunk';
 import type { World } from './world';
 
@@ -161,7 +164,7 @@ function sweepAxis(world: World, aabb: Aabb, delta: number, axis: number): numbe
         const state = world.getBlock(x, y, z);
         const def = defOf(state);
         if (!def.solid) continue;
-        const count = collisionShapeOf(def, state);
+        const count = collisionShapeOf(world, def, state, x, y, z);
         for (let b = 0; b < count; b++) {
           remaining = clampAgainstBox(aabb, x, y, z, b, remaining, axis);
           if (remaining === 0) return 0;
@@ -187,14 +190,47 @@ const TOUCH_EPSILON = 1e-4;
  * O cubo é o caminho quente e sai sem passar por `shapes.ts`: 99% dos blocos
  * consultados no sweep são pedra e terra.
  */
-function collisionShapeOf(def: BlockDef, state: number): number {
+function collisionShapeOf(
+  world: World, def: BlockDef, state: number, x: number, y: number, z: number,
+): number {
   const shape = SHAPE_BY_NAME[def.shape];
   if (shape === undefined) {
     COLLISION_BOXES[0] = 0; COLLISION_BOXES[1] = 0; COLLISION_BOXES[2] = 0;
     COLLISION_BOXES[3] = 1; COLLISION_BOXES[4] = 1; COLLISION_BOXES[5] = 1;
     return 1;
   }
-  return collisionBoxesFor(shape, stateBitsOf(state), COLLISION_BOXES);
+  const bits = stateBitsOf(state);
+  /*
+   * A escada é a única forma cuja **colisão** também depende do vizinho.
+   *
+   * O canto é derivado na hora, dos mesmos quatro vizinhos que o mesher
+   * consulta, e pela mesma função — se as duas contas divergissem, o jogador
+   * atravessaria o canto que enxerga, que é exatamente o que o cabeçalho deste
+   * módulo promete que não acontece. As quatro consultas só acontecem para
+   * escada: pedra e terra, que são o caminho quente, saem antes.
+   */
+  if (shape === SHAPE_STAIRS) {
+    return collisionBoxesFor(shape, bits, COLLISION_BOXES, stairCornerAt(world, x, y, z, bits));
+  }
+  return collisionBoxesFor(shape, bits, COLLISION_BOXES);
+}
+
+/** Canto da escada em `(x, y, z)`, lido do mundo. */
+function stairCornerAt(world: World, x: number, y: number, z: number, bits: number): number {
+  return stairCornerFrom(
+    bits,
+    stairBitsAt(world, x + 1, y, z),
+    stairBitsAt(world, x - 1, y, z),
+    stairBitsAt(world, x, y, z + 1),
+    stairBitsAt(world, x, y, z - 1),
+  );
+}
+
+/** Bits da escada naquela posição, ou `NOT_STAIRS`. */
+function stairBitsAt(world: World, x: number, y: number, z: number): number {
+  const state = world.getBlock(x, y, z);
+  if (SHAPE_BY_NAME[defOf(state).shape] !== SHAPE_STAIRS) return NOT_STAIRS;
+  return stateBitsOf(state);
 }
 
 const COLLISION_BOXES = new Float32Array(MAX_BOXES * BOX_STRIDE);

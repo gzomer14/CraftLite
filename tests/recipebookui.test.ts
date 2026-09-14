@@ -182,6 +182,77 @@ describe('livro de receitas no toque', () => {
   });
 });
 
+describe('prévia da grade da receita', () => {
+  /** Abre o livro e devolve o primeiro botão de receita e a prévia. */
+  function openBook(h: Harness): { button: FakeElement; preview: FakeElement } {
+    h.root.find((e) => e.textContent === 'Receitas')!.click();
+    const button = h.root.find((e) => e.className === 'recipe');
+    const preview = h.root.find((e) => e.className === 'preview');
+    expect(button, 'o livro precisa listar alguma receita').toBeDefined();
+    expect(preview, 'o painel de prévia precisa existir').toBeDefined();
+    return { button: button!, preview: preview! };
+  }
+
+  it('nasce escondida e aparece ao passar o mouse na receita', () => {
+    const h = harness();
+    const { button, preview } = openBook(h);
+    expect(preview.hidden).toBe(true);
+
+    button.dispatch('pointerenter', { pointerType: 'mouse' });
+    expect(preview.hidden, 'passar o mouse tem que mostrar a grade').toBe(false);
+    expect(preview.collect((e) => e.className.startsWith('cell')).length)
+      .toBeGreaterThan(0);
+
+    button.dispatch('pointerleave', { pointerType: 'mouse' });
+    expect(preview.hidden).toBe(true);
+  });
+
+  it('no toque ela aparece e fica — não há "sair de cima" no dedo', () => {
+    const h = harness();
+    const { button, preview } = openBook(h);
+    button.dispatch('pointerdown', { pointerType: 'touch' });
+    expect(preview.hidden).toBe(false);
+  });
+
+  it('marca em vermelho o ingrediente que falta na mochila', () => {
+    const h = harness();
+    const { button, preview } = openBook(h);
+    button.dispatch('pointerenter', { pointerType: 'mouse' });
+    const cells = preview.collect((e) => e.className.startsWith('cell'));
+    const filled = cells.filter((c) => c.title !== '');
+    expect(filled.length, 'a receita precisa ter ingrediente').toBeGreaterThan(0);
+    // Mochila vazia: tudo que a receita pede está faltando.
+    expect(filled.every((c) => c.classes.has('missing'))).toBe(true);
+  });
+
+  it('o mesmo ingrediente não conta duas vezes com uma unidade só', () => {
+    // Uma tábua na mochila não pode deixar verde uma receita que pede duas.
+    const h = harness();
+    h.inventory.set(0, makeStack(PLANKS, 1));
+    const { button, preview } = openBook(h);
+
+    const twoPlanks = h.root.collect((e) => e.className === 'recipe')
+      .find((b) => b.title.includes('Graveto') || b.title.includes('Vara'));
+    (twoPlanks ?? button).dispatch('pointerenter', { pointerType: 'mouse' });
+
+    const cells = preview.collect((e) => e.className.startsWith('cell') && e.title !== '');
+    const plankCells = cells.filter((c) => c.title.includes('Tábua'));
+    if (plankCells.length >= 2) {
+      expect(plankCells.some((c) => c.classes.has('missing'))).toBe(true);
+    }
+  });
+
+  it('a prévia some ao redesenhar a lista', () => {
+    const h = harness();
+    const { button, preview } = openBook(h);
+    button.dispatch('pointerenter', { pointerType: 'mouse' });
+    expect(preview.hidden).toBe(false);
+    // Preencher a grade redesenha o livro; a prévia antiga não pode ficar.
+    button.click();
+    expect(preview.hidden).toBe(true);
+  });
+});
+
 describe('slot de resultado do craft', () => {
   it('tocar duas vezes rápido não varre o inventário para o cursor', () => {
     const h = harness();

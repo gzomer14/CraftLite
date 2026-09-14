@@ -9,9 +9,11 @@
 import { clamp, DEG2RAD } from '../core/math';
 import type { SettingsStore } from '../game/settings';
 import { Gamepads } from './gamepad';
+import { Keybinds } from './keybinds';
 import { Keyboard } from './keyboard';
 import { Mouse } from './mouse';
 import { TouchControls } from './touch';
+import type { ActionId } from '../data/keybinds';
 
 const PITCH_LIMIT = 89.9 * DEG2RAD;
 
@@ -32,6 +34,8 @@ export interface ControlsCallbacks {
   onToggleFly: () => void;
   onPause: () => void;
   onInventory: () => void;
+  /** Largar o item da mão: 1 unidade, ou o stack inteiro com Ctrl (doc 08 §3.5). */
+  onDropItem: (whole: boolean) => void;
 }
 
 export class Controls {
@@ -39,6 +43,8 @@ export class Controls {
   readonly mouse: Mouse;
   readonly touch: TouchControls;
   readonly gamepad = new Gamepads();
+  /** Mapa de teclas do jogador (doc 08 §3.11). */
+  readonly keybinds: Keybinds;
 
   readonly state: ActionState = {
     forward: 0, strafe: 0, jump: false, sneak: false, sprint: false, breaking: false,
@@ -62,8 +68,12 @@ export class Controls {
   private sprintLatched = false;
   private sneakLatched = false;
 
-  constructor(canvas: HTMLCanvasElement, settings: SettingsStore, callbacks: ControlsCallbacks) {
+  constructor(
+    canvas: HTMLCanvasElement, settings: SettingsStore, callbacks: ControlsCallbacks,
+    keybinds: Keybinds = new Keybinds(),
+  ) {
     this.settings = settings;
+    this.keybinds = keybinds;
     this.keyboard = new Keyboard();
     this.mouse = new Mouse(canvas);
     this.touch = new TouchControls(canvas, settings);
@@ -77,24 +87,46 @@ export class Controls {
 
     this.bindKeyboard(callbacks);
     this.bindMouse(canvas, callbacks);
+    // Remapear em jogo refaz os binds na hora: a tela de opções fica aberta por
+    // cima do mundo, e a tecla nova tem que valer ao fechar.
+    keybinds.onChange(() => this.bindKeyboard(callbacks));
   }
 
+  /** Teclas que `bindKeyboard` registrou, para desfazer no remapeamento. */
+  private bound: string[] = [];
+
   private bindKeyboard(callbacks: ControlsCallbacks): void {
-    this.keyboard.bind('F3', (down) => { if (down) callbacks.onToggleDebug(); });
+    for (const code of this.bound) this.keyboard.unbind(code);
+    this.bound = [];
+
+    // `Escape` e os dígitos da hotbar são fixos (ver `data/keybinds.ts`).
     this.keyboard.bind('Escape', (down) => { if (down) callbacks.onPause(); });
-    this.keyboard.bind('KeyE', (down) => { if (down) callbacks.onInventory(); });
     for (let i = 0; i < 9; i++) {
       this.keyboard.bind(`Digit${i + 1}`, (down) => { if (down) callbacks.onHotbarSelect(i); });
     }
 
-    // Duplo espaço alterna o voo no criativo (doc 06 §9).
+    this.bindAction('debug', (down) => { if (down) callbacks.onToggleDebug(); });
+    this.bindAction('inventory', (down) => { if (down) callbacks.onInventory(); });
+    // Ctrl larga o stack inteiro; sozinho, larga um (doc 08 §3.5).
+    this.bindAction('drop', (down) => {
+      if (down) callbacks.onDropItem(this.keyboard.isDown(this.keybinds.codeFor('sprint')));
+    });
+
+    // Duplo toque no pulo alterna o voo no criativo (doc 06 §9).
     let lastJump = 0;
-    this.keyboard.bind('Space', (down) => {
+    this.bindAction('jump', (down) => {
       if (!down) return;
       const now = performance.now();
       if (now - lastJump < 300) callbacks.onToggleFly();
       lastJump = now;
     });
+  }
+
+  private bindAction(id: ActionId, action: (down: boolean) => void): void {
+    const code = this.keybinds.codeFor(id);
+    if (code === '') return;
+    this.bound.push(code);
+    this.keyboard.bind(code, action);
   }
 
   private bindMouse(canvas: HTMLCanvasElement, callbacks: ControlsCallbacks): void {
@@ -154,8 +186,9 @@ export class Controls {
     applyLook(yawDelta, pitchDelta);
 
     // --- movimento: teclado, joystick e analógico esquerdo somam ---
-    const keyForward = this.keyboard.axis('KeyS', 'KeyW');
-    const keyStrafe = this.keyboard.axis('KeyA', 'KeyD');
+    const keys = this.keybinds;
+    const keyForward = this.keyboard.axis(keys.codeFor('back'), keys.codeFor('forward'));
+    const keyStrafe = this.keyboard.axis(keys.codeFor('left'), keys.codeFor('right'));
     const t = this.touch.state;
     const g = this.gamepad.state;
 
@@ -170,9 +203,10 @@ export class Controls {
     this.state.strafe = strafe;
 
     // --- botões ---
-    const jumpHeld = this.keyboard.isDown('Space') || this.touch.buttons.jump || g.jump;
-    const sneakHeld = this.keyboard.isDown('ShiftLeft') || this.touch.buttons.sneak || g.sneak;
-    const sprintHeld = this.keyboard.isDown('ControlLeft') || t.sprint > 0;
+    const jumpHeld = this.keyboard.isDown(keys.codeFor('jump')) || this.touch.buttons.jump || g.jump;
+    const sneakHeld = this.keyboard.isDown(keys.codeFor('sneak'))
+      || this.touch.buttons.sneak || g.sneak;
+    const sprintHeld = this.keyboard.isDown(keys.codeFor('sprint')) || t.sprint > 0;
 
     this.state.jump = jumpHeld;
     this.state.sneak = this.settings.get('toggleSneak')

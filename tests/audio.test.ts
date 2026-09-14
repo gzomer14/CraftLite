@@ -8,10 +8,11 @@
  * navegador.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { SOUNDS, blockSound, buildGraph, durationOf, noiseBuffer } from '../src/audio/synth';
+import { SOUNDS, blockSound, buildGraph, durationOf, rateFor, noiseBuffer } from '../src/audio/synth';
 import { AudioEngine, SUBTITLES } from '../src/audio/engine';
 import { Music } from '../src/audio/music';
 import { MOBS } from '../src/data/mobs';
+import { BUSES, BUS_LABELS, BUS_SETTING, busFor } from '../src/data/soundbuses';
 
 /** Contexto de áudio falso: conta nós criados e ligações feitas. */
 function fakeContext() {
@@ -69,18 +70,82 @@ describe('tabela de sons', () => {
 
   it('nenhum som é longo demais para caber na memória do T0', () => {
     for (const name of Object.keys(SOUNDS)) {
-      const duration = durationOf(SOUNDS[name]);
+      const recipe = SOUNDS[name];
+      const duration = durationOf(recipe);
       expect(duration, name).toBeGreaterThan(0.01);
-      // 1,5 s a 22 kHz mono = ~130 KB. Acima disso é sample, não efeito.
-      expect(duration, name).toBeLessThanOrEqual(1.5);
+      /*
+       * 1,5 s a 22 kHz mono = ~130 KB. Acima disso é sample, não efeito.
+       *
+       * Som **sustentado** é a exceção declarada: ele é tocado em `loop`, então
+       * o buffer é o ciclo inteiro e não a duração do efeito. A chuva precisa
+       * de segundos de ruído para a volta não virar um "chhh… chhh…"; o teto
+       * dela é o dobro, e nada além do loop pode usá-lo.
+       */
+      const ceiling = recipe.kind === 'noise' && recipe.sustain === true ? 3 : 1.5;
+      expect(duration, name).toBeLessThanOrEqual(ceiling);
     }
   });
 
   it('o total renderizado cabe em ~1 MB (doc 10 §2)', () => {
-    let samples = 0;
-    for (const name of Object.keys(SOUNDS)) samples += durationOf(SOUNDS[name]) * 22050;
-    const megabytes = (samples * 4) / (1024 * 1024);
-    expect(megabytes).toBeLessThan(4);
+    let bytes = 0;
+    for (const name of Object.keys(SOUNDS)) {
+      const recipe = SOUNDS[name];
+      // Cada som é renderizado na taxa que a própria receita pede, não a 22 kHz
+      // fixos: é o que `AudioEngine.renderAll` faz.
+      bytes += durationOf(recipe) * rateFor(recipe, 22050) * 4;
+    }
+    /*
+     * O doc 10 §2 estimou ~1 MB para a tabela do M0; ela cresceu para 48 sons
+     * e o teto praticado virou 4 MB, que é o que estava aqui.
+     *
+     * A taxa por receita (`rateFor`) derrubou a conta de **3,95 para 3,26 MB**
+     * *acrescentando* três sons novos — morcego, trovão e o loop de chuva. O
+     * teto desce junto: 3,5 MB deixa margem para alguns sons, não para
+     * esquecer que existe um orçamento.
+     */
+    expect(bytes / (1024 * 1024)).toBeLessThan(3.5);
+  });
+
+  it('a taxa por receita nunca corta banda que o som usa', () => {
+    // Ruído com highpass e estalo agudo têm energia até o topo: eles não podem
+    // cair para metade da taxa, ou o chocalho do esqueleto perde o brilho.
+    expect(rateFor(SOUNDS['step/sand'], 22050)).toBe(11025);
+    expect(rateFor(SOUNDS['break/snow'], 22050)).toBe(22050);
+    expect(rateFor(SOUNDS['break/glass'], 22050)).toBe(22050);
+    // A chuva passa **raspando** do outro lado: o lowpass dela está em 4 kHz e
+    // a folga de 1,4 pede 5,6 kHz, contra os 5,5 que meia taxa cobre. Fica em
+    // 22 kHz de propósito — encolher a folga para ganhar 88 KB comeria a saia
+    // do filtro de todo mundo.
+    expect(rateFor(SOUNDS['weather/rain'], 22050)).toBe(22050);
+  });
+
+  it('todo som cai num barramento, e os de mob no lado certo', () => {
+    // Nada pode cair fora dos nove sliders do doc 08 §3.11.
+    for (const name of Object.keys(SOUNDS)) {
+      expect(BUSES, name).toContain(busFor(name));
+    }
+    expect(busFor('mob/zombie_ambient')).toBe('hostile');
+    expect(busFor('mob/creeper_attack')).toBe('hostile');
+    expect(busFor('mob/cow_ambient')).toBe('friendly');
+    // Lobo e enderman são neutros: são da casa, não da caverna.
+    expect(busFor('mob/wolf_hurt')).toBe('friendly');
+    expect(busFor('mob/enderman_teleport')).toBe('friendly');
+    expect(busFor('step/grass')).toBe('block');
+    expect(busFor('break/stone')).toBe('block');
+    expect(busFor('player/levelup')).toBe('player');
+    expect(busFor('ui/click')).toBe('ui');
+    expect(busFor('weather/rain')).toBe('weather');
+    // Fornalha e portal tocam sozinhos: são ambiente, não bloco.
+    expect(busFor('block/furnace')).toBe('ambient');
+    expect(busFor('block/portal')).toBe('ambient');
+    expect(busFor('block/door')).toBe('block');
+  });
+
+  it('cada barramento tem um slider e um rótulo', () => {
+    for (const bus of BUSES) {
+      expect(BUS_SETTING[bus], bus).toBeDefined();
+      expect(BUS_LABELS[bus], bus).toBeTruthy();
+    }
   });
 
   it('os passos e as quebras cobrem todos os materiais de bloco', () => {

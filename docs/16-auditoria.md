@@ -12,6 +12,121 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-14 · 12:31 → 13:32 · O resto do doc 08, o fogo, o morcego e o boneco
+
+**Pedido:** *"Pode atacar o ponto 2 e 4"* — os dois blocos que o doc 15 §6 carregava: as lacunas da
+tabela de Vídeo, Controles, Som e Acessibilidade do doc 08, e as "oportunidades pequenas que
+sobraram". No mesmo pedido, o usuário encerrou os outros dois itens: *"para o ponto 1 não tenho mais
+em mãos o J7 Metal, mas já fiz testes no meu celular e computador e tudo funcionou — pode considerar
+concluído"* e *"para o ponto 3 não precisa se preocupar com mundos antigos não, já foram
+recriados"*.
+
+**Resultado:** **nenhum documento normativo tem mais pendência de funcionalidade.** Vinte opções
+novas, dez teclas remapeáveis, um passe de render novo, um sistema de mundo novo, um mob novo e
+sete miudezas — todas com teste.
+
+Quatro decisões que mereceram mais do que uma linha de código:
+
+1. **A umbrella "Gráficos" não é um valor que o render consulta — ela reescreve os outros
+   controles.** Assim não existe o estado "Gráficos: Rápido, Nuvens: Bonitas", e o jogador vê nos
+   sliders o que escolheu no atalho.
+2. **Conflito de tecla é permitido e pintado de vermelho, não recusado.** Recusar prenderia o
+   jogador: trocar duas teclas de lugar passa obrigatoriamente por um estado em que as duas estão na
+   mesma. `Escape` e os dígitos da hotbar ficaram de fora do remapeamento — a saída de emergência de
+   toda camada de UI não pode ser remapeada para lugar nenhum.
+3. **Três sliders teriam nascido controlando o nada.** "Clima" não tinha som de clima, "Ambiente"
+   não tinha som de ambiente, e "esconder flashes do céu" não tinha flash nenhum para esconder. Em
+   vez de entregar controles vazios, entraram a chuva em loop (doc 10 §2, nunca implementada), o
+   trovão, e o relâmpago — determinístico da seed, como o resto do clima, sem um campo novo no save.
+4. **O boneco do jogador é 2D, de propósito, em todos os tiers.** O doc 08 §3.5 pede canvas WebGL e
+   abre a exceção *"em T0, pode ser um sprite estático"*. Um segundo contexto num aparelho de 2 GB
+   custa pool de buffers, programa e uma cópia do atlas de entidade; um `scissor` no principal faria
+   o passe de mobs rodar com outra matriz no meio do frame. O desvio está escrito no cabeçalho do
+   módulo, como o PROMPT.md §6 manda.
+
+**Uma dívida de memória foi paga no caminho.** A tabela de sons renderizava tudo a 22 kHz, e metade
+das amostras guardava banda que o próprio filtro já tinha jogado fora. `rateFor` deriva a taxa da
+própria receita: a conta caiu de **3,95 para 3,26 MB acrescentando três sons**, e o teto do teste
+desceu de 4 para 3,5 MB.
+
+**O canto de escada não foi copiado, foi derivado.** A regra sai de uma exigência geométrica
+verificável — a superfície alta de duas escadas perpendiculares tem que ser contínua pela face que
+elas dividem — e é isso que os testes medem, não nomes de rotação. Ele não ocupa bit nenhum do save,
+como a conexão de cerca, e a **colisão passou a derivar o canto pela mesma função**: o cabeçalho de
+`mesh/shapes.ts` promete desde o M1 que desenho e colisão não divergem, e o canto teria sido a
+primeira divergência.
+
+**Portões:** 1269 testes (70 arquivos) verdes, lint limpo, build limpo, **185,3 KB gzip** de 350.
+
+### Opções, teclas e som
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `+` | `src/data/keybinds.ts` | As dez ações remapeáveis, as teclas reservadas e o rótulo legível de um `code`. |
+| `+` | `src/input/keybinds.ts` | Mapa do jogador, persistido; conflito é sinalizado, não recusado. |
+| `+` | `src/data/soundbuses.ts` | Os oito barramentos, o rótulo de cada um, a chave de `Settings` e o roteamento por prefixo — quem dispara um som não sabe em qual slider ele cai. |
+| `+` | `tests/keybinds.test.ts` | 10 testes: tabela de fábrica única, tecla reservada, conflito nos dois sentidos, persistência, storage sujo. |
+| `+` | `tests/videooptions.test.ts` | 14 testes: umbrella, validação de opção de texto, relâmpago determinístico, balanço da câmera. |
+| `~` | `src/game/settings.ts` | Vinte chaves novas (simulação, vsync, gráficos, nuvens, partículas, névoa, AO, balanço, FPS, sete volumes, daltônico, contorno, flashes, distorção); `CHOICES` substitui os `if` soltos de validação; a umbrella escreve os controles que resume. |
+| `~` | `src/input/controls.ts` | Binds vêm do mapa e são refeitos quando ele muda; `onDropItem` (Q / Ctrl+Q, doc 08 §3.5) que não existia. |
+| `~` | `src/input/keyboard.ts` | `unbind`, sem o qual remapear deixava a tecla velha valendo também. |
+| `~` | `src/ui/screens/menu.ts` | `buildKeybinds`: botão que escuta a próxima tecla **em captura**, antes do jogo por baixo; CSS do conflito. |
+| `~` | `src/ui/screens/options.ts` | Nove sliders de som montados a partir de `soundbuses`; oito linhas novas em Vídeo; cinco em Acessibilidade. |
+| `~` | `src/ui/menuflow.ts` | Passa o mapa de teclas para a tela de opções e a miniatura para a de mundos. |
+| `~` | `src/audio/engine.ts` | Oito barramentos; roteamento por nome; `setLoop` para a chuva; taxa por receita; amostras do resource pack. |
+| `~` | `src/audio/synth.ts` | `rateFor` (taxa derivada da receita), envelope sustentado para loop, e quatro sons: chuva, trovão, fogo e a voz do morcego. |
+| `~` | `tests/audio.test.ts` | Roteamento dos nove sliders, taxa por receita, teto de memória em 3,5 MB. |
+
+### Render, mundo e conteúdo
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `+` | `src/render/clouds.ts` | Passe de nuvens: plano a y=192, uma draw call, forma no shader. Off/Rápido/Bonito = zero, uma ou duas oitavas. |
+| `+` | `src/render/shaders/clouds.glsl.ts` | Ruído de valor e a forma da nuvem, nas duas versões de GLSL. |
+| `+` | `src/world/fire.ts` | Fogo que se espalha: registro em rodízio com teto duro, chance vinda do `flammable` da tabela, chuva apaga, varredura de coluna carregada. |
+| `+` | `src/ui/containers/paperdoll.ts` | Boneco do jogador em vista frontal ortográfica, com a armadura vestida por cima. |
+| `+` | `tests/fire.test.ts` | 15 testes: acender, propagar, acabar, chuva, chão, teto de chamas e orçamento por tick. |
+| `+` | `tests/staircorners.test.ts` | 14 testes: volume das três formas, escolha do canto, continuidade entre vizinhas, desenho = colisão. |
+| `+` | `tests/paperdoll.test.ts` | 8 testes: projeção dentro do canvas, boneco não invertido nem espelhado, ordem de profundidade. |
+| `~` | `src/world/mesh/shapes.ts` | Escada com canto interno e externo; `stairCornerFrom` derivado dos quatro vizinhos; `collisionBoxesFor` aceita o canto. |
+| `~` | `src/world/mesh/complex.ts` | O mesher calcula o canto da escada, como já calculava a conexão de cerca. |
+| `~` | `src/world/physics.ts` | A colisão da escada consulta os mesmos quatro vizinhos, pela mesma função. Só para escada. |
+| `~` | `src/world/mesh/greedy.ts` | `smoothLighting`: desligado, AO 3 em todo vértice — e o merge deixa de quebrar nas bordas (5 quads viram 3 num degrau). |
+| `~` | `src/render/renderer.ts` | Passe de nuvens, modo de névoa, clarão do relâmpago, contorno em alto contraste. |
+| `~` | `src/render/camera.ts` | Balanço do olho ao andar, movido pela distância andada. |
+| `~` | `src/render/particles.ts` | Teto vivo em vez de capacidade fixa por tier — senão "Todas" em T0 não faria nada. |
+| `~` | `src/render/selection.ts` | Contorno branco opaco e grosso no alto contraste. |
+| `~` | `src/render/gl.ts` | `vsync` decide `desynchronized` na criação do contexto. |
+| `~` | `src/game/weather.ts` | Relâmpago determinístico da seed e do tick, com o interruptor de acessibilidade e o aviso do trovão. |
+| `~` | `src/game/survival.ts` | `SurvivalContext` com `onFire`, prometido no comentário desde o M4; dano de fogo a cada meio segundo, não por tick. |
+| `~` | `src/game/session.ts` | Fogo ligado ao tick, à chuva, ao chunk e ao isqueiro; dano de fogo no jogador. |
+| `~` | `src/data/blocks.ts` | Bloco `fire` (cruz, luz 15, `replaceable`, `itemless`). |
+| `~` | `src/data/textures.ts` | Textura `block/fire`, animada em 4 quadros. |
+| `~` | `src/data/mobs.ts` | Morcego: a primeira entrada da categoria `ambient`, que tinha cap desde o M5 e ninguém atrás. |
+| `~` | `src/data/mobmodels.ts` | Modelo `bat`: corpo, cabeça com orelhas e duas asas que batem. |
+| `~` | `src/data/mobskins.ts` | Skin do morcego e a do jogador — esta fora do atlas, só para o boneco. |
+| `~` | `src/ui/hud.ts` | Paleta do modo daltônico em variáveis CSS e contador de FPS. |
+| `~` | `src/ui/containers/screen.ts` | Boneco ao lado dos slots de equipamento. |
+| `~` | `src/ui/containers/recipebook.ts` | Prévia da grade da receita, com o que falta em vermelho. |
+| `~` | `src/ui/debug.ts` | `N fogo` na linha `E:`. |
+| `~` | `src/workers/protocol.ts`, `src/workers/chunk.worker.ts`, `src/world/pipeline.ts` | `smoothLighting` chega ao mesher pelo `init`. |
+
+### Save e resource pack
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/save/db.ts` | `worldSize` por cursor (sem trazer os chunks todos para a memória), `saveThumbnail`/`loadThumbnail`. |
+| `~` | `src/save/savemanager.ts` | `measureWorld` e `saveThumbnail`, ambos falhando em silêncio: tamanho e foto são informação, o mundo é o dado. |
+| `~` | `src/save/archive.ts` | `.clw` v2: miniatura no **fim** do arquivo, para um leitor da v1 achar tudo que conhece nos mesmos offsets. |
+| `~` | `src/game/savegame.ts` | Mede o mundo depois de gravar os chunks e guarda a foto do quadro. |
+| `~` | `src/ui/screens/worlds.ts` | Miniatura e tamanho na lista; `formatSize` com travessão para o mundo nunca medido. |
+| `~` | `src/render/pack.ts` | `sound/<nome>.ogg` no pacote, com teto próprio de 2 MB — o único item que entra como veio. |
+| `~` | `src/ui/screens/packs.ts` | O relatório conta imagens **e** sons. |
+| `~` | `src/main.ts` | Fiação de tudo: volumes, teclas, opções de vídeo, loop de chuva, trovão, balanço, FOV de corrida, miniatura. |
+| `~` | `docs/15-status.md`, `README.md` | Panorama, métricas, detalhe da entrega, três correções fora de marco e o §6 reescrito. |
+
+---
+
 ## 2026-09-13 · 15:05 → 15:27 · Um estilo de textura com relevo, e itens que têm volume
 
 **Pedido:** *"o que está me incomodando profundamente é essa textura completa do jogo,

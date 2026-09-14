@@ -9,7 +9,7 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-13 15:26 — **estilo de textura Nítido**
+**Última atualização:** 2026-09-14 13:32 — **acabamento pós-M7: opções, fogo, morcego e boneco**
 
 ---
 
@@ -25,6 +25,7 @@
 | **M5** Vida no mundo | 12 mobs com IA/animação/spawn, combate, armadura, cama, som procedural, árvores e plantas | ✅ concluído | — |
 | **M6** Profundidade | agricultura, reprodução, XP, encantamento, estruturas, clima, arco, conquistas | ✅ concluído | — |
 | **M7** Extras | redstone, Nether, trilhos, import/export, resource pack | ✅ concluído | multijogador P2P fora de escopo (ver abaixo) |
+| **Acabamento** pós-M7 | tabela de Vídeo e Acessibilidade completas, teclas remapeáveis, 9 sliders de som, fogo que se espalha, morcego, boneco do jogador, miniatura e tamanho do mundo, canto de escada, som no resource pack | ✅ concluído | **nada disso foi visto em aparelho ainda** |
 
 **O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
 ele irá pesar muito o jogo e trazer muita complexidade por enquanto desnecessária"*. O
@@ -37,21 +38,23 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-13 15:26, com `npm test`, `npm run build` e
+Medidas em 2026-09-14 13:32, com `npm test`, `npm run build` e
 `SIZE_BUDGET_KB=350 npm run size`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **174,5 KB** | < 350 KB | `npm run size` |
-| Testes | **1179**, 65 arquivos | manter verde | `npm test` |
-| Camadas de atlas | **152** | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
-| Geração de chunk | 6–14 ms (mediana; varia muito com a carga da máquina) | < 25 ms | `tests/perf.test.ts` |
-| Geração de chunk do Nether | 6,1 ms (mediana; 3,8 antes de a luz entrar) | < 25 ms | `tests/perf.test.ts` |
-| Meshing de section | 0,6–1,5 ms (mediana) | < 8 ms | `tests/perf.test.ts` |
-| Tick de 20 mobs | 0,14 ms | << 50 ms | `tests/mobs.test.ts` |
-| Tick de circuito (fio de 64) | 0,88 ms | < 5 ms | `tests/perf.test.ts` |
-| Acabamento do estilo Nítido (atlas inteiro) | **2,0 ms**, uma vez no boot | < 60 ms | `tests/perf.test.ts` |
-| Folha de sprites em volume (32 px) | **26,7 ms**, uma vez no boot | < 200 ms | `tests/perf.test.ts` |
+| Bundle (gzip, tudo) | **185,3 KB** | < 350 KB | `npm run size` |
+| Testes | **1269**, 70 arquivos | manter verde | `npm test` |
+| Camadas de atlas | **156** | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
+| Memória de áudio | **3,26 MB** (era 3,95 com três sons a menos) | < 3,5 MB | `tests/audio.test.ts` |
+| Geração de chunk | 5,7–6,2 ms (mediana; varia muito com a carga da máquina) | < 25 ms | `tests/perf.test.ts` |
+| Geração de chunk do Nether | 5,1 ms (mediana; 3,8 antes de a luz entrar) | < 25 ms | `tests/perf.test.ts` |
+| Meshing de section | 0,65 ms (mediana) | < 8 ms | `tests/perf.test.ts` |
+| Tick de 20 mobs | 0,20 ms | << 50 ms | `tests/mobs.test.ts` |
+| Tick de circuito (fio de 64) | 0,82 ms | < 5 ms | `tests/perf.test.ts` |
+| Tick de fogo (256 chamas, o teto) | **0,03 ms** | < 2 ms | `tests/perf.test.ts` |
+| Acabamento do estilo Nítido (atlas inteiro) | **2,1 ms**, uma vez no boot | < 60 ms | `tests/perf.test.ts` |
+| Folha de sprites em volume (32 px) | **29,3 ms**, uma vez no boot | < 200 ms | `tests/perf.test.ts` |
 | Mundo de RD 16 pronto | **165 pumps** (eram 1315) | — | `tests/dimensionrace.test.ts` |
 | Colunas em 40 ciclos com 4 vagas (RD 8) | **86** (eram 44) | — | `tests/dimensionrace.test.ts` |
 | FPS em T0 real (2017) | **60**, RD 4, escala 1,00 (Galaxy J7 Metal) | 30 estáveis | teste manual |
@@ -613,6 +616,104 @@ Escolhe-se em **Opções → Vídeo → "Texturas (recarrega)"**, e o padrão é
 mesmo motivo da Qualidade: o atlas já foi para a GPU e a folha já é `background-image` de dezenas
 de slots.
 
+### Acabamento pós-M7 ✅ — 2026-09-14
+
+Tudo que o §6 listava como "levantado pela revisão de UX e ficou para depois" (item 3) e como
+"oportunidades pequenas que sobraram" (item 5). Não é marco novo: é a lista de dívidas do doc 08 e
+da tabela de blocos sendo paga.
+
+**A tabela de Vídeo do doc 08 §3.11 ficou inteira.** Faltavam oito linhas e todas entraram:
+
+| Opção | O que ela faz de verdade |
+|---|---|
+| Distância de Simulação | raio em que mob nasce e vive (doc 07 §4). Num aparelho fraco baixá-la rende mais que baixar a de render: mob custa tick, não pixel |
+| Gráficos (Rápido/Bonito) | **umbrella**: escolher um dos dois reescreve nuvens, partículas, névoa, sombras e balanço de uma vez. Não é um valor que o render consulta — assim não existe o estado inconsistente "Gráficos: Rápido, Nuvens: Bonitas" |
+| Nuvens (Off/Rápido/Bonito) | passe novo (`render/clouds.ts`): um plano a y=192 com a forma feita no shader. **Uma draw call, dois triângulos, zero byte de textura.** Uma oitava de ruído no Rápido, duas no Bonito. Desenha depois do terreno opaco, com teste de profundidade e sem escrever profundidade — a montanha na frente esconde a nuvem, e quem voa acima delas vê o chão sumir |
+| Partículas (Mínimo/Reduzido/Todas) | teto vivo de partículas. Os arrays passaram a ser alocados **sempre no máximo** (~36 KB): dimensioná-los pelo preset economizaria 30 KB e faria o jogador de T0 que escolhe "Todas" não ver diferença nenhuma — o controle mentiria |
+| Névoa (Mínima/Próxima/Distante) | multiplica a densidade que a distância de render calcula. "Mínima" não zera: zero deixaria o terreno recortado contra o céu na borda do mundo carregado |
+| Iluminação Suave (AO) | recarrega. Desligada, todo vértice sai com AO 3 — e aí o merge greedy **deixa de quebrar nas bordas**: medido num degrau, 5 quads viram 3. É o caminho de fuga de quem precisa de cada vértice |
+| Balanço da Câmera | oscilação do olho ao andar, movida pela **distância andada** e não pelo tempo — senão a câmera balança parada empurrando contra a parede |
+| Mostrar FPS | contador solto no canto. O F3 já mostra o número, mas traz vinte linhas junto |
+| VSync | recarrega. **No navegador não se desliga o vsync** — quem apresenta o quadro é o compositor. O que este controle mexe é `desynchronized`, e o padrão é ligado (sincronizado) porque desligado piscou no S24 Ultra (§4). Quem quiser os poucos ms de latência a menos escolhe, sabendo |
+
+**Acessibilidade (doc 08 §6) também fechou.** Modo daltônico com paleta Okabe-Ito — o HUD codificava
+vida, fome, ar e XP **só por cor**, e três delas caem no eixo que protanopia e deuteranopia perdem:
+para 8% dos homens a barra de vida e a de experiência eram a mesma cor. Mais contorno de bloco em
+alto contraste (branco opaco e grosso, contra o preto alpha 0,4 que some em obsidiana), esconder
+flashes do céu, e efeitos de distorção 0–100% (hoje o "puxão" de FOV ao correr; em 0% a câmera não
+mexe, que é o que quem tem enjoo de movimento precisa).
+
+**Relâmpago.** "Esconder flashes do céu" não podia ser um interruptor sem nada atrás: a tempestade
+não tinha clarão nenhum. Agora tem, **determinístico da seed e do tick** como o resto do clima —
+dois jogadores no mesmo mundo veem o mesmo raio no mesmo instante, e o save não ganha um campo. O
+trovão é o único som do jogo que toca sem posição.
+
+**Teclas remapeáveis.** Dez ações em `data/keybinds.ts`, mapa do jogador em `input/keybinds.ts`,
+lista em Opções → Controles. Clicar no botão captura a próxima tecla **antes** de qualquer outro
+ouvinte — sem isso, o jogo por baixo continuaria agachando enquanto o jogador escolhe a tecla de
+agachar. **Conflito é permitido e pintado de vermelho, não recusado:** trocar duas teclas de lugar
+passa obrigatoriamente por um estado em que as duas estão na mesma. `Escape` e os dígitos da hotbar
+ficam de fora — remapear a saída de emergência de toda camada de UI cria o estado em que o jogador
+não consegue mais sair de uma tela. `Q` / `Ctrl+Q` (largar item) existia no doc 08 §3.5 e não tinha
+tecla nenhuma.
+
+**Nove sliders de som.** O motor tinha cinco barramentos (doc 10 §1) e o doc 08 pede nove
+controles; os dois não se contradizem — um descreve o grafo, o outro o painel. O grafo ganhou os
+que faltavam (hostil, amigável, jogador, clima) e o roteamento virou tabela em
+`data/soundbuses.ts`: **quem dispara um som não sabe mais em qual slider ele cai**. Mob neutro
+(lobo, enderman) conta como amigável — quem baixa "Mobs Hostis" quer parar de ouvir o zumbi na
+caverna, não o lobo. Os barramentos de Ambiente e Clima teriam nascido vazios, então ganharam
+conteúdo real: a fornalha e o portal foram para Ambiente, e a **chuva em loop** (doc 10 §2, nunca
+implementada) e o trovão para Clima.
+
+**Fogo que se espalha.** `flammable` estava na tabela de blocos desde o M1 — madeira 5, folha e lã
+30 — e **nada no código a lia**: a floresta não pegava fogo e o número era enfeite. `world/fire.ts`
+segue a disciplina do crescimento e dos fluidos: registro de posições em chamas, rodízio com teto
+duro por tick, **nada de random tick**. O incêndio grande queima mais devagar por chama e nunca
+derruba o frame (0,03 ms com as 256 chamas do teto). A chama envelhece, tenta pegar num vizinho com
+chance proporcional ao `flammable` dele, consome o que pega, se apaga sem combustível e **a chuva
+apaga** (doc 03 §8). O isqueiro deixou de servir só para portal.
+
+**Morcego.** A categoria `ambient` do doc 07 §4 tinha cap próprio no spawner desde o M5 e **nenhum
+mob atrás dela** — era a única linha da tabela de spawn vazia. Ele não ataca, não dropa, não dá XP
+e some longe: o valor dele é dizer "você está numa caverna" antes de o zumbi dizer.
+
+**Boneco do jogador.** O doc 08 §3.5 desenha um preview do modelo ao lado dos slots de armadura e
+abre a exceção *"em T0, pode ser um sprite estático"*. **Este é o caminho da exceção, para todos os
+tiers**, e o motivo está no cabeçalho de `ui/containers/paperdoll.ts`: um segundo contexto WebGL num
+aparelho de 2 GB custa pool de buffers, programa e uma cópia do atlas de entidade; um `scissor` no
+principal faria o passe de mobs rodar com outra matriz no meio do frame. O desenho é ortográfico de
+frente, peça por peça, com as faces que o modelo já mapeia — e com a **armadura vestida por cima**,
+que é a informação que a fileira de slots não dá: ela diz o que está guardado, não o que está no
+corpo. A cabeça acompanha o ponteiro por deslocamento.
+
+**Miniatura e tamanho do mundo.** O store `thumbs` existia desde o M4 e estava vazio; `sizeBytes`
+nascia 0 e ficava 0 para sempre — a tela de seleção mostrava três mundos com o mesmo texto cinza, e
+não havia como escolher qual apagar quando o aviso de cota do doc 11 §4 aparecesse. A foto é tirada
+**dentro do mesmo quadro em que o canvas foi desenhado** (o contexto é `preserveDrawingBuffer:
+false`), copiada para um canvas de 160×90 e guardada no autosave. O tamanho sai de uma varredura
+por cursor, no `saveAll` e não a cada autosave. As duas coisas **viajam no `.clw`**: o formato foi
+para a v2, com a miniatura no fim do arquivo — um leitor da v1 encontra tudo que conhece nos mesmos
+offsets.
+
+**Prévia da grade no livro de receitas.** O livro mostrava só o resultado: para saber o que entra
+numa bancada era preciso clicar e ver a grade se preencher — e, se faltasse ingrediente, o clique
+não fazia nada e o jogador continuava sem saber o quê. Agora a grade aparece ao passar o mouse ou
+tocar, com **o que falta em vermelho**.
+
+**Canto de escada.** O comentário de `mesh/shapes.ts` dizia que canto não existia porque *"dobrar a
+geometria custa mais do que o olho ganha"*. Ele custa **uma caixa** — interno são 3, externo são 2,
+contra 2 da reta — e, como a conexão de cerca, é derivado dos vizinhos na hora: **não ocupa bit
+nenhum do save**, e mundo antigo abre mostrando os cantos. A regra não saiu de decorar nomes de
+rotação: ela vem de uma exigência geométrica verificável — a superfície alta de duas escadas
+perpendiculares tem que ser contínua pela face que elas dividem. Desenho e colisão saem da mesma
+conta, incluindo as quatro consultas de vizinho, que só acontecem para escada.
+
+**Som no resource pack.** `sound/<nome>.ogg` (ou `.mp3`/`.wav`/`.m4a`) substitui a síntese. É o
+único item do pack que entra **como veio**, e por isso tem teto próprio de 2 MB. A amostra
+**desvia** da receita em vez de substituí-la, e um arquivo que o navegador não sabe ler cai de volta
+na síntese: ficar sem o som seria pior que ignorar a escolha do jogador.
+
 ---
 
 ## 4. Correções fora de marco
@@ -622,6 +723,9 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-14 | `audio/synth.ts`, `audio/engine.ts` | **A tabela de sons renderizava tudo a 22 kHz, e metade das amostras guardava banda que o próprio filtro tinha jogado fora.** Um passo na areia é ruído com lowpass em 600 Hz: Nyquist diz que 11 kHz basta, com folga. `rateFor` deriva a taxa da **própria receita** — não de uma lista à mão, para som novo já nascer com a taxa certa e mexer num filtro não deixar anotação velha para trás. A conta de memória de áudio caiu de **3,95 para 3,26 MB acrescentando três sons** (morcego, trovão e o loop de chuva), e o teto do teste desceu de 4 para 3,5 MB. Em T0 isso é memória de verdade. |
+| 2026-09-14 | `world/physics.ts`, `world/mesh/shapes.ts` | **A colisão da escada teria divergido do desenho no primeiro canto.** O cabeçalho de `mesh/shapes.ts` promete desde o M1 que as duas saem da mesma tabela — *"duas tabelas divergiriam na primeira forma nova, e o jogador atravessaria a escada que enxerga"* —, mas `collisionBoxesFor` recebia só `(forma, estado)` e o canto depende do **vizinho**. A física passou a derivar o canto dos mesmos quatro vizinhos, pela mesma função. As consultas só acontecem para escada: pedra e terra, que são o caminho quente do sweep, saem antes. |
+| 2026-09-14 | `render/particles.ts` | **O controle de partículas não poderia funcionar para cima.** A capacidade era dimensionada pelo preset do tier no construtor, então um jogador de T0 que escolhesse "Todas" continuaria com 128 — a opção existiria e não faria nada. Os arrays passaram a ser alocados sempre no máximo (~36 KB de `TypedArray`) e o modo virou um teto vivo. Trinta quilobytes não valem uma opção que mente. |
 | 2026-09-13 | `game/savegame.ts` | **Um pedaço de campo nasceu dentro do Nether — o inverso exato do bug da manhã, e a correção dele alargou esta fresta.** O pipeline troca de dimensão de forma **síncrona** e pede chunk no mesmo tick; o save troca de forma **assíncrona**, porque antes grava baús, veículos e as colunas que estão saindo. Nessa fresta o pipeline pedia chunk do Nether e o save respondia com a chave da superfície. O carimbo de dimensão do pipeline não pega este caso: quem está fora de sincronia não é o pipeline consigo mesmo, é o save com o pipeline. `SaveGame.loadChunk` passou a **esperar a troca terminar** — o carregamento já é assíncrono, o pipeline já sabe esperar, e a viagem tem tempo limite se algo travar. |
 | 2026-09-13 | `game/weather.ts`, `game/session.ts` | **Chovia no Nether**, debaixo de um teto de rocha-mãe. `hasSky` estava em `data/dimensions.ts` desde que o Nether nasceu e **nada no código a lia** — a terceira dívida desse tipo no projeto, depois de `fireImmune` e `flammable`. O corte é em `Weather.kind`, um lugar só: `isRaining`, `isThundering`, `intensity` e o teto de luz do céu saem todos dele. |
 | 2026-09-13 | `game/travel.ts`, `game/session.ts` | **O portal só funcionava perto da origem.** O pipeline carrega o anel em volta do **jogador**, e a travessia o deixava parado nas coordenadas antigas enquanto esperava o chunk de destino — que, com a escala 1:8, pode estar a 700 blocos dali. O chunk nunca chegava, a viagem estourava o tempo limite de 30 s e o jogador ficava largado na dimensão nova, nas coordenadas velhas, **preso dentro da rocha e sem portal nenhum**. Perto do spawn passava despercebido, porque a diferença cabia no render distance. Agora `onDimensionChange` leva as coordenadas do destino e a `Session` põe o jogador lá na hora; a física está congelada durante o carregamento, então mover antes de existir chão é seguro, e o Y definitivo continua saindo de `arriveAt`. Relato de campo: *"apareci travado voando… não consigo me mexer… não renderizou portal algum"*. |
@@ -703,8 +807,8 @@ mudanças em código de marcos "fechados":
 
 ## 5. Dependências entre pendências
 
-**Não há mais pendência de funcionalidade em aberto até o M7.** O que resta é a dependência
-externa ao código:
+**Não há mais pendência de funcionalidade em aberto.** O que resta é a dependência externa ao
+código:
 
 ```
 Teste em aparelho T0 real  ──►  fecha M3, M4, M5 e M6 de verdade
@@ -747,9 +851,26 @@ doc 14 continua valendo para o que ficou:
 redstone ✅  ──►  Nether ✅  ──►  trilhos ✅  ──►  import/export ✅  ──►  resource pack ✅
 ```
 
-**O M7 fechou em 2026-09-13**, e com ele os oito marcos do `PROMPT.md`. Não há mais pendência de
-funcionalidade de marco no projeto — o que resta está no §6, e é tudo de outra natureza: campo,
-polimento de UI e oportunidades pequenas.
+**O M7 fechou em 2026-09-13**, e com ele os oito marcos do `PROMPT.md`.
+
+**2026-09-14: a lista de polimento também fechou.** Os dois blocos que o §6 carregava — as lacunas
+do doc 08 (teclas, sliders de som, resto de Vídeo, Acessibilidade) e as "oportunidades pequenas"
+(boneco, morcego, `sizeBytes`, grade de receita, canto de escada, miniatura, fogo, som no pack) —
+foram entregues por inteiro, com teste. **Não sobrou pendência de funcionalidade em nenhum
+documento normativo.**
+
+No mesmo dia o usuário encerrou os outros dois itens que estavam abertos:
+
+- **Teste em aparelho fraco:** *"não tenho mais em mãos o J7 Metal, mas já fiz testes no meu
+  celular e computador e tudo funcionou — pode considerar concluído esse teste mesmo no dispositivo
+  mais fraco"*. O critério 2 do PROMPT.md §11 já estava cumprido com folga na medição de
+  2026-09-12 (60 FPS contra 30 de alvo).
+- **Mundos corrompidos antes de 2026-09-13:** *"não precisa se preocupar com mundos antigos não, já
+  foram recriados"*. O item sai da lista.
+
+**O que ficou, e é de outra natureza:** nada do que foi entregue em 2026-09-14 **rodou num
+aparelho**. Passe de nuvens, boneco, fogo, morcego e as vinte opções novas foram verificados por
+teste e por tipo, não por olho. Ver §6.
 
 **O que o Nether deixou pronto para quem vier depois:** `data/dimensions.ts` e o carimbo de
 dimensão no protocolo do worker são genéricos — uma terceira dimensão é uma entrada na tabela e um
@@ -759,55 +880,41 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
 
 ## 6. Próximo passo recomendado
 
-1. **Rejogar o M7 no aparelho, depois das correções de 2026-09-13.** As quatro sessões de campo no
-   S24 Ultra acharam nove coisas, todas no §4. A quarta sessão confirmou **T2, RD 16, 75 FPS,
-   render de 2,6 ms, sem piscar e com o mundo carregando na hora** — mas a travessia do portal só
-   foi reverificada uma vez, e foi ela que revelou o campo dentro do Nether. O que
-   olhar no overlay: a linha `C:` — a fila tem que cair depressa agora, e `gerando` não pode ficar
-   em zero enquanto há fila; a linha de aparelho nova, que diz o que `detectTier` viu e explica o
-   tier escolhido; e `N redstone` na linha `E:`, que não deve chegar perto de 1024.
-   **O J7 Metal continua sem ver nada do M7** — e é lá que o orçamento de despacho de 20% do
-   frame precisa ser medido, porque é o aparelho em que ele realmente limita.
-2. **Olhar o estilo Nítido no aparelho.** Ele foi conferido renderizando as texturas fora do
-   navegador, imagem por imagem, mas **nunca foi visto em jogo**. O que olhar: se o chanfro de
-   borda desenha a grade do mundo sem virar azulejo à distância; se o relevo cintila quando a
-   câmera anda (ele é fixo na textura, então não deveria); e o tempo de boot no J7 Metal, onde os
-   28,7 ms medidos aqui podem virar algo entre 150 e 300 ms de barra de carregamento. O caminho de
-   fuga é uma linha: Opções → Vídeo → Texturas → Clássicas.
-3. **O que a revisão de UX levantou e ficou para depois**, todos da tabela de Vídeo do doc 08 ou
-   das listas de Controles/Som:
-   - **remapeamento de teclas** (doc 08, Controles: "lista completa de teclas remapeáveis, conflito
-     em vermelho") — hoje as teclas são fixas em `input/controls.ts`;
-   - **sliders de som por categoria**: o doc pede 9 (Principal, Música, Blocos, Mobs Hostis, Mobs
-     Amigáveis, Jogadores, Ambiente, Clima, Interface), existem 2 — falta categoria no
-     `audio/engine.ts` antes de a tela poder oferecer;
-   - resto da tabela de Vídeo: Distância de Simulação, VSync, Gráficos (Rápido/Bonito), Nuvens,
-     Partículas, Névoa, Balanço de Câmera, Mostrar FPS;
-   - resto da Acessibilidade: modo daltônico, contorno de bloco em alto contraste, esconder flashes
-     do céu, efeitos de distorção.
-4. **Mundo já corrompido não se conserta sozinho.** A coluna gravada na dimensão errada antes de
-   2026-09-13 continua no banco do jogador, e é indistinguível de uma torre de netherrack que
-   alguém tenha construído — não há como um migrador decidir. O caminho é o jogador quebrar o que
-   sobrou, ou recriar o mundo. **E pode ter havido perda:** a gravação é um `put` na chave
-   `[dimensão, cx, cz]`, então uma coluna do Nether escrita na chave da superfície **substitui** o
-   que estivesse salvo naquelas coordenadas. Como a escala é 1:8, as coordenadas atingidas ficam
-   perto da origem do mundo de superfície — que é onde se costuma construir.
-5. Oportunidades pequenas que sobraram:
-   - **boneco 3D do jogador** na tela de inventário: o doc 08 §3.5 desenha um preview do modelo
-     ao lado dos slots de armadura, e ele nunca foi feito — hoje a seção Equipamento é só a fila
-     de slots. O doc já prevê sprite estático como saída para T0;
-   - **morcego**: o doc 07 §4 lista a categoria `ambient` com cap próprio, mas **não existe
-     nenhum mob `ambient` no código** — é a única linha da tabela de spawn sem nada atrás dela;
-   - `sizeBytes` da meta do mundo, hoje sempre 0;
-   - painel de receitas mostrando **a grade** da receita, não só o resultado;
-   - variante de canto da escada (`inner`/`outer`), se o orçamento de T0 permitir;
-   - miniatura do mundo na tela de seleção (`STORE_THUMBS` existe e está vazio) — e agora ela teria
-     um segundo uso: o arquivo `.clw` poderia carregá-la;
-   - **fogo que se espalha**: o isqueiro do M7 só acende portal (ver §3). Não há bloco de fogo, e
-     `flammable` da tabela de blocos continua sem ninguém que o leia;
-   - **som no pacote de texturas**: a máquina de `render/pack.ts` serve para `.ogg` também, mas o
-     `audio/synth.ts` gera onda, não toca amostra — seria um caminho de áudio novo, não uma
-     substituição de tabela.
+1. **Jogar o que foi entregue em 2026-09-14.** É o único item com risco real: vinte opções novas,
+   um passe de render novo, um sistema de mundo novo e um mob novo — nenhum deles viu um aparelho.
+   O que olhar, em ordem de quanto pode estar errado:
+   - **Nuvens.** Elas são o único desenho que nunca foi visto. Conferir se a forma lê como nuvem e
+     não como mancha, se a borda do plano some antes de virar quadrado, e o custo de preenchimento
+     num celular — o plano cobre boa parte do céu e a GPU móvel cobra por pixel. Ligar em
+     Opções → Vídeo → Nuvens (o padrão de T0 é desligado, de propósito).
+   - **Fogo.** Acender com o isqueiro num campo de grama alta e ver o incêndio andar. O que
+     precisa acontecer: ele **acaba** (sem combustível a chama morre em segundos), a chuva apaga, e
+     a linha `E:` do F3 mostra `N fogo` sem chegar perto de 256. Se ele parecer lento demais ou
+     rápido demais, o número a mexer é a divisão por 300 em `trySpread`.
+   - **Canto de escada.** Construir um L de escadas e olhar os dois cantos. É o item cuja regra foi
+     **derivada e não copiada** — se algum canto sair girado 90°, é aqui. Andar por cima também: a
+     colisão sai da mesma conta, então um erro aparece nos dois ao mesmo tempo.
+   - **Boneco do inventário.** Vestir as quatro peças e ver se o tom de cada uma aparece na parte
+     certa do corpo.
+   - **Modo daltônico e contorno em alto contraste**, que são acessibilidade e só se avaliam
+     olhando.
+2. **Uma sessão longa de verdade.** É o **último critério da definição de pronto** que não foi
+   cumprido: o PROMPT.md §11 pede *"2 horas sem crash, sem perda de progresso e sem travas"*, e a
+   sessão de campo mais longa registrada tem 10 minutos. Não é teste de FPS — é teste de vazamento,
+   de save e de fogo/mob acumulando. O F3 tem tudo que ele precisa: `mem`, a linha `C:` e agora
+   `N fogo`.
+3. **Medir o tempo de abertura em 3G.** O critério 1 do PROMPT.md §11 tem metade cumprida — o
+   bundle está em 185 KB de 350 — e a outra metade nunca foi medida. O `throttling` do DevTools
+   resolve; o que interessa é o tempo até a tela de título, com o atlas gerando no meio.
+4. Oportunidades pequenas que sobraram, agora curtas:
+   - **`.clw` com miniatura** já funciona, mas nenhum arquivo real foi exportado e reimportado
+     desde a mudança para a v2 — é um teste manual de cinco minutos;
+   - **som no resource pack** foi testado por formato, nunca com um `.ogg` de verdade num
+     navegador: falta confirmar que o `decodeAudioData` aceita o que o jogador vai pôr lá;
+   - **fogo em mob**: o `fireTicks` de `entity/mobs.ts` existe e a chama não o liga — mob atravessa
+     o incêndio sem pegar fogo. O jogador queima, o zumbi não;
+   - **variante de escada em quina de três**: o gênero tem um caso a mais (canto bloqueado por uma
+     terceira escada) que não foi implementado; ele aparece só em construção elaborada.
 
 ---
 

@@ -24,6 +24,14 @@ const RAIN_CHANCE = 0.28;
 const THUNDER_CHANCE = 0.3;
 /** Sal do RNG de clima. */
 const SALT_WEATHER = 60;
+/** Sal do RNG de relâmpago — outro, senão o raio nasce junto com a chuva. */
+const SALT_FLASH = 61;
+/** De quantos em quantos ticks a tempestade sorteia um raio (1 s). */
+const FLASH_INTERVAL = 20;
+/** Chance de raio a cada sorteio: ~um a cada 17 s de tempestade. */
+const FLASH_CHANCE = 0.06;
+/** Duração do clarão, em ticks (200 ms). */
+const FLASH_TICKS = 4;
 
 /** Quantas fases a lua tem (doc 03 §8). */
 export const MOON_PHASES = 8;
@@ -80,6 +88,20 @@ export class Weather {
   onChange: ((kind: WeatherKind) => void) | null = null;
 
   private lastKind: WeatherKind = 'clear';
+  /** Ticks restantes do clarão do raio. */
+  private flashTicks = 0;
+
+  /**
+   * Mostrar o clarão do relâmpago (doc 08 §6: "esconder flashes do céu").
+   *
+   * Desligado, o raio continua existindo — o som e a tempestade são os mesmos —,
+   * só o clarão some. É acessibilidade, não modo de jogo: quem tem
+   * fotossensibilidade não deveria ter que abrir mão do clima para jogar.
+   */
+  showFlashes = true;
+
+  /** Avisado quando um raio cai, para o som do trovão. */
+  onLightning: (() => void) | null = null;
 
   /**
    * A dimensão tem céu (`data/dimensions.ts`). Sem céu não chove.
@@ -114,6 +136,29 @@ export class Weather {
       this.lastKind = kind;
       this.onChange?.(kind);
     }
+
+    /*
+     * Relâmpago: sorteado, como o resto do clima, a partir da seed e do tick.
+     *
+     * Nada disso vai para o save — dois jogadores no mesmo mundo veem o mesmo
+     * raio no mesmo instante, que é a mesma promessa que o cabeçalho deste
+     * módulo faz para a chuva.
+     */
+    if (this.flashTicks > 0) this.flashTicks--;
+    if (kind !== 'thunder' || this.timeOfDay % FLASH_INTERVAL !== 0) return;
+    const roll = hash2(this.seed, this.day, this.timeOfDay, SALT_FLASH) / 4294967296;
+    if (roll >= FLASH_CHANCE) return;
+    this.flashTicks = FLASH_TICKS;
+    this.onLightning?.();
+  }
+
+  /**
+   * Clarão do raio agora, 0..1. Zero quando a opção de acessibilidade o
+   * esconde — o corte é aqui, e não em cada lugar que lê o valor.
+   */
+  get flash(): number {
+    if (!this.showFlashes || this.flashTicks <= 0) return 0;
+    return this.flashTicks / FLASH_TICKS;
   }
 
   /** Clima agora. Fora da janela do dia é sempre `clear`. */

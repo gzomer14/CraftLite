@@ -30,7 +30,8 @@ import {
 } from './blockinfo';
 import { nbIndex } from './greedy';
 import {
-  BOX_STRIDE, FACING_STEP, MAX_BOXES, SHAPE_FENCE, SHAPE_FENCE_GATE, SHAPE_PANE, boxesFor,
+  BOX_STRIDE, FACING_STEP, MAX_BOXES, NOT_STAIRS, SHAPE_FENCE, SHAPE_FENCE_GATE, SHAPE_PANE,
+  SHAPE_STAIRS, boxesFor, stairCornerFrom,
   railSlopeDir,
 } from './shapes';
 import { FACE_POS_Y } from '../../render/vertex';
@@ -85,9 +86,9 @@ export function meshComplex(
           quads += emitRail(out, x, y, z, bits & 0xf, tex, blockLight, skyLight, tint);
         } else if (kind === CPLX_BOXES) {
           const shape = shapeIdOf(tables, id);
-          const links = needsConnections(shape)
-            ? connectionsAt(blocks, tables, x, y, z)
-            : 0;
+          const links = shape === SHAPE_STAIRS
+            ? stairCornerAt(blocks, tables, x, y, z, bits)
+            : needsConnections(shape) ? connectionsAt(blocks, tables, x, y, z) : 0;
           const count = boxesFor(shape, bits, links, BOXES);
           for (let b = 0; b < count; b++) {
             quads += emitBox(
@@ -104,6 +105,35 @@ export function meshComplex(
 /** Formas cuja geometria depende dos vizinhos (doc 04 §2.5). */
 function needsConnections(shape: number): boolean {
   return shape === SHAPE_FENCE || shape === SHAPE_PANE;
+}
+
+/**
+ * Forma de canto da escada, a partir das quatro escadas vizinhas (doc 04 §3).
+ *
+ * Mesma ideia da conexão de cerca — geometria derivada do vizinho, sem custar
+ * bit de save —, mas com regra própria: cerca liga em qualquer coisa sólida,
+ * escada só faz canto com outra escada perpendicular e do mesmo lado de cima.
+ */
+function stairCornerAt(
+  blocks: Uint16Array, tables: BlockTables, x: number, y: number, z: number, bits: number,
+): number {
+  return stairCornerFrom(
+    bits,
+    stairBitsAt(blocks, tables, x, y, z, 0),
+    stairBitsAt(blocks, tables, x, y, z, 1),
+    stairBitsAt(blocks, tables, x, y, z, 2),
+    stairBitsAt(blocks, tables, x, y, z, 3),
+  );
+}
+
+/** Bits da escada vizinha em `dir`, ou `NOT_STAIRS` se não houver escada lá. */
+function stairBitsAt(
+  blocks: Uint16Array, tables: BlockTables, x: number, y: number, z: number, dir: number,
+): number {
+  const step = FACING_STEP[dir];
+  const state = blocks[nbIndex(x + step[0], y, z + step[1])];
+  if (shapeIdOf(tables, state & 0x3ff) !== SHAPE_STAIRS) return NOT_STAIRS;
+  return (state >>> 10) & 0x3f;
 }
 
 /**

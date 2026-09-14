@@ -8,6 +8,7 @@
 
 import { Camera } from './camera';
 import { ChunkRenderer } from './chunkrenderer';
+import { CloudsPass } from './clouds';
 import { Particles } from './particles';
 import { SelectionPass } from './selection';
 import { SkyPass } from './sky';
@@ -45,6 +46,7 @@ export class Renderer {
   private readonly sky: SkyPass;
   private readonly selection: SelectionPass;
   readonly particles: Particles;
+  readonly clouds: CloudsPass;
 
   /** Bloco mirado neste frame. Mutado no lugar pelo chamador. */
   readonly highlight: HighlightState = { visible: false, x: 0, y: 0, z: 0, stage: -1, brightness: 1 };
@@ -65,10 +67,32 @@ export class Renderer {
    * mora aqui e é reaplicado lá.
    */
   minSkyLight = 0.06;
+  /**
+   * Névoa do doc 08 §3.11: `off` sem névoa, `near` densa, `far` o padrão.
+   *
+   * Multiplica a densidade calculada a partir da distância de render — ela
+   * continua sendo a base, porque é ela que esconde a borda do mundo carregado.
+   */
+  fogMode: 'off' | 'near' | 'far' = 'far';
+  /**
+   * Clarão do relâmpago, 0..1 (doc 03 §8). Quem zera por acessibilidade é o
+   * `Weather`, não este campo: aqui ele só é aplicado.
+   */
+  skyFlash = 0;
+  /** Contorno do bloco mirado em alto contraste (doc 08 §6). */
+  set highContrastOutline(value: boolean) {
+    this.selection.highContrast = value;
+  }
   /** Cor fixa de céu e névoa da dimensão; `null` = céu com ciclo de dia. */
   private fogOverride: readonly [number, number, number] | null = null;
   /** Piso de luz da dimensão, 0..1 (o Nether nunca é preto absoluto). */
   private ambient = 0;
+  /** Dimensão com céu: sem céu não há nuvem para desenhar. */
+  private hasSky = true;
+  /** Tick do dia do último `setDayTime`, que as nuvens usam para andar. */
+  private dayTime = 0;
+  /** Densidade de névoa da distância de render, antes do modo do jogador. */
+  private baseFogDensity = 0.006;
   private readonly skyParams: SkyParams = {
     fogColor: new Float32Array(3),
     fogDensity: 0.006,
@@ -91,6 +115,8 @@ export class Renderer {
     this.sky = new SkyPass(ctx);
     this.selection = new SelectionPass(ctx, atlas);
     this.particles = new Particles(ctx, preset);
+    this.clouds = new CloudsPass(ctx);
+    this.clouds.mode = preset.clouds;
     this.chunks = new ChunkRenderer(ctx);
     this.renderScale = preset.renderScale;
     this.maxDpr = preset.maxDpr;
@@ -120,7 +146,21 @@ export class Renderer {
     this.camera.far = Math.max(160, blocks + 64);
     // Densa o bastante para esconder a borda do mundo carregado, mas não tanto
     // que apague o terreno visível: ~85% da distância de render.
-    this.skyParams.fogDensity = 1.0 / (blocks * 0.85);
+    this.baseFogDensity = 1.0 / (blocks * 0.85);
+    this.applyFog();
+  }
+
+  /**
+   * Aplica o modo de névoa sobre a densidade da distância de render.
+   *
+   * `off` não zera de verdade: zero apagaria a mistura no shader e deixaria o
+   * terreno recortado contra o céu na borda do mundo carregado. O que ele faz é
+   * empurrar a névoa para muito longe — o efeito que o jogador quer ("quero ver
+   * longe") sem o artefato que ele não pediu.
+   */
+  applyFog(): void {
+    const factor = this.fogMode === 'off' ? 0.25 : this.fogMode === 'near' ? 1.8 : 1;
+    this.skyParams.fogDensity = this.baseFogDensity * factor;
   }
 
   resize(): void {
@@ -153,6 +193,7 @@ export class Renderer {
     const def = dimensionOf(dimension);
     this.fogOverride = def.fog;
     this.ambient = def.ambientLight / 15;
+    this.hasSky = def.hasSky;
   }
 
   /** `dayTime` em ticks do dia (0..23999). */
@@ -161,6 +202,7 @@ export class Renderer {
    * escurecer só o céu deixaria o terreno distante brilhando na tempestade.
    */
   setDayTime(dayTime: number, dayFactor: number, rain = 0): void {
+    this.dayTime = dayTime;
     this.sky.update(dayTime);
     this.sky.applyRain(rain);
     this.skyParams.minSkyLight = Math.max(this.minSkyLight, this.ambient);
@@ -174,6 +216,21 @@ export class Renderer {
       return;
     }
     this.skyParams.dayFactor = dayFactor * (1 - rain * 0.45);
+    /*
+     * O raio clareia céu, névoa e iluminação global no mesmo passo.
+     *
+     * Clarear só o céu deixaria o terreno preto contra um flash branco, que é
+     * o oposto do efeito: o que o relâmpago faz é **iluminar a paisagem** por
+     * um instante.
+     */
+    if (this.skyFlash > 0) {
+      const t = Math.min(1, this.skyFlash) * 0.75;
+      for (let c = 0; c < 3; c++) {
+        this.sky.zenith[c] += (1 - this.sky.zenith[c]) * t;
+        this.sky.horizon[c] += (1 - this.sky.horizon[c]) * t;
+      }
+      this.skyParams.dayFactor = Math.max(this.skyParams.dayFactor, t);
+    }
     // O fog usa a cor do horizonte: se divergir, o terreno distante fica
     // recortado contra o céu.
     this.skyParams.fogColor.set(this.sky.horizon);
@@ -211,6 +268,15 @@ export class Renderer {
     this.terrain.begin(this.camera.viewProj, this.skyParams, true);
     calls += this.chunks.draw('cutout', this.setOriginCutout);
     this.terrain.end();
+
+    // 2c. nuvens: depois do terreno opaco, para a montanha na frente escondê-las
+    // e o chão sumir por baixo de quem voa acima delas. Sem céu, sem nuvem.
+    if (this.hasSky) {
+      calls += this.clouds.render(
+        this.camera.viewProj, this.camera.renderX, this.camera.renderZ,
+        this.dayTime, this.skyParams.dayFactor,
+      );
+    }
 
     // 3. entidades: mobs, flechas e itens no chão
     if (this.mobRenderer !== null && this.mobRenderer.pending > 0) {
@@ -270,6 +336,7 @@ export class Renderer {
 
   dispose(): void {
     this.chunks.dispose();
+    this.clouds.dispose();
     this.sky.dispose();
     this.selection.dispose();
     this.particles.dispose();

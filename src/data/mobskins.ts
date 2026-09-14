@@ -12,6 +12,28 @@ import type { SkinRecipe } from '../render/skingen';
 const INK: [number, number, number] = [26, 24, 28];
 
 export const MOB_SKINS: Record<string, SkinRecipe> = {
+  /*
+   * Jogador. **Não entra no atlas de entidade** — nenhum mob a usa, e o atlas
+   * só sobe o que a tabela de mobs pede. Quem a consome é o boneco da tela de
+   * inventário (`ui/containers/paperdoll.ts`), que a gera em um canvas 2D.
+   *
+   * Camiseta azul, calça índigo e pele clara: arte do projeto, como o resto.
+   */
+  player: {
+    base: [62, 104, 168], noise: 0.05,
+    parts: {
+      head: [214, 175, 142],
+      arm: [62, 104, 168],
+      leg: [58, 62, 104],
+    },
+    details: [
+      { kind: 'eyes', part: 'head', color: [52, 76, 120], y: 0.4, size: 2, gap: 2 },
+      { kind: 'mouth', part: 'head', color: [176, 128, 106], y: 0.7, w: 4, h: 1 },
+      { kind: 'band', part: 'head', color: [86, 62, 44], y: 0, h: 2 },
+      { kind: 'band', part: 'body', color: [48, 82, 138], y: 0.78, h: 3 },
+    ],
+  },
+
   // Barco: madeira clara com as bordas escurecidas (M6).
   boat: {
     base: [166, 130, 78], noise: 0.12,
@@ -72,6 +94,19 @@ export const MOB_SKINS: Record<string, SkinRecipe> = {
     parts: { tentacle: [36, 58, 98] },
     details: [
       { kind: 'eyes', part: 'body', color: [226, 226, 236], y: 0.35, size: 2, gap: 4 },
+    ],
+  },
+
+  /*
+   * Morcego: marrom-escuro de caverna, com a membrana da asa mais clara — é o
+   * que faz ele aparecer contra a rocha sem virar uma silhueta preta.
+   */
+  bat: {
+    base: [68, 54, 46], noise: 0.14,
+    parts: { wing: [96, 78, 68], ear: [52, 42, 36] },
+    details: [
+      { kind: 'eyes', part: 'head', color: [198, 92, 72], y: 0.38, size: 1, gap: 2 },
+      { kind: 'shade', part: 'wing', amount: 0.9 },
     ],
   },
 

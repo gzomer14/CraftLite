@@ -87,8 +87,22 @@ export class GreedyMesher {
 
   quads = 0;
 
-  constructor(tables: BlockTables, packed: boolean) {
+  /**
+   * Iluminação suave (doc 08 §3.11, linha "Iluminação Suave (AO)").
+   *
+   * Desligada, todo vértice sai com AO 3 — sem sombra de canto. Não é só
+   * estética: com o AO uniforme, o merge greedy deixa de ser interrompido nas
+   * bordas (`aoUniformAlongU`) e a mesma section rende **menos quads**. É o
+   * caminho de fuga de quem precisa de cada vértice.
+   *
+   * Vale no próximo carregamento: o AO é assado no mesh, e trocá-lo ao vivo
+   * significa remesar o mundo inteiro.
+   */
+  smoothLighting = true;
+
+  constructor(tables: BlockTables, packed: boolean, smoothLighting = true) {
     this.tables = tables;
+    this.smoothLighting = smoothLighting;
     this.opaque = new MeshBuilder(packed, 8192);
     this.cutout = new MeshBuilder(packed, 2048);
     this.translucent = new MeshBuilder(packed, 2048);
@@ -294,7 +308,13 @@ export class GreedyMesher {
     const skyLight = (lightByte >>> 4) & 0xf;
 
     const ao = this.ao;
-    this.computeAo(blocks, x, y, z, face, ao);
+    if (this.smoothLighting) {
+      this.computeAo(blocks, x, y, z, face, ao);
+    } else {
+      // Tudo aceso: o merge greedy deixa de quebrar nas bordas e o mesh
+      // encolhe, que é exatamente o que quem desliga o AO está comprando.
+      ao[0] = 3; ao[1] = 3; ao[2] = 3; ao[3] = 3;
+    }
 
     return (
       (texLayer & 0x3ff) |

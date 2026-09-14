@@ -175,7 +175,9 @@ export const FENCE_COLLISION_HEIGHT = 1.5;
  * fechado colidem como um bloco inteiro de 1,5 de altura — é o que impede
  * pular a cerca —, e portão aberto não colide com nada.
  */
-export function collisionBoxesFor(shape: number, state: number, out: Float32Array): number {
+export function collisionBoxesFor(
+  shape: number, state: number, out: Float32Array, corner = CORNER_NONE,
+): number {
   if (shape === SHAPE_FENCE) {
     return one(out, 0, 0, 0, 0, 1, FENCE_COLLISION_HEIGHT, 1);
   }
@@ -183,7 +185,7 @@ export function collisionBoxesFor(shape: number, state: number, out: Float32Arra
     if ((state & 4) !== 0) return 0;
     return one(out, 0, 0, 0, 0, 1, FENCE_COLLISION_HEIGHT, 1);
   }
-  return boxesFor(shape, state, 0, out);
+  return boxesFor(shape, state, corner, out);
 }
 
 /**
@@ -214,7 +216,9 @@ export function boxesFor(
     case SHAPE_FLAT:
       return one(out, 0, 0, 0, 0, 1, FLAT_HEIGHT, 1);
     case SHAPE_STAIRS:
-      return stairs(state, out);
+      // A escada reusa `connections` como forma de canto: os dois são
+      // derivados do vizinho e nenhum ocupa bit do save.
+      return stairs(state, connections, out);
     case SHAPE_FENCE:
       return connected(out, POST, 1, connections);
     case SHAPE_PANE:
@@ -265,24 +269,123 @@ function one(
 }
 
 /**
- * Escada: a base de meio bloco mais o degrau encostado na parede de trás.
+ * Escada, com as variantes de canto (doc 04 §3).
  *
- * bits 0–1 = para onde a **subida** aponta, bit 2 = de cabeça para baixo. Não
- * há variante de canto: no orçamento de T0, dobrar a geometria da escada para
- * arredondar quina custa mais do que o olho ganha.
+ * bits 0–1 = para onde a **subida** aponta, bit 2 = de cabeça para baixo. O
+ * **lado alto** — a metade em que fica o degrau — é `bits ^ 1` nos índices de
+ * `FACING_STEP`, e é em torno dele que toda a geometria é descrita.
+ *
+ * `corner` vem de `stairCornerFrom` e **não ocupa bit nenhum do save**: ele é
+ * derivado dos vizinhos na hora, como a conexão de cerca (doc 04 §2.5). Um save
+ * feito antes dos cantos abre mostrando os cantos, sem migração.
+ *
+ * Três formas:
+ * - **reta**: base de meia altura + meia caixa no lado alto;
+ * - **canto externo**: a meia caixa vira um **quarto** — a interseção do lado
+ *   alto com o lado alto do vizinho perpendicular;
+ * - **canto interno**: a meia caixa mais o quarto que falta para fechar o L.
  */
-function stairs(state: number, out: Float32Array): number {
+function stairs(state: number, corner: number, out: Float32Array): number {
   const top = (state & 4) !== 0;
   const baseY0 = top ? HALF : 0;
   let count = one(out, 0, 0, baseY0, 0, 1, baseY0 + HALF, 1);
 
-  const stepY0 = top ? 0 : HALF;
-  const facing = state & 3;
-  if (facing === 0) count = one(out, count, 0, stepY0, 0, HALF, stepY0 + HALF, 1);
-  else if (facing === 1) count = one(out, count, HALF, stepY0, 0, 1, stepY0 + HALF, 1);
-  else if (facing === 2) count = one(out, count, 0, stepY0, 0, 1, stepY0 + HALF, HALF);
-  else count = one(out, count, 0, stepY0, HALF, 1, stepY0 + HALF, 1);
-  return count;
+  const y0 = top ? 0 : HALF;
+  const y1 = y0 + HALF;
+  const tall = (state & 3) ^ 1;
+  const kind = corner & 3;
+
+  if (kind === CORNER_NONE) {
+    count = halfBox(out, count, tall, y0, y1);
+    return count;
+  }
+
+  const quarter = (corner >>> 2) & 3;
+  if (kind === CORNER_OUTER) {
+    // Só a interseção das duas metades altas sobrevive.
+    return quarterBox(out, count, tall, quarter, y0, y1);
+  }
+  // Interno: a metade alta inteira mais o quarto que fecha a curva.
+  count = halfBox(out, count, tall, y0, y1);
+  return quarterBox(out, count, tall ^ 1, quarter, y0, y1);
+}
+
+/** Meia caixa no lado `dir` de `FACING_STEP`, entre `y0` e `y1`. */
+function halfBox(out: Float32Array, index: number, dir: number, y0: number, y1: number): number {
+  if (dir === 0) return one(out, index, HALF, y0, 0, 1, y1, 1);
+  if (dir === 1) return one(out, index, 0, y0, 0, HALF, y1, 1);
+  if (dir === 2) return one(out, index, 0, y0, HALF, 1, y1, 1);
+  return one(out, index, 0, y0, 0, 1, y1, HALF);
+}
+
+/** Um quarto: a interseção das metades `a` e `b`, que são de eixos diferentes. */
+function quarterBox(
+  out: Float32Array, index: number, a: number, b: number, y0: number, y1: number,
+): number {
+  // `a` é sempre do eixo X e `b` do eixo Z, ou o contrário; normaliza.
+  const xDir = a < 2 ? a : b;
+  const zDir = a < 2 ? b : a;
+  const x0 = xDir === 0 ? HALF : 0;
+  const x1 = xDir === 0 ? 1 : HALF;
+  const z0 = zDir === 2 ? HALF : 0;
+  const z1 = zDir === 2 ? 1 : HALF;
+  return one(out, index, x0, y0, z0, x1, y1, z1);
+}
+
+/** Formas de canto, nos bits 0–1 de `corner`. */
+export const CORNER_NONE = 0;
+export const CORNER_OUTER = 1;
+export const CORNER_INNER = 2;
+
+/** Vizinho que não é escada, para `stairCornerFrom`. */
+export const NOT_STAIRS = -1;
+
+/**
+ * Forma de canto de uma escada, a partir dos bits dos quatro vizinhos.
+ *
+ * Cada `nb*` é o estado da escada vizinha naquele lado, ou `NOT_STAIRS`. A
+ * regra sai de uma exigência só, geométrica e verificável: **a superfície alta
+ * das duas escadas tem que ser contínua pela face que elas dividem.**
+ *
+ *  - vizinho perpendicular **do lado alto** → canto **interno**: a escada ganha
+ *    o quarto que falta para o L fechar em volta dele;
+ *  - vizinho perpendicular **do lado aberto** → canto **externo**: a meia caixa
+ *    encolhe para o quarto que sobra do lado de fora da curva.
+ *
+ * Nos dois casos quem escolhe o quarto é o **lado alto do vizinho**: é ele que
+ * diz para onde a curva vira. O interno vem depois e vence, como no gênero —
+ * uma escada entre duas perpendiculares fecha a curva em vez de abrir.
+ *
+ * Vizinho com o bit de "de cabeça para baixo" diferente não faz canto: as duas
+ * metades altas estão em alturas diferentes e não há superfície para ligar.
+ */
+export function stairCornerFrom(
+  bits: number, nbPlusX: number, nbMinusX: number, nbPlusZ: number, nbMinusZ: number,
+): number {
+  const tall = (bits & 3) ^ 1;
+  const open = tall ^ 1;
+  const top = bits & 4;
+  const neighbors = [nbPlusX, nbMinusX, nbPlusZ, nbMinusZ];
+
+  // Externo primeiro, para o interno poder sobrescrever.
+  let result = CORNER_NONE;
+  const front = neighbors[open];
+  if (isPerpendicularStair(front, tall, top)) {
+    result = CORNER_OUTER | (((front & 3) ^ 1) << 2);
+  }
+  const back = neighbors[tall];
+  if (isPerpendicularStair(back, tall, top)) {
+    result = CORNER_INNER | (((back & 3) ^ 1) << 2);
+  }
+  return result;
+}
+
+/** true se o vizinho é escada, do mesmo lado de cima e de eixo perpendicular. */
+function isPerpendicularStair(nb: number, tall: number, top: number): boolean {
+  if (nb === NOT_STAIRS) return false;
+  if ((nb & 4) !== top) return false;
+  // Eixo: 0/1 são X, 2/3 são Z. Perpendicular = eixos diferentes.
+  return ((nb & 3) >> 1) !== (tall >> 1);
 }
 
 /** Poste central mais um braço por vizinho conectado (cerca e grade). */

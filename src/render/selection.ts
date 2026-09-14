@@ -104,6 +104,17 @@ export class SelectionPass {
     }
   }
 
+  /**
+   * Contorno em alto contraste (doc 08 §6).
+   *
+   * O contorno padrão é preto com alpha 0,4 (doc 06 §5) — discreto de
+   * propósito, e por isso mesmo quase invisível sobre obsidiana, pedra
+   * profunda ou qualquer bloco escuro de caverna. Ligado, ele vira branco
+   * opaco e grosso: quem não distingue o cinza escuro do preto passa a ver
+   * onde está mirando.
+   */
+  highContrast = false;
+
   /** Contorno wireframe do bloco mirado (doc 06 §5: preto, alpha 0.4). */
   drawOutline(viewProj: Mat4, x: number, y: number, z: number): void {
     const gl = this.ctx.gl;
@@ -114,9 +125,13 @@ export class SelectionPass {
 
     gl.uniformMatrix4fv(this.lineUniforms.uViewProj, false, viewProj);
     // Um fio de folga para o contorno não afundar na face do bloco.
-    gl.uniform3f(this.lineUniforms.uOrigin, x - 0.002, y - 0.002, z - 0.002);
-    gl.uniform3f(this.lineUniforms.uScale, 1.004, 1.004, 1.004);
-    gl.uniform4f(this.lineUniforms.uColor, 0, 0, 0, 0.4);
+    // A folga maior do alto contraste descola a linha da face: é o que dá o
+    // "grosso" sem depender de `lineWidth`, que a maioria das GPUs ignora.
+    const gap = this.highContrast ? 0.008 : 0.002;
+    gl.uniform3f(this.lineUniforms.uOrigin, x - gap, y - gap, z - gap);
+    gl.uniform3f(this.lineUniforms.uScale, 1 + gap * 2, 1 + gap * 2, 1 + gap * 2);
+    if (this.highContrast) gl.uniform4f(this.lineUniforms.uColor, 1, 1, 1, 1);
+    else gl.uniform4f(this.lineUniforms.uColor, 0, 0, 0, 0.4);
 
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);

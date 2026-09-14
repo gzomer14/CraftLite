@@ -484,6 +484,19 @@ const railBase = (): Partial<BlockDef> => ({
 });
 
 SPECS.push(
+  /*
+   * Fogo (doc 03 §9 e doc 04).
+   *
+   * Cruz sem colisão, luz 15 e `replaceable`: andar nele não empurra o
+   * jogador, e colocar bloco por cima o apaga. **`itemless`** porque fogo não
+   * é item — quem o cria é o isqueiro ou a propagação, nunca a mochila.
+   *
+   * Os bits de estado guardam a **idade** 0..15, que é o que decide quando ele
+   * se apaga sozinho (`world/fire.ts`).
+   */
+  { id: 125, name: 'fire', display: 'Fogo', tex: 'block/fire', shape: 'cross',
+    solid: false, opaque: false, lightAttenuation: 0, emission: 15, hardness: 0,
+    replaceable: true, itemless: true, sound: 'cloth' },
   { id: 123, name: 'powered_rail', display: 'Trilho Motorizado', ...railBase(),
     tex: 'block/powered_rail',
     stages: railStages('block/powered_rail', 'block/powered_rail', 'block/powered_rail_on') },

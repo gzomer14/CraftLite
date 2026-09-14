@@ -235,6 +235,39 @@ export class SaveDatabase {
     await done(tx);
   }
 
+  /**
+   * Tamanho em bytes de tudo que pertence ao mundo — chunks de todas as
+   * dimensões mais o registro do jogador.
+   *
+   * Varre com cursor em vez de `getAll`: `getAll` traria os bytes de todos os
+   * chunks para a memória de uma vez, e um mundo grande num aparelho de 2 GB é
+   * justamente onde isso não pode acontecer. O cursor lê um por vez e deixa
+   * cada um ser coletado.
+   *
+   * É uma varredura completa, então **não** roda a cada autosave: quem a chama
+   * é o `saveAll`, que já é raro (sair do mundo, esconder a aba).
+   */
+  async worldSize(worldId: string): Promise<number> {
+    const db = await this.open();
+    const tx = db.transaction([STORE_CHUNKS, STORE_PLAYERS], 'readonly');
+    const chunks = tx.objectStore(STORE_CHUNKS);
+    let total = 0;
+    for (let dim = 0; dim < MAX_DIMENSIONS; dim++) {
+      total += await sumByteLength(chunks, dimensionIdFor(worldId, dim));
+    }
+    total += await sumByteLength(tx.objectStore(STORE_PLAYERS), worldId);
+    return total;
+  }
+
+  /** Miniatura do mundo (PNG), gravada pelo jogo ao salvar. */
+  async saveThumbnail(worldId: string, png: Uint8Array): Promise<void> {
+    await this.put(STORE_THUMBS, png, worldId);
+  }
+
+  async loadThumbnail(worldId: string): Promise<Uint8Array | undefined> {
+    return this.get<Uint8Array>(STORE_THUMBS, worldId);
+  }
+
   /** Uso e cota do armazenamento (doc 11 §4). */
   async estimate(): Promise<{ usage: number; quota: number } | null> {
     if (navigator.storage?.estimate === undefined) return null;
@@ -279,6 +312,30 @@ export function playerKeyFor(worldId: string, playerId: string): IDBValidKey {
 
 /** Quantas dimensões um mundo pode ter, para quem precisa varrer todas. */
 export const DIMENSION_COUNT = MAX_DIMENSIONS;
+
+/**
+ * Soma o `byteLength` de tudo que está sob o prefixo de chave, com cursor.
+ *
+ * Registro que não é `ArrayBuffer`/`TypedArray` conta zero em vez de quebrar: o
+ * store de jogadores guarda objetos, e o tamanho deles é ruído perto do dos
+ * chunks.
+ */
+function sumByteLength(store: IDBObjectStore, prefix: string): Promise<number> {
+  return new Promise<number>((resolve, reject) => {
+    const range = IDBKeyRange.bound([prefix], [prefix, []], false, false);
+    const request = store.openCursor(range);
+    let total = 0;
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (cursor === null) { resolve(total); return; }
+      const value: unknown = cursor.value;
+      if (value instanceof ArrayBuffer) total += value.byteLength;
+      else if (ArrayBuffer.isView(value)) total += value.byteLength;
+      cursor.continue();
+    };
+    request.onerror = () => reject(request.error ?? new Error('Erro ao medir o mundo.'));
+  });
+}
 
 function deleteByPrefix(store: IDBObjectStore, prefix: string): void {
   // IDBKeyRange sobre array: tudo que começa com o worldId.

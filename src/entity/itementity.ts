@@ -18,6 +18,17 @@ const DESPAWN_TICKS = 6000;
 /** Ticks antes de poder ser coletado — evita recolher o que acabou de sair da mão. */
 const PICKUP_DELAY = 10;
 /**
+ * Ticks antes de o jogador poder recoletar o que ele **jogou fora** (2 s).
+ *
+ * Meio segundo não bastava: a caixa de coleta tem 1,3 de raio horizontal, o
+ * item saía com um empurrão aleatório de ±0,05 e caía praticamente nos pés de
+ * quem o jogou. Na prática, largar um item era vê-lo voltar para a mochila
+ * sozinho — e o jogador sem uma forma de se livrar de nada (relato de campo
+ * 2026-09-14). O arremesso para a frente resolve o caso normal; este atraso
+ * resolve o resto, inclusive quem joga contra a parede e anda atrás do item.
+ */
+const THROWN_PICKUP_DELAY = 40;
+/**
  * Caixa de coleta: a AABB do jogador expandida.
  *
  * Um raio esférico em torno do meio do corpo falha justamente no caso mais
@@ -28,6 +39,8 @@ const PICKUP_DELAY = 10;
 const PICKUP_HORIZONTAL = 1.3;
 const PICKUP_BELOW = 1.5;
 const PICKUP_ABOVE = 2.8;
+/** Velocidade do arremesso, em blocos por tick. */
+const THROW_SPEED = 0.3;
 /** Raio em que duas pilhas iguais se fundem. */
 const MERGE_RADIUS = 0.75;
 const GRAVITY = -0.04;
@@ -48,6 +61,8 @@ export class ItemEntities {
   private readonly count: Uint8Array;
   private readonly damage: Uint16Array;
   private readonly age: Int32Array;
+  /** Ticks que cada item ainda precisa esperar para poder ser coletado. */
+  private readonly pickupAt: Int32Array;
   private readonly capacity: number;
 
   private activeCount = 0;
@@ -70,28 +85,48 @@ export class ItemEntities {
     this.count = new Uint8Array(capacity);
     this.damage = new Uint16Array(capacity);
     this.age = new Int32Array(capacity);
+    this.pickupAt = new Int32Array(capacity);
   }
 
   get active(): number {
     return this.activeCount;
   }
 
-  /** Solta um item no mundo, com um empurrão aleatório. */
-  spawn(x: number, y: number, z: number, stack: ItemStack, thrown = false): boolean {
+/**
+   * Solta um item no mundo, com um empurrão aleatório.
+   *
+   * `throwDir` é a direção do arremesso, normalizada — o olhar de quem jogou.
+   * Sem ela o item apenas cai onde nasceu, que é o certo para o que sai de um
+   * bloco quebrado.
+   */
+  spawn(
+    x: number, y: number, z: number, stack: ItemStack,
+    throwDir?: ArrayLike<number> | null,
+  ): boolean {
     if (this.activeCount >= this.capacity) return false;
     const i = this.activeCount++;
     this.x[i] = x; this.y[i] = y; this.z[i] = z;
     this.prevX[i] = x; this.prevY[i] = y; this.prevZ[i] = z;
 
-    if (thrown) {
-      // Jogado pelo jogador: sai para a frente com força.
-      this.vx[i] = (Math.random() - 0.5) * 0.1;
-      this.vy[i] = 0.2;
-      this.vz[i] = (Math.random() - 0.5) * 0.1;
+    if (throwDir !== undefined && throwDir !== null) {
+      /*
+       * Jogado pelo jogador: sai **na direção do olhar**, com força.
+       *
+       * Antes o "arremesso" era um empurrão aleatório de ±0,05 por eixo, que
+       * derruba o item a menos de meio bloco de distância — dentro da caixa de
+       * coleta, que tem 1,3. Com atrito e gravidade, 0,3 por tick põe o item a
+       * uns três blocos à frente, que é onde o jogador espera vê-lo.
+       */
+      const spread = 0.02;
+      this.vx[i] = throwDir[0] * THROW_SPEED + (Math.random() - 0.5) * spread;
+      this.vy[i] = throwDir[1] * THROW_SPEED + 0.2;
+      this.vz[i] = throwDir[2] * THROW_SPEED + (Math.random() - 0.5) * spread;
+      this.pickupAt[i] = THROWN_PICKUP_DELAY;
     } else {
       this.vx[i] = (Math.random() - 0.5) * 0.08;
       this.vy[i] = 0.12;
       this.vz[i] = (Math.random() - 0.5) * 0.08;
+      this.pickupAt[i] = PICKUP_DELAY;
     }
 
     this.item[i] = stack.item;
@@ -117,7 +152,7 @@ export class ItemEntities {
 
       this.integrate(world, i);
 
-      if (this.age[i] >= PICKUP_DELAY) {
+      if (this.age[i] >= this.pickupAt[i]) {
         if (this.tryPickup(i, playerX, playerY, playerZ)) { i--; continue; }
       }
     }
@@ -221,6 +256,7 @@ export class ItemEntities {
     this.count[i] = this.count[last];
     this.damage[i] = this.damage[last];
     this.age[i] = this.age[last];
+    this.pickupAt[i] = this.pickupAt[last];
   }
 
   /** Percorre as entidades ativas para o render, sem alocar. */

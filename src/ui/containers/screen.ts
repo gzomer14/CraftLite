@@ -68,7 +68,41 @@ export interface ContainerScreenCallbacks {
    * contar o item como obtido (conquistas).
    */
   onFurnaceOutput?: (furnace: Furnace, item: number) => void;
+  /** Duração do toque longo, das opções (doc 08 §6). */
+  longPressMs?: () => number;
+  /** Vibração curta ao confirmar o toque longo; ausente = sem retorno tátil. */
+  vibrate?: () => void;
 }
+
+/**
+ * Quanto o dedo pode escorregar antes de o toque virar rolagem, em pixels de
+ * tela. Abaixo disso é tremor de mão, não intenção.
+ */
+const TOUCH_SLOP = 12;
+
+/**
+ * true quando o evento veio de um mouse de verdade.
+ *
+ * `pointerType` ausente ou vazio conta como mouse, que é a mesma regra de
+ * `isMouseClick` em `input/controls.ts`: evento sintetizado — por teclado, por
+ * navegador antigo ou por teste — não deve cair no caminho de toque, onde a
+ * ação espera um `pointerup` que talvez nunca venha.
+ */
+/** true no aparelho de dedo. Falha fechado: sem `matchMedia`, esconde a dica. */
+function coarsePointer(): boolean {
+  try {
+    return matchMedia('(pointer: coarse)').matches;
+  } catch {
+    return false;
+  }
+}
+
+function isMousePointer(e: PointerEvent): boolean {
+  const type = e.pointerType;
+  return type === undefined || type === '' || type === 'mouse';
+}
+/** Toque longo quando as opções não informam o valor escolhido pelo jogador. */
+const DEFAULT_LONG_PRESS_MS = 300;
 
 /** Cores das quatro peças vestidas, reusado a cada `refresh` para não alocar. */
 const DOLL_ARMOR: (string | null)[] = [null, null, null, null];
@@ -88,6 +122,14 @@ export class ContainerScreen {
    * mantido daí em diante — recriar o canvas a cada abertura regeraria a skin.
    */
   private doll: PaperDoll | null = null;
+  /**
+   * Toque em curso num slot: de onde partiu, se o toque longo já resolveu, e o
+   * relógio dele. `null` quando não há dedo na tela.
+   */
+  private touchPress: {
+    index: number; x: number; y: number; consumed: boolean;
+    timer: ReturnType<typeof setTimeout>;
+  } | null = null;
   private readonly book: RecipeBookPanel | null;
   private readonly bookToggle: HTMLButtonElement;
   /** Rodapé com o botão de fechar — a única saída sem teclado. */
@@ -226,7 +268,19 @@ export class ContainerScreen {
     this.body.appendChild(main);
     if (this.book !== null) this.body.appendChild(this.book.element);
 
-    this.panel.append(header, this.body, this.footer);
+    /*
+     * Dica do toque longo, só no ponteiro grosso.
+     *
+     * O gesto não tem como ser descoberto sozinho: no mouse o botão direito é
+     * convenção de trinta anos, no dedo não há convenção nenhuma. Uma linha de
+     * texto é mais barata que um jogador que nunca consegue montar uma receita.
+     */
+    const touchHint = document.createElement('div');
+    touchHint.className = 'touch-hint';
+    touchHint.textContent = 'Toque longo num slot: pega metade · solta 1 de cada vez';
+    touchHint.hidden = !coarsePointer();
+
+    this.panel.append(header, this.body, touchHint, this.footer);
     this.root.append(this.panel, this.cursorEl, this.tooltip.element);
     document.body.appendChild(this.root);
 
@@ -501,21 +555,50 @@ export class ContainerScreen {
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      /*
-       * No toque, o rótulo aparece **junto** com a ação, não no lugar dela.
-       *
-       * Aqui o clique já resolve no `pointerdown` — é disso que depende o
-       * arraste de distribuição entre slots. Cancelar por toque longo quebraria
-       * esse arraste, então o caminho seguro é avisar o que foi pego. Quem
-       * precisa saber **antes** de agir é a paleta criativa, e lá o toque longo
-       * cancela de verdade.
-       */
-      if (e.pointerType !== 'mouse') {
-        const text = this.describeSlot(view);
-        if (text !== null) this.tooltip.flash(text, e.clientX, e.clientY);
+
+      if (isMousePointer(e)) {
+        // No mouse a ação resolve já: é disso que depende o arraste de
+        // distribuição entre slots, que só existe com ponteiro fino.
+        this.resolveSlot(view, e.button === 2 ? 'right' : e.button === 1 ? 'middle' : 'left',
+          e.shiftKey);
+        return;
       }
-      this.onSlotDown(view, e);
+
+      /*
+       * No toque a ação resolve **ao soltar**, e não ao encostar.
+       *
+       * É o que abre espaço para o toque longo valer como botão direito —
+       * pegar metade da pilha e soltar uma unidade de cada vez (doc 08 §3.5).
+       * Sem ele, no celular **todo** toque movia a pilha inteira, e montar uma
+       * receita que pede uma tábua em cada célula era impossível: o jogador
+       * colocava as 24 de uma vez (relato de campo 2026-09-14).
+       *
+       * O arraste de distribuição não é perdido nessa troca porque ele **nunca
+       * funcionou no toque**: o ponteiro de toque recebe captura implícita no
+       * elemento do `pointerdown`, então `pointerenter` não dispara nos outros
+       * slots. Ele era, e continua, um gesto de mouse.
+       */
+      const text = this.describeSlot(view);
+      if (text !== null) this.tooltip.flash(text, e.clientX, e.clientY);
+      this.armTouch(view, e);
     });
+    el.addEventListener('pointerup', (e) => {
+      if (isMousePointer(e)) return;
+      if (this.touchPress === null || this.touchPress.index !== view.index) return;
+      const consumed = this.touchPress.consumed;
+      this.cancelTouch();
+      // O toque longo já resolveu; soltar depois dele não pode agir de novo.
+      if (!consumed) this.resolveSlot(view, 'left', false);
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (isMousePointer(e) || this.touchPress === null) return;
+      // Escorregar o dedo é rolagem, não escolha: cancela o toque longo e a
+      // ação curta junto.
+      const dx = e.clientX - this.touchPress.x;
+      const dy = e.clientY - this.touchPress.y;
+      if (dx * dx + dy * dy > TOUCH_SLOP * TOUCH_SLOP) this.cancelTouch();
+    });
+    el.addEventListener('pointercancel', () => this.cancelTouch());
     el.addEventListener('pointerenter', (e) => {
       if (this.dragging !== null) this.dragSlots.push(view.index);
       // Só o mouse tem "estar em cima"; no toque quem mostra é o `pointerdown`.
@@ -536,9 +619,34 @@ export class ContainerScreen {
     return el;
   }
 
-  private onSlotDown(view: SlotView, e: PointerEvent): void {
-    const button: ClickButton = e.button === 2 ? 'right' : e.button === 1 ? 'middle' : 'left';
+  /**
+   * Arma o toque: o relógio do toque longo começa aqui, e a ação curta espera
+   * o dedo sair.
+   */
+  private armTouch(view: SlotView, e: PointerEvent): void {
+    this.cancelTouch();
+    // `setTimeout` global e não `window.setTimeout`: a tela é montada em
+    // ambiente sem `window` nos testes, e o relógio é o mesmo.
+    const press = {
+      index: view.index, x: e.clientX, y: e.clientY, consumed: false,
+      timer: null as unknown as ReturnType<typeof setTimeout>,
+    };
+    press.timer = setTimeout(() => {
+      press.consumed = true;
+      // Toque longo = botão direito: pega metade, ou solta uma unidade.
+      this.resolveSlot(view, 'right', false);
+      this.callbacks.vibrate?.();
+    }, this.callbacks.longPressMs?.() ?? DEFAULT_LONG_PRESS_MS);
+    this.touchPress = press;
+  }
 
+  private cancelTouch(): void {
+    if (this.touchPress === null) return;
+    clearTimeout(this.touchPress.timer);
+    this.touchPress = null;
+  }
+
+  private resolveSlot(view: SlotView, button: ClickButton, shift: boolean): void {
     /*
      * Duplo clique junta os stacks iguais (doc 08 §3.5) — menos nos slots que
      * só produzem saída.
@@ -568,7 +676,7 @@ export class ContainerScreen {
       this.dragSlots.push(view.index);
     }
 
-    this.handleClick(view, button, { shift: e.shiftKey });
+    this.handleClick(view, button, { shift });
   }
 
   /**
@@ -885,6 +993,9 @@ function injectStyle(): void {
 #container-screen .close{flex:1;min-height:44px;background:#6e6e6e;color:#fff;
   border:2px solid #000;font:14px/1 ui-monospace,monospace;cursor:pointer}
 #container-screen .close:hover,#container-screen .close:focus-visible{background:#7b94c7}
+/* Dica do toque longo: discreta, abaixo da grade e acima dos botões. */
+#container-screen .touch-hint{margin-top:calc(2 * var(--px,3px));color:#3f3f3f;
+  font:calc(4 * var(--px,3px))/1.3 ui-monospace,monospace;text-align:center}
 #container-screen .panel-header{display:flex;align-items:center;justify-content:space-between;
   gap:calc(4 * var(--px,3px));margin-bottom:calc(2 * var(--px,3px))}
 #container-screen .panel-header .title{margin-bottom:0}

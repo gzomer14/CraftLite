@@ -172,6 +172,24 @@ Painel de **176 × 166** px de GUI:
   Receitas desconhecidas aparecem em silhueta cinza. O filtro "só o que dá" nasce **desligado**:
   ligado, o livro de quem acabou de entrar no mundo abria vazio, que é o oposto do que ele serve. Novas receitas geram toast ao serem desbloqueadas.
 
+**Meia pilha e uma unidade no dedo.** A tabela abaixo é escrita em botões de
+mouse, e no toque **não existe botão direito** — `PointerEvent.button` é sempre
+0. Sem um gesto para ele, todo toque move a pilha inteira, e montar uma receita
+que pede uma tábua em cada célula fica impossível: o jogador coloca as 24 de
+uma vez. **No toque, o toque longo vale como o botão direito** — pega metade
+com a mão vazia, solta uma unidade com a mão cheia.
+
+Para isso a ação de toque resolve **ao soltar o dedo**, e não ao encostar. O
+arraste de distribuição entre slots não se perde nessa troca porque ele nunca
+funcionou no dedo: o ponteiro de toque recebe captura implícita no elemento do
+`pointerdown`, então os outros slots nunca recebem `pointerenter`. Ele é, e
+segue sendo, um gesto de mouse. Escorregar o dedo cancela os dois — é rolagem,
+não escolha.
+
+O gesto não tem como ser descoberto sozinho (no mouse o botão direito é
+convenção de trinta anos; no dedo não há convenção nenhuma), então o painel
+mostra uma linha de dica no ponteiro grosso.
+
 **Nome do item sem mouse.** No toque não há hover, e o `title` do HTML nunca aparece — tocar um
 item da paleta criativa o mandava para a hotbar sem nunca dizer o que ele era. **Toque longo**
 (mesmo `longPressMs` das opções) mostra o rótulo e **cancela a ação daquele toque**; o toque curto
@@ -196,6 +214,13 @@ lugar dela. Escorregar o dedo cancela a consulta: é rolagem, não pergunta.
 | **Tecla 1–9** com mouse sobre um slot | Troca com aquele slot da hotbar |
 | **Q** / **Ctrl+Q** | Joga 1 item / o stack inteiro no chão |
 | Clicar fora do painel com cursor cheio | Joga no chão |
+
+> **O que é jogado fora sai na direção do olhar.** Largar um item com um
+> empurrão aleatório o deixa a menos de meio bloco de quem o largou — dentro da
+> caixa de coleta — e ele volta para a mochila sozinho meio segundo depois, o
+> que na prática é não ter como se livrar de nada. O item sai para a frente, e
+> o que o jogador jogou fora só pode ser recolhido **dois segundos** depois; o
+> que cai de um bloco quebrado continua sendo pego na hora.
 
 **Tooltip** ao passar o mouse: nome (cor por raridade) + descrição + durabilidade
 ("Durabilidade: 231 / 250") + encantamentos em azul-claro. Fundo `#100010F0` com borda roxa.

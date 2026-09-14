@@ -12,6 +12,68 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-14 · 14:35 → 14:48 · Meia pilha no dedo, e o item que voltava sozinho
+
+**Pedido:** dois relatos de campo do celular. *"ao tentar colocar uma única madeira em cada
+espacinho do menu de Criação eu não consigo, pois clicando em qualquer espaço ele acaba movendo o
+stack inteiro"* — com a pergunta de como colocar itens individualmente na criação, nos baús, na
+bancada e ao reorganizar o inventário. E *"estou conseguindo jogar itens fora... porém ele está
+indo muito perto do meu personagem então instantaneamente meu personagem coleta ele e volta para
+meu inventário"*.
+
+**Resultado:** os dois eram bugs, não limitações.
+
+### O botão direito não existia no dedo
+
+O doc 08 §3.5 descreve as interações de slot em botões de mouse, e no toque
+`PointerEvent.button` é **sempre 0**. Todo toque virava clique esquerdo, então não havia gesto
+nenhum para "pegar metade" nem para "soltar uma unidade" — e montar uma receita que pede uma tábua
+por célula era impossível.
+
+O toque longo passou a valer como botão direito. Para isso a ação de toque resolve **ao soltar o
+dedo**, e não ao encostar. A dúvida era se isso quebrava o arraste de distribuição entre slots, que
+o comentário do módulo dizia depender do `pointerdown` — e **não quebra, porque esse arraste nunca
+funcionou no dedo**: o ponteiro de toque recebe captura implícita no elemento do `pointerdown`,
+então os outros slots nunca recebem `pointerenter`. Era, e segue sendo, um gesto de mouse.
+
+O gesto não tem como ser descoberto sozinho — no mouse o botão direito é convenção de trinta anos,
+no dedo não há convenção nenhuma —, então o painel ganhou uma linha de dica no ponteiro grosso, e
+o toque longo vibra ao pegar.
+
+### O "arremesso" não arremessava
+
+`spawn(..., thrown)` prometia no comentário que o item *"sai para a frente com força"* e dava um
+empurrão **aleatório** de ±0,05 por eixo. O item caía a menos de meio bloco de quem o largou —
+dentro da caixa de coleta, que tem 1,3 de raio horizontal — e o `PICKUP_DELAY` de 10 ticks o
+devolvia meio segundo depois. Na prática, não havia como se livrar de nada.
+
+São duas correções somadas: o item sai **na direção do olhar** a 0,3 por tick, e o que o jogador
+jogou fora só pode ser recolhido depois de 40 ticks. O arremesso resolve o caso normal; o atraso
+cobre quem joga contra a parede e anda atrás do item. O que cai de bloco quebrado continua sendo
+pego na hora — esperar dois segundos por cada item minerado seria o oposto do que se quer.
+
+### Um terceiro, achado por teste
+
+Ao separar mouse de dedo, `pointerType` **indefinido ou vazio** passou a cair no ramo de toque, que
+espera um `pointerup` que talvez nunca venha. Evento sintetizado — por teclado, por navegador antigo
+ou por teste — deixava de agir. A regra virou a mesma de `isMouseClick` em `input/controls.ts`:
+ausente ou vazio conta como mouse. Quem achou foi um teste existente de shift+clique, não o campo.
+
+**Portões:** 1328 testes (73 arquivos) verdes, lint limpo, build limpo, **188,7 KB gzip** de 350.
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `+` | `tests/itemdrop.test.ts` | 6 testes: o item vai para a frente, não volta sozinho, volta a ser coletável depois de 2 s, o drop de bloco continua imediato, e o `pickupAt` sobrevive à compactação do array. |
+| `~` | `src/ui/containers/screen.ts` | Toque longo = botão direito; ação de toque ao soltar; `TOUCH_SLOP` cancela se o dedo escorregar; `isMousePointer` trata `pointerType` ausente como mouse; linha de dica no ponteiro grosso. |
+| `~` | `src/entity/itementity.ts` | `spawn` recebe a **direção** do arremesso em vez de um booleano; atraso de coleta por item, com 40 ticks para o que foi jogado fora. |
+| `~` | `src/game/session.ts` | `dropItem` arremessa na direção do olhar, com vetor reusado; a morte continua deixando o inventário **em volta** do corpo, que é onde não há olhar para usar. |
+| `~` | `src/main.ts` | Passa `longPressMs` e a vibração para a tela de contêiner. |
+| `~` | `tests/recipebookui.test.ts` | O toque agora é `pointerdown` + `pointerup`: um teste que dispara só um dos dois descreve um gesto que não existe. Mais 6 testes do toque longo, incluindo a garantia de que o mouse não mudou. |
+| `~` | `docs/08-interface-ui.md` | §3.5: o toque longo como botão direito, por que a ação resolve ao soltar, e a regra do item jogado fora. |
+| `~` | `docs/15-status.md`, `README.md` | Métricas, três correções fora de marco e o roteiro de reteste no celular. |
+
+---
+
 ## 2026-09-14 · 13:45 → 14:11 · Jogar de controle: DualSense, Xbox e menus navegáveis
 
 **Pedido:** *"implementar no jogo a compatibilidade de jogar com controle conectado tanto no

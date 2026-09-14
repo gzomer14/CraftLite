@@ -259,6 +259,10 @@ async function boot(): Promise<void> {
     onBuyEnchant: (slot) => session.buyEnchant(slot),
     xpLevel: () => session.xp.level,
     onFurnaceOutput: (furnace, item) => session.collectFurnaceXp(furnace, item),
+    longPressMs: () => settings.get('longPressMs'),
+    // O toque longo do slot não tem retorno visual próprio; a vibração é o que
+    // diz ao jogador que o gesto pegou.
+    vibrate: () => { if (settings.get('vibration')) navigator.vibrate?.(12); },
   });
   const creativeScreen = new CreativeScreen({
     onClose: () => { controls.reset(); },

@@ -356,7 +356,9 @@ export class Session {
     };
     this.survival.onDeath = () => {
       for (const stack of this.inventory.dropAll()) {
-        this.items.spawn(this.player.x, this.player.y + 1, this.player.z, stack, true);
+        // Morrendo, o inventário cai **em volta** do corpo e não numa direção:
+        // não há olhar para arremessar, e o jogador volta andando até o monte.
+        this.items.spawn(this.player.x, this.player.y + 1, this.player.z, stack);
       }
       // Doc 06 §6: morrer zera a experiência. Não sobra orbe no chão — o que
       // o jogador recupera correndo de volta é o inventário, não o nível.
@@ -1339,9 +1341,24 @@ export class Session {
     if (name !== undefined) this.achievements.obtain(name);
   }
 
+  /**
+   * Larga um item no mundo, arremessado **na direção do olhar**.
+   *
+   * Antes ele nascia com um empurrão aleatório de ±0,05 por eixo e caía nos
+   * pés de quem o largou — dentro da caixa de coleta, que tem 1,3 de raio. Meio
+   * segundo depois o próprio jogador o recolhia, e não havia como se livrar de
+   * nada (relato de campo 2026-09-14). Agora ele sai para a frente, e o atraso
+   * de coleta de `ItemEntities` cobre o resto.
+   */
   private dropItem(stack: ItemStack): void {
-    this.items.spawn(this.player.x, this.player.y + 1.2, this.player.z, stack, true);
+    forwardFrom(this.dropDirection, this.player.yaw, this.player.pitch);
+    this.items.spawn(
+      this.player.x, this.player.y + 1.2, this.player.z, stack, this.dropDirection,
+    );
   }
+
+  /** Direção do arremesso, reusada — largar item não aloca. */
+  private readonly dropDirection = createVec3();
 
   // --- contêineres ----------------------------------------------------------
 

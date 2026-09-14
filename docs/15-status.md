@@ -9,7 +9,7 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-14 14:11 — **controle: DualSense, Xbox e navegação de interface**
+**Última atualização:** 2026-09-14 14:48 — **dois relatos de campo do celular: meia pilha e descarte**
 
 ---
 
@@ -39,13 +39,13 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-14 14:11, com `npm test`, `npm run build` e
+Medidas em 2026-09-14 14:48, com `npm test`, `npm run build` e
 `SIZE_BUDGET_KB=350 npm run size`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **188,2 KB** | < 350 KB | `npm run size` |
-| Testes | **1316**, 72 arquivos | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **188,7 KB** | < 350 KB | `npm run size` |
+| Testes | **1328**, 73 arquivos | manter verde | `npm test` |
 | Camadas de atlas | **156** | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Memória de áudio | **3,26 MB** (era 3,95 com três sons a menos) | < 3,5 MB | `tests/audio.test.ts` |
 | Geração de chunk | 5,7–6,2 ms (mediana; varia muito com a carga da máquina) | < 25 ms | `tests/perf.test.ts` |
@@ -791,6 +791,9 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-14 | `ui/containers/screen.ts` | **No celular, todo toque de slot movia a pilha inteira — não havia como colocar um item de cada vez.** No toque `PointerEvent.button` é sempre 0, então o clique direito do doc 08 §3.5 (pegar metade, soltar uma unidade) simplesmente não existia: montar uma receita que pede uma tábua por célula era impossível, o jogador colocava as 24 de uma vez. O **toque longo** passou a valer como botão direito, e para isso a ação de toque resolve **ao soltar o dedo** e não ao encostar. O arraste de distribuição não se perde: ele nunca funcionou no dedo, porque o ponteiro de toque recebe captura implícita no elemento do `pointerdown` e os outros slots nunca recebem `pointerenter` — era, e segue sendo, gesto de mouse. Relato de campo: *"clicando em qualquer espaço ele acaba movendo o stack inteiro"*. |
+| 2026-09-14 | `entity/itementity.ts`, `game/session.ts` | **O item jogado fora voltava sozinho para a mochila.** `spawn(..., thrown)` prometia "sai para a frente com força" e dava um empurrão **aleatório** de ±0,05 por eixo: o item caía a menos de meio bloco de quem o largou, dentro da caixa de coleta, que tem 1,3 de raio horizontal. Meio segundo depois o próprio jogador o recolhia. Agora ele é arremessado **na direção do olhar** a 0,3 por tick, e o atraso de coleta do que foi jogado fora subiu de 10 para 40 ticks — o arremesso resolve o caso normal, o atraso cobre quem joga contra a parede. O que cai de bloco quebrado continua sendo pego na hora. Relato de campo: *"ele está indo muito perto do meu personagem então instantaneamente meu personagem coleta ele"*. |
+| 2026-09-14 | `ui/containers/screen.ts` | **Evento sem `pointerType` caía no caminho de toque.** Ao separar mouse de dedo, `pointerType` indefinido ou vazio — evento sintetizado por teclado, por navegador antigo ou por teste — ia para o ramo que espera um `pointerup` que talvez nunca venha, e a ação nunca acontecia. A regra passou a ser a mesma de `isMouseClick` em `input/controls.ts`: ausente ou vazio conta como mouse. Achado por um teste existente de shift+clique, não em campo. |
 | 2026-09-14 | `input/controls.ts`, `input/gamepad.ts` | **Pausa, inventário e rolagem de hotbar do controle eram calculados e jogados fora.** Os três campos existiam em `GamepadState` desde o M3, `poll()` os preenchia todo tick e **nada em `Controls` os lia**. Quem jogasse de controle andava, olhava, pulava e quebrava — e não conseguia abrir a mochila nem pausar o jogo. Do mapeamento do doc 09 §3 também faltavam `Y` (soltar item) e `LT` (usar), que nunca existiram. |
 | 2026-09-14 | `audio/synth.ts`, `audio/engine.ts` | **A tabela de sons renderizava tudo a 22 kHz, e metade das amostras guardava banda que o próprio filtro tinha jogado fora.** Um passo na areia é ruído com lowpass em 600 Hz: Nyquist diz que 11 kHz basta, com folga. `rateFor` deriva a taxa da **própria receita** — não de uma lista à mão, para som novo já nascer com a taxa certa e mexer num filtro não deixar anotação velha para trás. A conta de memória de áudio caiu de **3,95 para 3,26 MB acrescentando três sons** (morcego, trovão e o loop de chuva), e o teto do teste desceu de 4 para 3,5 MB. Em T0 isso é memória de verdade. |
 | 2026-09-14 | `world/physics.ts`, `world/mesh/shapes.ts` | **A colisão da escada teria divergido do desenho no primeiro canto.** O cabeçalho de `mesh/shapes.ts` promete desde o M1 que as duas saem da mesma tabela — *"duas tabelas divergiriam na primeira forma nova, e o jogador atravessaria a escada que enxerga"* —, mas `collisionBoxesFor` recebia só `(forma, estado)` e o canto depende do **vizinho**. A física passou a derivar o canto dos mesmos quatro vizinhos, pela mesma função. As consultas só acontecem para escada: pedra e terra, que são o caminho quente do sweep, saem antes. |
@@ -968,7 +971,15 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      certa do corpo.
    - **Modo daltônico e contorno em alto contraste**, que são acessibilidade e só se avaliam
      olhando.
-2. **Ligar o DualSense.** O suporte a controle foi escrito contra um `Gamepad` falso — nenhum
+2. **Reconferir o inventário no celular.** As duas correções de 2026-09-14
+   vieram de relato de campo e voltam para lá:
+   - **toque longo num slot** pega metade com a mão vazia e solta uma unidade com a mão cheia.
+     Montar uma receita de tábua por célula é o teste que importa. A dica aparece no painel, e o
+     gesto usa o `longPressMs` das opções — quem achar lento demais baixa lá;
+   - **largar item** agora arremessa na direção do olhar, e o que foi jogado fora só volta a ser
+     coletável depois de dois segundos. Vale largar olhando para o chão e para uma parede, que é
+     onde o arremesso sozinho não resolveria.
+3. **Ligar o DualSense.** O suporte a controle foi escrito contra um `Gamepad` falso — nenhum
    controle físico esteve na mesa. Em ordem de quanto pode estar errado:
    - **Opções → Controle** primeiro, antes de entrar num mundo: a linha de estado diz se o jogo
      vê o controle e qual família reconheceu. Se ela disser *"o navegador não reconheceu este
@@ -982,15 +993,15 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      o `id` que escolhe o perfil. Vale conectar dos dois jeitos.
    - **No celular**, lembrar que ligar o áudio e a tela cheia exigem um toque na tela — o controle
      não serve de gesto para o navegador. O jogo avisa isso ao conectar.
-3. **Uma sessão longa de verdade.** É o **último critério da definição de pronto** que não foi
+4. **Uma sessão longa de verdade.** É o **último critério da definição de pronto** que não foi
    cumprido: o PROMPT.md §11 pede *"2 horas sem crash, sem perda de progresso e sem travas"*, e a
    sessão de campo mais longa registrada tem 10 minutos. Não é teste de FPS — é teste de vazamento,
    de save e de fogo/mob acumulando. O F3 tem tudo que ele precisa: `mem`, a linha `C:` e agora
    `N fogo`.
-4. **Medir o tempo de abertura em 3G.** O critério 1 do PROMPT.md §11 tem metade cumprida — o
-   bundle está em 188 KB de 350 — e a outra metade nunca foi medida. O `throttling` do DevTools
+5. **Medir o tempo de abertura em 3G.** O critério 1 do PROMPT.md §11 tem metade cumprida — o
+   bundle está em 189 KB de 350 — e a outra metade nunca foi medida. O `throttling` do DevTools
    resolve; o que interessa é o tempo até a tela de título, com o atlas gerando no meio.
-5. Oportunidades pequenas que sobraram, agora curtas:
+6. Oportunidades pequenas que sobraram, agora curtas:
    - **`.clw` com miniatura** já funciona, mas nenhum arquivo real foi exportado e reimportado
      desde a mudança para a v2 — é um teste manual de cinco minutos;
    - **som no resource pack** foi testado por formato, nunca com um `.ogg` de verdade num

@@ -140,6 +140,18 @@ function harness(): Harness {
   return h;
 }
 
+/**
+ * Um toque curto num slot: encostar e soltar.
+ *
+ * No toque a ação resolve **ao soltar**, e não ao encostar — é o que abre
+ * espaço para o toque longo valer como botão direito. Um teste que dispara só
+ * `pointerdown` está descrevendo um gesto que não existe.
+ */
+function tapTouch(el: FakeElement): void {
+  el.dispatch('pointerdown', { pointerType: 'touch' });
+  el.dispatch('pointerup', { pointerType: 'touch' });
+}
+
 /** O elemento do slot marcado com `data-slot`. */
 function slotEl(root: FakeElement, source: string, index: number): FakeElement {
   const el = root.find((e) => e.dataset.slot === `${source}:${index}`);
@@ -179,6 +191,102 @@ describe('livro de receitas no toque', () => {
     button.click();
     expect(h.filled, 'o clique precisa chegar no preenchimento').toBe(1);
     expect(refreshed, 'preencher a grade tem que redesenhar a tela').toBe(true);
+  });
+});
+
+/**
+ * Colocar item **individualmente** no celular (relato de campo 2026-09-14).
+ *
+ * *"ao tentar colocar uma única madeira em cada espacinho do menu de Criação eu
+ * não consigo, pois clicando em qualquer espaço ele acaba movendo o stack
+ * inteiro"*. No toque `e.button` é sempre 0, então todo toque era clique
+ * esquerdo e não existia gesto para a metade / a unidade do doc 08 §3.5.
+ */
+describe('toque longo vale botão direito', () => {
+  /** Segura o dedo no slot até o toque longo resolver. */
+  function longPress(el: FakeElement): void {
+    el.dispatch('pointerdown', { pointerType: 'touch' });
+    vi.advanceTimersByTime(400);
+    el.dispatch('pointerup', { pointerType: 'touch' });
+  }
+
+  it('toque longo com a mão vazia pega metade da pilha', () => {
+    vi.useFakeTimers();
+    const h = harness();
+    h.inventory.set(0, makeStack(PLANKS, 24));
+    h.screen.refresh();
+
+    longPress(slotEl(h.root, 'inv', 0));
+    expect(h.inventory.cursor?.count, 'metade de 24').toBe(12);
+    expect(h.inventory.get(0)?.count).toBe(12);
+    vi.useRealTimers();
+  });
+
+  it('toque longo com a mão cheia solta **uma** unidade', () => {
+    vi.useFakeTimers();
+    const h = harness();
+    h.inventory.set(0, makeStack(PLANKS, 24));
+    h.screen.refresh();
+    // Toque curto pega a pilha inteira, como sempre.
+    tapTouch(slotEl(h.root, 'inv', 0));
+    expect(h.inventory.cursor?.count).toBe(24);
+
+    longPress(slotEl(h.root, 'inv', CRAFT_START));
+    expect(h.inventory.slots[CRAFT_START]?.count, 'uma tábua na célula').toBe(1);
+    expect(h.inventory.cursor?.count, 'o resto continua na mão').toBe(23);
+    vi.useRealTimers();
+  });
+
+  it('o toque curto continua movendo a pilha inteira', () => {
+    vi.useFakeTimers();
+    const h = harness();
+    h.inventory.set(0, makeStack(PLANKS, 24));
+    h.screen.refresh();
+
+    tapTouch(slotEl(h.root, 'inv', 0));
+    expect(h.inventory.cursor?.count).toBe(24);
+    expect(h.inventory.get(0)).toBe(null);
+    vi.useRealTimers();
+  });
+
+  it('soltar depois do toque longo não age duas vezes', () => {
+    vi.useFakeTimers();
+    const h = harness();
+    h.inventory.set(0, makeStack(PLANKS, 24));
+    h.screen.refresh();
+
+    const slot = slotEl(h.root, 'inv', 0);
+    slot.dispatch('pointerdown', { pointerType: 'touch' });
+    vi.advanceTimersByTime(400);
+    expect(h.inventory.cursor?.count, 'o longo já pegou metade').toBe(12);
+    slot.dispatch('pointerup', { pointerType: 'touch' });
+    expect(h.inventory.cursor?.count, 'soltar não pode pegar o resto').toBe(12);
+    vi.useRealTimers();
+  });
+
+  it('escorregar o dedo é rolagem: não pega nada', () => {
+    vi.useFakeTimers();
+    const h = harness();
+    h.inventory.set(0, makeStack(PLANKS, 24));
+    h.screen.refresh();
+
+    const slot = slotEl(h.root, 'inv', 0);
+    slot.dispatch('pointerdown', { pointerType: 'touch', clientX: 0, clientY: 0 });
+    slot.dispatch('pointermove', { pointerType: 'touch', clientX: 0, clientY: 40 });
+    vi.advanceTimersByTime(400);
+    slot.dispatch('pointerup', { pointerType: 'touch' });
+    expect(h.inventory.cursor, 'rolar a lista não é escolher').toBe(null);
+    expect(h.inventory.get(0)?.count).toBe(24);
+    vi.useRealTimers();
+  });
+
+  it('o mouse não mudou: o botão direito continua pegando metade na hora', () => {
+    const h = harness();
+    h.inventory.set(0, makeStack(PLANKS, 24));
+    h.screen.refresh();
+
+    slotEl(h.root, 'inv', 0).dispatch('pointerdown', { pointerType: 'mouse', button: 2 });
+    expect(h.inventory.cursor?.count).toBe(12);
   });
 });
 
@@ -262,11 +370,11 @@ describe('slot de resultado do craft', () => {
     h.inventory.slots[CRAFT_START] = makeStack(LOG, 1);
 
     const result = slotEl(h.root, 'inv', CRAFT_RESULT);
-    result.dispatch('pointerdown', { pointerType: 'touch' });
+    tapTouch(result);
     expect(h.inventory.cursor?.count, 'o primeiro toque pega o resultado').toBe(4);
 
     // Segundo toque logo em seguida: é craftar de novo, não um gesto.
-    result.dispatch('pointerdown', { pointerType: 'touch' });
+    tapTouch(result);
     expect(
       h.inventory.get(0)?.count,
       'as 64 guardadas não podem voltar para a mão sozinhas',

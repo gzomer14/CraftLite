@@ -19,8 +19,26 @@ const DEAD_RADIUS = 8;
 const MAX_RADIUS = 60;
 /** Empurrar até o limite por este tempo ativa a corrida. */
 const SPRINT_HOLD_MS = 300;
-/** Movimento além disto cancela o toque curto e vira arraste de câmera. */
-const DRAG_THRESHOLD = 10;
+/**
+ * Folga do **toque curto**, em px CSS: acima disso o gesto foi um arraste de
+ * câmera e não um toque.
+ *
+ * Eram 10 px, medidos desde o ponto inicial. Num celular na mão, com o outro
+ * polegar mexendo o joystick, 10 px de deriva acontecem em quase todo toque —
+ * e o resultado era o jogo "não detectar" que o jogador tocou (relato de campo
+ * 2026-09-14). Dezesseis é a folga que os navegadores usam para o próprio
+ * `click`.
+ */
+const TAP_SLOP = 16;
+/**
+ * Folga do **toque longo**. Maior que a do toque curto de propósito: o dedo
+ * parado ainda escorrega enquanto o aparelho balança na mão, e cancelar a
+ * quebra por isso é o que fazia segurar não funcionar.
+ *
+ * Sair desta folga não cancela nada: apenas **reinicia a contagem** a partir da
+ * posição nova, que é como todo toque longo com folga funciona.
+ */
+const HOLD_SLOP = 28;
 /** Multiplicador do arraste sobre a sensibilidade base — ver `onMove`. */
 const TOUCH_LOOK_SCALE = 2.0;
 
@@ -32,8 +50,19 @@ interface Finger {
   x: number;
   y: number;
   startTime: number;
-  /** Passou do limiar de arraste: não é mais um toque curto. */
-  dragged: boolean;
+  /** Maior distância já percorrida desde o início — decide o toque curto. */
+  maxDistance: number;
+  /**
+   * Âncora do toque longo e o instante em que ela foi posta.
+   *
+   * Sair de `HOLD_SLOP` reancora aqui e reinicia a contagem, em vez de cancelar
+   * a quebra para sempre.
+   */
+  anchorX: number;
+  anchorY: number;
+  anchorTime: number;
+  /** A quebra já começou: deriva não cancela mais, e o dedo para de girar a câmera. */
+  breaking: boolean;
   /** Já está no limite do joystick desde este instante (para a corrida). */
   atLimitSince: number;
 }
@@ -70,6 +99,9 @@ export class TouchControls {
   /** Delta de câmera acumulado entre ticks. */
   private lookX = 0;
   private lookY = 0;
+  /** Onde o último toque curto pediu para colocar, em px CSS. */
+  private pendingPlaceX = 0;
+  private pendingPlaceY = 0;
 
   readonly state: TouchState = {
     forward: 0, strafe: 0, sprint: 0,
@@ -96,7 +128,22 @@ export class TouchControls {
     canvas.addEventListener('pointermove', this.onMove, { passive: false });
     canvas.addEventListener('pointerup', this.onUp);
     canvas.addEventListener('pointercancel', this.onUp);
-    canvas.addEventListener('pointerleave', this.onUp);
+    /*
+     * **`pointerleave` não conta como soltar o dedo.**
+     *
+     * Ele dispara quando o ponteiro sai da área do elemento — e um dedo que
+     * encosta na borda da tela, ou que passa por cima de um botão do HUD,
+     * gerava um "soltou" falso. Num toque curto isso **coloca um bloco** que
+     * ninguém pediu; num toque longo, cancela a quebra no meio. Era uma das
+     * fontes do "vira e mexe ela falha" relatado em campo (2026-09-14).
+     *
+     * A rede de segurança contra dedo perdido é ouvir no `window`: se a captura
+     * de ponteiro falhar e o `pointerup` não vier no canvas, ele vem aqui.
+     */
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pointerup', this.onUp);
+      window.addEventListener('pointercancel', this.onUp);
+    }
   }
 
   private readonly onDown = (e: PointerEvent): void => {
@@ -115,12 +162,15 @@ export class TouchControls {
     }
 
     const role = this.roleFor(e.clientX);
+    const now = performance.now();
     const finger: Finger = {
       role,
       startX: e.clientX, startY: e.clientY,
       x: e.clientX, y: e.clientY,
-      startTime: performance.now(),
-      dragged: false,
+      startTime: now,
+      maxDistance: 0,
+      anchorX: e.clientX, anchorY: e.clientY, anchorTime: now,
+      breaking: false,
       atLimitSince: 0,
     };
     this.fingers.set(e.pointerId, finger);
@@ -146,11 +196,24 @@ export class TouchControls {
     finger.x = e.clientX;
     finger.y = e.clientY;
 
-    if (Math.hypot(e.clientX - finger.startX, e.clientY - finger.startY) > DRAG_THRESHOLD) {
-      finger.dragged = true;
+    const fromStart = Math.hypot(e.clientX - finger.startX, e.clientY - finger.startY);
+    if (fromStart > finger.maxDistance) finger.maxDistance = fromStart;
+
+    // Saiu da folga do toque longo: reancora e recomeça a contar.
+    if (Math.hypot(e.clientX - finger.anchorX, e.clientY - finger.anchorY) > HOLD_SLOP) {
+      finger.anchorX = e.clientX;
+      finger.anchorY = e.clientY;
+      finger.anchorTime = performance.now();
     }
 
-    if (finger.role === 'look') {
+    /*
+     * Um dedo que está quebrando **não gira mais a câmera**.
+     *
+     * Ele é o mesmo polegar que mira: deixar a deriva dele girar a cena tirava
+     * o alvo de baixo do dedo no meio da quebra, e a barra de progresso voltava
+     * do zero sozinha. Quem quer virar solta e vira.
+     */
+    if (finger.role === 'look' && !finger.breaking) {
       /*
        * Escala do arraste sobre a sensibilidade base (rad por pixel de mouse).
        *
@@ -185,10 +248,21 @@ export class TouchControls {
       this.state.sprint = 0;
     } else if (finger.role === 'look' && this.settings.get('touchMode') === 'A') {
       const held = performance.now() - finger.startTime;
-      // Toque curto e parado = colocar bloco (doc 09 §2.2).
-      if (!finger.dragged && held < this.settings.get('longPressMs')) {
+      /*
+       * Toque curto e parado = colocar bloco (doc 09 §2.2).
+       *
+       * A mira vai para `pendingPlace` e **não** direto para `state`: o
+       * `update()` do tick seguinte roda antes de alguém ler `state.hasAim`, e
+       * limpava a mira que este toque acabou de definir. O efeito era colocar
+       * bloco sempre no centro da tela enquanto quebrar usava o dedo — os dois
+       * gestos com alvos diferentes, que é exatamente a confusão relatada em
+       * campo (2026-09-14).
+       */
+      if (!finger.breaking && finger.maxDistance <= TAP_SLOP
+        && held < this.settings.get('longPressMs')) {
         this.state.placeRequested = true;
-        this.setAim(finger.x, finger.y);
+        this.pendingPlaceX = finger.x;
+        this.pendingPlaceY = finger.y;
       }
     }
   };
@@ -260,10 +334,13 @@ export class TouchControls {
     this.state.holdProgress = 0;
 
     for (const finger of this.fingers.values()) {
-      if (finger.role !== 'look' || finger.dragged) continue;
-      const held = now - finger.startTime;
+      if (finger.role !== 'look') continue;
+      // A contagem é a partir da **âncora**, que a deriva reinicia; quem já
+      // está quebrando não é mais cancelado por deriva nenhuma.
+      const held = now - finger.anchorTime;
       const progress = held / settings.longPressMs;
-      if (progress >= 1) {
+      if (finger.breaking || progress >= 1) {
+        finger.breaking = true;
         this.state.breaking = true;
         this.setAim(finger.x, finger.y);
         this.state.holdProgress = 1;
@@ -272,7 +349,18 @@ export class TouchControls {
       }
     }
 
-    if (!this.state.breaking && this.state.holdProgress === 0) this.state.hasAim = false;
+    /*
+     * A mira do toque curto sobrevive até alguém consumir o pedido.
+     *
+     * Ela é posta no `pointerup`, que acontece **entre** ticks; sem guardá-la
+     * aqui, este mesmo método a apagaria antes de o jogo ler — e o bloco ia
+     * para o centro da tela.
+     */
+    if (!this.state.breaking && this.state.placeRequested) {
+      this.setAim(this.pendingPlaceX, this.pendingPlaceY);
+    } else if (!this.state.breaking && this.state.holdProgress === 0) {
+      this.state.hasAim = false;
+    }
   }
 
   private moveFinger(): Finger | undefined {

@@ -54,12 +54,15 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-function setup(): { canvas: FakeCanvas; touch: TouchControls; settings: SettingsStore } {
+function baseSetup(): { canvas: FakeCanvas; touch: TouchControls; settings: SettingsStore } {
   const canvas = new FakeCanvas();
   const settings = new SettingsStore();
   const touch = new TouchControls(canvas as unknown as HTMLElement, settings);
   return { canvas, touch, settings };
 }
+
+/** Preparo padrão, com as opções de fábrica. */
+const setup = baseSetup;
 
 describe('joystick flutuante', () => {
   it('aparece onde o dedo tocar na metade esquerda', () => {
@@ -272,6 +275,16 @@ describe('multitoque real', () => {
 });
 
 describe('modo A — toque no mundo', () => {
+  /**
+   * O modo A deixou de ser o padrão em 2026-09-14 (ver `game/settings.ts`), e
+   * estes testes são sobre ele: cada um o liga explicitamente.
+   */
+  const setup = (): ReturnType<typeof baseSetup> => {
+    const harness = baseSetup();
+    harness.settings.set('touchMode', 'A');
+    return harness;
+  };
+
   it('toque curto e parado pede para colocar', () => {
     const { canvas, touch } = setup();
     canvas.down(2, 600, 200);
@@ -282,15 +295,25 @@ describe('modo A — toque no mundo', () => {
   });
 
   it('a mira vai para a posição do dedo, não para o centro', () => {
+    /*
+     * **Na ordem real do tick.** O `update()` roda no começo de
+     * `Controls.update`, antes de alguém ler `state.hasAim` — e a versão
+     * anterior deste teste lia a mira sem chamá-lo. Por isso ela passava
+     * enquanto o jogo colocava blocos no centro da tela: o `update()` apagava
+     * a mira que o `pointerup` tinha acabado de definir (relato de campo
+     * 2026-09-14).
+     */
     const { canvas, touch } = setup();
     canvas.down(2, 600, 100);
     now += 100;
     canvas.up(2, 600, 100);
-    touch.consumePlace();
+
+    touch.update();
     // 600/800 → NDC x = 0.5 ; 100/400 → NDC y = 0.5
     expect(touch.state.aimNdcX).toBeCloseTo(0.5, 3);
     expect(touch.state.aimNdcY).toBeCloseTo(0.5, 3);
-    expect(touch.state.hasAim).toBe(true);
+    expect(touch.state.hasAim, 'sem isto o bloco vai para o centro da tela').toBe(true);
+    expect(touch.consumePlace()).toBe(true);
   });
 
   it('arrastar cancela o toque curto', () => {
@@ -323,13 +346,81 @@ describe('modo A — toque no mundo', () => {
     expect(touch.state.holdProgress).toBeLessThan(0.6);
   });
 
-  it('arrastar cancela o toque longo', () => {
+  it('arrastar não quebra durante o movimento, mas parar rearma a contagem', () => {
+    /*
+     * A regra **mudou de propósito**. Antes, um dedo que passasse de 10 px
+     * ficava marcado como "arrastado" para sempre e não conseguia mais
+     * quebrar até ser levantado — o que na mão significa mirar arrastando e
+     * depois segurar sem nada acontecer. Agora sair da folga **reancora** a
+     * contagem, como em todo toque longo com folga.
+     */
     const { canvas, touch } = setup();
     canvas.down(2, 600, 200);
-    canvas.move(2, 650, 200);
+
+    for (let step = 1; step <= 6; step++) {
+      now += 60;
+      canvas.move(2, 600 + step * 40, 200);
+      touch.update();
+      expect(touch.state.breaking, `arrastando, passo ${step}`).toBe(false);
+    }
+
     now += 400;
     touch.update();
-    expect(touch.state.breaking).toBe(false);
+    expect(touch.state.breaking, 'parou e segurou: tem que quebrar').toBe(true);
+  });
+
+  it('a deriva pequena do dedo parado não reinicia a quebra', () => {
+    // O caso que mais doía: segurar para quebrar com o aparelho balançando na
+    // mão. Com folga de 10 px, quase todo toque longo era cancelado.
+    const { canvas, touch } = setup();
+    canvas.down(2, 600, 200);
+    for (let step = 0; step < 5; step++) {
+      now += 60;
+      canvas.move(2, 600 + (step % 2 === 0 ? 6 : -6), 200 + step);
+      touch.update();
+    }
+    now += 60;
+    touch.update();
+    expect(touch.state.breaking, 'tremor de mão não é arraste').toBe(true);
+  });
+
+  it('começada a quebra, a deriva não a cancela mais', () => {
+    const { canvas, touch } = setup();
+    canvas.down(2, 600, 200);
+    now += 400;
+    touch.update();
+    expect(touch.state.breaking).toBe(true);
+
+    canvas.move(2, 700, 260);
+    touch.update();
+    expect(touch.state.breaking, 'quebrar não pode parar no meio por deriva').toBe(true);
+  });
+
+  it('o dedo que está quebrando para de girar a câmera', () => {
+    // Ele é o mesmo polegar que mira: girar a cena tirava o alvo de baixo dele.
+    const { canvas, touch } = setup();
+    const look = new Float32Array(2);
+    canvas.down(2, 600, 200);
+    now += 400;
+    touch.update();
+    touch.consumeLook(look);
+
+    canvas.move(2, 660, 200);
+    touch.consumeLook(look);
+    expect(look[0], 'quebrando, o arraste não vira câmera').toBe(0);
+  });
+
+  it('sair da área do canvas não coloca bloco sozinho', () => {
+    /*
+     * `pointerleave` era tratado como "soltou o dedo": encostar na borda da
+     * tela, ou passar por cima de um botão do HUD, colocava um bloco que
+     * ninguém pediu.
+     */
+    const { canvas, touch } = setup();
+    canvas.down(2, 600, 200);
+    now += 50;
+    canvas.emit('pointerleave', { pointerId: 2, clientX: 799, clientY: 200 });
+    expect(touch.consumePlace()).toBe(false);
   });
 
   it('o tempo de toque longo é ajustável (acessibilidade)', () => {

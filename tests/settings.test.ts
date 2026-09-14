@@ -27,8 +27,14 @@ beforeEach(() => stubStorage());
 afterEach(() => vi.unstubAllGlobals());
 
 describe('padrões', () => {
-  it('o modo de toque padrão é A (doc 09 §2.2)', () => {
-    expect(new SettingsStore().get('touchMode')).toBe('A');
+  it('o modo de toque padrão é o B — desvio consciente do doc 09 §2.2', () => {
+    /*
+     * O doc pede o A como padrão. Ele tinha bugs reais, já corrigidos, mas
+     * sobra a ambiguidade de ter duas miras ao mesmo tempo: o alvo é o dedo e
+     * a mira branca continua no centro da tela. Decisão do usuário com o jogo
+     * na mão (2026-09-14); o A continua a um toque nas opções.
+     */
+    expect(new SettingsStore().get('touchMode')).toBe('B');
   });
 
   it('o toque longo padrão é 300 ms', () => {
@@ -122,9 +128,10 @@ describe('persistência', () => {
 
   it('reset volta aos padrões', () => {
     const settings = new SettingsStore();
-    settings.set('touchMode', 'B');
+    // Tem que sair do padrão para o teste provar alguma coisa.
+    settings.set('touchMode', 'A');
     settings.reset();
-    expect(settings.get('touchMode')).toBe('A');
+    expect(settings.get('touchMode')).toBe('B');
   });
 });
 
@@ -144,7 +151,7 @@ describe('validação', () => {
 
   it('ignora JSON corrompido', () => {
     store['craftlite.settings.v1'] = '{isto não é json';
-    expect(new SettingsStore().get('touchMode')).toBe('A');
+    expect(new SettingsStore().get('touchMode')).toBe('B');
   });
 
   it('ignora campos com tipo errado', () => {
@@ -161,13 +168,14 @@ describe('validação', () => {
 
   it('ignora touchMode inválido', () => {
     store['craftlite.settings.v1'] = JSON.stringify({ touchMode: 'Z' });
-    expect(new SettingsStore().get('touchMode')).toBe('A');
+    expect(new SettingsStore().get('touchMode')).toBe('B');
   });
 
   it('descarta campos desconhecidos', () => {
-    store['craftlite.settings.v1'] = JSON.stringify({ naoExiste: 42, touchMode: 'B' });
+    store['craftlite.settings.v1'] = JSON.stringify({ naoExiste: 42, touchMode: 'A' });
     const settings = new SettingsStore();
-    expect(settings.get('touchMode')).toBe('B');
+    // O campo válido ao lado do desconhecido continua valendo.
+    expect(settings.get('touchMode')).toBe('A');
     expect((settings.current as Record<string, unknown>).naoExiste).toBeUndefined();
   });
 });
@@ -176,9 +184,11 @@ describe('storage hostil', () => {
   it('sobrevive a localStorage que joga exceção', () => {
     stubStorage('throws');
     const settings = new SettingsStore();
-    expect(settings.get('touchMode')).toBe('A');
-    expect(() => settings.set('touchMode', 'B')).not.toThrow();
-    expect(settings.get('touchMode')).toBe('B'); // vale na sessão, só não persiste
+    expect(settings.get('touchMode')).toBe('B');
+    // Mudar para um valor **diferente** do padrão é o que prova que a escrita
+    // vale em memória mesmo sem conseguir persistir.
+    expect(() => settings.set('touchMode', 'A')).not.toThrow();
+    expect(settings.get('touchMode')).toBe('A'); // vale na sessão, só não persiste
   });
 });
 

@@ -1036,6 +1036,9 @@ async function boot(): Promise<void> {
 
     session.weather.showFlashes = !settings.get('hideSkyFlashes');
 
+    // Modo A mira no dedo: a mira central apontaria para outro lugar.
+    hud.setCrosshairVisible(!(isTouchDevice && settings.get('touchMode') === 'A'));
+
     // Layout de controle forçado (`auto` deixa a detecção decidir).
     const forced = settings.get('padProfile');
     gamepads.forcedProfile = forced === 'auto' ? null : profileById(forced);

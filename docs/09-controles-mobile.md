@@ -68,7 +68,23 @@ Tratar `pointerlockerror` (alguns navegadores exigem gesto do usuário) com uma 
 
 ### 2.2 Modelo de interação por toque (a decisão mais importante do mobile)
 
-Oferecer **dois modos**, escolhíveis nas opções, com o **Modo A como padrão**:
+Oferecer **dois modos**, escolhíveis nas opções.
+
+> **O padrão é o B, e não o A** — decisão do usuário em 2026-09-14, com o jogo
+> na mão: *"mudando para a opção B... essa sim funciona perfeitamente. Talvez
+> deixar ela como padrão no jogo e a outra opcional"*.
+>
+> O A tinha três bugs reais, todos corrigidos (doc 15 §4): a mira do toque
+> curto era apagada antes de ser lida — então **colocar bloco usava o centro da
+> tela enquanto quebrar usava o dedo** —, a folga de arraste de 10 px cancelava
+> quase todo gesto de uma mão que segura o aparelho, e `pointerleave` valia como
+> "soltou o dedo", colocando blocos sozinho.
+>
+> Mesmo consertado, sobra uma ambiguidade que **não é bug**: no A o alvo é o
+> dedo, e o dedo tapa justamente o que ele mira num aparelho pequeno. O B é
+> inequívoco — dois botões, alvo sempre no centro. O A continua a um toque de
+> distância nas opções, e nele a mira central **some**, porque ela apontaria
+> para outro lugar que não o alvo.
 
 **Modo A — "Toque no mundo" (recomendado, é o que o jogo mobile original usa)**
 | Gesto | Ação |

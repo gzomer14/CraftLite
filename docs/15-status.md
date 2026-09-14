@@ -9,7 +9,7 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-14 14:48 — **dois relatos de campo do celular: meia pilha e descarte**
+**Última atualização:** 2026-09-14 15:12 — **três bugs do Modo A de toque, e o padrão vira o B**
 
 ---
 
@@ -39,13 +39,13 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-14 14:48, com `npm test`, `npm run build` e
+Medidas em 2026-09-14 15:12, com `npm test`, `npm run build` e
 `SIZE_BUDGET_KB=350 npm run size`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **188,7 KB** | < 350 KB | `npm run size` |
-| Testes | **1328**, 73 arquivos | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **188,9 KB** | < 350 KB | `npm run size` |
+| Testes | **1332**, 73 arquivos | manter verde | `npm test` |
 | Camadas de atlas | **156** | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Memória de áudio | **3,26 MB** (era 3,95 com três sons a menos) | < 3,5 MB | `tests/audio.test.ts` |
 | Geração de chunk | 5,7–6,2 ms (mediana; varia muito com a carga da máquina) | < 25 ms | `tests/perf.test.ts` |
@@ -791,6 +791,10 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-14 | `input/touch.ts` | **No Modo A, colocar bloco mirava no centro da tela e quebrar mirava no dedo.** `onUp` definia a mira do toque curto, mas `update()` roda no **começo** de `Controls.update`, antes de alguém ler `state.hasAim` — e apagava a mira que o toque acabara de definir. O `placeRequested` sobrevivia sozinho, então o bloco ia para o crosshair. Os dois gestos do mesmo modo tinham alvos diferentes, o que de dentro do jogo é indistinguível de "funcionalidade bugada" (relato de campo: *"fiquei muito confuso se... ele irá fazer a ação onde estou clicando ou se sempre respeita o ponteiro branco de mira"*). O teste existente passava porque lia a mira **sem** chamar `update()` — ele não modelava a ordem do tick, e foi essa brecha que deixou o bug passar. |
+| 2026-09-14 | `input/touch.ts` | **A folga de arraste de 10 px cancelava quase todo toque.** O limiar era medido desde o ponto inicial e era **pegajoso**: um dedo que passasse dele ficava marcado como "arrastado" para sempre e não conseguia mais nem colocar nem quebrar até ser levantado. Com o outro polegar mexendo o joystick e o aparelho balançando na mão, 10 px acontecem em quase todo gesto. Agora são duas folgas — 16 px para o toque curto, 28 px para o longo — e sair da folga do longo **reancora** a contagem em vez de matá-la. Começada a quebra, deriva nenhuma a cancela, e o dedo que quebra para de girar a câmera: ele é o mesmo polegar que mira, e girar a cena tirava o alvo de baixo dele. |
+| 2026-09-14 | `input/touch.ts` | **`pointerleave` valia como soltar o dedo.** Encostar na borda da tela ou passar por cima de um botão do HUD gerava um "soltou" falso — que num toque curto **coloca um bloco que ninguém pediu** e num toque longo cancela a quebra no meio. Ele saiu; a rede de segurança contra dedo perdido passou a ser ouvir `pointerup`/`pointercancel` no `window`. |
+| 2026-09-14 | `game/settings.ts`, `ui/hud.ts` | **O padrão de toque virou o Modo B** — desvio consciente do doc 09 §2.2, que pede o A. Decisão do usuário com o jogo na mão. Mesmo com os três bugs acima corrigidos, sobra no A uma ambiguidade que não tem conserto: o alvo é o dedo, e o dedo tapa o que mira num aparelho pequeno. No A a **mira central agora some**, porque ela apontava para um lugar que não é o alvo. |
 | 2026-09-14 | `ui/containers/screen.ts` | **No celular, todo toque de slot movia a pilha inteira — não havia como colocar um item de cada vez.** No toque `PointerEvent.button` é sempre 0, então o clique direito do doc 08 §3.5 (pegar metade, soltar uma unidade) simplesmente não existia: montar uma receita que pede uma tábua por célula era impossível, o jogador colocava as 24 de uma vez. O **toque longo** passou a valer como botão direito, e para isso a ação de toque resolve **ao soltar o dedo** e não ao encostar. O arraste de distribuição não se perde: ele nunca funcionou no dedo, porque o ponteiro de toque recebe captura implícita no elemento do `pointerdown` e os outros slots nunca recebem `pointerenter` — era, e segue sendo, gesto de mouse. Relato de campo: *"clicando em qualquer espaço ele acaba movendo o stack inteiro"*. |
 | 2026-09-14 | `entity/itementity.ts`, `game/session.ts` | **O item jogado fora voltava sozinho para a mochila.** `spawn(..., thrown)` prometia "sai para a frente com força" e dava um empurrão **aleatório** de ±0,05 por eixo: o item caía a menos de meio bloco de quem o largou, dentro da caixa de coleta, que tem 1,3 de raio horizontal. Meio segundo depois o próprio jogador o recolhia. Agora ele é arremessado **na direção do olhar** a 0,3 por tick, e o atraso de coleta do que foi jogado fora subiu de 10 para 40 ticks — o arremesso resolve o caso normal, o atraso cobre quem joga contra a parede. O que cai de bloco quebrado continua sendo pego na hora. Relato de campo: *"ele está indo muito perto do meu personagem então instantaneamente meu personagem coleta ele"*. |
 | 2026-09-14 | `ui/containers/screen.ts` | **Evento sem `pointerType` caía no caminho de toque.** Ao separar mouse de dedo, `pointerType` indefinido ou vazio — evento sintetizado por teclado, por navegador antigo ou por teste — ia para o ramo que espera um `pointerup` que talvez nunca venha, e a ação nunca acontecia. A regra passou a ser a mesma de `isMouseClick` em `input/controls.ts`: ausente ou vazio conta como mouse. Achado por um teste existente de shift+clique, não em campo. |
@@ -971,7 +975,13 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      certa do corpo.
    - **Modo daltônico e contorno em alto contraste**, que são acessibilidade e só se avaliam
      olhando.
-2. **Reconferir o inventário no celular.** As duas correções de 2026-09-14
+2. **Reconferir o toque no celular.** O padrão agora é o **Modo B**, que é o que já funcionava —
+   então o primeiro teste é confirmar que nada regrediu nele. Depois vale voltar ao **Modo A** nas
+   opções e ver se ele ficou utilizável: colocar e quebrar agora miram no **mesmo** lugar (o dedo),
+   a mira central some, a folga de arraste dobrou, e arrastar para mirar e então segurar passou a
+   funcionar em vez de travar o dedo. Se ainda falhar, o número a mexer é `HOLD_SLOP` em
+   `input/touch.ts`.
+3. **Reconferir o inventário no celular.** As duas correções de 2026-09-14
    vieram de relato de campo e voltam para lá:
    - **toque longo num slot** pega metade com a mão vazia e solta uma unidade com a mão cheia.
      Montar uma receita de tábua por célula é o teste que importa. A dica aparece no painel, e o
@@ -979,7 +989,7 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
    - **largar item** agora arremessa na direção do olhar, e o que foi jogado fora só volta a ser
      coletável depois de dois segundos. Vale largar olhando para o chão e para uma parede, que é
      onde o arremesso sozinho não resolveria.
-3. **Ligar o DualSense.** O suporte a controle foi escrito contra um `Gamepad` falso — nenhum
+4. **Ligar o DualSense.** O suporte a controle foi escrito contra um `Gamepad` falso — nenhum
    controle físico esteve na mesa. Em ordem de quanto pode estar errado:
    - **Opções → Controle** primeiro, antes de entrar num mundo: a linha de estado diz se o jogo
      vê o controle e qual família reconheceu. Se ela disser *"o navegador não reconheceu este
@@ -993,15 +1003,15 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      o `id` que escolhe o perfil. Vale conectar dos dois jeitos.
    - **No celular**, lembrar que ligar o áudio e a tela cheia exigem um toque na tela — o controle
      não serve de gesto para o navegador. O jogo avisa isso ao conectar.
-4. **Uma sessão longa de verdade.** É o **último critério da definição de pronto** que não foi
+5. **Uma sessão longa de verdade.** É o **último critério da definição de pronto** que não foi
    cumprido: o PROMPT.md §11 pede *"2 horas sem crash, sem perda de progresso e sem travas"*, e a
    sessão de campo mais longa registrada tem 10 minutos. Não é teste de FPS — é teste de vazamento,
    de save e de fogo/mob acumulando. O F3 tem tudo que ele precisa: `mem`, a linha `C:` e agora
    `N fogo`.
-5. **Medir o tempo de abertura em 3G.** O critério 1 do PROMPT.md §11 tem metade cumprida — o
+6. **Medir o tempo de abertura em 3G.** O critério 1 do PROMPT.md §11 tem metade cumprida — o
    bundle está em 189 KB de 350 — e a outra metade nunca foi medida. O `throttling` do DevTools
    resolve; o que interessa é o tempo até a tela de título, com o atlas gerando no meio.
-6. Oportunidades pequenas que sobraram, agora curtas:
+7. Oportunidades pequenas que sobraram, agora curtas:
    - **`.clw` com miniatura** já funciona, mas nenhum arquivo real foi exportado e reimportado
      desde a mudança para a v2 — é um teste manual de cinco minutos;
    - **som no resource pack** foi testado por formato, nunca com um `.ogg` de verdade num

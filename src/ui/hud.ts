@@ -75,6 +75,7 @@ export class Hud {
   private readonly damage: HTMLDivElement;
   private damageFlashEnabled = true;
   private readonly subtitle: HTMLDivElement;
+  private readonly crosshair: HTMLDivElement;
   /** Contador de FPS do doc 08 §3.11, sem precisar abrir o F3. */
   private readonly fps: HTMLDivElement;
   private lastFps = -1;
@@ -107,9 +108,9 @@ export class Hud {
     this.root = document.createElement('div');
     this.root.id = 'hud';
 
-    const crosshair = document.createElement('div');
-    crosshair.className = 'crosshair';
-    crosshair.setAttribute('aria-hidden', 'true');
+    this.crosshair = document.createElement('div');
+    this.crosshair.className = 'crosshair';
+    this.crosshair.setAttribute('aria-hidden', 'true');
 
     // Barras de vida e fome (doc 08 §3.4). Ficam acima da hotbar, vida à
     // esquerda e fome à direita, como o jogador espera.
@@ -214,7 +215,7 @@ export class Hud {
     }
 
     this.root.append(
-      this.damage, crosshair, this.objective, this.fps, this.armor, bars, this.xpBar, hotbar,
+      this.damage, this.crosshair, this.objective, this.fps, this.armor, bars, this.xpBar, hotbar,
       this.toast, this.subtitle, this.achievement,
     );
     document.body.appendChild(this.root);
@@ -441,6 +442,19 @@ export class Hud {
     for (const key of PALETTE_KEYS) {
       style.setProperty(`--hud-${key}`, palette[key]);
     }
+  }
+
+  /**
+   * Mostra ou esconde a mira central.
+   *
+   * No **Modo A** de toque o alvo é a posição do dedo (doc 09 §2.2), e a mira
+   * branca no meio da tela aponta para outro lugar: são duas miras ao mesmo
+   * tempo, e o jogador não tem como saber qual delas manda. Desenhá-la ali é
+   * dizer algo falso — no Modo A ela sai.
+   */
+  setCrosshairVisible(visible: boolean): void {
+    if (this.crosshair.hidden === !visible) return;
+    this.crosshair.hidden = !visible;
   }
 
   /** Contador de FPS. Só mexe no DOM quando o número inteiro muda. */

@@ -12,6 +12,65 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-14 · 14:55 → 15:12 · O Modo A de toque tinha três bugs, e o padrão virou o B
+
+**Pedido:** *"para mim a opção A de controles... está bem estranha. Vira e mexe ela falha, parece
+que não detecta que estou clicando para colocar um bloco, ou que estou segurando para quebrar"* —
+com a dúvida de *"se ao clicar ou segurar... ele irá fazer a ação onde estou clicando na posição do
+meu dedo, ou se ele sempre respeita o ponteiro branco de mira no meio da tela"*, e a proposta de
+tornar o Modo B o padrão.
+
+**Resultado:** a confusão tinha causa. **Os dois gestos do Modo A miravam em lugares diferentes** —
+e mais dois bugs faziam o modo falhar sozinho. Os três corrigidos, e o padrão virou o B por decisão
+do usuário.
+
+### A pergunta tinha uma resposta ruim: os dois, dependendo do gesto
+
+`onUp` definia a mira do toque curto, mas o `update()` de `TouchControls` roda no **começo** de
+`Controls.update`, antes de alguém ler `state.hasAim` — e apagava a mira que o toque acabara de
+definir. O pedido de colocar sobrevivia sozinho, então **o bloco ia para o crosshair**. Quebrar, que
+acontece durante o tick com o dedo ainda na tela, usava o dedo. Dois alvos no mesmo modo.
+
+O teste que deveria pegar isso passava: ele lia a mira **sem** chamar `update()`, ou seja, não
+modelava a ordem do tick. Foi reescrito na ordem real, e é ele que agora protege a correção.
+
+### O modo falhava sozinho
+
+A folga de arraste era de 10 px, medida desde o ponto inicial e **pegajosa**: um dedo que passasse
+dela ficava marcado como "arrastado" para sempre e não conseguia mais nem colocar nem quebrar até
+ser levantado. Com o outro polegar no joystick e o aparelho balançando na mão, 10 px acontecem em
+quase todo gesto — era o *"vira e mexe ela falha"*.
+
+Agora são duas folgas, 16 px para o toque curto e 28 px para o longo, e sair da folga do longo
+**reancora** a contagem em vez de matá-la — que é como todo toque longo com folga funciona. Uma vez
+começada, a quebra não é mais cancelada por deriva; e o dedo que está quebrando **para de girar a
+câmera**, porque é o mesmo polegar que mira e girar a cena tirava o alvo de baixo dele.
+
+E `pointerleave` valia como "soltou o dedo": encostar na borda da tela ou passar por cima de um
+botão do HUD colocava um bloco que ninguém pediu. Saiu; a rede contra dedo perdido passou a ser
+ouvir `pointerup`/`pointercancel` no `window`.
+
+### O padrão virou o B
+
+Desvio consciente do doc 09 §2.2, registrado lá e em `game/settings.ts`. Mesmo consertado, sobra no
+A uma ambiguidade que não é bug: o alvo é o dedo, e o dedo tapa justamente o que ele mira num
+aparelho pequeno. O B é inequívoco. O A continua a um toque nas opções — e nele **a mira central
+some**, porque ela apontava para um lugar que não é o alvo.
+
+**Portões:** 1332 testes (73 arquivos) verdes, lint limpo, build limpo, **188,9 KB gzip** de 350.
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/input/touch.ts` | A mira do toque curto sobrevive até ser consumida; duas folgas (`TAP_SLOP`/`HOLD_SLOP`) com reancoragem em vez de cancelamento; quebra latchada contra deriva; o dedo que quebra não gira a câmera; `pointerleave` deixa de valer como soltar, com rede de segurança no `window`. |
+| `~` | `src/game/settings.ts` | Padrão de `touchMode` passa a ser `B`, com o motivo do desvio no comentário do tipo. |
+| `~` | `src/ui/hud.ts`, `src/main.ts` | `setCrosshairVisible`: no Modo A de toque a mira central some. |
+| `~` | `tests/touch.test.ts` | O teste da mira passou a rodar na ordem real do tick — era a brecha que deixou o bug passar. Mais cinco: deriva pequena não reinicia, quebra começada não cancela, o dedo que quebra não gira a câmera, arrastar rearma, e `pointerleave` não coloca bloco. |
+| `~` | `tests/settings.test.ts` | Novo padrão; e três testes que tinham virado vazios ao trocar o valor (afirmavam o padrão contra o padrão) voltaram a provar o que prometem. |
+| `~` | `docs/09-controles-mobile.md` | §2.2: o padrão é o B, com os três bugs e a ambiguidade que sobra. |
+| `~` | `docs/15-status.md`, `README.md` | Métricas, quatro correções fora de marco e o roteiro de reteste do toque. |
+
+---
+
 ## 2026-09-14 · 14:35 → 14:48 · Meia pilha no dedo, e o item que voltava sozinho
 
 **Pedido:** dois relatos de campo do celular. *"ao tentar colocar uma única madeira em cada

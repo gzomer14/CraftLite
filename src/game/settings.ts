@@ -10,7 +10,22 @@ import type { TextureStyleId } from '../data/texturestyle';
 
 const STORAGE_KEY = 'craftlite.settings.v1';
 
-/** Modo de interação por toque (doc 09 §2.2). O A é o padrão. */
+/**
+ * Modo de interação por toque (doc 09 §2.2).
+ *
+ * **Desvio consciente do doc 09, que pede o A como padrão** (decisão do
+ * usuário, 2026-09-14, com o jogo na mão): o B é o padrão.
+ *
+ * O A tinha bugs reais, já corrigidos — a mira do toque curto era descartada
+ * antes de ser lida, a folga de arraste de 10 px cancelava quase todo gesto, e
+ * `pointerleave` colocava blocos sozinho. Mas sobra uma ambiguidade que não é
+ * bug e não tem conserto: no A o alvo é **o dedo**, e a mira branca no centro
+ * da tela continua desenhada. Duas miras ao mesmo tempo é confuso por
+ * construção, e num aparelho pequeno o dedo tapa justamente o que ele mira.
+ *
+ * O B é inequívoco: dois botões, alvo sempre no centro. O A continua a um
+ * toque de distância em Opções → Controles.
+ */
 export type TouchMode = 'A' | 'B';
 
 /** Umbrella de qualidade do doc 08 §3.11. `auto` segue o preset do tier. */
@@ -167,7 +182,7 @@ export interface Settings {
 const DEFAULTS: Settings = {
   lookSensitivity: 0.0022,
   invertY: false,
-  touchMode: 'A',
+  touchMode: 'B',
   longPressMs: 300,
   touchButtonScale: 1,
   leftHanded: false,

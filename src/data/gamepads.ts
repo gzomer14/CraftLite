@@ -105,6 +105,13 @@ export type PadIntent =
  *    L2 vale clique direito. É a mesma mão fazendo a mesma coisa nos dois
  *    lados — sem isso não havia como pegar meia pilha ou soltar um item de
  *    cada vez com o controle.
+ * 4. **O direcional também troca o item da mão**, junto com L1/R1. Fora dos
+ *    menus ele não tinha função nenhuma, e um relato de campo (2026-09-14) diz
+ *    que L1/R1 não trocam item num DualSense por Bluetooth — o que este código
+ *    não explica, já que os dois estão nos índices 4 e 5 do layout padrão.
+ *    Enquanto o teste de controle em Opções não disser o que o aparelho manda
+ *    de verdade, o direcional é o caminho que com certeza existe. Com uma tela
+ *    aberta ele volta a ser navegação: `uiCapture` zera a hotbar.
  */
 export const PAD_BINDINGS: Readonly<Record<PadIntent, readonly PadButton[]>> = {
   jump: ['faceDown'],
@@ -113,8 +120,8 @@ export const PAD_BINDINGS: Readonly<Record<PadIntent, readonly PadButton[]>> = {
   place: ['l2'],
   break: ['r2'],
   drop: ['faceUp'],
-  hotbarPrev: ['l1'],
-  hotbarNext: ['r1'],
+  hotbarPrev: ['l1', 'dpadLeft'],
+  hotbarNext: ['r1', 'dpadRight'],
   inventory: ['faceLeft', 'select'],
   pause: ['start'],
   navUp: ['dpadUp'],

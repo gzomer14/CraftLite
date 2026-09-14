@@ -185,6 +185,35 @@ describe('mapeamento padrão', () => {
     expect(pads.state.hotbarNext, 'R1 avança um slot').toBe(true);
   });
 
+  it('o direcional também troca o item da mão, fora dos menus', () => {
+    /*
+     * Relato de campo 2026-09-14: L1/R1 não trocam item num DualSense por
+     * Bluetooth, e o código não explica por quê — os dois estão nos índices 4
+     * e 5 do layout padrão. O direcional é o caminho que com certeza existe
+     * enquanto o teste de controle em Opções não disser o que o aparelho
+     * manda.
+     */
+    const pads = new Gamepads();
+    connect(fakePad({ id: IDS.dualsenseChrome, pressed: [STANDARD_BUTTONS.dpadRight] }));
+    pads.poll();
+    expect(pads.state.hotbarNext, '→ avança um slot').toBe(true);
+
+    connect(fakePad({ id: IDS.dualsenseChrome, pressed: [STANDARD_BUTTONS.dpadLeft] }));
+    pads.poll();
+    expect(pads.state.hotbarPrev, '← volta um slot').toBe(true);
+  });
+
+  it('com uma tela aberta o direcional volta a ser só navegação', () => {
+    // Senão andar no menu com o direcional trocaria o item da mão por baixo.
+    const pads = new Gamepads();
+    pads.uiCapture = true;
+    connect(fakePad({ id: IDS.dualsenseChrome, pressed: [STANDARD_BUTTONS.dpadRight] }));
+    pads.poll();
+    expect(pads.state.hotbarNext).toBe(false);
+    pads.pollNav();
+    expect(pads.nav.right, 'mas a navegação continua recebendo').toBe(true);
+  });
+
   it('pausa e inventário chegam ao jogo — antes eram calculados e jogados fora', () => {
     const pads = new Gamepads();
     connect(fakePad({ id: IDS.xboxOne, pressed: [STANDARD_BUTTONS.start] }));

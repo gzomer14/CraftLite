@@ -12,6 +12,58 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-14 · 18:05 → 18:20 · O painel que lê o controle cru
+
+**Pedido:** *"Tudo está funcionando conforme esperado, porém o R1 e L1 continuam não funcionando,
+não trocam de item atual na mão de jeito nenhum."*
+
+**Resultado:** o bug continua sem causa, e a sessão entregou o instrumento para achá-la mais um
+caminho que funciona.
+
+### O código diz que funciona, e funciona — no teste
+
+Primeiro passo foi exercitar o caminho inteiro de ponta a ponta: `Controls` de verdade, callbacks
+de verdade, um `Gamepad` falso apertando o índice 4. `onHotbarScroll(-1)` chega. `L1`/`R1` estão
+nos índices 4 e 5 do layout padrão, `PAD_BINDINGS` os liga a `hotbarPrev`/`hotbarNext`,
+`Inventory.scroll` move a seleção, e o HUD espelha `inventory.selected` todo quadro. Todo o resto
+do controle funciona no mesmo aparelho, incluindo botões vizinhos.
+
+Quando o código não explica o sintoma, mexer no código é chutar. A resposta honesta foi **medir o
+aparelho**.
+
+### Painel de teste de controle
+
+`ui/screens/padtester.ts`, em Opções → Controle. Lê `navigator.getGamepads()` **cru**: sem perfil,
+sem remapeamento, sem zona morta — um diagnóstico que passasse pela camada sob suspeita não
+diagnosticaria nada. Mostra o índice e o nome de cada botão apertado, o **último aperto** (que fica
+na tela depois de soltar, porque apertar e ler ao mesmo tempo é difícil e quem usa controle sem fio
+costuma estar longe do monitor), a contagem de botões e eixos, os eixos, e se o navegador
+normalizou o layout. Só roda com a tela aberta.
+
+### O direcional ←/→ troca o item da mão
+
+Não é a correção do bug — é um caminho que com certeza existe enquanto o bug não tem causa. Fora
+dos menus o direcional não tinha função nenhuma; dentro deles ele volta a ser navegação, porque
+`uiCapture` já zera a hotbar.
+
+### Grid de arquivos
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `+` | `src/ui/screens/padtester.ts` | painel de teste ao vivo: índice, nome, último aperto, eixos, contagem, aviso de layout não normalizado |
+| `~` | `src/ui/screens/options.ts` | painel montado na seção Controle; começa em `show`, para em `hide`; linha de estado convida a apertar os botões |
+| `~` | `src/data/gamepads.ts` | `hotbarPrev`/`hotbarNext` ganharam `dpadLeft`/`dpadRight`; nota 4 no comentário de `PAD_BINDINGS` explicando por quê |
+| `+` | `tests/padtester.test.ts` | 7 testes: índice mostrado, último aperto que sobrevive ao soltar, aviso de layout, contagem, botão fora da tabela, relógio que para |
+| `~` | `tests/gamepad.test.ts` | direcional troca item fora dos menus; e volta a ser só navegação com tela aberta |
+| `~` | `docs/09-controles-mobile.md` | §3 direcional na hotbar e o painel de teste |
+| `~` | `docs/15-status.md` | §1 linha da 3ª passada (⚠️); §2 métricas; §3 seção nova; §5 pendência P1 reaberta; §6 item 1 novo |
+| `~` | `docs/16-auditoria.md` | esta sessão |
+| `~` | `README.md` | contagem de testes e bundle |
+
+**Portões:** 1380 testes em 76 arquivos verdes · lint limpo · build limpo · 191,1 KB gzip de 350.
+
+---
+
 ## 2026-09-14 · 17:30 → 17:58 · O controle vira mouse nos menus
 
 **Pedido:** cinco ajustes depois de jogar com o DualSense ligado por Bluetooth — que *"ele

@@ -14,6 +14,7 @@ import {
 } from './menu';
 import type { Keybinds } from '../../input/keybinds';
 import type { Gamepads } from '../../input/gamepad';
+import { PadTester } from './padtester';
 import { BUSES, BUS_LABELS, BUS_SETTING } from '../../data/soundbuses';
 import type { SettingsStore } from '../../game/settings';
 
@@ -275,6 +276,7 @@ export class OptionsScreen {
   private readonly root: HTMLDivElement;
   private readonly closeButton: HTMLButtonElement;
   private readonly padStatus: HTMLParagraphElement;
+  private readonly padTester = new PadTester();
   private readonly gamepads: Gamepads | null;
   private onClose: (() => void) | null = null;
 
@@ -306,7 +308,13 @@ export class OptionsScreen {
        * A linha de estado responde isso sem o jogador ter que entrar num mundo
        * e tentar andar.
        */
-      if (title === 'Controle') section.appendChild(this.padStatus);
+      /*
+       * E a segunda pergunta é "o jogo está vendo **este botão**?". O painel de
+       * teste responde ela lendo o controle cru, sem perfil nem remapeamento:
+       * é o único jeito de separar "o mapeamento está errado" de "o aparelho
+       * não manda esse botão".
+       */
+      if (title === 'Controle') section.append(this.padStatus, this.padTester.element);
     }
 
     const reset = menuButton('Restaurar padrões', () => {
@@ -336,6 +344,7 @@ export class OptionsScreen {
     this.onClose = onClose ?? null;
     this.root.hidden = false;
     this.refreshPadStatus();
+    this.padTester.start();
     this.closeButton.focus();
   }
 
@@ -350,12 +359,15 @@ export class OptionsScreen {
     const warning = pads.nonStandard
       ? ' — o navegador não reconheceu este modelo, então o mapeamento é o da família.'
       : '';
-    this.padStatus.textContent = `Conectado: ${pads.labels.family}${warning}`;
+    this.padStatus.textContent = `Conectado: ${pads.labels.family}${warning}`
+      + ' Aperte os botões: o painel abaixo mostra o que o aparelho manda de verdade.';
   }
 
   hide(): void {
     if (this.root.hidden) return;
     this.root.hidden = true;
+    // Sem isto o painel continuaria lendo o controle com a tela fechada.
+    this.padTester.stop();
     this.onClose?.();
   }
 }

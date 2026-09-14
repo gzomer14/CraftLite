@@ -9,7 +9,7 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-14 17:56 — **o controle vira mouse nos menus**
+**Última atualização:** 2026-09-14 18:16 — **o painel que lê o controle cru**
 
 ---
 
@@ -27,7 +27,8 @@
 | **M7** Extras | redstone, Nether, trilhos, import/export, resource pack | ✅ concluído | multijogador P2P fora de escopo (ver abaixo) |
 | **Acabamento** pós-M7 | tabela de Vídeo e Acessibilidade completas, teclas remapeáveis, 9 sliders de som, fogo que se espalha, morcego, boneco do jogador, miniatura e tamanho do mundo, canto de escada, som no resource pack | ✅ concluído | **nada disso foi visto em aparelho ainda** |
 | **Controle** pós-M7 | perfis por família (DualSense, DualShock 4, Xbox, Switch Pro), mapeamento completo do doc 09 §3, navegação de interface por gamepad, opções de analógico | ✅ concluído | — |
-| **Controle, 2ª passada** | `□` abre a mochila, botão e intenção viraram tabelas separadas, navegação espacial nos menus, cursor no analógico direito, clique direito no gatilho esquerdo | ✅ concluído | **o cursor e a navegação espacial não foram vistos em aparelho** |
+| **Controle, 2ª passada** | `□` abre a mochila, botão e intenção viraram tabelas separadas, navegação espacial nos menus, cursor no analógico direito, clique direito no gatilho esquerdo | ✅ validado com DualSense por Bluetooth | — |
+| **Controle, 3ª passada** | direcional ←/→ troca o item da mão; painel de teste de controle em Opções | ⚠️ entregue | **`L1`/`R1` não trocam item num DualSense real e o código não explica por quê — ver §4** |
 
 **O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
 ele irá pesar muito o jogo e trazer muita complexidade por enquanto desnecessária"*. O
@@ -40,13 +41,13 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-14 17:56, com `npm test`, `npm run build` e
+Medidas em 2026-09-14 18:16, com `npm test`, `npm run build` e
 `SIZE_BUDGET_KB=350 npm run size`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **190,4 KB** | < 350 KB | `npm run size` |
-| Testes | **1371**, 75 arquivos | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **191,1 KB** | < 350 KB | `npm run size` |
+| Testes | **1380**, 76 arquivos | manter verde | `npm test` |
 | Camadas de atlas | **156** | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Memória de áudio | **3,26 MB** (era 3,95 com três sons a menos) | < 3,5 MB | `tests/audio.test.ts` |
 | Geração de chunk | 5,7–6,2 ms (mediana; varia muito com a carga da máquina) | < 25 ms | `tests/perf.test.ts` |
@@ -839,6 +840,42 @@ como pegar metade de uma pilha nem soltar um item de cada vez (doc 08 §3.5), qu
 
 ---
 
+### Controle, terceira passada ⚠️ — 2026-09-14
+
+**Pendência aberta: `L1`/`R1` não trocam o item da mão num DualSense real.**
+
+O relato veio duas vezes, a segunda depois de a primeira ter sido respondida com
+*"isso já funciona"* — o que estava errado como resposta, mesmo estando certo
+como leitura do código. Os dois botões estão nos índices **4 e 5** do layout
+padrão, `PAD_BINDINGS` os liga a `hotbarPrev`/`hotbarNext`, `Controls.update`
+chama `onHotbarScroll`, e `Inventory.scroll` move a seleção. O caminho inteiro
+foi exercitado de ponta a ponta com um `Gamepad` falso — `Controls` de verdade,
+callbacks de verdade — e chega. Todo o resto do controle funciona no mesmo
+aparelho, incluindo botões vizinhos.
+
+Quando o código não explica o sintoma, a resposta não é mexer no código: é
+**medir o aparelho**. Foram as duas coisas:
+
+1. **Painel de teste de controle** em Opções → Controle
+   (`ui/screens/padtester.ts`). Ele lê `navigator.getGamepads()` **cru** — sem
+   perfil, sem remapeamento, sem zona morta — e mostra o índice, o nome e o
+   valor de cada botão apertado, o último aperto (que fica na tela depois de
+   soltar, porque apertar e ler ao mesmo tempo é difícil), a contagem de botões
+   e eixos, e se o navegador normalizou o layout. Um diagnóstico que passasse
+   pela camada sob suspeita não diagnosticaria nada.
+2. **O direcional ←/→ passou a trocar o item da mão**, fora dos menus. Não é
+   a correção do bug — é um caminho que com certeza existe enquanto o bug não
+   tem causa. Dentro dos menus o direcional volta a ser navegação, porque
+   `uiCapture` zera a hotbar.
+
+O que o painel vai dizer decide o próximo passo: se apertar `L1` acusar o índice
+4, o problema não está no mapeamento e a investigação vira para o consumo; se
+não acusar nada, o aparelho não está mandando o botão e o caminho é outro (um
+segundo controle na lista, um `id` diferente em Bluetooth, uma contagem de
+botões fora do padrão).
+
+---
+
 ---
 
 ## 4. Correções fora de marco
@@ -944,8 +981,18 @@ mudanças em código de marcos "fechados":
 
 ## 5. Dependências entre pendências
 
-**Não há mais pendência de funcionalidade em aberto.** O que resta é a dependência externa ao
-código:
+**P1 — `L1`/`R1` não trocam o item da mão num DualSense por Bluetooth** (aberta em 2026-09-14).
+É a única pendência de funcionalidade, e ela **depende de dado que só existe no aparelho**: o
+código diz que deveria funcionar e o jogador diz que não funciona. O painel de teste em
+Opções → Controle foi entregue para tirar a dúvida, e o direcional ←/→ cobre a função enquanto
+isso (§3).
+
+```
+Painel de teste com o DualSense na mão  ──►  diz se o aparelho manda o botão 4/5
+                                        ──►  decide se P1 é mapeamento ou consumo
+```
+
+Fora dela, o que resta é a dependência externa ao código:
 
 ```
 Teste em aparelho T0 real  ──►  fecha M3, M4, M5 e M6 de verdade
@@ -1018,7 +1065,18 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
 
 ## 6. Próximo passo recomendado
 
-1. **Jogar o que foi entregue em 2026-09-14.** É o único item com risco real: vinte opções novas,
+1. **Abrir Opções → Controle com o DualSense ligado e apertar `L1` e `R1`.** É o item de cima
+   porque é o único com pendência aberta (§5 P1) e porque leva trinta segundos. O painel diz o
+   índice de cada botão apertado. Três leituras possíveis:
+   - **acusa `4 (l1)` e `5 (r1)`** — o aparelho manda, o mapeamento está certo, e o problema está
+     depois: o próximo lugar a olhar é se algo zera `hotbarPrev`/`hotbarNext` antes do consumo;
+   - **não acusa nada ao apertar `L1`/`R1`** — o aparelho não manda esses botões nesse modo de
+     conexão. Aí o que interessa é a contagem de botões e o aviso de layout: um DualSense em
+     Bluetooth pode aparecer com relatório diferente do de cabo;
+   - **acusa outro índice** — é mapeamento, e a correção é uma linha em `PAD_BINDINGS`.
+
+   Enquanto isso, **o direcional ←/→ troca o item da mão** e é o caminho que funciona.
+2. **Jogar o que foi entregue em 2026-09-14.** É o único item com risco real: vinte opções novas,
    um passe de render novo, um sistema de mundo novo e um mob novo — nenhum deles viu um aparelho.
    O que olhar, em ordem de quanto pode estar errado:
    - **Nuvens.** Elas são o único desenho que nunca foi visto. Conferir se a forma lê como nuvem e
@@ -1036,17 +1094,17 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      certa do corpo.
    - **Modo daltônico e contorno em alto contraste**, que são acessibilidade e só se avaliam
      olhando.
-2. **Reconferir a quebra.** Um clique — de mouse ou de dedo — tem que derrubar **um** bloco, no
+3. **Reconferir a quebra.** Um clique — de mouse ou de dedo — tem que derrubar **um** bloco, no
    criativo e no sobrevivência; segurando, o ritmo é de ~4 por segundo. E as plantas passaram a ser
    miráveis: grama alta, flores, mudas e cana agora quebram. Vale conferir que **minerar pedra não
    ficou mais lento** — é o que o intervalo foi desenhado para não fazer.
-3. **Reconferir o toque no celular.** O padrão agora é o **Modo B**, que é o que já funcionava —
+4. **Reconferir o toque no celular.** O padrão agora é o **Modo B**, que é o que já funcionava —
    então o primeiro teste é confirmar que nada regrediu nele. Depois vale voltar ao **Modo A** nas
    opções e ver se ele ficou utilizável: colocar e quebrar agora miram no **mesmo** lugar (o dedo),
    a mira central some, a folga de arraste dobrou, e arrastar para mirar e então segurar passou a
    funcionar em vez de travar o dedo. Se ainda falhar, o número a mexer é `HOLD_SLOP` em
    `input/touch.ts`.
-4. **Reconferir o inventário no celular.** As duas correções de 2026-09-14
+5. **Reconferir o inventário no celular.** As duas correções de 2026-09-14
    vieram de relato de campo e voltam para lá:
    - **toque longo num slot** pega metade com a mão vazia e solta uma unidade com a mão cheia.
      Montar uma receita de tábua por célula é o teste que importa. A dica aparece no painel, e o
@@ -1054,7 +1112,7 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
    - **largar item** agora arremessa na direção do olhar, e o que foi jogado fora só volta a ser
      coletável depois de dois segundos. Vale largar olhando para o chão e para uma parede, que é
      onde o arremesso sozinho não resolveria.
-5. **Voltar ao DualSense.** O reconhecimento por Bluetooth e a navegação básica já foram
+6. **Voltar ao DualSense.** O reconhecimento por Bluetooth e a navegação básica já foram
    confirmados em 2026-09-14; o que ainda não viu aparelho é a segunda passada. Em ordem de
    quanto pode estar errado:
    - **O cursor do analógico direito** com o inventário aberto. É o item novo e o mais fácil de
@@ -1074,15 +1132,15 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      ligada.
    - **No celular**, lembrar que ligar o áudio e a tela cheia exigem um toque na tela — o controle
      não serve de gesto para o navegador. O jogo avisa isso ao conectar.
-6. **Uma sessão longa de verdade.** É o **último critério da definição de pronto** que não foi
+7. **Uma sessão longa de verdade.** É o **último critério da definição de pronto** que não foi
    cumprido: o PROMPT.md §11 pede *"2 horas sem crash, sem perda de progresso e sem travas"*, e a
    sessão de campo mais longa registrada tem 10 minutos. Não é teste de FPS — é teste de vazamento,
    de save e de fogo/mob acumulando. O F3 tem tudo que ele precisa: `mem`, a linha `C:` e agora
    `N fogo`.
-7. **Medir o tempo de abertura em 3G.** O critério 1 do PROMPT.md §11 tem metade cumprida — o
+8. **Medir o tempo de abertura em 3G.** O critério 1 do PROMPT.md §11 tem metade cumprida — o
    bundle está em 189 KB de 350 — e a outra metade nunca foi medida. O `throttling` do DevTools
    resolve; o que interessa é o tempo até a tela de título, com o atlas gerando no meio.
-8. Oportunidades pequenas que sobraram, agora curtas:
+9. Oportunidades pequenas que sobraram, agora curtas:
    - **`.clw` com miniatura** já funciona, mas nenhum arquivo real foi exportado e reimportado
      desde a mudança para a v2 — é um teste manual de cinco minutos;
    - **som no resource pack** foi testado por formato, nunca com um `.ogg` de verdade num

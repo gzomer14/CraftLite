@@ -133,7 +133,7 @@ Usar a Gamepad API. Mapeamento padrão (rótulos de Xbox; o DualSense mostra
 - Analógico esquerdo: mover · Analógico direito: câmera (com curva quadrática e dead zone 0.15)
 - `LT`: colocar/usar · `RT`: quebrar/atacar — o par de gatilhos é a mão inteira
 - `A`: pular · `B`: agachar · `X`: abrir a mochila · `Y`: soltar item
-- `LB`/`RB`: item anterior/próximo da hotbar · `Start`: pausa · `Select`: mochila
+- `LB`/`RB` **e o direcional ←/→**: item anterior/próximo da hotbar · `Start`: pausa · `Select`: mochila
 - `L3`: correr · duplo toque em `A`: alternar voo no criativo (doc 06 §9)
 - Direcional: navegar a interface (ver §3.2) · Vibração leve ao quebrar bloco.
 
@@ -141,6 +141,14 @@ Usar a Gamepad API. Mapeamento padrão (rótulos de Xbox; o DualSense mostra
 `STANDARD_BUTTONS` diz onde cada botão fica no layout da especificação e
 `PAD_BINDINGS` diz o que ele dispara. Remapear é uma linha na segunda — nenhum
 índice muda de lugar, porque o índice é do aparelho e não do jogo.
+
+O direcional troca o item da mão **fora dos menus** e volta a ser navegação
+dentro deles — `uiCapture` zera a hotbar enquanto uma tela estiver aberta. Ele
+entrou porque um relato de campo (2026-09-14) diz que `L1`/`R1` não trocam item
+num DualSense por Bluetooth, e o código não explica isso: os dois estão nos
+índices 4 e 5 do layout padrão e o caminho tem teste. **Opções → Controle tem
+um painel que lê o controle cru** — índice, nome e valor de cada botão, sem
+perfil nem remapeamento no meio — e é ele que resolve esse tipo de dúvida.
 
 **Aperto é uma borda de subida, e soltar o controle não apaga o que estava
 apertado.** Pausar solta todo o input (é o mesmo `reset` do `blur`); se ele

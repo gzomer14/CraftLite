@@ -188,8 +188,17 @@ describe('4. o botão de voar só existe no criativo', () => {
 
   it('há um jeito de ligá-lo, e ele olha o modo', () => {
     expect(src).toContain('setCreative(creative: boolean)');
-    expect(readFileSync('src/main.ts', 'utf8'))
-      .toContain("touchUi.setCreative(player.mode === 'creative')");
+    /*
+     * O modo mudou de "lido uma vez no boot" para "pode trocar em partida"
+     * (2026-09-14), então a interface toda passou a acompanhá-lo por um lugar
+     * só. É esse lugar que o teste cobra: dois caminhos separados voltariam a
+     * deixar o botão de voar visível no sobrevivência.
+     */
+    const main = readFileSync('src/main.ts', 'utf8');
+    expect(main).toContain('function applyGameMode()');
+    expect(main).toContain('touchUi.setCreative(creative)');
+    expect(main).toContain('hud.setCreative(creative)');
+    expect(main, 'trocar de modo passa pelo mesmo lugar').toContain('applyGameMode();');
   });
 });
 

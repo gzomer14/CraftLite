@@ -27,7 +27,7 @@ import { nextObjective, objectiveFor } from './data/achievements';
 const displayOfTarget = (target: string): string =>
   ITEM_BY_NAME.get(target)?.display ?? MOB_BY_NAME.get(target)?.display ?? target;
 import { modelOf } from './data/mobmodels';
-import { Player } from './entity/player';
+import { Player, type GameMode } from './entity/player';
 import { SaveGame } from './game/savegame';
 import { SettingsStore } from './game/settings';
 import { Session } from './game/session';
@@ -480,6 +480,8 @@ async function boot(): Promise<void> {
       menu.openOptions(() => pauseMenu.show());
     },
     achievements: () => session.achievements.mask,
+    gameMode: () => player.mode,
+    onToggleMode: () => setGameMode(player.mode === 'creative' ? 'survival' : 'creative'),
     onSaveAndQuit: () => {
       pauseMenu.setStatus('salvando…');
       void (async () => {
@@ -503,7 +505,45 @@ async function boot(): Promise<void> {
     onPlace: () => { modeBPlace = true; },
   });
   touchUi.setVisible(isTouchDevice);
-  touchUi.setCreative(player.mode === 'creative');
+  applyGameMode();
+
+  /**
+   * Troca o modo **no mesmo mundo** (pedido de campo 2026-09-14).
+   *
+   * O save já guardava o modo junto da meta desde o M4 — `saveAll` grava
+   * `meta.gameMode = player.mode` —, então persistir é só salvar depois de
+   * trocar. O que não existia era como trocar.
+   *
+   * Três cuidados que o modo novo exige:
+   *
+   * - **para de voar**. Entrar no sobrevivência voando deixaria o jogador
+   *   parado no ar; sair dele com o voo ligado daria voo de graça. Cair é a
+   *   resposta certa nos dois casos, e o duplo toque no pulo religa quando
+   *   valer.
+   * - **fecha a tela aberta**. A paleta do criativo e a mochila do
+   *   sobrevivência são telas diferentes para o mesmo botão: deixar a antiga
+   *   aberta mostraria itens que o modo novo não dá.
+   * - **salva na hora**. Trocar de modo é raro e deliberado; esperar o
+   *   autosave arriscaria perder justamente a coisa que o jogador acabou de
+   *   pedir.
+   */
+  function setGameMode(next: GameMode): void {
+    if (player.mode === next) return;
+    player.mode = next;
+    player.flying = false;
+    if (creativeScreen.isOpen) creativeScreen.close();
+    if (containerScreen.isOpen) session.closeScreen();
+    applyGameMode();
+    hud.showMessage(next === 'creative' ? 'Modo Criativo' : 'Modo Sobrevivência', 60);
+    void save?.saveAll();
+  }
+
+  /** Põe a interface de acordo com o modo atual. */
+  function applyGameMode(): void {
+    const creative = player.mode === 'creative';
+    touchUi.setCreative(creative);
+    hud.setCreative(creative);
+  }
 
   // Estado dos botões dedicados do Modo B.
   let modeBBreaking = false;

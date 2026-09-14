@@ -102,6 +102,24 @@ export class UiNavigator {
       return false;
     }
 
+    /*
+     * **Sem pedido do controle, a navegação não encosta no foco.**
+     *
+     * Até 2026-09-14 ela tomava o foco a cada tick com uma tela aberta, mesmo
+     * de quem nunca ligou um controle — e, como o primeiro focável do
+     * inventário criativo é o campo de busca, no celular pegar um item
+     * devolvia o foco para a busca e **subia o teclado virtual** (relato de
+     * campo). O foco é do jogador; o controle só o move quando é empurrado.
+     */
+    if (!asking(nav)) {
+      this.held.clear();
+      this.cursor.fade();
+      return true;
+    }
+    // O navegador não sabe que existe gamepad, então `:focus-visible` não
+    // acende sozinho. Sem isto o foco anda certo e **não aparece**.
+    markPadNav();
+
     const items = focusableIn(layer);
     if (items.length === 0) return true;
 
@@ -115,22 +133,49 @@ export class UiNavigator {
       this.cursor.fade();
     }
 
-    // Sem nada focado dentro da camada, o primeiro item recebe o foco: é o que
-    // dá ao jogador um ponto de partida visível ao abrir a tela.
+    // Sem nada focado dentro da camada, o controle escolhe por onde começar.
     let current = items.indexOf(document.activeElement as HTMLElement);
-    if (current < 0) {
-      items[0].focus();
-      current = 0;
+    const fresh = current < 0;
+    if (fresh) {
+      current = firstTarget(items);
+      items[current].focus();
     }
 
-    if (this.repeat(nav, 'down')) this.moveFocus(items, current, 0, 1);
-    else if (this.repeat(nav, 'up')) this.moveFocus(items, current, 0, -1);
-    else if (this.repeat(nav, 'right')) this.adjust(items, current, 1);
-    else if (this.repeat(nav, 'left')) this.adjust(items, current, -1);
+    /*
+     * As sete leituras saem **antes** de qualquer ação, e não dentro de um
+     * `else if`: `repeat` guarda quantos ticks cada direção está segurada, e
+     * uma direção que nunca é lida guarda um número velho — o que fazia o
+     * primeiro aperto dela, depois de soltar outra, repetir na hora ou não
+     * valer.
+     */
+    const down = this.repeat(nav, 'down');
+    const up = this.repeat(nav, 'up');
+    const right = this.repeat(nav, 'right');
+    const left = this.repeat(nav, 'left');
+    const confirm = this.repeat(nav, 'confirm');
+    const secondary = this.repeat(nav, 'secondary');
+    const cancel = this.repeat(nav, 'cancel');
 
-    if (this.repeat(nav, 'confirm')) activate(items[current], 'left');
-    if (this.repeat(nav, 'secondary')) activate(items[current], 'right');
-    if (this.repeat(nav, 'cancel')) escape(layer);
+    /*
+     * O aperto que **revela** onde está o foco não anda com ele, e não aperta
+     * nada. Quem abriu a tela no dedo e pegou o controle depois precisa ver
+     * onde está antes de agir — e confirmar às cegas no primeiro aperto podia
+     * cair em "Apagar mundo". Voltar é a exceção: sair de uma tela nunca
+     * deveria custar dois apertos.
+     */
+    if (fresh) {
+      if (cancel) escape(layer);
+      return true;
+    }
+
+    if (down) this.moveFocus(items, current, 0, 1);
+    else if (up) this.moveFocus(items, current, 0, -1);
+    else if (right) this.adjust(items, current, 1);
+    else if (left) this.adjust(items, current, -1);
+
+    if (confirm) activate(items[current], 'left');
+    if (secondary) activate(items[current], 'right');
+    if (cancel) escape(layer);
     return true;
   }
 
@@ -257,13 +302,116 @@ function topLayer(): HTMLElement | null {
   return top;
 }
 
-/** Elementos focáveis e visíveis dentro da camada, em ordem de documento. */
+/** O controle está pedindo alguma coisa neste tick. */
+function asking(nav: NavState): boolean {
+  return nav.up || nav.down || nav.left || nav.right
+    || nav.confirm || nav.cancel || nav.secondary
+    || nav.cursorX !== 0 || nav.cursorY !== 0;
+}
+
+/**
+ * Elementos focáveis e **desenhados** dentro da camada, em ordem de documento.
+ *
+ * O atributo `hidden` não pega tudo: um painel escondido por CSS (uma aba
+ * fechada, uma lista rolada, um `display:none` de classe) deixa os botões dele
+ * no documento, e o direcional caía neles — "indo para botões nem existentes
+ * em tela" (relato de campo 2026-09-14). Quem não tem caixa de layout não está
+ * na tela.
+ *
+ * A regra se calibra sozinha: se **ninguém** tem caixa, não há layout para
+ * consultar (ambiente sem DOM, tela ainda não desenhada) e a lista vai inteira,
+ * que é o comportamento antigo.
+ */
 function focusableIn(layer: HTMLElement): HTMLElement[] {
-  const out: HTMLElement[] = [];
+  const all: HTMLElement[] = [];
+  const drawn: HTMLElement[] = [];
   for (const el of layer.querySelectorAll<HTMLElement>(FOCUSABLE)) {
-    if (!isHidden(el)) out.push(el);
+    if (isHidden(el)) continue;
+    all.push(el);
+    if (hasBox(el)) drawn.push(el);
   }
-  return out;
+  return drawn.length > 0 ? drawn : all;
+}
+
+/** O elemento ocupa espaço na tela. Sem `getBoundingClientRect`, não dá para saber. */
+function hasBox(el: HTMLElement): boolean {
+  if (typeof el.getBoundingClientRect !== 'function') return false;
+  const rect = el.getBoundingClientRect();
+  return rect.width > 0 || rect.height > 0;
+}
+
+/**
+ * Por onde começar quando nada está focado: o primeiro item que **não** seja
+ * campo de texto.
+ *
+ * Cair num campo de texto por engano sobe o teclado virtual por cima da tela
+ * inteira — é o que acontecia no inventário criativo, cujo primeiro focável é
+ * a busca. Chegar nele de propósito, andando com o direcional, continua
+ * valendo.
+ */
+function firstTarget(items: HTMLElement[]): number {
+  for (let i = 0; i < items.length; i++) {
+    if (!isTextEntry(items[i])) return i;
+  }
+  return 0;
+}
+
+/** Campo em que se digita. `textarea` não existe em tela nenhuma do jogo. */
+function isTextEntry(el: HTMLElement): boolean {
+  if (!(el instanceof HTMLInputElement)) return false;
+  return el.type === 'text' || el.type === 'search' || el.type === 'email'
+    || el.type === 'number' || el.type === 'password' || el.type === 'url';
+}
+
+/**
+ * Marca o documento como "navegando de controle", para o foco aparecer.
+ *
+ * `:focus-visible` é decidido pelo navegador a partir da **modalidade do
+ * último input**, e gamepad não é uma modalidade que ele conheça: um
+ * `element.focus()` disparado de um laço de `requestAnimationFrame` depois de
+ * o jogador ter tocado a tela não acende anel nenhum. O foco andava certo e
+ * ficava invisível, o que de dentro do jogo é indistinguível de "a navegação
+ * está pulando para lugar nenhum" (relato de campo 2026-09-14).
+ *
+ * Um toque ou uma tecla devolve a decisão ao navegador — a mesma heurística
+ * que ele aplica, só que para uma modalidade a mais.
+ */
+const PAD_NAV = 'pad-nav';
+function markPadNav(): void {
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement as HTMLElement | undefined;
+  // A marca mora na classe do documento, e não numa variável do módulo: o
+  // estado fica onde ele é lido, e ninguém precisa mantê-los em sincronia.
+  if (root?.classList === undefined || root.classList.contains(PAD_NAV)) return;
+  injectPadNavStyle();
+  root.classList.add(PAD_NAV);
+  if (typeof window === 'undefined') return;
+  const off = (): void => {
+    root.classList.remove(PAD_NAV);
+    window.removeEventListener('pointerdown', off);
+    window.removeEventListener('keydown', off);
+  };
+  window.addEventListener('pointerdown', off);
+  window.addEventListener('keydown', off);
+}
+
+let styleInjected = false;
+function injectPadNavStyle(): void {
+  if (styleInjected) return;
+  styleInjected = true;
+  const css = document.createElement('style');
+  /*
+   * `!important` de propósito: as telas estilizam o foco com seletores de id
+   * (`#container-screen .slot:focus-visible`), que ganham de qualquer
+   * especificidade razoável daqui. Este anel é acessibilidade, não decoração —
+   * ele tem que vencer.
+   */
+  css.textContent = `
+.pad-nav :focus{outline:calc(1 * var(--px, 3px)) solid #ffd479 !important;
+  outline-offset:calc(1 * var(--px, 3px)) !important;
+  box-shadow:0 0 0 calc(1 * var(--px, 3px)) #000000a6 !important}
+`;
+  document.head.appendChild(css);
 }
 
 /**

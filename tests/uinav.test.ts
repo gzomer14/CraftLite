@@ -137,6 +137,19 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals());
 
+/**
+ * Deixa a navegação com um foco de partida.
+ *
+ * O primeiro aperto **revela** onde o foco está e não anda com ele — é o que
+ * permite pegar o controle no meio de uma tela aberta no dedo sem o cursor
+ * saltar. Os testes que exercitam o andar precisam passar por esse aperto
+ * antes.
+ */
+function inicia(nav: UiNavigator): void {
+  nav.tick({ ...NOTHING, down: true });
+  nav.tick(NOTHING);
+}
+
 /** Aperta a direção por um tick e solta. */
 function tap(nav: UiNavigator, key: keyof NavState): void {
   nav.tick({ ...NOTHING, [key]: true });
@@ -170,19 +183,56 @@ describe('quando a navegação está ativa', () => {
     dialog(debaixo);
     dialog(emCima);
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
-    // O foco inicial vai para o primeiro item da camada de cima.
+    tap(nav, 'down');
+    // O foco de partida vai para o primeiro item da camada de cima.
     expect(emCima.focused).toBe(true);
     expect(debaixo.focused).toBe(false);
   });
 });
 
 describe('foco', () => {
-  it('abrir a tela já deixa alguma coisa focada', () => {
+  it('o primeiro empurrão no direcional escolhe por onde começar', () => {
     const primeiro = el('button');
     dialog(primeiro, el('button'));
-    new UiNavigator().tick(NOTHING);
-    expect(primeiro.focused, 'sem foco inicial não há de onde partir').toBe(true);
+    const nav = new UiNavigator();
+    nav.tick({ ...NOTHING, cursorX: 0, cursorY: 0, confirm: false, up: true });
+    expect(primeiro.focused, 'sem foco de partida não há de onde andar').toBe(true);
+  });
+
+  it('sem controle na mão, a tela aberta não mexe no foco de ninguém', () => {
+    /*
+     * Relato de campo 2026-09-14: no inventário criativo do celular, pegar
+     * qualquer item devolvia o foco ao campo de busca e subia o teclado
+     * virtual. A causa era esta — a navegação tomava o foco a cada tick com
+     * uma tela aberta, mesmo de quem nunca ligou um controle.
+     */
+    const primeiro = el('button');
+    dialog(primeiro, el('button'));
+    const nav = new UiNavigator();
+    for (let i = 0; i < 20; i++) nav.tick(NOTHING);
+    expect(primeiro.focused, 'o foco é do jogador até o controle ser empurrado')
+      .toBe(false);
+  });
+
+  it('o foco de partida foge de campo de texto — senão sobe o teclado virtual', () => {
+    const busca = el('input');
+    busca.type = 'search';
+    const primeiroBotao = el('button');
+    dialog(busca, primeiroBotao);
+    const nav = new UiNavigator();
+    tap(nav, 'down');
+    expect(busca.focused, 'a busca do inventário criativo é o primeiro focável')
+      .toBe(false);
+    expect(primeiroBotao.focused).toBe(true);
+  });
+
+  it('só de campo de texto, ele ainda é o ponto de partida', () => {
+    const busca = el('input');
+    busca.type = 'search';
+    dialog(busca);
+    const nav = new UiNavigator();
+    tap(nav, 'down');
+    expect(busca.focused, 'melhor um ponto de partida esquisito que nenhum').toBe(true);
   });
 
   it('para baixo anda um item; para cima volta', () => {
@@ -190,7 +240,7 @@ describe('foco', () => {
     const b = el('button');
     dialog(a, b);
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
+    inicia(nav);
 
     tap(nav, 'down');
     expect(b.focused).toBe(true);
@@ -203,7 +253,7 @@ describe('foco', () => {
     const b = el('button');
     dialog(a, b);
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
+    inicia(nav);
 
     tap(nav, 'down');
     tap(nav, 'down');
@@ -219,7 +269,7 @@ describe('foco', () => {
     const c = el('button');
     dialog(a, desligado, c);
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
+    inicia(nav);
     tap(nav, 'down');
     expect(c.focused).toBe(true);
   });
@@ -231,7 +281,7 @@ describe('foco', () => {
     const c = el('button');
     dialog(a, escondido, c);
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
+    inicia(nav);
     tap(nav, 'down');
     expect(c.focused).toBe(true);
   });
@@ -242,7 +292,7 @@ describe('repetição', () => {
     const botoes = [el('button'), el('button'), el('button'), el('button')];
     dialog(...botoes);
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
+    inicia(nav);
 
     // Cinco ticks segurando: um na borda, e a repetição ainda não começou.
     for (let i = 0; i < 5; i++) nav.tick({ ...NOTHING, down: true });
@@ -253,7 +303,7 @@ describe('repetição', () => {
     const botoes = Array.from({ length: 8 }, () => el('button'));
     dialog(...botoes);
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
+    inicia(nav);
 
     for (let i = 0; i < 20; i++) nav.tick({ ...NOTHING, down: true });
     const focado = botoes.findIndex((b) => b.focused);
@@ -267,7 +317,7 @@ describe('confirmar e voltar', () => {
     const botao = el('button');
     dialog(botao);
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
+    inicia(nav);
     tap(nav, 'confirm');
     expect(botao.clicks).toBe(1);
   });
@@ -277,7 +327,7 @@ describe('confirmar e voltar', () => {
     caixa.type = 'checkbox';
     dialog(caixa);
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
+    inicia(nav);
     tap(nav, 'confirm');
     expect(caixa.checked).toBe(true);
     expect(caixa.events).toContain('change');
@@ -286,7 +336,7 @@ describe('confirmar e voltar', () => {
   it('voltar manda Escape para a camada — quem fecha é a tela', () => {
     const layer = dialog(el('button'));
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
+    inicia(nav);
     tap(nav, 'cancel');
     expect(layer.events, 'a tela já sabe tratar Escape (doc 08 §4.1)')
       .toContain('keydown');
@@ -305,7 +355,7 @@ describe('esquerda e direita mexem no valor', () => {
     dialog(slider, outro);
 
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
+    inicia(nav);
     tap(nav, 'right');
     expect(Number(slider.value)).toBeCloseTo(0.55, 5);
     expect(outro.focused, 'o foco não pode ter escapado').toBe(false);
@@ -322,7 +372,7 @@ describe('esquerda e direita mexem no valor', () => {
     dialog(slider);
 
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
+    inicia(nav);
     tap(nav, 'right');
     expect(Number(slider.value)).toBe(1);
   });
@@ -334,7 +384,7 @@ describe('esquerda e direita mexem no valor', () => {
     dialog(select);
 
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
+    inicia(nav);
     tap(nav, 'right');
     expect(select.selectedIndex).toBe(1);
     expect(select.events).toContain('change');
@@ -345,7 +395,7 @@ describe('esquerda e direita mexem no valor', () => {
     const b = el('button');
     dialog(a, b);
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
+    inicia(nav);
     tap(nav, 'right');
     expect(b.focused, 'a seta não pode ficar inerte').toBe(true);
   });
@@ -373,7 +423,7 @@ describe('navegação espacial', () => {
   it('para a direita corta caminho até a coluna do lado', () => {
     const { craft, mochila } = inventario();
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
+    inicia(nav);
     craft.focus();
 
     tap(nav, 'right');
@@ -383,7 +433,7 @@ describe('navegação espacial', () => {
   it('para cima e para baixo seguem a coluna, não a ordem do documento', () => {
     const { craft, armadura } = inventario();
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
+    inicia(nav);
     craft.focus();
 
     tap(nav, 'up');
@@ -399,7 +449,7 @@ describe('navegação espacial', () => {
     dialog(origem, torto, alinhado);
 
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
+    inicia(nav);
     origem.focus();
     tap(nav, 'right');
     expect(alinhado.focused, 'a linha reta é o que o polegar espera').toBe(true);
@@ -408,7 +458,7 @@ describe('navegação espacial', () => {
   it('sem nada daquele lado, cai na ordem do documento e dá a volta', () => {
     const { mochila, armadura } = inventario();
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
+    inicia(nav);
     mochila.focus();
 
     tap(nav, 'right');
@@ -422,7 +472,7 @@ describe('navegação espacial', () => {
     const b = el('button');
     dialog(a, b);
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
+    inicia(nav);
     tap(nav, 'down');
     expect(b.focused).toBe(true);
   });
@@ -439,7 +489,7 @@ describe('slots do inventário', () => {
     const casa = slot(0, 0);
     dialog(casa);
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
+    inicia(nav);
     tap(nav, 'confirm');
     expect(casa.events, 'o slot age no keydown').toContain('keydown');
     expect(casa.clicks, 'e não num click que ninguém ouve').toBe(0);
@@ -449,7 +499,7 @@ describe('slots do inventário', () => {
     const casa = slot(0, 0);
     dialog(casa);
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
+    inicia(nav);
     tap(nav, 'secondary');
     expect(casa.events, 'é como se pegar metade da pilha fosse no mouse')
       .toContain('pointerdown');
@@ -459,7 +509,7 @@ describe('slots do inventário', () => {
     const botao = el('button');
     dialog(botao);
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
+    inicia(nav);
     tap(nav, 'secondary');
     expect(botao.clicks, 'botão de menu não tem clique direito').toBe(0);
   });
@@ -489,8 +539,8 @@ describe('cursor do analógico direito', () => {
     comCursor(longe);
 
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
-    expect(a.focused, 'começa no primeiro item').toBe(true);
+    tap(nav, 'down');
+    a.focus();
 
     nav.tick({ ...NOTHING, cursorX: 1, cursorY: 1 });
     expect(longe.focused, 'o cursor vai direto na casa apontada').toBe(true);
@@ -507,7 +557,6 @@ describe('cursor do analógico direito', () => {
     comCursor(rotulo);
 
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
     outro.focus();
     nav.tick({ ...NOTHING, cursorX: -1, cursorY: -1 });
     expect(casa.focused).toBe(true);
@@ -520,10 +569,10 @@ describe('cursor do analógico direito', () => {
     comCursor(b);
 
     const nav = new UiNavigator();
-    nav.tick(NOTHING);
-    expect(a.focused).toBe(true);
+    a.focus();
     nav.tick(NOTHING);
     expect(a.focused, 'sem empurrar o analógico, o foco fica onde está').toBe(true);
+    expect(b.focused).toBe(false);
   });
 
   it('sem DOM para criar o cursor, nada quebra', () => {
@@ -532,5 +581,93 @@ describe('cursor do analógico direito', () => {
     dialog(a);
     const nav = new UiNavigator();
     expect(() => nav.tick({ ...NOTHING, cursorX: 1, cursorY: 0 })).not.toThrow();
+  });
+});
+
+describe('o que está fora da tela', () => {
+  /*
+   * Relato de campo 2026-09-14: *"parece que muitas vezes indo para botões nem
+   * existentes em tela"*. O atributo `hidden` não pega tudo — um painel
+   * fechado por CSS deixa os botões dele no documento.
+   */
+  it('quem não ocupa espaço fica fora do caminho', () => {
+    const a = slot(0, 0);
+    const fantasma = el('button');
+    const b = slot(0, 30);
+    dialog(a, fantasma, b);
+
+    const nav = new UiNavigator();
+    inicia(nav);
+    a.focus();
+    tap(nav, 'down');
+    expect(b.focused, 'o botão sem caixa de layout não está na tela').toBe(true);
+    expect(fantasma.focused).toBe(false);
+  });
+
+  it('se ninguém tem caixa, a lista vai inteira', () => {
+    // É o ambiente sem layout: não há o que consultar, e sumir com tudo
+    // deixaria a navegação morta.
+    const a = el('button');
+    const b = el('button');
+    dialog(a, b);
+    const nav = new UiNavigator();
+    inicia(nav);
+    tap(nav, 'down');
+    expect(b.focused).toBe(true);
+  });
+});
+
+describe('o foco precisa aparecer', () => {
+  /*
+   * `:focus-visible` é decidido pela modalidade do último input, e gamepad não
+   * é uma modalidade que o navegador conheça: o foco andava certo e ficava
+   * invisível, que de dentro do jogo é igual a não andar.
+   */
+  function comRaiz(): { classes: Set<string>; ouvintes: string[] } {
+    const classes = new Set<string>();
+    const ouvintes: string[] = [];
+    const head = new FakeEl('head');
+    vi.stubGlobal('document', {
+      get activeElement() { return activeElement; },
+      querySelectorAll: (selector: string) => root.querySelectorAll(selector),
+      createElement: (tag: string) => new FakeEl(tag),
+      documentElement: {
+        classList: {
+          add: (name: string) => classes.add(name),
+          remove: (name: string) => classes.delete(name),
+          contains: (name: string) => classes.has(name),
+        },
+      },
+      head,
+    });
+    vi.stubGlobal('window', {
+      addEventListener: (type: string) => ouvintes.push(type),
+      removeEventListener: () => {},
+    });
+    return { classes, ouvintes };
+  }
+
+  it('navegar de controle marca o documento', () => {
+    const marca = comRaiz();
+    dialog(el('button'));
+    const nav = new UiNavigator();
+    nav.tick({ ...NOTHING, down: true });
+    expect(marca.classes.has('pad-nav'), 'sem a marca o anel de foco não acende')
+      .toBe(true);
+  });
+
+  it('a marca sai no primeiro toque ou tecla — a decisão volta ao navegador', () => {
+    const marca = comRaiz();
+    dialog(el('button'));
+    new UiNavigator().tick({ ...NOTHING, down: true });
+    expect(marca.ouvintes).toEqual(['pointerdown', 'keydown']);
+  });
+
+  it('sem controle empurrado, nada é marcado', () => {
+    const marca = comRaiz();
+    dialog(el('button'));
+    const nav = new UiNavigator();
+    for (let i = 0; i < 10; i++) nav.tick(NOTHING);
+    expect(marca.classes.has('pad-nav')).toBe(false);
   });
 });

@@ -128,6 +128,7 @@ Elementos, todos em `position:fixed`, `pointer-events:none`:
 | Hotbar | bottom center, 8px de GUI de margem | 9 slots; item + contagem + barra de durabilidade |
 | Corações | acima da hotbar, esquerda | 10 corações, meio-coração; **tremem** quando vida ≤ 4; overlay dourado = Absorção |
 | Fome | acima da hotbar, direita | 10 coxas; balançam quando envenenado (verde) |
+| **Vida, ar, fome e armadura no Criativo** | — | **não aparecem**: nada disso muda ali, e quatro fileiras congeladas ocupam a faixa mais disputada da tela |
 | Armadura | acima dos corações | só aparece se armor > 0 |
 | Bolhas de ar | acima da fome | só debaixo d'água, 10 bolhas |
 | Barra de XP | acima da hotbar, largura total (182 px de GUI) | + nível em verde com contorno preto |
@@ -263,8 +264,15 @@ Animação de tampa abrindo no mundo + som.
 
 ### 3.10 Menu de pausa — `mockups/10-pause.svg`
 Fundo desfocado (`backdrop-filter: blur(4px)` — desligar em T0, usar só dim) e escurecido.
-Botões: **Voltar ao Jogo** · Conquistas · Estatísticas · Opções... · **Salvar e Sair**.
+Botões: **Voltar ao Jogo** · Conquistas · **Mudar para Criativo/Sobrevivência** · Estatísticas ·
+Opções... · **Salvar e Sair**.
 No mobile, o botão de pause fica no canto superior direito do HUD.
+
+**Trocar de modo vale para o mundo, não para o jogo.** O modo é do save, e o botão da pausa o
+troca sem criar mundo novo: sair e voltar devolve o último modo aplicado. O rótulo diz **para onde
+vai** (*"Mudar para Criativo"*) e não onde está, porque *"Modo: Criativo"* deixa dúvida sobre qual
+dos dois é o estado atual. Trocar desliga o voo e fecha a tela aberta — a paleta do Criativo e a
+mochila do Sobrevivência são telas diferentes para o mesmo botão.
 
 ### 3.11 Opções — `mockups/11-options.svg`
 
@@ -357,6 +365,11 @@ Abre com `T` ou `/`. Comandos: `/gamemode`, `/time set`, `/tp`, `/give`, `/seed`
    No gamepad o direcional anda pela **geometria da tela** — o vizinho mais próximo na direção
    pedida, não o próximo na ordem do documento —, o **analógico direito vira cursor** e aponta
    direto no alvo, e o gatilho esquerdo vale **clique direito** nos slots (doc 09 §3.2).
+   Duas regras que a navegação por gamepad tem que respeitar, e que não são óbvias:
+   **ela não encosta no foco enquanto o controle não for empurrado** (senão rouba o foco de quem
+   joga no dedo — e um campo de texto focado por engano sobe o teclado virtual por cima da tela);
+   e **o foco dela precisa ficar visível**, porque `:focus-visible` não acende para uma modalidade
+   que o navegador não conhece.
 4. `aria-label` em todo botão; `role="dialog"` + focus trap nos modais.
 5. Animações respeitam `prefers-reduced-motion`.
 6. **Nada de layout thrash:** a UI só re-renderiza quando o estado muda; o HUD atualiza campos

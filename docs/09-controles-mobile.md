@@ -195,6 +195,24 @@ O alvo da navegação é o elemento com `role="dialog"` visível mais acima, e n
 uma lista de telas: o doc 08 §4.4 já exige esse atributo em todo modal, então
 tela nova entra na navegação sozinha.
 
+**A navegação fica quieta até o controle ser empurrado.** Ela não toma o foco de ninguém enquanto
+não houver pedido — e o primeiro aperto **revela** onde o foco está sem andar com ele nem apertar
+nada. Sem essa regra a navegação disputava o foco com quem joga no dedo: no inventário criativo,
+cujo primeiro focável é a busca, pegar um item devolvia o foco à busca e subia o teclado virtual.
+
+**O foco de partida foge de campo de texto**, pelo mesmo motivo. Chegar nele de propósito, andando
+com o direcional, continua valendo.
+
+**O foco precisa aparecer.** `:focus-visible` é decidido pelo navegador a partir da modalidade do
+último input, e gamepad não é uma modalidade que ele conheça — um `focus()` disparado de um laço
+não acende anel nenhum, e o foco anda certo e fica invisível. Enquanto a navegação estiver em uso, o
+documento ganha a classe `pad-nav` e o anel é desenhado à mão; o primeiro toque ou tecla devolve a
+decisão ao navegador.
+
+**Só entra na travessia quem está desenhado.** O atributo `hidden` não pega tudo: um painel fechado
+por CSS deixa os botões dele no documento, e o direcional caía neles — "indo para botões nem
+existentes em tela". Quem não tem caixa de layout está fora.
+
 **O direcional anda pela tela, não pela ordem do documento.** O foco vai para o
 vizinho mais próximo na direção pedida, medido em pixels, com peso extra para
 quem sai do eixo — assim uma coluna de slots desce em linha reta e "para a

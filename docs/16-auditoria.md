@@ -12,6 +12,84 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-14 · 18:22 → 18:45 · O foco que ninguém via, e o modo que dá para trocar
+
+**Pedido:** seis relatos de uma sessão. *"No menu inicial, a movimentação utilizando o analógico
+entre as opções de menu está bem ruim, parece que muitas vezes indo para botões nem existentes em
+tela. Para criar um mundo novo utilizando somente o controle... foi uma missão impossível"*; no
+inventário criativo, *"ele já vem com a pesquisa pré-selecionada, e literalmente em qualquer item
+que pego ele simplesmente seleciona a pesquisa novamente sozinho... todo movimento abre o pop-up do
+teclado do celular"*; *"não está movimentando com o analógico entre os itens"*; trocar de modo no
+mesmo mundo; corações e fome aparecendo no criativo; e *"os ícones de fome são simplesmente um
+risco feio"*.
+
+**Resultado:** os três primeiros relatos tinham a mesma raiz, e ela era minha.
+
+### O foco andava certo e ninguém via
+
+`:focus-visible` é decidido pelo navegador a partir da **modalidade do último input**, e gamepad não
+é uma modalidade que ele conheça. Um `focus()` disparado de um laço de `requestAnimationFrame`,
+depois de o jogador ter tocado a tela, não acende anel nenhum — e toda a interface do jogo estiliza
+foco com `:focus-visible`. A navegação movia o foco corretamente e **não mostrava nada**, o que de
+dentro do jogo é igual a não funcionar.
+
+O documento passou a ganhar a classe `pad-nav` enquanto a navegação está em uso, com anel próprio
+desenhado à mão (e `!important`, porque as telas estilizam foco com seletores de id). O primeiro
+toque ou tecla devolve a decisão ao navegador — a heurística dele, para uma modalidade a mais.
+
+### A navegação roubava o foco de quem joga no dedo
+
+Ela rodava a cada tick com qualquer tela aberta e, sem nada focado, focava o primeiro item —
+inclusive para quem nunca ligou um controle. No inventário criativo o primeiro focável é o **campo
+de busca**: no celular, pegar um item devolvia o foco à busca e subia o teclado virtual por cima da
+tela inteira.
+
+Agora ela não encosta no foco enquanto o controle não for empurrado; o aperto que **revela** onde o
+foco está não anda com ele nem ativa nada (quem abriu a tela no dedo e pegou o controle depois
+precisa ver onde está antes de agir, e confirmar às cegas podia cair em "Apagar mundo"); e o foco de
+partida foge de campo de texto.
+
+Junto saíram mais dois: **botão escondido por CSS entrava na travessia** (o filtro olhava só o
+atributo `hidden`, e um painel fechado por classe deixa os botões no documento) e **a contagem de
+repetição do direcional guardava número velho**, porque as leituras estavam dentro de um `else if`.
+
+### Modo de jogo no mesmo mundo
+
+O save já guardava `meta.gameMode` desde o M4 e `saveAll` já o escrevia a partir de `player.mode`.
+Faltava **como trocar**. O botão mora na pausa — é decisão de partida, não preferência — e diz para
+onde vai, não onde está. Trocar desliga o voo, fecha a tela aberta (a paleta do Criativo e a mochila
+do Sobrevivência são telas diferentes para o mesmo botão) e salva na hora.
+
+### A fome virou comida
+
+O doc 08 §3.4 pede *"10 coxas"* desde sempre; o código desenhava `▮`/`▯`. Agora é uma coxa de 9×9
+definida como **grade de caracteres no código** e convertida em SVG de retângulos para servir de
+máscara CSS — cor vinda de `var(--hud-hunger)`, então a paleta para daltônicos segue valendo, e
+nenhum asset de terceiros entrou. E vida, ar, fome e armadura somem no Criativo: nada disso muda
+ali, e quatro fileiras congeladas ocupam a faixa mais disputada da tela.
+
+### Grid de arquivos
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/input/uinav.ts` | inerte sem pedido do controle; primeiro aperto revela sem andar; foco de partida foge de campo de texto; classe `pad-nav` com anel próprio; só entra na travessia quem tem caixa de layout; as sete leituras saem antes da ação |
+| `~` | `src/ui/hud.ts` | `setCreative` some com vida/ar/fome/armadura; fome virou dez `<i>` com máscara de coxa gerada por `maskFrom(DRUMSTICK)` |
+| `~` | `src/ui/screens/pause.ts` | botão de trocar de modo, rotulado pelo destino, com `aria-label` que diz os dois estados |
+| `~` | `src/main.ts` | `setGameMode`/`applyGameMode`: troca, desliga o voo, fecha a tela aberta, avisa no HUD e salva |
+| `+` | `tests/hudicons.test.ts` | 9 testes: grade quadrada, forma com carne em cima e osso embaixo, SVG válido, retângulos unidos, sem cor no desenho |
+| `+` | `tests/gamemode.test.ts` | 4 testes: rótulo pelo destino, `aria-label`, releitura ao reabrir, botão ausente sem callback |
+| `~` | `tests/uinav.test.ts` | contrato novo do foco de partida (5 testes reescritos); fora da tela (2); anel de foco (3) |
+| `~` | `tests/uxpolish.test.ts` | o modo passou a ter um lugar só na interface, e é ele que o teste cobra |
+| `~` | `docs/08-interface-ui.md` | §3.4 HUD sem vitais no Criativo; §3.10 troca de modo; §4 regra 3 |
+| `~` | `docs/09-controles-mobile.md` | §3.2 navegação quieta, foco visível, fora-da-tela |
+| `~` | `docs/15-status.md` | §1 três linhas novas; §2 métricas; §3 seção nova; §4 cinco correções; §6 itens 2 e 3 |
+| `~` | `docs/16-auditoria.md` | esta sessão |
+| `~` | `README.md` | contagem de testes e bundle |
+
+**Portões:** 1401 testes em 78 arquivos verdes · lint limpo · build limpo · 192,3 KB gzip de 350.
+
+---
+
 ## 2026-09-14 · 18:05 → 18:20 · O painel que lê o controle cru
 
 **Pedido:** *"Tudo está funcionando conforme esperado, porém o R1 e L1 continuam não funcionando,

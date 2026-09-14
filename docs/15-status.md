@@ -9,7 +9,7 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-14 18:16 — **o painel que lê o controle cru**
+**Última atualização:** 2026-09-14 18:40 — **o foco que ninguém via, e o modo que dá para trocar**
 
 ---
 
@@ -28,7 +28,10 @@
 | **Acabamento** pós-M7 | tabela de Vídeo e Acessibilidade completas, teclas remapeáveis, 9 sliders de som, fogo que se espalha, morcego, boneco do jogador, miniatura e tamanho do mundo, canto de escada, som no resource pack | ✅ concluído | **nada disso foi visto em aparelho ainda** |
 | **Controle** pós-M7 | perfis por família (DualSense, DualShock 4, Xbox, Switch Pro), mapeamento completo do doc 09 §3, navegação de interface por gamepad, opções de analógico | ✅ concluído | — |
 | **Controle, 2ª passada** | `□` abre a mochila, botão e intenção viraram tabelas separadas, navegação espacial nos menus, cursor no analógico direito, clique direito no gatilho esquerdo | ✅ validado com DualSense por Bluetooth | — |
-| **Controle, 3ª passada** | direcional ←/→ troca o item da mão; painel de teste de controle em Opções | ⚠️ entregue | **`L1`/`R1` não trocam item num DualSense real e o código não explica por quê — ver §4** |
+| **Controle, 3ª passada** | direcional ←/→ troca o item da mão; painel de teste de controle em Opções | ⚠️ entregue | **`L1`/`R1` não trocam item num DualSense real e o código não explica por quê — ver §5 P1** |
+| **Controle, 4ª passada** | navegação quieta até o controle ser empurrado, anel de foco próprio, só o que está desenhado entra na travessia | ✅ concluído | — |
+| **Modo de jogo** | trocar entre Criativo e Sobrevivência no mesmo mundo, pela pausa, com o modo guardado no save | ✅ concluído | — |
+| **HUD** | coxa de frango desenhada no lugar do retângulo da fome; vida, ar, fome e armadura somem no Criativo | ✅ concluído | — |
 
 **O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
 ele irá pesar muito o jogo e trazer muita complexidade por enquanto desnecessária"*. O
@@ -41,13 +44,13 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-14 18:16, com `npm test`, `npm run build` e
+Medidas em 2026-09-14 18:40, com `npm test`, `npm run build` e
 `SIZE_BUDGET_KB=350 npm run size`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **191,1 KB** | < 350 KB | `npm run size` |
-| Testes | **1380**, 76 arquivos | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **192,3 KB** | < 350 KB | `npm run size` |
+| Testes | **1401**, 78 arquivos | manter verde | `npm test` |
 | Camadas de atlas | **156** | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Memória de áudio | **3,26 MB** (era 3,95 com três sons a menos) | < 3,5 MB | `tests/audio.test.ts` |
 | Geração de chunk | 5,7–6,2 ms (mediana; varia muito com a carga da máquina) | < 25 ms | `tests/perf.test.ts` |
@@ -876,6 +879,64 @@ botões fora do padrão).
 
 ---
 
+### Controle, quarta passada; modo de jogo; HUD ✅ — 2026-09-14
+
+Seis relatos de uma sessão só, e os três primeiros tinham **a mesma raiz**: a
+navegação por controle brigava com o jogador em vez de ajudá-lo.
+
+**O foco andava certo e ninguém via.** `:focus-visible` é decidido pelo
+navegador a partir da modalidade do último input, e **gamepad não é uma
+modalidade que ele conheça**: um `focus()` disparado de um laço de
+`requestAnimationFrame`, depois de o jogador ter tocado a tela, não acende anel
+nenhum. Toda a interface do jogo estiliza foco com `:focus-visible`, então
+navegar de controle movia o foco de verdade e não mostrava nada — o que de
+dentro do jogo é indistinguível de *"parece que está indo para botões nem
+existentes em tela"*. O documento agora ganha a classe `pad-nav` enquanto a
+navegação está em uso, com anel desenhado à mão; o primeiro toque ou tecla
+devolve a decisão ao navegador. É a mesma heurística dele, para uma modalidade
+a mais.
+
+**A navegação tomava o foco de quem nunca ligou um controle.** Ela rodava a cada
+tick com uma tela aberta e, sem nada focado, focava o primeiro item. No
+inventário criativo o primeiro focável é **o campo de busca** — então, no
+celular, pegar qualquer item devolvia o foco à busca e **subia o teclado
+virtual** por cima da tela inteira (*"impossibilitando de fazer qualquer
+coisa"*). Agora ela não encosta no foco enquanto o controle não for empurrado, e
+o aperto que revela onde o foco está não anda com ele nem aperta nada — quem
+abriu a tela no dedo e pegou o controle depois precisa ver onde está antes de
+agir. O foco de partida também **foge de campo de texto**, pelo mesmo motivo.
+
+**Botão que não está na tela não entra na travessia.** O atributo `hidden` não
+pega tudo: um painel fechado por CSS deixa os botões dele no documento. Agora
+quem não tem caixa de layout fica fora — e a regra se calibra sozinha: se
+ninguém tem caixa, não há layout para consultar e a lista vai inteira, que é o
+comportamento antigo.
+
+Junto, saiu um bug de contagem que não tinha sido relatado: as sete leituras do
+direcional estavam dentro de um `else if`, então a direção que não era lida
+guardava um número de ticks velho e o primeiro aperto dela, depois de soltar
+outra, repetia na hora ou não valia.
+
+**Trocar de modo no mesmo mundo.** O save já guardava `meta.gameMode` desde o M4
+e `saveAll` já o escrevia a partir de `player.mode` — o que não existia era
+**como trocar**. O botão mora na pausa, porque é decisão de partida e não
+preferência, e diz para onde vai (*"Mudar para Criativo"*) e não onde está.
+Trocar desliga o voo, fecha a tela aberta e salva na hora.
+
+**A fome virou comida.** O doc 08 §3.4 sempre pediu *"10 coxas"*; o código
+desenhava `▮▮▯▯`, que na tela do celular lê como um risco. Agora é uma coxa de
+frango de 9×9, definida como grade de caracteres no código e convertida em SVG
+de retângulos para servir de **máscara** — a cor continua saindo do CSS, então a
+paleta para daltônicos (doc 08 §6) segue valendo, e nenhum asset de terceiros
+entrou no repositório. O lado do ícone acompanha a fonte da barra, então a opção
+de texto grande da acessibilidade vale nos dois.
+
+**E some tudo no Criativo.** Vida, ar, fome e armadura não mudam nunca ali:
+quatro fileiras congeladas ocupando a faixa mais disputada da tela, sugerindo
+uma mecânica que não existe.
+
+---
+
 ---
 
 ## 4. Correções fora de marco
@@ -885,6 +946,11 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-14 | `input/uinav.ts` | **O foco do gamepad era invisível.** Toda a interface estiliza foco com `:focus-visible`, que o navegador acende a partir da **modalidade do último input** — e gamepad não é uma modalidade que ele conheça. Um `focus()` disparado de um laço de `requestAnimationFrame` depois de um toque na tela não acende anel nenhum: a navegação movia o foco corretamente e não mostrava nada. Relato de campo: *"parece que muitas vezes indo para botões nem existentes em tela"*. O documento passou a ganhar a classe `pad-nav` enquanto a navegação está em uso, com anel próprio; o primeiro toque ou tecla devolve a decisão ao navegador. |
+| 2026-09-14 | `input/uinav.ts` | **A navegação por controle roubava o foco de quem joga no dedo.** Ela rodava a cada tick com qualquer tela aberta e, sem nada focado dentro dela, focava o primeiro item — inclusive para quem nunca ligou um controle. No inventário criativo o primeiro focável é o campo de busca, então no celular **pegar um item subia o teclado virtual** por cima da tela (*"em qualquer item que pego ele simplesmente seleciona a pesquisa novamente sozinho"*). Agora ela só age quando o controle é empurrado, o primeiro aperto revela o foco sem andar nem ativar, e o foco de partida evita campo de texto. |
+| 2026-09-14 | `input/uinav.ts` | **Botão escondido por CSS entrava na travessia.** O filtro olhava só o atributo `hidden`, e um painel fechado por classe deixa os botões dele no documento com caixa de layout zerada. Agora quem não tem caixa fica de fora — e, se ninguém tem, a lista vai inteira, porque aí não há layout para consultar (é o caso do ambiente de teste). |
+| 2026-09-14 | `input/uinav.ts` | **A contagem de repetição do direcional guardava número velho.** As leituras estavam dentro de um `else if`, então a direção não lida em um tick não tinha o contador atualizado: o primeiro aperto dela, depois de soltar outra, repetia na hora ou não valia. As sete leituras passaram a sair antes de qualquer ação. |
+| 2026-09-14 | `ui/hud.ts` | **A barra de fome era um retângulo, não comida.** O doc 08 §3.4 pede *"10 coxas"* desde sempre; o código desenhava `▮`/`▯`, que na tela do celular lê como um risco (*"são simplesmente um risco feio"*). Virou uma coxa de 9×9 definida como grade no código e convertida em SVG de retângulos para servir de máscara CSS — a cor continua vindo de `var(--hud-hunger)`, então a paleta para daltônicos segue valendo. |
 | 2026-09-14 | `input/gamepad.ts` | **Um aperto no `Start` abria e fechava o menu várias vezes.** `togglePause` solta todo o input (é o mesmo `reset` do `blur`), e `reset` **limpava** o estado anterior das bordas de subida. No tick seguinte o `Start` continuava apertado e não havia mais nada guardado dizendo isso — o jogo lia uma borda nova e pausava de novo, a 20 Hz, enquanto o dedo estivesse no botão. Agora `reset` **silencia até soltar**: marca tudo como já apertado, e o primeiro polling em que o botão aparece solto devolve o aperto seguinte. A exceção é o instante em que o controle é reconhecido — a Gamepad API só revela o aparelho depois do primeiro aperto, e engolir esse pediria dois. Relato de campo: *"pressionando uma vez ele considera que apertei duas ou até três vezes"*. |
 | 2026-09-14 | `input/uinav.ts` | **Confirmar num slot de inventário com o controle não fazia nada.** A navegação chamava `click()` em tudo, e os slots **não são `<button>`**: são `div[role="button"]` que agem no `keydown` de Enter e no `pointerdown` (doc 08 §3.5). O `click` disparava um evento que ninguém escuta. Passou despercebido porque a navegação por gamepad foi entregue no mesmo dia em que os slots ganharam o tratamento de toque, e os testes de navegação usavam só `<button>` de verdade. Agora a ativação fala a língua de cada elemento — e é o mesmo caminho que faz o clique direito do controle funcionar. |
 | 2026-09-14 | `world/raycast.ts`, `game/interaction.ts` | **Nenhuma planta podia ser quebrada — o raio atravessava todas.** A condição de acerto excluía tudo que é `replaceable`, e `plant()` marca exatamente isso: as 18 de dureza zero (grama alta, samambaia, flores, mudas, cana, arbusto, trepadeira), mais neve fina e fogo. O raio passava direto e acertava o chão atrás. O código de colocação já esperava o contrário — ele tem um ramo *"bloco substituível recebe no próprio lugar"* que **nunca era alcançado**. A regra não podia simplesmente cair, porque os outros dois usuários do raio são linha de visão de mob e de explosão, e uma flor não pode esconder o jogador de um creeper: virou opção (`RayOptions.replaceable`), ligada só na interação. Relato de campo: *"as plantas que encontro na grama, nenhuma delas consigo quebrar"*. |
@@ -1076,7 +1142,20 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
    - **acusa outro índice** — é mapeamento, e a correção é uma linha em `PAD_BINDINGS`.
 
    Enquanto isso, **o direcional ←/→ troca o item da mão** e é o caminho que funciona.
-2. **Jogar o que foi entregue em 2026-09-14.** É o único item com risco real: vinte opções novas,
+2. **Reconferir os menus com o controle**, que é o que mudou mais na última passada:
+   - **o foco tem que aparecer.** Empurrar o direcional numa tela precisa acender um anel amarelo
+     no item escolhido. Se ele não acender, nada mais dessa lista importa — era essa a causa de
+     *"indo para botões nem existentes em tela"*;
+   - **criar um mundo só de controle**, indo até o seletor de modo e trocando para Criativo. É o
+     caminho que o usuário relatou como impossível;
+   - **abrir o inventário criativo no celular** e pegar itens: o teclado virtual **não** pode
+     subir sozinho, e o analógico tem que andar entre as casinhas;
+   - **pegar o controle com a tela já aberta no dedo**: o primeiro aperto mostra onde o foco está
+     e não aperta nada.
+3. **Trocar de modo pela pausa** e conferir que sair e voltar ao mundo devolve o modo aplicado.
+   No Criativo, vida, ar, fome e armadura somem do HUD; no Sobrevivência voltam — e a fome agora é
+   uma coxa de frango, não um retângulo.
+4. **Jogar o que foi entregue em 2026-09-14.** É o único item com risco real: vinte opções novas,
    um passe de render novo, um sistema de mundo novo e um mob novo — nenhum deles viu um aparelho.
    O que olhar, em ordem de quanto pode estar errado:
    - **Nuvens.** Elas são o único desenho que nunca foi visto. Conferir se a forma lê como nuvem e
@@ -1094,17 +1173,17 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      certa do corpo.
    - **Modo daltônico e contorno em alto contraste**, que são acessibilidade e só se avaliam
      olhando.
-3. **Reconferir a quebra.** Um clique — de mouse ou de dedo — tem que derrubar **um** bloco, no
+5. **Reconferir a quebra.** Um clique — de mouse ou de dedo — tem que derrubar **um** bloco, no
    criativo e no sobrevivência; segurando, o ritmo é de ~4 por segundo. E as plantas passaram a ser
    miráveis: grama alta, flores, mudas e cana agora quebram. Vale conferir que **minerar pedra não
    ficou mais lento** — é o que o intervalo foi desenhado para não fazer.
-4. **Reconferir o toque no celular.** O padrão agora é o **Modo B**, que é o que já funcionava —
+6. **Reconferir o toque no celular.** O padrão agora é o **Modo B**, que é o que já funcionava —
    então o primeiro teste é confirmar que nada regrediu nele. Depois vale voltar ao **Modo A** nas
    opções e ver se ele ficou utilizável: colocar e quebrar agora miram no **mesmo** lugar (o dedo),
    a mira central some, a folga de arraste dobrou, e arrastar para mirar e então segurar passou a
    funcionar em vez de travar o dedo. Se ainda falhar, o número a mexer é `HOLD_SLOP` em
    `input/touch.ts`.
-5. **Reconferir o inventário no celular.** As duas correções de 2026-09-14
+7. **Reconferir o inventário no celular.** As duas correções de 2026-09-14
    vieram de relato de campo e voltam para lá:
    - **toque longo num slot** pega metade com a mão vazia e solta uma unidade com a mão cheia.
      Montar uma receita de tábua por célula é o teste que importa. A dica aparece no painel, e o
@@ -1112,7 +1191,7 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
    - **largar item** agora arremessa na direção do olhar, e o que foi jogado fora só volta a ser
      coletável depois de dois segundos. Vale largar olhando para o chão e para uma parede, que é
      onde o arremesso sozinho não resolveria.
-6. **Voltar ao DualSense.** O reconhecimento por Bluetooth e a navegação básica já foram
+8. **Voltar ao DualSense.** O reconhecimento por Bluetooth e a navegação básica já foram
    confirmados em 2026-09-14; o que ainda não viu aparelho é a segunda passada. Em ordem de
    quanto pode estar errado:
    - **O cursor do analógico direito** com o inventário aberto. É o item novo e o mais fácil de
@@ -1132,15 +1211,15 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      ligada.
    - **No celular**, lembrar que ligar o áudio e a tela cheia exigem um toque na tela — o controle
      não serve de gesto para o navegador. O jogo avisa isso ao conectar.
-7. **Uma sessão longa de verdade.** É o **último critério da definição de pronto** que não foi
+9. **Uma sessão longa de verdade.** É o **último critério da definição de pronto** que não foi
    cumprido: o PROMPT.md §11 pede *"2 horas sem crash, sem perda de progresso e sem travas"*, e a
    sessão de campo mais longa registrada tem 10 minutos. Não é teste de FPS — é teste de vazamento,
    de save e de fogo/mob acumulando. O F3 tem tudo que ele precisa: `mem`, a linha `C:` e agora
    `N fogo`.
-8. **Medir o tempo de abertura em 3G.** O critério 1 do PROMPT.md §11 tem metade cumprida — o
+10. **Medir o tempo de abertura em 3G.** O critério 1 do PROMPT.md §11 tem metade cumprida — o
    bundle está em 189 KB de 350 — e a outra metade nunca foi medida. O `throttling` do DevTools
    resolve; o que interessa é o tempo até a tela de título, com o atlas gerando no meio.
-9. Oportunidades pequenas que sobraram, agora curtas:
+11. Oportunidades pequenas que sobraram, agora curtas:
    - **`.clw` com miniatura** já funciona, mas nenhum arquivo real foi exportado e reimportado
      desde a mudança para a v2 — é um teste manual de cinco minutos;
    - **som no resource pack** foi testado por formato, nunca com um `.ogg` de verdade num

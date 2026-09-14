@@ -19,6 +19,12 @@ export interface PauseMenuCallbacks {
   onSaveAndQuit: () => void;
   /** Máscara de conquistas do jogador; sem ela o botão não aparece. */
   achievements?: () => number;
+  /**
+   * Modo de jogo atual e como trocá-lo. Os dois juntos, ou nenhum: sem saber
+   * o modo não dá para escrever o rótulo do botão.
+   */
+  gameMode?: () => 'survival' | 'creative';
+  onToggleMode?: () => void;
 }
 
 export class PauseMenu {
@@ -26,6 +32,7 @@ export class PauseMenu {
   private readonly resumeButton: HTMLButtonElement;
   private readonly status: HTMLParagraphElement;
   private readonly achievementList: HTMLDivElement;
+  private readonly modeButton: HTMLButtonElement | null;
   private readonly callbacks: PauseMenuCallbacks;
 
   constructor(callbacks: PauseMenuCallbacks) {
@@ -50,12 +57,25 @@ export class PauseMenu {
     const options = button('Opções', callbacks.onOptions);
     const quit = button('Salvar e Sair', callbacks.onSaveAndQuit);
 
+    /*
+     * Trocar de modo **no mesmo mundo** (pedido de campo 2026-09-14).
+     *
+     * Ele mora na pausa e não nas opções porque é decisão de partida, e não
+     * de preferência: vale para este mundo, e o save já guarda o modo junto da
+     * meta desde o M4 — o que faltava era como mudá-lo sem criar outro mundo.
+     */
+    const toggle = callbacks.onToggleMode;
+    this.modeButton = toggle === undefined || callbacks.gameMode === undefined
+      ? null
+      : button('Modo', () => { toggle(); this.refreshMode(); });
+
     const actions = document.createElement('div');
     actions.className = 'actions';
     actions.append(this.resumeButton);
     if (callbacks.achievements !== undefined) {
       actions.appendChild(button('Conquistas', () => this.toggleAchievements()));
     }
+    if (this.modeButton !== null) actions.appendChild(this.modeButton);
     actions.append(options, quit);
 
     this.root.append(title, this.status, actions, this.achievementList);
@@ -107,7 +127,25 @@ export class PauseMenu {
 
   show(): void {
     this.root.hidden = false;
+    this.refreshMode();
     this.resumeButton.focus();
+  }
+
+  /**
+   * O rótulo diz o que o botão **faz**, não onde o jogador está: "Mudar para
+   * Criativo" não deixa dúvida de qual dos dois é o estado atual, e
+   * "Modo: Criativo" deixa.
+   */
+  private refreshMode(): void {
+    const button = this.modeButton;
+    const mode = this.callbacks.gameMode?.();
+    if (button === null || mode === undefined) return;
+    const next = mode === 'creative' ? 'Sobrevivência' : 'Criativo';
+    button.textContent = `Mudar para ${next}`;
+    button.setAttribute(
+      'aria-label',
+      `Modo atual: ${mode === 'creative' ? 'Criativo' : 'Sobrevivência'}. Mudar para ${next}.`,
+    );
   }
 
   hide(): void {

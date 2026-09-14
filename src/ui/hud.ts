@@ -66,6 +66,10 @@ export class Hud {
   private readonly settings: SettingsStore | null;
   private readonly hearts: HTMLDivElement;
   private readonly hunger: HTMLDivElement;
+  /** Uma coxa por dois pontos de fome. */
+  private readonly hungerIcons: HTMLElement[] = [];
+  /** A linha de vida/ar/fome inteira, para sumir no criativo. */
+  private readonly bars: HTMLDivElement;
   private readonly air: HTMLDivElement;
   private readonly armor: HTMLDivElement;
   private readonly toast: HTMLDivElement;
@@ -122,10 +126,27 @@ export class Hud {
     this.hunger = document.createElement('div');
     this.hunger.className = 'hunger';
     this.hunger.setAttribute('role', 'img');
+    /*
+     * A fome é desenhada, não escrita.
+     *
+     * Ela era a string `▮▮▮▯▯` — um retângulo cheio que, na tela do celular,
+     * lê como um risco e não como comida (relato de campo 2026-09-14). Agora
+     * são dez `<i>` com a silhueta de uma coxa de frango, recortada por
+     * máscara: a cor continua vindo do CSS, então a paleta para daltônicos
+     * (doc 08 §6) segue valendo, e o desenho segue sendo gerado por código,
+     * sem asset de terceiros.
+     */
+    for (let i = 0; i < 10; i++) {
+      const piece = document.createElement('i');
+      piece.className = 'empty';
+      this.hungerIcons.push(piece);
+      this.hunger.appendChild(piece);
+    }
     this.air = document.createElement('div');
     this.air.className = 'air';
     this.air.hidden = true;
     bars.append(this.hearts, this.air, this.hunger);
+    this.bars = bars;
 
     // Armadura fica acima dos corações e só aparece com armor > 0 (doc 08 §3.4).
     this.armor = document.createElement('div');
@@ -286,6 +307,22 @@ export class Hud {
    * coração para cima — chamar isto 60 vezes por segundo com o mesmo valor
    * seria desperdício puro.
    */
+  /**
+   * Some com vida, ar, fome e armadura no criativo (doc 08 §3.4).
+   *
+   * No criativo nada disso muda nunca: a vida não cai, a fome não desce e a
+   * armadura não protege de nada. Quatro fileiras de ícones congelados ocupam
+   * a faixa mais disputada da tela — logo acima da hotbar — e ainda sugerem
+   * uma mecânica que não existe ali.
+   */
+  setCreative(on: boolean): void {
+    this.bars.hidden = on;
+    this.creative = on;
+    if (on) this.armor.hidden = true;
+  }
+
+  private creative = false;
+
   setStats(health: number, hunger: number, air: number, maxAir: number, armor = 0): void {
     const halfHearts = Math.round(health);
     if (halfHearts !== this.lastHealth) {
@@ -298,14 +335,17 @@ export class Hud {
     const halfHunger = Math.round(hunger);
     if (halfHunger !== this.lastHungerValue) {
       this.lastHungerValue = halfHunger;
-      this.hunger.textContent = icons(halfHunger, 20, '▮', '▯');
+      const full = Math.ceil(halfHunger / 2);
+      for (let i = 0; i < this.hungerIcons.length; i++) {
+        this.hungerIcons[i].className = i < full ? '' : 'empty';
+      }
       this.hunger.setAttribute('aria-label', `Fome: ${halfHunger} de 20`);
     }
 
     const armorPoints = Math.round(armor);
     if (armorPoints !== this.lastArmor) {
       this.lastArmor = armorPoints;
-      this.armor.hidden = armorPoints <= 0;
+      this.armor.hidden = armorPoints <= 0 || this.creative;
       if (armorPoints > 0) {
         this.armor.textContent = icons(armorPoints, 20, '◆', '◇');
         this.armor.setAttribute('aria-label', `Armadura: ${armorPoints} de 20`);
@@ -483,6 +523,59 @@ export class Hud {
   }
 }
 
+/**
+ * A coxa de frango da barra de fome, em 9×9 — a mesma resolução dos ícones do
+ * gênero, e a mesma grade de pixel do resto da interface.
+ *
+ * Desenhar por grade e não por curva é o que mantém o ícone legível em
+ * `--px: 2` num celular velho: cada `#` vira um quadrado inteiro, sem
+ * suavização para borrar o contorno.
+ */
+export const DRUMSTICK = [
+  '...###...',
+  '..#####..',
+  '.#######.',
+  '.#######.',
+  '.#######.',
+  '..#####..',
+  '..###....',
+  '.##......',
+  '###......',
+] as const;
+
+/**
+ * Transforma a grade num SVG de retângulos, para servir de máscara em CSS.
+ *
+ * Máscara e não imagem colorida: assim a cor continua saindo de
+ * `var(--hud-hunger)`, e a paleta para daltônicos (doc 08 §6) segue trocando o
+ * tom do ícone como trocava o da letra. Cada linha vira **um** retângulo por
+ * sequência de `#`, e não um por pixel — são 9 retângulos em vez de 50.
+ */
+export function maskFrom(grid: readonly string[]): string {
+  const size = grid[0].length;
+  let rects = '';
+  for (let y = 0; y < grid.length; y++) {
+    const row = grid[y];
+    let x = 0;
+    while (x < size) {
+      if (row[x] !== '#') { x++; continue; }
+      let run = 1;
+      while (x + run < size && row[x + run] === '#') run++;
+      rects += `<rect x="${x}" y="${y}" width="${run}" height="1"/>`;
+      x += run;
+    }
+  }
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${grid.length}">`
+    + `<g fill="#000">${rects}</g></svg>`;
+  // `encodeURIComponent` e não base64: o SVG continua legível no inspetor, e é
+  // menor para um desenho deste tamanho.
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
+
+/** A máscara da coxa, montada uma vez. */
+const COXA = maskFrom(DRUMSTICK);
+
 /** Monta a fileira de ícones cheios/vazios em pares (meio-coração). */
 function icons(value: number, max: number, full: string, empty: string): string {
   const total = max / 2;
@@ -585,7 +678,15 @@ function injectStyle(): void {
   padding:calc(1 * var(--px)) calc(2 * var(--px))}
 #hud .hearts{color:var(--hud-hearts,#dc0000)}
 #hud .hearts.critical{animation:hud-shake .5s infinite}
-#hud .hunger{color:var(--hud-hunger,#c68a45)}
+#hud .hunger{color:var(--hud-hunger,#c68a45);display:flex;gap:calc(0.5 * var(--px))}
+/* A cor sai do CSS, então a paleta para daltônicos continua mandando no ícone. */
+/* O lado acompanha a fonte da barra: assim a coxa e o coração têm o mesmo
+   tamanho aparente, e a opção de texto grande da acessibilidade vale nos dois. */
+#hud .hunger i{display:block;background:currentColor;
+  width:calc(7 * var(--px) * var(--hud-text,1));
+  height:calc(7 * var(--px) * var(--hud-text,1));
+  -webkit-mask:${COXA} center/contain no-repeat;mask:${COXA} center/contain no-repeat}
+#hud .hunger i.empty{opacity:.26}
 #hud .air{color:var(--hud-air,#8ecbff)}
 @keyframes hud-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-1px)}
   75%{transform:translateX(1px)}}

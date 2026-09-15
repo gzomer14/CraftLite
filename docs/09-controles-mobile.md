@@ -143,7 +143,8 @@ Usar a Gamepad API. Mapeamento padrão (rótulos de Xbox; o DualSense mostra
 - Analógico esquerdo: mover · Analógico direito: câmera (com curva quadrática e dead zone 0.15)
 - `LT`: colocar/usar · `RT`: quebrar/atacar — o par de gatilhos é a mão inteira
 - `A`: pular · `B`: agachar · `X`: abrir a mochila · `Y`: soltar item
-- `LB`/`RB` **e o direcional ←/→**: item anterior/próximo da hotbar · `Start`: pausa · `Select`: mochila
+- `LB`/`RB` **e o direcional ←/→**: item anterior/próximo da hotbar (o direcional não é enfeite:
+  ver o aviso em §3.1) · `Start`: pausa · `Select`: mochila
 - `L3`: correr · duplo toque em `A`: alternar voo no criativo (doc 06 §9)
 - Direcional: navegar a interface (ver §3.2) · Vibração leve ao quebrar bloco.
 
@@ -153,15 +154,27 @@ Usar a Gamepad API. Mapeamento padrão (rótulos de Xbox; o DualSense mostra
 índice muda de lugar, porque o índice é do aparelho e não do jogo.
 
 O direcional troca o item da mão **fora dos menus** e volta a ser navegação
-dentro deles — `uiCapture` zera a hotbar enquanto uma tela estiver aberta. Ele
-entrou porque um relato de campo (2026-09-14) diz que `L1`/`R1` não trocam item
-num DualSense por Bluetooth, e o código não explica isso: os dois estão nos
-índices 4 e 5 do layout padrão e o caminho tem teste. **Opções → Controle tem
+dentro deles — `uiCapture` zera a hotbar enquanto uma tela estiver aberta.
+
+> **`L1`/`R1` podem nunca chegar ao jogo, e não há o que fazer sobre isso.**
+> Num Android, o sistema entrega os botões do controle como **tecla**, e o
+> navegador fica com alguns antes de a página ver: no Chrome, `L1` e `R1`
+> **trocam de aba**. Um DualSense por Bluetooth reporta `mapping: 'standard'` e
+> 17 botões, e mesmo assim os índices 4 e 5 nunca ficam `pressed` — confirmado
+> em campo em 2026-09-14 com o painel que lê o controle cru, e confirmado de
+> fora com um testador de joystick, onde os mesmos botões trocavam de aba do
+> navegador. Instalar como PWA não muda.
+>
+> É por isso que **o direcional também troca o item**, e é isso que a tela de
+> Opções diz quando há um controle ligado: a saída não é consertar o mapeamento
+> — ele está certo —, é oferecer um caminho que o navegador não reserva. **Opções → Controle tem
 um painel que lê o controle cru** — índice, nome e valor de cada botão, sem
 perfil nem remapeamento no meio — e é ele que resolve esse tipo de dúvida. Ele
 mostra os três jeitos de um botão chegar (`pressed`, meio curso e só encostado),
 o **último eixo que saiu do lugar** (para o caso de o botão estar chegando como
-eixo ou chapéu) e o `id` cru do aparelho.
+eixo ou chapéu), a **última tecla que a página recebeu** — que é o que separa
+"o navegador entregou e o jogo ignorou" de "o navegador ficou com ela" — e o
+`id` cru do aparelho.
 
 **Aperto é uma borda de subida, e soltar o controle não apaga o que estava
 apertado.** Pausar solta todo o input (é o mesmo `reset` do `blur`); se ele

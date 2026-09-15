@@ -45,6 +45,16 @@ export class PadTester {
   private lastAxis = '';
   /** Leitura anterior dos eixos, para saber qual mexeu. */
   private readonly lastAxes: number[] = [];
+  /**
+   * Última tecla que **a página** recebeu.
+   *
+   * Num Android, o sistema entrega os botões do controle como tecla, e o
+   * navegador fica com alguns antes de a página ver: no Chrome, `L1` e `R1`
+   * trocam de aba. É por isso que eles não aparecem como botão nenhum aqui — e
+   * esta linha é o que separa "a página recebeu e ignorou" de "a página nunca
+   * viu". Sem ela, os dois casos são indistinguíveis de dentro do jogo.
+   */
+  private lastKey = '';
 
   constructor() {
     this.element = document.createElement('div');
@@ -58,9 +68,14 @@ export class PadTester {
     if (this.timer !== null) return;
     this.lastPress = '';
     this.lastAxis = '';
+    this.lastKey = '';
     this.lastAxes.length = 0;
     this.refresh();
     this.timer = setInterval(() => this.refresh(), 1000 / HZ);
+    // `capture` para ver a tecla antes de qualquer tela que a trate.
+    if (typeof window !== 'undefined') {
+      window.addEventListener('keydown', this.onKey, true);
+    }
   }
 
   /** Para de ler. Sem isto o painel continuaria acordando a aba fechada. */
@@ -68,7 +83,16 @@ export class PadTester {
     if (this.timer === null) return;
     clearInterval(this.timer);
     this.timer = null;
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('keydown', this.onKey, true);
+    }
   }
+
+  /** Anota a tecla como ela chega, sem interpretar nada. */
+  private readonly onKey = (e: KeyboardEvent): void => {
+    const code = e.code === '' ? '—' : e.code;
+    this.lastKey = `${e.key} · code ${code} · keyCode ${e.keyCode}`;
+  };
 
   /**
    * Monta o texto do painel. Exportado como método para o teste poder chamar
@@ -121,6 +145,7 @@ export class PadTester {
       + `apertado agora: ${pressed.length > 0 ? pressed.join(', ') : '—'}\n`
       + `último aperto: ${this.lastPress === '' ? '—' : this.lastPress}\n`
       + `último eixo que mexeu: ${this.lastAxis === '' ? '—' : this.lastAxis}\n`
+      + `última tecla na página: ${this.lastKey === '' ? '—' : this.lastKey}\n`
       + `eixos: ${axes.join('  ')}`;
   }
 }

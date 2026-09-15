@@ -12,6 +12,53 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-14 · 21:08 → 21:20 · O L1/R1 é do navegador, não do jogo
+
+**Pedido:** *"Fiz o teste aqui e realmente pressionando os botões não mudou literalmente nenhuma
+informação, porém descobri algo interessante. Abri um joystick tester no Chrome aqui no meu
+celular... e ao pressionar L1/R1 ele tem a ação de mudar página no Google Chrome, mudar abas. Eu
+acho que alguma função do próprio navegador está sobrescrevendo o jogo, mesmo instalado via PWA."*
+E, sobre o resto da entrega anterior: *"tudo funcionou perfeitamente"*.
+
+**Resultado:** o diagnóstico do usuário está certo, e fecha uma investigação de três sessões.
+
+### A resposta veio de fora do jogo
+
+Num Android, o sistema entrega os botões do controle como **tecla**, e o navegador fica com algumas
+antes de a página ver: no Chrome, `L1` e `R1` trocam de aba. O painel concorda com isso por
+omissão — reporta `mapping: 'standard'`, 17 botões, 4 eixos, e os índices 4 e 5 nunca ficando
+`pressed`. Instalar como PWA não muda. **Não há correção do lado do jogo**: o mapeamento está
+certo e a Gamepad API nunca recebe o evento.
+
+O que dava para fazer foi feito: o direcional ←/→ (entregue na sessão anterior como "caminho que
+com certeza existe") virou a resposta definitiva; a tela de Opções passa a dizer isso quando há
+controle ligado, no lugar onde o jogador vai procurar; e a dica de entrada no mundo cita o
+direcional junto de `L1`/`R1`.
+
+### A linha que faltava no painel
+
+O painel passou a mostrar **a última tecla que a página recebeu**, com `key`, `code` e `keyCode`.
+É o que separa "o navegador entregou e o jogo ignorou" de "o navegador ficou com ela" — dois casos
+indistinguíveis de dentro do jogo, e a diferença entre ter e não ter conserto. Aqui a linha fica
+vazia, o que confirma o diagnóstico em vez de deduzi-lo.
+
+### Grid de arquivos
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/ui/screens/padtester.ts` | linha "última tecla na página" (`key`/`code`/`keyCode`), com o ouvinte ligado e desligado junto do relógio |
+| `~` | `src/ui/screens/options.ts` | a linha de estado explica o botão que não aparece e aponta o direcional |
+| `~` | `src/main.ts` | a dica de entrada no mundo cita o direcional ao lado de `L1`/`R1` |
+| `~` | `tests/padtester.test.ts` | 3 testes: a tecla anotada como chega, a linha vazia como informação, o ouvinte solto no `stop` |
+| `~` | `docs/09-controles-mobile.md` | §3 o aviso sobre botão reservado pelo navegador; o que o painel mostra |
+| `~` | `docs/15-status.md` | §1 3ª passada concluída; §2 métricas; §3 seção nova; §5 **P1 fechada**; §6 item 1 removido e a câmera marcada como validada |
+| `~` | `docs/16-auditoria.md` | esta sessão |
+| `~` | `README.md` | contagem de testes |
+
+**Portões:** 1416 testes em 78 arquivos verdes · lint limpo · build limpo · 192,7 KB gzip de 350.
+
+---
+
 ## 2026-09-14 · 20:30 → 21:05 · A câmera saiu do tick
 
 **Pedido:** três relatos. (1) no painel de controle, *"ele simplesmente não reconhece quando

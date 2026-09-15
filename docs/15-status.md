@@ -9,7 +9,7 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-14 21:00 — **a câmera saiu do tick**
+**Última atualização:** 2026-09-14 21:16 — **o L1/R1 é do navegador, não do jogo**
 
 ---
 
@@ -28,7 +28,7 @@
 | **Acabamento** pós-M7 | tabela de Vídeo e Acessibilidade completas, teclas remapeáveis, 9 sliders de som, fogo que se espalha, morcego, boneco do jogador, miniatura e tamanho do mundo, canto de escada, som no resource pack | ✅ concluído | **nada disso foi visto em aparelho ainda** |
 | **Controle** pós-M7 | perfis por família (DualSense, DualShock 4, Xbox, Switch Pro), mapeamento completo do doc 09 §3, navegação de interface por gamepad, opções de analógico | ✅ concluído | — |
 | **Controle, 2ª passada** | `□` abre a mochila, botão e intenção viraram tabelas separadas, navegação espacial nos menus, cursor no analógico direito, clique direito no gatilho esquerdo | ✅ validado com DualSense por Bluetooth | — |
-| **Controle, 3ª passada** | direcional ←/→ troca o item da mão; painel de teste de controle em Opções | ⚠️ entregue | **`L1`/`R1` não trocam item num DualSense real e o código não explica por quê — ver §5 P1** |
+| **Controle, 3ª passada** | direcional ←/→ troca o item da mão; painel de teste de controle em Opções | ✅ concluído | causa achada e fora do jogo — ver §3 |
 | **Controle, 4ª passada** | navegação quieta até o controle ser empurrado, anel de foco próprio, só o que está desenhado entra na travessia | ✅ concluído | — |
 | **Modo de jogo** | trocar entre Criativo e Sobrevivência no mesmo mundo, pela pausa, com o modo guardado no save | ✅ concluído | — |
 | **HUD** | coxa de frango desenhada no lugar do retângulo da fome; vida, ar, fome e armadura somem no Criativo | ✅ concluído | — |
@@ -46,13 +46,13 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-14 21:00, com `npm test`, `npm run build` e
+Medidas em 2026-09-14 21:16, com `npm test`, `npm run build` e
 `SIZE_BUDGET_KB=350 npm run size`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **192,5 KB** | < 350 KB | `npm run size` |
-| Testes | **1413**, 78 arquivos | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **192,7 KB** | < 350 KB | `npm run size` |
+| Testes | **1416**, 78 arquivos | manter verde | `npm test` |
 | Camadas de atlas | **156** | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Memória de áudio | **3,26 MB** (era 3,95 com três sons a menos) | < 3,5 MB | `tests/audio.test.ts` |
 | Geração de chunk | 5,7–6,2 ms (mediana; varia muito com a carga da máquina) | < 25 ms | `tests/perf.test.ts` |
@@ -981,6 +981,43 @@ meio curso, e só encostado, que alguns drivers usam e o painel engolia), o
 chapéu, é aqui que aparece) e o `id` cru do aparelho. As hipóteses que restam
 estão listadas no §5 P1.
 
+> **Fechado horas depois:** a causa é o navegador. Ver a seção
+> *"`L1`/`R1`: a causa era o navegador"*, acima.
+
+---
+
+### `L1`/`R1`: a causa era o navegador ✅ — 2026-09-14
+
+Três sessões atrás isto era um sintoma sem explicação: num DualSense real, `L1`
+e `R1` não trocavam o item da mão, enquanto todo o resto do controle
+funcionava. O código não explicava — os dois estão nos índices 4 e 5 do layout
+padrão e o caminho inteiro tem teste de ponta a ponta.
+
+**A resposta veio de fora do jogo.** O jogador abriu um testador de joystick no
+Chrome do Android e viu que apertar `L1`/`R1` **trocava de aba do navegador**.
+É isso: num Android, o sistema entrega os botões do controle como **tecla**, e o
+navegador fica com algumas antes de a página ver. O painel de teste concorda —
+ele reporta `mapping: 'standard'` e 17 botões, e os índices 4 e 5 nunca ficam
+`pressed`. Instalar como PWA não muda.
+
+Não há correção do lado do jogo: o mapeamento está certo, e a Gamepad API nunca
+recebe o evento. O que dava para fazer, e foi feito:
+
+- **o direcional ←/→ troca o item**, entregue na sessão anterior como caminho
+  "que com certeza existe" — que agora é a resposta definitiva e não mais uma
+  muleta;
+- **a tela de Opções diz isso** quando há controle ligado, no lugar onde o
+  jogador vai procurar: se um botão não aparece no painel, o navegador ficou com
+  ele;
+- **a dica de entrada no mundo cita o direcional** junto de `L1`/`R1`;
+- **o painel passou a mostrar a última tecla que a página recebeu**. É o que
+  separa "o navegador entregou e o jogo ignorou" de "o navegador ficou com ela"
+  — dois casos indistinguíveis de dentro do jogo, e a diferença entre ter e não
+  ter conserto. Aqui a linha fica vazia, o que confirma o diagnóstico.
+
+Fica registrado porque é o tipo de coisa que se investiga de novo daqui a seis
+meses: **o mapeamento não está errado**.
+
 ---
 
 ---
@@ -1095,28 +1132,17 @@ mudanças em código de marcos "fechados":
 
 ## 5. Dependências entre pendências
 
-**P1 — o navegador não reporta `L1`/`R1` de um DualSense por Bluetooth** (aberta em 2026-09-14).
-É a única pendência de funcionalidade, e ela **não está no jogo**: o painel de teste lê
-`navigator.getGamepads()` cru, sem perfil nem remapeamento, e mesmo assim os dois botões não
-aparecem — *"reconhece todas as outras teclas do controle, menos essas duas"*, num controle que
-funciona no PS5. O que sobra de hipótese, em ordem de plausibilidade:
+**P1 fechada em 2026-09-14: a causa é o navegador, e não há correção do lado do jogo.**
+Num Android, o sistema entrega os botões do controle como **tecla**, e o navegador fica com
+algumas antes de a página ver — no Chrome, `L1` e `R1` **trocam de aba**. O painel de teste, que lê
+`navigator.getGamepads()` cru, mostrou o DualSense com `mapping: 'standard'` e 17 botões e mesmo
+assim os índices 4 e 5 nunca ficando `pressed`; um testador de joystick de fora do jogo confirmou,
+trocando de aba ao apertar os mesmos botões. Instalar como PWA não muda. A mitigação já estava no
+ar — **o direcional ←/→ troca o item** —, e agora a tela de Opções diz isso quando há controle
+ligado.
 
-1. **eles chegam como eixo ou chapéu** em vez de botão — o painel agora mostra o último eixo que
-   saiu do lugar, que é o que confirma isso em um aperto;
-2. **eles chegam sem `pressed`**, só com `touched` ou com valor parcial — o painel mostrava só
-   `pressed` e agora mostra os três sinais;
-3. **o relatório HID do DualSense em Bluetooth é diferente do de cabo** nesse navegador, e os dois
-   botões caem fora do que ele expõe. Conectar por cabo separa esta da anterior.
-
-Se for (1) ou (2), a correção é uma linha no mapeamento. Se for (3), não há correção do lado do
-jogo, e o direcional ←/→ — que já troca o item da mão — passa a ser a resposta definitiva.
-
-```
-Painel de teste com o DualSense na mão  ──►  eixo? sinal parcial? nada?
-                                        ──►  decide se P1 tem conserto aqui dentro
-```
-
-Fora dela, o que resta é a dependência externa ao código:
+**Não há mais pendência de funcionalidade em aberto.** O que resta é a dependência externa ao
+código:
 
 ```
 Teste em aparelho T0 real  ──►  fecha M3, M4, M5 e M6 de verdade
@@ -1189,19 +1215,7 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
 
 ## 6. Próximo passo recomendado
 
-1. **Abrir Opções → Controle e apertar `L1` e `R1` de novo — o painel ficou mais fundo.** É o
-   único item com pendência aberta (§5 P1) e leva trinta segundos. O que olhar, nesta ordem:
-   - **a linha "último eixo que mexeu"**: se ela mudar ao apertar `L1`/`R1`, eles estão chegando
-     como eixo, e a correção é uma linha no mapeamento;
-   - **"apertado agora"**, que agora mostra meio curso (`4 (l1) 0.40`) e botão só encostado
-     (`4 (l1) toque`) — dois sinais que o painel engolia antes;
-   - **a contagem de botões** e o `id` cru, que passaram a aparecer: se o número for menor que 17,
-     o navegador está expondo um relatório reduzido;
-   - **por cabo**, se houver um USB-C à mão. É o que separa "o aparelho não manda" de "o Bluetooth
-     não manda".
-
-   Enquanto isso, **o direcional ←/→ troca o item da mão** e é o caminho que funciona.
-2. **Reconferir os menus com o controle**, que é o que mudou mais na última passada:
+1. **Reconferir os menus com o controle**, que é o que mudou mais na última passada:
    - **o foco tem que aparecer.** Empurrar o direcional numa tela precisa acender um anel amarelo
      no item escolhido. Se ele não acender, nada mais dessa lista importa — era essa a causa de
      *"indo para botões nem existentes em tela"*;
@@ -1211,15 +1225,13 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      subir sozinho, e o analógico tem que andar entre as casinhas;
    - **pegar o controle com a tela já aberta no dedo**: o primeiro aperto mostra onde o foco está
      e não aperta nada.
-3. **Olhar em volta, e só isso.** A câmera saiu do tick e agora é lida por quadro: girar tem que
-   ficar liso no computador e no celular, sem o "pulando de quadro em quadro". E no Modo A,
-   arrastar o dedo para olhar **não** pode mais acender o anel de quebra — ele só aparece quando o
-   dedo encosta e fica parado. Se a velocidade do analógico tiver mudado de sensação, o número é
-   `padSensitivity` nas opções.
-4. **Trocar de modo pela pausa** e conferir que sair e voltar ao mundo devolve o modo aplicado.
+2. ~~**Olhar em volta, e só isso.**~~ **Validado em campo em 2026-09-14**: a câmera por quadro e o
+   Modo A que não acende mais o anel durante o arrasto foram confirmados no celular e no
+   computador. Se a velocidade do analógico incomodar, o número é `padSensitivity` nas opções.
+3. **Trocar de modo pela pausa** e conferir que sair e voltar ao mundo devolve o modo aplicado.
    No Criativo, vida, ar, fome e armadura somem do HUD; no Sobrevivência voltam — e a fome agora é
    uma coxa de frango, não um retângulo.
-5. **Jogar o que foi entregue em 2026-09-14.** É o único item com risco real: vinte opções novas,
+4. **Jogar o que foi entregue em 2026-09-14.** É o único item com risco real: vinte opções novas,
    um passe de render novo, um sistema de mundo novo e um mob novo — nenhum deles viu um aparelho.
    O que olhar, em ordem de quanto pode estar errado:
    - **Nuvens.** Elas são o único desenho que nunca foi visto. Conferir se a forma lê como nuvem e
@@ -1237,17 +1249,17 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      certa do corpo.
    - **Modo daltônico e contorno em alto contraste**, que são acessibilidade e só se avaliam
      olhando.
-6. **Reconferir a quebra.** Um clique — de mouse ou de dedo — tem que derrubar **um** bloco, no
+5. **Reconferir a quebra.** Um clique — de mouse ou de dedo — tem que derrubar **um** bloco, no
    criativo e no sobrevivência; segurando, o ritmo é de ~4 por segundo. E as plantas passaram a ser
    miráveis: grama alta, flores, mudas e cana agora quebram. Vale conferir que **minerar pedra não
    ficou mais lento** — é o que o intervalo foi desenhado para não fazer.
-7. **Reconferir o toque no celular.** O padrão agora é o **Modo B**, que é o que já funcionava —
+6. **Reconferir o toque no celular.** O padrão agora é o **Modo B**, que é o que já funcionava —
    então o primeiro teste é confirmar que nada regrediu nele. Depois vale voltar ao **Modo A** nas
    opções e ver se ele ficou utilizável: colocar e quebrar agora miram no **mesmo** lugar (o dedo),
    a mira central some, a folga de arraste dobrou, e arrastar para mirar e então segurar passou a
    funcionar em vez de travar o dedo. Se ainda falhar, o número a mexer é `HOLD_SLOP` em
    `input/touch.ts`.
-8. **Reconferir o inventário no celular.** As duas correções de 2026-09-14
+7. **Reconferir o inventário no celular.** As duas correções de 2026-09-14
    vieram de relato de campo e voltam para lá:
    - **toque longo num slot** pega metade com a mão vazia e solta uma unidade com a mão cheia.
      Montar uma receita de tábua por célula é o teste que importa. A dica aparece no painel, e o
@@ -1255,7 +1267,7 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
    - **largar item** agora arremessa na direção do olhar, e o que foi jogado fora só volta a ser
      coletável depois de dois segundos. Vale largar olhando para o chão e para uma parede, que é
      onde o arremesso sozinho não resolveria.
-9. **Voltar ao DualSense.** O reconhecimento por Bluetooth e a navegação básica já foram
+8. **Voltar ao DualSense.** O reconhecimento por Bluetooth e a navegação básica já foram
    confirmados em 2026-09-14; o que ainda não viu aparelho é a segunda passada. Em ordem de
    quanto pode estar errado:
    - **O cursor do analógico direito** com o inventário aberto. É o item novo e o mais fácil de
@@ -1275,15 +1287,15 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      ligada.
    - **No celular**, lembrar que ligar o áudio e a tela cheia exigem um toque na tela — o controle
      não serve de gesto para o navegador. O jogo avisa isso ao conectar.
-10. **Uma sessão longa de verdade.** É o **último critério da definição de pronto** que não foi
+9. **Uma sessão longa de verdade.** É o **último critério da definição de pronto** que não foi
    cumprido: o PROMPT.md §11 pede *"2 horas sem crash, sem perda de progresso e sem travas"*, e a
    sessão de campo mais longa registrada tem 10 minutos. Não é teste de FPS — é teste de vazamento,
    de save e de fogo/mob acumulando. O F3 tem tudo que ele precisa: `mem`, a linha `C:` e agora
    `N fogo`.
-11. **Medir o tempo de abertura em 3G.** O critério 1 do PROMPT.md §11 tem metade cumprida — o
+10. **Medir o tempo de abertura em 3G.** O critério 1 do PROMPT.md §11 tem metade cumprida — o
    bundle está em 189 KB de 350 — e a outra metade nunca foi medida. O `throttling` do DevTools
    resolve; o que interessa é o tempo até a tela de título, com o atlas gerando no meio.
-12. Oportunidades pequenas que sobraram, agora curtas:
+11. Oportunidades pequenas que sobraram, agora curtas:
    - **`.clw` com miniatura** já funciona, mas nenhum arquivo real foi exportado e reimportado
      desde a mudança para a v2 — é um teste manual de cinco minutos;
    - **som no resource pack** foi testado por formato, nunca com um `.ogg` de verdade num

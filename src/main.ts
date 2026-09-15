@@ -1256,7 +1256,8 @@ function showHint(controls: Controls, isTouch: boolean, gamepads: Gamepads): voi
     hint.textContent = `${base}\n`
       + `Controle: analógicos mover/olhar · ${l.faceDown} pular · ${l.faceRight} agachar · `
       + `${l.l2} colocar · ${l.r2} quebrar · ${l.faceUp} largar · `
-      + `${l.l1}/${l.r1} trocar item · ${l.start} pausa · ${l.faceLeft} mochila`;
+      + `${l.l1}/${l.r1} ou direcional ←→ trocar item · ${l.start} pausa · `
+      + `${l.faceLeft} mochila`;
   };
   gamepads.onConnect(showPadHint);
   showPadHint();

@@ -359,8 +359,19 @@ export class OptionsScreen {
     const warning = pads.nonStandard
       ? ' — o navegador não reconheceu este modelo, então o mapeamento é o da família.'
       : '';
+    /*
+     * A segunda frase não é curiosidade: num Android, o sistema entrega os
+     * botões do controle como tecla e o navegador fica com alguns antes de a
+     * página ver — no Chrome, `L1` e `R1` trocam de aba, e o jogo nunca os
+     * recebe (confirmado em campo, 2026-09-14, com o painel abaixo lendo o
+     * controle cru). Não há o que corrigir do lado do jogo; o que há é dizer
+     * qual é o caminho que funciona, aqui, onde o jogador está procurando.
+     */
     this.padStatus.textContent = `Conectado: ${pads.labels.family}${warning}`
-      + ' Aperte os botões: o painel abaixo mostra o que o aparelho manda de verdade.';
+      + ' Aperte os botões: o painel abaixo mostra o que o aparelho manda de verdade.'
+      + ' Se algum botão não aparecer nele, o navegador ficou com ele antes do jogo —'
+      + ' é o que acontece com L1/R1 no Chrome do Android, que os usa para trocar de aba.'
+      + ' O direcional ←→ também troca o item da mão.';
   }
 
   hide(): void {

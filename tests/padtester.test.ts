@@ -46,10 +46,22 @@ function connect(pad: Gamepad | null): void {
   vi.stubGlobal('navigator', { getGamepads: () => (pad === null ? [] : [pad]) });
 }
 
+/** Ouvintes registrados no `window`, para o teste disparar a tecla. */
+let teclado: ((e: unknown) => void)[] = [];
+
 beforeEach(() => {
+  teclado = [];
   vi.stubGlobal('document', {
     createElement: (tag: string) => new FakeEl(tag),
     head: new FakeEl('head'),
+  });
+  vi.stubGlobal('window', {
+    addEventListener: (type: string, fn: (e: unknown) => void) => {
+      if (type === 'keydown') teclado.push(fn);
+    },
+    removeEventListener: (_type: string, fn: (e: unknown) => void) => {
+      teclado = teclado.filter((f) => f !== fn);
+    },
   });
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -175,5 +187,43 @@ describe('sinais que não são um aperto comum', () => {
     const tester = new PadTester();
     tester.refresh();
     expect(tester.element.textContent).toContain('Vendor: dead Product: beef');
+  });
+});
+
+describe('a tecla que a página recebe', () => {
+  /*
+   * Num Android, o sistema entrega os botões do controle como tecla, e o
+   * navegador fica com alguns antes de a página ver: no Chrome, `L1` e `R1`
+   * trocam de aba. Esta linha é o que separa "a página recebeu e ignorou" de
+   * "a página nunca viu" — dois casos indistinguíveis de dentro do jogo, e a
+   * diferença entre ter e não ter conserto.
+   */
+  it('anota a tecla como ela chega, sem interpretar', () => {
+    connect(fakePad({}));
+    const tester = new PadTester();
+    tester.start();
+    for (const fn of teclado) fn({ key: 'Unidentified', code: '', keyCode: 102 });
+    tester.refresh();
+    expect(tester.element.textContent)
+      .toContain('última tecla na página: Unidentified · code — · keyCode 102');
+    tester.stop();
+  });
+
+  it('sem tecla nenhuma, a linha fica vazia — e é essa a informação', () => {
+    connect(fakePad({}));
+    const tester = new PadTester();
+    tester.start();
+    tester.refresh();
+    expect(tester.element.textContent).toContain('última tecla na página: —');
+    tester.stop();
+  });
+
+  it('parar solta o ouvinte de teclado junto com o relógio', () => {
+    connect(fakePad({}));
+    const tester = new PadTester();
+    tester.start();
+    expect(teclado.length).toBe(1);
+    tester.stop();
+    expect(teclado.length, 'a tela fechada não escuta mais nada').toBe(0);
   });
 });

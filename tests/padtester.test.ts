@@ -21,8 +21,10 @@ class FakeEl {
 
 function fakePad(options: {
   id?: string; pressed?: number[]; axes?: number[]; mapping?: string; buttons?: number;
+  touched?: number[]; values?: Record<number, number>;
 }): Gamepad {
   const pressed = new Set(options.pressed ?? []);
+  const touched = new Set(options.touched ?? []);
   const total = options.buttons ?? 17;
   return {
     id: options.id ?? 'DualSense Wireless Controller (Vendor: 054c Product: 0ce6)',
@@ -31,7 +33,9 @@ function fakePad(options: {
     mapping: (options.mapping ?? 'standard') as GamepadMappingType,
     axes: options.axes ?? [0, 0, 0, 0],
     buttons: Array.from({ length: total }, (_, i) => ({
-      pressed: pressed.has(i), touched: pressed.has(i), value: pressed.has(i) ? 1 : 0,
+      pressed: pressed.has(i),
+      touched: pressed.has(i) || touched.has(i),
+      value: options.values?.[i] ?? (pressed.has(i) ? 1 : 0),
     })) as unknown as readonly GamepadButton[],
     timestamp: 0,
     vibrationActuator: null,
@@ -121,5 +125,55 @@ describe('relógio', () => {
     vi.advanceTimersByTime(1000);
     expect(leituras, 'com a tela fechada ele não acorda a aba').toBe(durante);
     vi.useRealTimers();
+  });
+});
+
+describe('sinais que não são um aperto comum', () => {
+  /*
+   * A linha que o painel existe para mostrar: num DualSense real, `L1` e `R1`
+   * não aparecem como botão nenhum enquanto o resto do controle aparece. As
+   * três formas abaixo são as maneiras conhecidas de um botão chegar sem
+   * `pressed`, e o painel engolia todas.
+   */
+  it('meio curso aparece com o valor', () => {
+    connect(fakePad({ values: { 6: 0.4 } }));
+    const tester = new PadTester();
+    tester.refresh();
+    expect(tester.element.textContent).toContain('6 (l2) 0.40');
+  });
+
+  it('encostado sem apertar também aparece', () => {
+    connect(fakePad({ touched: [4] }));
+    const tester = new PadTester();
+    tester.refresh();
+    expect(tester.element.textContent, 'alguns drivers só reportam touched')
+      .toContain('4 (l1) toque');
+  });
+
+  it('um eixo que sai do lugar fica registrado', () => {
+    // É a hipótese que sobra se L1/R1 não chegam como botão: um chapéu, ou um
+    // ombro que o driver reporta como eixo.
+    const tester = new PadTester();
+    connect(fakePad({ axes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }));
+    tester.refresh();
+    connect(fakePad({ axes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 1] }));
+    tester.refresh();
+    expect(tester.element.textContent).toContain('último eixo que mexeu: 9 → 1.00');
+  });
+
+  it('ruído de analógico parado não conta como movimento', () => {
+    const tester = new PadTester();
+    connect(fakePad({ axes: [0, 0, 0, 0] }));
+    tester.refresh();
+    connect(fakePad({ axes: [0.08, 0, 0, 0] }));
+    tester.refresh();
+    expect(tester.element.textContent).toContain('último eixo que mexeu: —');
+  });
+
+  it('mostra o id cru, que é o que se cola num relato', () => {
+    connect(fakePad({ id: 'Controle Esquisito (Vendor: dead Product: beef)' }));
+    const tester = new PadTester();
+    tester.refresh();
+    expect(tester.element.textContent).toContain('Vendor: dead Product: beef');
   });
 });

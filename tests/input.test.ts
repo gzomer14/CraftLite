@@ -7,6 +7,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { Mouse } from '../src/input/mouse';
 import { Keyboard } from '../src/input/keyboard';
 import { Controls } from '../src/input/controls';
+import { Gamepads } from '../src/input/gamepad';
 import { SettingsStore } from '../src/game/settings';
 
 /** Alvo de eventos mínimo, para não precisar de DOM real. */
@@ -179,5 +180,98 @@ describe('pointer lock não é pedido por toque', () => {
     const counter = setup();
     canvas.emit('click', {});
     expect(counter.locks).toBe(1);
+  });
+});
+
+/**
+ * A câmera é lida **por quadro desenhado**, e não no tick de 20 Hz.
+ *
+ * `camera.yaw` recebe `player.yaw` direto, sem interpolação: girar a 20 Hz num
+ * display de 60 Hz repete o mesmo ângulo por três quadros e depois pula. O jogo
+ * rodava liso e a câmera andava *"de quadro em quadro, como se fosse
+ * movimentação por teclado"* (relato de campo 2026-09-14).
+ */
+describe('a câmera é por quadro, não por tick', () => {
+  function makeControls(pads: Gamepads): Controls {
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {} }));
+    const fake = canvas as unknown as HTMLCanvasElement;
+    (fake as unknown as { requestPointerLock: () => void }).requestPointerLock = () => {};
+    return new Controls(fake, new SettingsStore(), {
+      onHotbarSelect: () => {}, onHotbarScroll: () => {}, onPickBlock: () => {},
+      onToggleDebug: () => {}, onToggleFly: () => {}, onPause: () => {}, onInventory: () => {},
+      onDropItem: () => {},
+    }, undefined, pads);
+  }
+
+  /** Quanto a câmera girou numa chamada de `updateLook`. */
+  function look(controls: Controls, dtMs: number): { yaw: number; pitch: number } {
+    const out = { yaw: 0, pitch: 0 };
+    controls.updateLook(dtMs, (yaw, pitch) => { out.yaw = yaw; out.pitch = pitch; });
+    return out;
+  }
+
+  function fakePad(axes: number[]): void {
+    vi.stubGlobal('navigator', {
+      getGamepads: () => [{
+        id: 'Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 02fd)',
+        index: 0, connected: true, mapping: 'standard', axes,
+        buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })),
+        timestamp: 0, vibrationActuator: null,
+      }],
+    });
+  }
+
+  it('o tick não mexe mais na câmera', () => {
+    const controls = makeControls(new Gamepads());
+    (controls.mouse as unknown as { locked: boolean }).locked = true;
+    canvas.emit('mousemove', { movementX: 40, movementY: 0 });
+
+    controls.update();
+    // Se o tick tivesse consumido o movimento, não sobraria nada para o quadro.
+    expect(look(controls, 16).yaw, 'o delta espera o quadro').not.toBe(0);
+  });
+
+  it('o mouse entrega pixels: o tempo do quadro não escala', () => {
+    const controls = makeControls(new Gamepads());
+    (controls.mouse as unknown as { locked: boolean }).locked = true;
+
+    canvas.emit('mousemove', { movementX: 40, movementY: 0 });
+    const curto = look(controls, 8);
+    canvas.emit('mousemove', { movementX: 40, movementY: 0 });
+    const longo = look(controls, 33);
+    expect(longo.yaw, 'o mesmo arrasto gira o mesmo, em qualquer FPS')
+      .toBeCloseTo(curto.yaw, 10);
+  });
+
+  it('o analógico entrega velocidade: o tempo do quadro escala', () => {
+    const pads = new Gamepads();
+    const controls = makeControls(pads);
+    fakePad([0, 0, 1, 0]);
+    controls.update();
+
+    const umQuadro = look(controls, 16);
+    const doisQuadros = look(controls, 32);
+    expect(doisQuadros.yaw, 'girar não pode depender do FPS')
+      .toBeCloseTo(umQuadro.yaw * 2, 6);
+  });
+
+  it('um engasgo longo não vira um giro de controle', () => {
+    const pads = new Gamepads();
+    const controls = makeControls(pads);
+    fakePad([0, 0, 1, 0]);
+    controls.update();
+
+    const normal = look(controls, 100);
+    const engasgo = look(controls, 250);
+    expect(engasgo.yaw, 'o passo é limitado').toBeCloseTo(normal.yaw, 10);
+  });
+
+  it('sem input nenhum, nem chama de volta', () => {
+    const controls = makeControls(new Gamepads());
+    vi.stubGlobal('navigator', { getGamepads: () => [] });
+    controls.update();
+    let chamou = false;
+    controls.updateLook(16, () => { chamou = true; });
+    expect(chamou, 'quadro parado não recalcula câmera').toBe(false);
   });
 });

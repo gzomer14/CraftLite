@@ -346,13 +346,20 @@ describe('modo A — toque no mundo', () => {
     expect(touch.state.holdProgress).toBeLessThan(0.6);
   });
 
-  it('arrastar não quebra durante o movimento, mas parar rearma a contagem', () => {
+  it('o dedo que girou a câmera não quebra mais, nem depois de parar', () => {
     /*
-     * A regra **mudou de propósito**. Antes, um dedo que passasse de 10 px
-     * ficava marcado como "arrastado" para sempre e não conseguia mais
-     * quebrar até ser levantado — o que na mão significa mirar arrastando e
-     * depois segurar sem nada acontecer. Agora sair da folga **reancora** a
-     * contagem, como em todo toque longo com folga.
+     * A regra **mudou duas vezes**, e esta é a que o jogador pediu com o jogo
+     * na mão.
+     *
+     * Primeiro, um dedo que passasse de 10 px ficava marcado como "arrastado"
+     * para sempre — e como 10 px acontecem em quase todo gesto, o toque longo
+     * mal disparava. A resposta foi **reancorar** a contagem ao sair da folga,
+     * o que fez arrastar-e-segurar virar quebra.
+     *
+     * O efeito disso na mão foi pior que o problema: olhar em volta arrastando
+     * o dedo mostrava o anel de progresso o tempo todo, *"achando que eu vou
+     * começar a quebrar algo"* (relato de campo 2026-09-14). Um gesto é uma
+     * coisa só — arrastou, é câmera. Para quebrar, levanta e encosta de novo.
      */
     const { canvas, touch } = setup();
     canvas.down(2, 600, 200);
@@ -366,7 +373,40 @@ describe('modo A — toque no mundo', () => {
 
     now += 400;
     touch.update();
-    expect(touch.state.breaking, 'parou e segurou: tem que quebrar').toBe(true);
+    expect(touch.state.breaking, 'parar no meio do arrasto não rearma').toBe(false);
+    expect(touch.state.holdProgress, 'e o anel de progresso não aparece').toBe(0);
+  });
+
+  it('levantar o dedo e encostar de novo volta a quebrar', () => {
+    // A outra metade da regra: o dedo é que fica queimado, não a tela.
+    const { canvas, touch } = setup();
+    canvas.down(2, 600, 200);
+    now += 60;
+    canvas.move(2, 800, 200);
+    touch.update();
+    canvas.up(2, 800, 200);
+
+    canvas.down(3, 800, 200);
+    now += 400;
+    touch.update();
+    expect(touch.state.breaking).toBe(true);
+  });
+
+  it('começou a quebrar, arrastar não para — só soltar o dedo para', () => {
+    const { canvas, touch } = setup();
+    canvas.down(2, 600, 200);
+    now += 400;
+    touch.update();
+    expect(touch.state.breaking).toBe(true);
+
+    now += 60;
+    canvas.move(2, 900, 300);
+    touch.update();
+    expect(touch.state.breaking, 'arrastar quebrando segue quebrando').toBe(true);
+
+    canvas.up(2, 900, 300);
+    touch.update();
+    expect(touch.state.breaking, 'soltar o dedo é o que para').toBe(false);
   });
 
   it('a deriva pequena do dedo parado não reinicia a quebra', () => {

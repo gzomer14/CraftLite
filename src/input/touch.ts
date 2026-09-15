@@ -30,15 +30,6 @@ const SPRINT_HOLD_MS = 300;
  * `click`.
  */
 const TAP_SLOP = 16;
-/**
- * Folga do **toque longo**. Maior que a do toque curto de propósito: o dedo
- * parado ainda escorrega enquanto o aparelho balança na mão, e cancelar a
- * quebra por isso é o que fazia segurar não funcionar.
- *
- * Sair desta folga não cancela nada: apenas **reinicia a contagem** a partir da
- * posição nova, que é como todo toque longo com folga funciona.
- */
-const HOLD_SLOP = 28;
 /** Multiplicador do arraste sobre a sensibilidade base — ver `onMove`. */
 const TOUCH_LOOK_SCALE = 2.0;
 
@@ -53,14 +44,10 @@ interface Finger {
   /** Maior distância já percorrida desde o início — decide o toque curto. */
   maxDistance: number;
   /**
-   * Âncora do toque longo e o instante em que ela foi posta.
-   *
-   * Sair de `HOLD_SLOP` reancora aqui e reinicia a contagem, em vez de cancelar
-   * a quebra para sempre.
+   * O dedo já girou a câmera, então **não é mais candidato a quebrar** até ser
+   * levantado. Ver `onMove`.
    */
-  anchorX: number;
-  anchorY: number;
-  anchorTime: number;
+  panned: boolean;
   /** A quebra já começou: deriva não cancela mais, e o dedo para de girar a câmera. */
   breaking: boolean;
   /** Já está no limite do joystick desde este instante (para a corrida). */
@@ -169,7 +156,7 @@ export class TouchControls {
       x: e.clientX, y: e.clientY,
       startTime: now,
       maxDistance: 0,
-      anchorX: e.clientX, anchorY: e.clientY, anchorTime: now,
+      panned: false,
       breaking: false,
       atLimitSince: 0,
     };
@@ -199,12 +186,21 @@ export class TouchControls {
     const fromStart = Math.hypot(e.clientX - finger.startX, e.clientY - finger.startY);
     if (fromStart > finger.maxDistance) finger.maxDistance = fromStart;
 
-    // Saiu da folga do toque longo: reancora e recomeça a contar.
-    if (Math.hypot(e.clientX - finger.anchorX, e.clientY - finger.anchorY) > HOLD_SLOP) {
-      finger.anchorX = e.clientX;
-      finger.anchorY = e.clientY;
-      finger.anchorTime = performance.now();
-    }
+    /*
+     * **Quem começou a girar a câmera não quebra mais.**
+     *
+     * O dedo que arrasta é o mesmo que segura, e enquanto ele estava em
+     * movimento o anel de progresso ficava aparecendo: o jogador olhava em
+     * volta e o jogo insistia que ele estava prestes a quebrar alguma coisa
+     * (relato de campo 2026-09-14). Um gesto é uma coisa só — arrastou, é
+     * câmera, e ponto. Para quebrar, levanta o dedo e encosta de novo parado.
+     *
+     * Isto **desfaz** a reancoragem que existia aqui até hoje, que deixava
+     * "arrastar e então segurar" virar quebra. Era uma resposta para o toque
+     * longo que não disparava; o que o jogador quer é o contrário — que ele
+     * não dispare sozinho no meio de um arrasto.
+     */
+    if (!finger.breaking && finger.maxDistance > TAP_SLOP) finger.panned = true;
 
     /*
      * Um dedo que está quebrando **não gira mais a câmera**.
@@ -335,9 +331,11 @@ export class TouchControls {
 
     for (const finger of this.fingers.values()) {
       if (finger.role !== 'look') continue;
-      // A contagem é a partir da **âncora**, que a deriva reinicia; quem já
-      // está quebrando não é mais cancelado por deriva nenhuma.
-      const held = now - finger.anchorTime;
+      // Já virou câmera: não conta mais tempo nem mostra anel de progresso.
+      if (finger.panned && !finger.breaking) continue;
+      // Conta desde que o dedo encostou; quem já está quebrando não é
+      // cancelado por deriva nenhuma.
+      const held = now - finger.startTime;
       const progress = held / settings.longPressMs;
       if (finger.breaking || progress >= 1) {
         finger.breaking = true;

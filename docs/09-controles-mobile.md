@@ -92,13 +92,23 @@ Oferecer **dois modos**, escolhíveis nas opções.
 | Toque curto (< 150 ms) na zona de câmera | **Colocar bloco** / usar item na face apontada |
 | Toque longo (segurar) parado | **Quebrar** o bloco apontado, com barra de progresso circular no ponto |
 | Toque curto sobre um mob | **Atacar** |
-| Arrastar | Girar a câmera (cancela o toque curto se mover > 10 px) |
+| Arrastar | Girar a câmera — **e o dedo que arrastou deixa de ser candidato a quebrar** |
 | Segurar sobre um bloco no Criativo | Quebra instantânea |
 | Toque duplo no botão de pulo | Alterna voo (Criativo) |
 | Dois dedos pinçando | (opcional) FOV / zoom |
 
 > O raycast usa a **posição do dedo**, não o centro da tela. Isso é o que faz o modo A funcionar:
 > converter `(clientX, clientY)` → ray via inversa da matriz de projeção.
+
+> **Um gesto é uma coisa só.** Passou da folga de toque (16 px), o dedo virou câmera e **não volta
+> a ser quebra** enquanto não for levantado — nem se parar no meio do arrasto. Sem essa regra, o
+> anel de progresso ficava aparecendo enquanto o jogador só olhava em volta, *"achando que eu vou
+> começar a quebrar algo"* (relato de campo 2026-09-14).
+>
+> Isso **desfez** a reancoragem que existia antes, em que sair da folga apenas reiniciava a
+> contagem e "arrastar e então segurar" virava quebra. Aquilo foi uma resposta ao toque longo que
+> quase nunca disparava; o problema real na mão é o oposto — ele disparando sozinho no meio de um
+> arrasto. Começada a quebra, nada a cancela a não ser levantar o dedo.
 
 **Modo B — "Botões dedicados" (clássico, alvo fixo no crosshair)**
 Dois botões grandes no lado direito: ⛏ (quebrar, segurar) e ▣ (colocar). A câmera só gira por
@@ -148,7 +158,10 @@ entrou porque um relato de campo (2026-09-14) diz que `L1`/`R1` não trocam item
 num DualSense por Bluetooth, e o código não explica isso: os dois estão nos
 índices 4 e 5 do layout padrão e o caminho tem teste. **Opções → Controle tem
 um painel que lê o controle cru** — índice, nome e valor de cada botão, sem
-perfil nem remapeamento no meio — e é ele que resolve esse tipo de dúvida.
+perfil nem remapeamento no meio — e é ele que resolve esse tipo de dúvida. Ele
+mostra os três jeitos de um botão chegar (`pressed`, meio curso e só encostado),
+o **último eixo que saiu do lugar** (para o caso de o botão estar chegando como
+eixo ou chapéu) e o `id` cru do aparelho.
 
 **Aperto é uma borda de subida, e soltar o controle não apaga o que estava
 apertado.** Pausar solta todo o input (é o mesmo `reset` do `blur`); se ele

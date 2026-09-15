@@ -12,6 +12,72 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-14 · 20:30 → 21:05 · A câmera saiu do tick
+
+**Pedido:** três relatos. (1) no painel de controle, *"ele simplesmente não reconhece quando
+pressiono L1 ou R1. Reconhece todas as outras teclas do controle, menos essas duas"*, num controle
+que funciona no PS5; (2) no Modo A, *"se eu coloco o dedo na tela apenas para mover a câmera... ele
+constantemente aparece a bolinha achando que eu vou começar a quebrar algo"*; (3) *"a câmera não se
+move de forma lisinha, e sim frame a frame... como se fosse movimentação por teclado"*.
+
+**Resultado:** o terceiro era a correção mais visível da semana, e valia para todo mundo.
+
+### A câmera andava a 20 Hz
+
+O jogo simula a 20 Hz e interpola no render — a posição do jogador seguia essa regra. A rotação
+**não**: `camera.yaw` recebe `player.yaw` direto, sem interpolação, e `player.yaw` só mudava dentro
+do tick. Num display de 60 Hz o mesmo ângulo aparecia em três quadros seguidos e então pulava; num
+de 120, em seis. Daí o jogo rodar liso e a câmera não.
+
+Interpolar a rotação como se interpola a posição não era a resposta. Posição é **simulação**: tem
+estado anterior de verdade, e interpolar reconstrói o que aconteceu entre dois estados conhecidos.
+Rotação é **input**: interpolar adiciona um tick de atraso e continua entregando velocidade em
+degraus de 50 ms. A leitura da câmera saiu do tick e virou `Controls.updateLook(dtMs, …)`, chamada
+uma vez por quadro desenhado.
+
+A divisão importa e está testada: mouse e dedo entregam **pixels acumulados** e não escalam com o
+tempo — o mesmo arrasto gira o mesmo em qualquer FPS; o analógico entrega **velocidade** e é
+multiplicado pela duração do quadro, com o passo limitado a 100 ms para um engasgo de 250 ms não
+virar um giro. Pausado, o movimento é consumido e jogado fora, senão a câmera saltaria tudo de uma
+vez ao voltar.
+
+### Um gesto é uma coisa só
+
+No Modo A, o dedo que passa da folga de toque vira câmera e **não volta a ser quebra** até ser
+levantado. Isso desfaz a reancoragem entregue de manhã, em que parar no meio de um arrasto rearmava
+a contagem: ela tinha sido a resposta para o toque longo que quase nunca disparava, e o efeito na
+mão foi o oposto — o anel de progresso aparecendo enquanto o jogador só olhava em volta. Sumiram
+com ela o `HOLD_SLOP` e os campos de âncora; a contagem voltou a ser desde que o dedo encostou.
+
+### O painel de controle ficou mais fundo
+
+`L1`/`R1` continuam sem aparecer, e o painel lê o controle cru — então a causa não está no jogo. O
+painel passou a mostrar os **três** jeitos de um botão chegar (`pressed`, meio curso, e só
+`touched`, que alguns drivers usam e que ele engolia), o **último eixo que saiu do lugar** (se o
+botão estiver chegando como eixo ou chapéu, é onde isso aparece) e o `id` cru do aparelho. As
+hipóteses que sobram estão no doc 15 §5 P1.
+
+### Grid de arquivos
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/input/controls.ts` | `updateLook(dtMs, …)` novo, por quadro; `update()` deixou de mexer na câmera; passo de integração limitado |
+| `~` | `src/main.ts` | a câmera é lida no `render`, antes de posicionar; pausado, o movimento é consumido e descartado |
+| `~` | `src/input/touch.ts` | `panned`: dedo que girou a câmera sai da disputa pela quebra; `HOLD_SLOP` e a âncora saíram |
+| `~` | `src/ui/screens/padtester.ts` | três sinais por botão, último eixo que mexeu, `id` cru |
+| `~` | `tests/input.test.ts` | 5 testes da câmera por quadro: o tick não consome, pixel não escala, velocidade escala, engasgo limitado, quadro parado não recalcula |
+| `~` | `tests/touch.test.ts` | contrato novo do arrasto (3 testes no lugar de 1) |
+| `~` | `tests/padtester.test.ts` | 5 testes dos sinais que não são um aperto comum |
+| `~` | `docs/01-arquitetura-tecnica.md` | §3.3: a câmera é a exceção do timestep fixo, e por quê |
+| `~` | `docs/09-controles-mobile.md` | §2.2 um gesto é uma coisa só; §3 o que o painel mostra |
+| `~` | `docs/15-status.md` | §1 duas linhas; §2 métricas; §3 seção nova; §4 duas correções; §5 P1 reescrita com as hipóteses; §6 itens 1 e 3 |
+| `~` | `docs/16-auditoria.md` | esta sessão |
+| `~` | `README.md` | contagem de testes |
+
+**Portões:** 1413 testes em 78 arquivos verdes · lint limpo · build limpo · 192,5 KB gzip de 350.
+
+---
+
 ## 2026-09-14 · 18:22 → 18:45 · O foco que ninguém via, e o modo que dá para trocar
 
 **Pedido:** seis relatos de uma sessão. *"No menu inicial, a movimentação utilizando o analógico

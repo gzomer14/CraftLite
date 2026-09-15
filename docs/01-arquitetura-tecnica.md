@@ -124,6 +124,13 @@ interface ChunkSection {
 ### 3.3 Tick do mundo
 - **Fixed timestep de 20 ticks/s (50 ms)**, igual ao original. Render é livre (rAF), com
   interpolação de posição entre ticks (`alpha`).
+- **A câmera é a exceção: ela é lida por quadro desenhado, não por tick.** Posição é simulação e
+  tem estado anterior de verdade, então interpola; rotação é **input**, e interpolar input só
+  adiciona um tick de atraso e continua entregando a velocidade em degraus de 50 ms. Ler o mouse
+  na hora de desenhar é o que faz a câmera acompanhar o display em vez de andar de 20 em 20 Hz
+  (relato de campo 2026-09-14: *"a câmera se move pulando, como se fosse movimentação por
+  teclado"*). Mouse e dedo entregam pixels acumulados e não são escalados pelo tempo; analógico
+  entrega velocidade e é multiplicado pela duração do quadro.
 - Se o navegador atrasar, limitar a **5 ticks de catch-up por frame** e então descartar o resto
   (evita espiral da morte).
 - **Random ticks**: por section carregada, 3 posições aleatórias por tick recebem `randomTick()`

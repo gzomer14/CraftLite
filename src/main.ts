@@ -739,9 +739,7 @@ async function boot(): Promise<void> {
 
   const loop = new GameLoop({
     tick() {
-      controls.update((yawDelta, pitchDelta) => {
-        Controls.applyLookTo(player, yawDelta, pitchDelta);
-      });
+      controls.update();
 
       if (controls.touch.fingerCount >= 3) {
         if (threeFingerArmed) { debug.toggle(); threeFingerArmed = false; }
@@ -898,6 +896,20 @@ async function boot(): Promise<void> {
       pipeline.drainReady(budgetMs, (result) => renderer.chunks.apply(result));
     },
     render(alpha) {
+      /*
+       * A câmera é lida **aqui**, e não no tick.
+       *
+       * `camera.yaw` recebe `player.yaw` direto, sem interpolação — girar a
+       * 20 Hz num display de 60 Hz repetiria o mesmo ângulo por três quadros e
+       * depois pularia. Ver o comentário de `Controls.updateLook`.
+       */
+      controls.updateLook(loop.stats.frameMs, (yawDelta, pitchDelta) => {
+        // Pausado, o movimento é **consumido e jogado fora**: guardá-lo faria
+        // a câmera saltar tudo de uma vez ao voltar ao jogo.
+        if (paused) return;
+        Controls.applyLookTo(player, yawDelta, pitchDelta);
+      });
+
       const camera = renderer.camera;
       camera.prevX = player.prevX;
       camera.prevY = player.prevY + player.eyeHeight;

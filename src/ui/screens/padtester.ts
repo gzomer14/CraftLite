@@ -22,6 +22,8 @@ import { STANDARD_BUTTONS, profileFor, type PadButton } from '../../data/gamepad
 
 /** Quantas vezes por segundo o painel se atualiza. Só roda com a tela aberta. */
 const HZ = 15;
+/** Quanto um eixo precisa andar para contar como "mexeu". */
+const AXIS_MOVE = 0.4;
 
 /** Nome do botão por índice, no layout que este aparelho estiver usando. */
 function namesFor(pad: Gamepad): Map<number, PadButton> {
@@ -39,6 +41,10 @@ export class PadTester {
   private timer: ReturnType<typeof setInterval> | null = null;
   /** Índice e nome do último botão que foi apertado, para não sumir ao soltar. */
   private lastPress = '';
+  /** Último eixo que saiu do lugar, e para quanto. */
+  private lastAxis = '';
+  /** Leitura anterior dos eixos, para saber qual mexeu. */
+  private readonly lastAxes: number[] = [];
 
   constructor() {
     this.element = document.createElement('div');
@@ -51,6 +57,8 @@ export class PadTester {
   start(): void {
     if (this.timer !== null) return;
     this.lastPress = '';
+    this.lastAxis = '';
+    this.lastAxes.length = 0;
     this.refresh();
     this.timer = setInterval(() => this.refresh(), 1000 / HZ);
   }
@@ -77,27 +85,63 @@ export class PadTester {
     const names = namesFor(pad);
     const pressed: string[] = [];
     for (let i = 0; i < pad.buttons.length; i++) {
-      const button = pad.buttons[i];
-      if (button === undefined) continue;
-      if (!button.pressed && button.value <= 0.35) continue;
-      const name = names.get(i);
-      pressed.push(name === undefined ? String(i) : `${i} (${name})`);
+      const label = signalOf(pad.buttons[i], i, names.get(i));
+      if (label !== null) pressed.push(label);
     }
     if (pressed.length > 0) this.lastPress = pressed.join(', ');
 
+    /*
+     * O eixo que mexeu por último.
+     *
+     * É a linha que existe por causa de um sintoma sem explicação: `L1` e `R1`
+     * de um DualSense não aparecem como botão nenhum, enquanto o resto do
+     * controle aparece. Se eles estiverem chegando como **eixo** — um chapéu,
+     * ou um controle que reporta ombro analógico —, é aqui que isso fica
+     * visível. Sem esta linha, um eixo que muda some no meio de uma fileira de
+     * números.
+     */
     const axes: string[] = [];
-    for (let i = 0; i < pad.axes.length; i++) axes.push((pad.axes[i] ?? 0).toFixed(2));
+    for (let i = 0; i < pad.axes.length; i++) {
+      const value = pad.axes[i] ?? 0;
+      axes.push(value.toFixed(2));
+      const before = this.lastAxes[i];
+      if (before !== undefined && Math.abs(value - before) > AXIS_MOVE) {
+        this.lastAxis = `${i} → ${value.toFixed(2)}`;
+      }
+      this.lastAxes[i] = value;
+    }
 
     const layout = pad.mapping === 'standard'
       ? 'layout normalizado pelo navegador'
       : 'layout NÃO normalizado — os índices vêm da família';
 
     this.element.textContent =
-      `${layout} · ${pad.buttons.length} botões · ${pad.axes.length} eixos\n`
+      `${pad.id}\n`
+      + `${layout} · ${pad.buttons.length} botões · ${pad.axes.length} eixos\n`
       + `apertado agora: ${pressed.length > 0 ? pressed.join(', ') : '—'}\n`
       + `último aperto: ${this.lastPress === '' ? '—' : this.lastPress}\n`
+      + `último eixo que mexeu: ${this.lastAxis === '' ? '—' : this.lastAxis}\n`
       + `eixos: ${axes.join('  ')}`;
   }
+}
+
+/**
+ * O que este botão está mandando agora, ou `null` se não está mandando nada.
+ *
+ * Os três sinais aparecem separados de propósito. `pressed` é o caminho comum;
+ * `value` sozinho é gatilho analógico ou botão que o driver reporta em meio
+ * curso; `touched` sem `pressed` é o que alguns drivers fazem com botões que o
+ * navegador não sabe classificar — e era um sinal que o painel **engolia**.
+ */
+function signalOf(
+  button: GamepadButton | undefined, index: number, name: PadButton | undefined,
+): string | null {
+  if (button === undefined) return null;
+  const who = name === undefined ? String(index) : `${index} (${name})`;
+  if (button.pressed) return who;
+  if (button.value > 0) return `${who} ${button.value.toFixed(2)}`;
+  if (button.touched) return `${who} toque`;
+  return null;
 }
 
 /** O primeiro controle conectado, ou `null`. Cópia local, de propósito: cru. */

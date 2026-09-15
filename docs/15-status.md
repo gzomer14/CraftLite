@@ -9,7 +9,7 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-14 18:40 — **o foco que ninguém via, e o modo que dá para trocar**
+**Última atualização:** 2026-09-14 21:00 — **a câmera saiu do tick**
 
 ---
 
@@ -32,6 +32,8 @@
 | **Controle, 4ª passada** | navegação quieta até o controle ser empurrado, anel de foco próprio, só o que está desenhado entra na travessia | ✅ concluído | — |
 | **Modo de jogo** | trocar entre Criativo e Sobrevivência no mesmo mundo, pela pausa, com o modo guardado no save | ✅ concluído | — |
 | **HUD** | coxa de frango desenhada no lugar do retângulo da fome; vida, ar, fome e armadura somem no Criativo | ✅ concluído | — |
+| **Câmera** | rotação lida por quadro desenhado, não no tick de 20 Hz | ✅ concluído | — |
+| **Toque, Modo A** | dedo que girou a câmera deixa de ser candidato a quebrar | ✅ concluído | — |
 
 **O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
 ele irá pesar muito o jogo e trazer muita complexidade por enquanto desnecessária"*. O
@@ -44,13 +46,13 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-14 18:40, com `npm test`, `npm run build` e
+Medidas em 2026-09-14 21:00, com `npm test`, `npm run build` e
 `SIZE_BUDGET_KB=350 npm run size`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **192,3 KB** | < 350 KB | `npm run size` |
-| Testes | **1401**, 78 arquivos | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **192,5 KB** | < 350 KB | `npm run size` |
+| Testes | **1413**, 78 arquivos | manter verde | `npm test` |
 | Camadas de atlas | **156** | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Memória de áudio | **3,26 MB** (era 3,95 com três sons a menos) | < 3,5 MB | `tests/audio.test.ts` |
 | Geração de chunk | 5,7–6,2 ms (mediana; varia muito com a carga da máquina) | < 25 ms | `tests/perf.test.ts` |
@@ -937,6 +939,50 @@ uma mecânica que não existe.
 
 ---
 
+### A câmera saiu do tick ✅ — 2026-09-14
+
+Três relatos. Um deles é a correção mais visível da semana e valia para **todo
+mundo**, em qualquer aparelho.
+
+**A câmera andava a 20 Hz.** O jogo simula a 20 Hz e interpola no render, e a
+posição do jogador seguia essa regra — mas a rotação não: `camera.yaw` recebia
+`player.yaw` direto, sem interpolação, e `player.yaw` só mudava no tick. Num
+display de 60 Hz isso repete o mesmo ângulo por três quadros e depois pula; num
+de 120, por seis. O jogo rodava liso e a câmera andava *"de quadro em quadro,
+como se fosse movimentação por teclado"* — notado inclusive por quem não estava
+procurando.
+
+Interpolar a rotação como se interpola a posição **não** era a resposta. Posição
+é simulação: ela tem estado anterior de verdade, e interpolar é reconstruir o
+que aconteceu entre dois estados conhecidos. Rotação é **input**: interpolar
+adiciona um tick de atraso e continua entregando a velocidade em degraus, porque
+o passo continua sendo de 50 ms. A câmera passou a ser lida **uma vez por quadro
+desenhado**, que é o que todo jogo de primeira pessoa faz.
+
+A divisão importa: mouse e dedo entregam **pixels acumulados** desde a última
+leitura e não são escalados pelo tempo — o mesmo arrasto tem que girar o mesmo
+em qualquer FPS. O analógico entrega **velocidade** (−1..1) e é multiplicado
+pela duração do quadro, senão girar dependeria do FPS. O passo vem limitado a
+100 ms: um engasgo de 250 ms faria o analógico girar cinco vezes de uma vez.
+
+**Um gesto é uma coisa só.** No Modo A, o dedo que passa da folga de toque vira
+câmera e **não volta a ser quebra** enquanto não for levantado. Isso desfaz a
+reancoragem entregue de manhã, em que parar no meio de um arrasto rearmava a
+contagem: era uma resposta ao toque longo que quase nunca disparava, e o efeito
+na mão foi o oposto — o anel de progresso aparecendo o tempo todo enquanto o
+jogador só olhava em volta. Começada a quebra, nada a cancela a não ser levantar
+o dedo.
+
+**O painel de controle ficou mais fundo.** O `L1`/`R1` do DualSense continua não
+aparecendo — *"reconhece todas as outras teclas do controle, menos essas
+duas"* —, e o painel agora mostra os três jeitos de um botão chegar (`pressed`,
+meio curso, e só encostado, que alguns drivers usam e o painel engolia), o
+**último eixo que saiu do lugar** (se o botão estiver chegando como eixo ou
+chapéu, é aqui que aparece) e o `id` cru do aparelho. As hipóteses que restam
+estão listadas no §5 P1.
+
+---
+
 ---
 
 ## 4. Correções fora de marco
@@ -946,6 +992,8 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-14 | `input/controls.ts`, `main.ts` | **A rotação da câmera acontecia a 20 Hz.** A posição do jogador é interpolada no render, mas a rotação não — `camera.yaw` recebe `player.yaw` direto —, e `player.yaw` só mudava no tick. Num display de 60 Hz o mesmo ângulo aparecia em três quadros seguidos e então pulava: o jogo rodava liso e a câmera andava *"de quadro em quadro, como se fosse movimentação por teclado"*. A leitura da câmera saiu do tick e passou a ser por quadro desenhado; interpolar a rotação teria adicionado um tick de atraso sem tirar o degrau, porque o passo continuaria sendo de 50 ms. Mouse e dedo entregam pixels e não escalam com o tempo; analógico entrega velocidade e escala, com o passo limitado a 100 ms para um engasgo não virar um giro. |
+| 2026-09-14 | `input/touch.ts` | **No Modo A, olhar em volta mostrava o anel de "vai quebrar" o tempo todo.** A reancoragem entregue horas antes — sair da folga reiniciava a contagem em vez de cancelá-la — fazia qualquer pausa no meio de um arrasto rearmar a quebra. Ela tinha sido a resposta para o toque longo que quase nunca disparava; na mão, o problema virou o oposto. Agora o dedo que passa de `TAP_SLOP` vira câmera e não volta a ser candidato a quebrar até ser levantado. Relato de campo: *"ele constantemente aparece a bolinha achando que eu vou começar a quebrar algo"*. |
 | 2026-09-14 | `input/uinav.ts` | **O foco do gamepad era invisível.** Toda a interface estiliza foco com `:focus-visible`, que o navegador acende a partir da **modalidade do último input** — e gamepad não é uma modalidade que ele conheça. Um `focus()` disparado de um laço de `requestAnimationFrame` depois de um toque na tela não acende anel nenhum: a navegação movia o foco corretamente e não mostrava nada. Relato de campo: *"parece que muitas vezes indo para botões nem existentes em tela"*. O documento passou a ganhar a classe `pad-nav` enquanto a navegação está em uso, com anel próprio; o primeiro toque ou tecla devolve a decisão ao navegador. |
 | 2026-09-14 | `input/uinav.ts` | **A navegação por controle roubava o foco de quem joga no dedo.** Ela rodava a cada tick com qualquer tela aberta e, sem nada focado dentro dela, focava o primeiro item — inclusive para quem nunca ligou um controle. No inventário criativo o primeiro focável é o campo de busca, então no celular **pegar um item subia o teclado virtual** por cima da tela (*"em qualquer item que pego ele simplesmente seleciona a pesquisa novamente sozinho"*). Agora ela só age quando o controle é empurrado, o primeiro aperto revela o foco sem andar nem ativar, e o foco de partida evita campo de texto. |
 | 2026-09-14 | `input/uinav.ts` | **Botão escondido por CSS entrava na travessia.** O filtro olhava só o atributo `hidden`, e um painel fechado por classe deixa os botões dele no documento com caixa de layout zerada. Agora quem não tem caixa fica de fora — e, se ninguém tem, a lista vai inteira, porque aí não há layout para consultar (é o caso do ambiente de teste). |
@@ -1047,15 +1095,25 @@ mudanças em código de marcos "fechados":
 
 ## 5. Dependências entre pendências
 
-**P1 — `L1`/`R1` não trocam o item da mão num DualSense por Bluetooth** (aberta em 2026-09-14).
-É a única pendência de funcionalidade, e ela **depende de dado que só existe no aparelho**: o
-código diz que deveria funcionar e o jogador diz que não funciona. O painel de teste em
-Opções → Controle foi entregue para tirar a dúvida, e o direcional ←/→ cobre a função enquanto
-isso (§3).
+**P1 — o navegador não reporta `L1`/`R1` de um DualSense por Bluetooth** (aberta em 2026-09-14).
+É a única pendência de funcionalidade, e ela **não está no jogo**: o painel de teste lê
+`navigator.getGamepads()` cru, sem perfil nem remapeamento, e mesmo assim os dois botões não
+aparecem — *"reconhece todas as outras teclas do controle, menos essas duas"*, num controle que
+funciona no PS5. O que sobra de hipótese, em ordem de plausibilidade:
+
+1. **eles chegam como eixo ou chapéu** em vez de botão — o painel agora mostra o último eixo que
+   saiu do lugar, que é o que confirma isso em um aperto;
+2. **eles chegam sem `pressed`**, só com `touched` ou com valor parcial — o painel mostrava só
+   `pressed` e agora mostra os três sinais;
+3. **o relatório HID do DualSense em Bluetooth é diferente do de cabo** nesse navegador, e os dois
+   botões caem fora do que ele expõe. Conectar por cabo separa esta da anterior.
+
+Se for (1) ou (2), a correção é uma linha no mapeamento. Se for (3), não há correção do lado do
+jogo, e o direcional ←/→ — que já troca o item da mão — passa a ser a resposta definitiva.
 
 ```
-Painel de teste com o DualSense na mão  ──►  diz se o aparelho manda o botão 4/5
-                                        ──►  decide se P1 é mapeamento ou consumo
+Painel de teste com o DualSense na mão  ──►  eixo? sinal parcial? nada?
+                                        ──►  decide se P1 tem conserto aqui dentro
 ```
 
 Fora dela, o que resta é a dependência externa ao código:
@@ -1131,15 +1189,16 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
 
 ## 6. Próximo passo recomendado
 
-1. **Abrir Opções → Controle com o DualSense ligado e apertar `L1` e `R1`.** É o item de cima
-   porque é o único com pendência aberta (§5 P1) e porque leva trinta segundos. O painel diz o
-   índice de cada botão apertado. Três leituras possíveis:
-   - **acusa `4 (l1)` e `5 (r1)`** — o aparelho manda, o mapeamento está certo, e o problema está
-     depois: o próximo lugar a olhar é se algo zera `hotbarPrev`/`hotbarNext` antes do consumo;
-   - **não acusa nada ao apertar `L1`/`R1`** — o aparelho não manda esses botões nesse modo de
-     conexão. Aí o que interessa é a contagem de botões e o aviso de layout: um DualSense em
-     Bluetooth pode aparecer com relatório diferente do de cabo;
-   - **acusa outro índice** — é mapeamento, e a correção é uma linha em `PAD_BINDINGS`.
+1. **Abrir Opções → Controle e apertar `L1` e `R1` de novo — o painel ficou mais fundo.** É o
+   único item com pendência aberta (§5 P1) e leva trinta segundos. O que olhar, nesta ordem:
+   - **a linha "último eixo que mexeu"**: se ela mudar ao apertar `L1`/`R1`, eles estão chegando
+     como eixo, e a correção é uma linha no mapeamento;
+   - **"apertado agora"**, que agora mostra meio curso (`4 (l1) 0.40`) e botão só encostado
+     (`4 (l1) toque`) — dois sinais que o painel engolia antes;
+   - **a contagem de botões** e o `id` cru, que passaram a aparecer: se o número for menor que 17,
+     o navegador está expondo um relatório reduzido;
+   - **por cabo**, se houver um USB-C à mão. É o que separa "o aparelho não manda" de "o Bluetooth
+     não manda".
 
    Enquanto isso, **o direcional ←/→ troca o item da mão** e é o caminho que funciona.
 2. **Reconferir os menus com o controle**, que é o que mudou mais na última passada:
@@ -1152,10 +1211,15 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      subir sozinho, e o analógico tem que andar entre as casinhas;
    - **pegar o controle com a tela já aberta no dedo**: o primeiro aperto mostra onde o foco está
      e não aperta nada.
-3. **Trocar de modo pela pausa** e conferir que sair e voltar ao mundo devolve o modo aplicado.
+3. **Olhar em volta, e só isso.** A câmera saiu do tick e agora é lida por quadro: girar tem que
+   ficar liso no computador e no celular, sem o "pulando de quadro em quadro". E no Modo A,
+   arrastar o dedo para olhar **não** pode mais acender o anel de quebra — ele só aparece quando o
+   dedo encosta e fica parado. Se a velocidade do analógico tiver mudado de sensação, o número é
+   `padSensitivity` nas opções.
+4. **Trocar de modo pela pausa** e conferir que sair e voltar ao mundo devolve o modo aplicado.
    No Criativo, vida, ar, fome e armadura somem do HUD; no Sobrevivência voltam — e a fome agora é
    uma coxa de frango, não um retângulo.
-4. **Jogar o que foi entregue em 2026-09-14.** É o único item com risco real: vinte opções novas,
+5. **Jogar o que foi entregue em 2026-09-14.** É o único item com risco real: vinte opções novas,
    um passe de render novo, um sistema de mundo novo e um mob novo — nenhum deles viu um aparelho.
    O que olhar, em ordem de quanto pode estar errado:
    - **Nuvens.** Elas são o único desenho que nunca foi visto. Conferir se a forma lê como nuvem e
@@ -1173,17 +1237,17 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      certa do corpo.
    - **Modo daltônico e contorno em alto contraste**, que são acessibilidade e só se avaliam
      olhando.
-5. **Reconferir a quebra.** Um clique — de mouse ou de dedo — tem que derrubar **um** bloco, no
+6. **Reconferir a quebra.** Um clique — de mouse ou de dedo — tem que derrubar **um** bloco, no
    criativo e no sobrevivência; segurando, o ritmo é de ~4 por segundo. E as plantas passaram a ser
    miráveis: grama alta, flores, mudas e cana agora quebram. Vale conferir que **minerar pedra não
    ficou mais lento** — é o que o intervalo foi desenhado para não fazer.
-6. **Reconferir o toque no celular.** O padrão agora é o **Modo B**, que é o que já funcionava —
+7. **Reconferir o toque no celular.** O padrão agora é o **Modo B**, que é o que já funcionava —
    então o primeiro teste é confirmar que nada regrediu nele. Depois vale voltar ao **Modo A** nas
    opções e ver se ele ficou utilizável: colocar e quebrar agora miram no **mesmo** lugar (o dedo),
    a mira central some, a folga de arraste dobrou, e arrastar para mirar e então segurar passou a
    funcionar em vez de travar o dedo. Se ainda falhar, o número a mexer é `HOLD_SLOP` em
    `input/touch.ts`.
-7. **Reconferir o inventário no celular.** As duas correções de 2026-09-14
+8. **Reconferir o inventário no celular.** As duas correções de 2026-09-14
    vieram de relato de campo e voltam para lá:
    - **toque longo num slot** pega metade com a mão vazia e solta uma unidade com a mão cheia.
      Montar uma receita de tábua por célula é o teste que importa. A dica aparece no painel, e o
@@ -1191,7 +1255,7 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
    - **largar item** agora arremessa na direção do olhar, e o que foi jogado fora só volta a ser
      coletável depois de dois segundos. Vale largar olhando para o chão e para uma parede, que é
      onde o arremesso sozinho não resolveria.
-8. **Voltar ao DualSense.** O reconhecimento por Bluetooth e a navegação básica já foram
+9. **Voltar ao DualSense.** O reconhecimento por Bluetooth e a navegação básica já foram
    confirmados em 2026-09-14; o que ainda não viu aparelho é a segunda passada. Em ordem de
    quanto pode estar errado:
    - **O cursor do analógico direito** com o inventário aberto. É o item novo e o mais fácil de
@@ -1211,15 +1275,15 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      ligada.
    - **No celular**, lembrar que ligar o áudio e a tela cheia exigem um toque na tela — o controle
      não serve de gesto para o navegador. O jogo avisa isso ao conectar.
-9. **Uma sessão longa de verdade.** É o **último critério da definição de pronto** que não foi
+10. **Uma sessão longa de verdade.** É o **último critério da definição de pronto** que não foi
    cumprido: o PROMPT.md §11 pede *"2 horas sem crash, sem perda de progresso e sem travas"*, e a
    sessão de campo mais longa registrada tem 10 minutos. Não é teste de FPS — é teste de vazamento,
    de save e de fogo/mob acumulando. O F3 tem tudo que ele precisa: `mem`, a linha `C:` e agora
    `N fogo`.
-10. **Medir o tempo de abertura em 3G.** O critério 1 do PROMPT.md §11 tem metade cumprida — o
+11. **Medir o tempo de abertura em 3G.** O critério 1 do PROMPT.md §11 tem metade cumprida — o
    bundle está em 189 KB de 350 — e a outra metade nunca foi medida. O `throttling` do DevTools
    resolve; o que interessa é o tempo até a tela de título, com o atlas gerando no meio.
-11. Oportunidades pequenas que sobraram, agora curtas:
+12. Oportunidades pequenas que sobraram, agora curtas:
    - **`.clw` com miniatura** já funciona, mas nenhum arquivo real foi exportado e reimportado
      desde a mudança para a v2 — é um teste manual de cinco minutos;
    - **som no resource pack** foi testado por formato, nunca com um `.ogg` de verdade num

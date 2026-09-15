@@ -7,6 +7,7 @@
  */
 
 import { clamp, DEG2RAD } from '../core/math';
+import { TICK_MS } from '../core/loop';
 import type { SettingsStore } from '../game/settings';
 import { Gamepads } from './gamepad';
 import { Keybinds } from './keybinds';
@@ -16,6 +17,8 @@ import { TouchControls } from './touch';
 import type { ActionId } from '../data/keybinds';
 
 const PITCH_LIMIT = 89.9 * DEG2RAD;
+/** Teto do passo de integração da câmera: um engasgo não vira um giro. */
+const MAX_LOOK_STEP_MS = 100;
 
 export interface ActionState {
   forward: number;
@@ -179,25 +182,55 @@ export class Controls {
   }
 
   /**
-   * Consolida tudo. Chamado uma vez por tick, antes de usar `state`.
-   * Devolve o delta de câmera já aplicado a `yaw`/`pitch` do jogador.
+   * A câmera, **uma vez por quadro desenhado** e não por tick.
+   *
+   * É a única parte do input que não roda a 20 Hz, e o motivo é visível: a
+   * rotação não é interpolada no render — `camera.yaw` recebe `player.yaw`
+   * direto —, então girar a 20 Hz num display de 60 ou 120 Hz mostra o mesmo
+   * ângulo por dois ou seis quadros seguidos e depois pula. O jogo roda liso e
+   * a câmera anda "de quadro em quadro, como movimento por teclado" (relato de
+   * campo 2026-09-14).
+   *
+   * Interpolar a rotação como se interpola a posição não resolveria: a posição
+   * é simulada e tem estado anterior de verdade, enquanto a câmera é **input**.
+   * Interpolar input só adiciona um tick de atraso e continua entregando a
+   * velocidade em degraus, porque o passo ainda seria de 50 ms. Ler o mouse
+   * quando se desenha é o que todo jogo de primeira pessoa faz.
+   *
+   * `dtMs` é a duração do quadro. Mouse e dedo entregam **pixels acumulados**
+   * desde a última leitura e não são escalados; o analógico entrega
+   * **velocidade** (−1..1) e é multiplicado pelo tempo, senão girar mais rápido
+   * dependeria do FPS.
    */
-  update(applyLook: (yawDelta: number, pitchDelta: number) => void): void {
-    this.touch.update();
-    this.gamepad.poll();
-
-    // --- câmera: mouse + arraste de toque + analógico direito ---
+  updateLook(dtMs: number, applyLook: (yawDelta: number, pitchDelta: number) => void): void {
     this.mouse.consume(this.look);
     this.touch.consumeLook(this.touchLook);
-    // O analógico entrega −1..1 por tick, não pixels: a escala é outra, e ela
-    // tem multiplicador próprio — mão no mouse e polegar no analógico não
-    // querem a mesma sensibilidade.
+    // O analógico tem multiplicador próprio — mão no mouse e polegar no
+    // analógico não querem a mesma sensibilidade.
+    /*
+     * `dtMs` é a duração do **quadro anterior**, que é o que se tem na hora de
+     * desenhar o atual — é a conta padrão de integração por quadro. Ela vem
+     * limitada: zero no primeiro quadro, e um engasgo de 250 ms faria o
+     * analógico girar cinco vezes mais de uma vez só.
+     */
+    const step = Math.min(Math.max(dtMs, 1), MAX_LOOK_STEP_MS) / TICK_MS;
     const padSens = this.settings.get('lookSensitivity') * 22
-      * this.settings.get('padSensitivity');
+      * this.settings.get('padSensitivity') * step;
     const yawDelta = this.look[0] + this.touchLook[0] - this.gamepad.state.lookX * padSens;
     const pitchDelta = this.look[1] + this.touchLook[1]
       + (this.settings.get('invertY') ? -1 : 1) * this.gamepad.state.lookY * padSens;
+    if (yawDelta === 0 && pitchDelta === 0) return;
     applyLook(yawDelta, pitchDelta);
+  }
+
+  /**
+   * Consolida o resto. Chamado uma vez por tick, antes de usar `state`.
+   *
+   * A câmera **não** sai daqui: ela é por quadro, em `updateLook`.
+   */
+  update(): void {
+    this.touch.update();
+    this.gamepad.poll();
 
     // --- movimento: teclado, joystick e analógico esquerdo somam ---
     const keys = this.keybinds;

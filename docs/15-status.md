@@ -9,7 +9,7 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-14 21:16 — **o L1/R1 é do navegador, não do jogo**
+**Última atualização:** 2026-09-14 22:50 — **o jogo testado por um robô: 3G medido, sessão longa rodando**
 
 ---
 
@@ -69,6 +69,10 @@ Medidas em 2026-09-14 21:16, com `npm test`, `npm run build` e
 | Render em T0 | **2,7 ms** de 33,3 ms de orçamento | ≤ 8 ms (soma do doc 02 §2) | overlay F3 no aparelho |
 | Heap em T0 | **20 MB**, estável na sessão | sem crescimento | overlay F3 no aparelho |
 | FPS em celular atual | **75, T2, RD 16, escala 1,00, render 2,6 ms** (S24 Ultra) | — | teste manual |
+| Abertura em 3G rápido | **4,48 s** até a tela de título | < 5 s (PROMPT.md §11) | `npm run slow-network` |
+| Abertura em 3G lento | 9,66 s | — | `npm run slow-network` |
+| Abertura sem limite de rede | 2,89 s | — | `npm run slow-network` |
+| Bytes na rede até o título | **173,0 KB** (169,1 KB do bundle, servido em gzip) | < 350 KB | `npm run slow-network` |
 
 ---
 
@@ -1020,6 +1024,67 @@ meses: **o mapeamento não está errado**.
 
 ---
 
+### Os dois critérios que faltavam viraram teste automatizado ✅ — 2026-09-14
+
+O PROMPT.md §11 tem dois critérios que nunca tinham sido medidos: *"abre em
+< 5 s em 3G"* e *"2 horas sem crash, sem perda de progresso e sem travas"*.
+Ambos pediam um navegador de verdade rodando o jogo publicado, e agora existe
+um jeito de fazer isso sem ninguém segurando o mouse.
+
+**O harness é um Chrome de verdade dirigido por CDP, com zero dependência.** O
+Node 22 já traz `fetch` e `WebSocket` globais, e o protocolo do DevTools é JSON
+sobre um socket — `scripts/cdp.mjs` tem 40 linhas e faz o que o Puppeteer faria
+trazendo 300 MB e um Chrome próprio. O Chrome usado é o que já está instalado.
+
+**Abertura em 3G — medida, não estimada** (`npm run slow-network`). O CDP
+estrangula a rede com os mesmos perfis do DevTools, o cache fica desligado e o
+perfil é novo a cada medida (senão a segunda leitura sai do service worker e
+mede zero). O cronômetro para quando **a tela de título fica visível**, que é o
+que o critério pede — e não no `load` do documento.
+
+| Rede | Até o título | `load` |
+|---|---|---|
+| sem limite | 2,89 s | 1,11 s |
+| **3G rápido** (1,6 Mbit/s, 562 ms) | **4,48 s** ✅ | 2,49 s |
+| 3G lento (400 kbit/s, 2000 ms) | 9,66 s | 7,76 s |
+
+São 173,0 KB na rede até o título, dos quais 169,1 KB do bundle — o GitHub
+Pages serviu **gzip**, não brotli, então há 26 KB de margem que o servidor
+simplesmente não usou.
+
+O número que interessa não é só o veredito: **no 3G rápido, metade do tempo não
+é rede.** O documento fica pronto em 2,49 s e a tela de título aparece em 4,48 s
+— os ~2 s do meio são atlas procedural, folha de sprites e inicialização do GL,
+num desktop. Num T0 essa metade cresce, e é ela, não o tamanho do bundle, que
+decide se o critério continua cumprido. O caminho para ganhar tempo, se um dia
+precisar, está do lado da CPU.
+
+**Sessão longa — automatizada** (`npm run soak`). Um agente injetado na página
+entra no menu, cria um mundo criativo, liga o voo e segura o "para frente":
+voar em linha reta é o pior caso do pipeline, porque nunca para de pedir chunk
+novo. A cada 30 s guarda uma amostra do overlay de depuração.
+
+Três coisas que o harness aprendeu do jeito difícil, e que estão no código
+porque um teste que mente é pior que nenhum:
+
+1. **Aba escondida não roda.** Numa aba comum o jogo para quando ela deixa de
+   estar visível — é o que o `visibilitychange` faz, e está certo. O teste
+   rodaria só com a janela em primeiro plano por duas horas. Daí headless.
+2. **`blur` solta as teclas.** `Keyboard` esvazia as teclas apertadas quando a
+   janela perde o foco, e uma janela headless perde o foco sem avisar: o
+   primeiro teste passou minutos com o jogador imóvel num mundo que carregava
+   normalmente, FPS saudável, tudo verde. O "para frente" passou a ser
+   **reafirmado** a cada 500 ms, e duas amostras no mesmo lugar viram erro
+   registrado.
+3. **O duplo toque do voo estava na fronteira.** O terceiro aperto — o que
+   segura para subir — caía em cima da janela de 300 ms que alterna o voo: às
+   vezes ligava, às vezes desligava o que acabara de ligar. Era cara ou coroa, e
+   no coroa o boneco encalhava numa parede a seis blocos do nascimento. Agora a
+   subida é **verificada**: subiu mais de 25 blocos e ficou, está voando; senão,
+   tenta de novo.
+
+---
+
 ---
 
 ## 4. Correções fora de marco
@@ -1287,14 +1352,18 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      ligada.
    - **No celular**, lembrar que ligar o áudio e a tela cheia exigem um toque na tela — o controle
      não serve de gesto para o navegador. O jogo avisa isso ao conectar.
-9. **Uma sessão longa de verdade.** É o **último critério da definição de pronto** que não foi
-   cumprido: o PROMPT.md §11 pede *"2 horas sem crash, sem perda de progresso e sem travas"*, e a
-   sessão de campo mais longa registrada tem 10 minutos. Não é teste de FPS — é teste de vazamento,
-   de save e de fogo/mob acumulando. O F3 tem tudo que ele precisa: `mem`, a linha `C:` e agora
-   `N fogo`.
-10. **Medir o tempo de abertura em 3G.** O critério 1 do PROMPT.md §11 tem metade cumprida — o
-   bundle está em 189 KB de 350 — e a outra metade nunca foi medida. O `throttling` do DevTools
-   resolve; o que interessa é o tempo até a tela de título, com o atlas gerando no meio.
+9. **Uma sessão longa de verdade.** O PROMPT.md §11 pede *"2 horas sem crash, sem perda de
+   progresso e sem travas"*. Agora existe `npm run soak`, que roda isso sozinho num Chrome headless
+   — o resultado da primeira execução está no §3. O que **o robô não cobre** e ainda vale a pena
+   fazer à mão: uma sessão longa **jogando de verdade**, com inventário, construção, morte e
+   volta, e principalmente **no celular**, que é o aparelho com o orçamento apertado. O robô voa em
+   linha reta; ele prova que o pipeline e a memória aguentam, não que o jogo é jogável por duas
+   horas.
+10. ~~**Medir o tempo de abertura em 3G.**~~ **Feito em 2026-09-14**: 4,48 s no 3G rápido, dentro
+   dos 5 s do critério (§2 e §3). O que sobrou como pergunta em aberto é a **outra metade do
+   tempo**: ~2 s entre o documento pronto e a tela de título são CPU de boot, medidos num desktop.
+   Vale repetir a medida no celular, porque é essa metade que cresce num T0 — e é ela, e não o
+   tamanho do bundle, que decide se o critério continua cumprido.
 11. Oportunidades pequenas que sobraram, agora curtas:
    - **`.clw` com miniatura** já funciona, mas nenhum arquivo real foi exportado e reimportado
      desde a mudança para a v2 — é um teste manual de cinco minutos;

@@ -12,6 +12,81 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-14 · 21:30 → 22:50 · Os dois critérios que faltavam viraram teste
+
+**Pedido:** *"para o teste de 2h você não consegue simplesmente abrir o Chrome aqui da minha
+máquina, acessar o github pages publicado, criar um mundo no criativo e deixar voando por esse
+tempo todo? ... Inclusive para o teste do 3G, se não estou enganado o DevTools do navegador permite
+escolher diferentes conexões"*.
+
+**Resultado:** sim para os dois, mas não do jeito proposto — e o "não" é o achado.
+
+### Numa aba comum, o teste não roda
+
+A primeira tentativa foi exatamente a sugerida: abrir o jogo publicado numa aba do Chrome do
+usuário. Ela travou num ponto revelador — `document.hidden` era `true`, `requestAnimationFrame`
+nunca disparava, e o jogo estava **parado**. É o `visibilitychange` do próprio jogo, que para o
+loop quando a aba some, e está certo. Consequência: o teste de duas horas numa aba comum exigiria a
+janela em primeiro plano e desobstruída por duas horas — a máquina do usuário inteira, parada.
+
+Daí **headless**, que não tem aba escondida. E com `--use-gl=angle --use-angle=gl-egl`, que é o que
+faz o Chrome headless usar a GPU de verdade (Intel UHD 620) em vez de cair no SwiftShader — a
+diferença entre medir 60 FPS e medir 4.
+
+### O harness: Chrome de verdade, zero dependência
+
+O Node 22 já traz `fetch` e `WebSocket` globais, e o CDP é JSON sobre um socket: `scripts/cdp.mjs`
+tem 40 linhas e dispensa o Puppeteer, que traria 300 MB e um Chrome próprio. O Chrome usado é o que
+já está instalado.
+
+### 3G medido, e a metade que não é rede
+
+`Network.emulateNetworkConditions` com os perfis do DevTools, cache desligado, perfil novo a cada
+medida. O cronômetro para quando **a tela de título aparece**, não no `load`.
+
+| Rede | Até o título | `load` |
+|---|---|---|
+| sem limite | 2,89 s | 1,11 s |
+| **3G rápido** | **4,48 s** ✅ (critério: < 5 s) | 2,49 s |
+| 3G lento | 9,66 s | 7,76 s |
+
+173,0 KB na rede, 169,1 KB deles do bundle — em **gzip**, porque o GitHub Pages não serviu brotli,
+deixando 26 KB de margem na mesa. E o número que interessa além do veredito: **no 3G rápido,
+metade do tempo é CPU de boot**, não rede. Num T0 essa metade cresce, e é ela que decide o critério.
+
+### Três lições do agente de sessão longa
+
+O agente entra no menu, cria mundo criativo, liga o voo e segura o "para frente" — voar em linha
+reta é o pior caso do pipeline. Três falhas silenciosas foram achadas e corrigidas antes de valer:
+
+1. **`blur` solta as teclas.** `Keyboard` esvazia as teclas quando a janela perde o foco, e uma
+   janela headless perde o foco sem avisar. O primeiro teste passou minutos com o jogador imóvel
+   num mundo que carregava normalmente, FPS saudável, tudo verde. O "para frente" virou
+   **reafirmação** a cada 500 ms, e duas amostras no mesmo lugar viram erro registrado.
+2. **O duplo toque do voo estava na fronteira dos 300 ms.** O terceiro aperto, o que segura para
+   subir, caía em cima da janela que alterna o voo: às vezes ligava, às vezes desligava. No coroa, o
+   boneco encalhava numa parede a seis blocos do nascimento. A subida passou a ser **verificada**.
+3. **Três segundos de subida não bastam.** Deixavam o boneco na altura das árvores. Agora são oito,
+   com retentativa.
+
+Um teste que mente é pior que nenhum: as três davam um verde perfeito medindo nada.
+
+### Grid de arquivos
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `+` | `scripts/cdp.mjs` | driver CDP mínimo sobre o `WebSocket` global do Node 22 |
+| `+` | `scripts/soak.mjs` | sessão longa: sobe o Chrome headless com GPU real, injeta o agente, grava as amostras |
+| `+` | `scripts/soak-agent.js` | o agente que joga sozinho, com subida verificada e watchdog de travamento |
+| `+` | `scripts/slow-network.mjs` | abertura em 3G pelos perfis do DevTools, cronometrada até a tela de título |
+| `~` | `package.json` | `npm run soak` e `npm run slow-network` |
+| `~` | `docs/15-status.md` | §2 quatro métricas de rede; §3 seção nova; §6 itens 9 e 10 |
+| `~` | `docs/16-auditoria.md` | esta sessão |
+
+**Portões:** 1416 testes em 78 arquivos verdes · lint limpo · build limpo · 192,7 KB gzip de 350.
+
+---
+
 ## 2026-09-14 · 21:08 → 21:20 · O L1/R1 é do navegador, não do jogo
 
 **Pedido:** *"Fiz o teste aqui e realmente pressionando os botões não mudou literalmente nenhuma

@@ -81,6 +81,10 @@ pendência de funcionalidade. Falta jogar em aparelho o que foi entregue depois 
   aponta direto na casinha desejada, e o gatilho esquerdo vale **clique direito** — que é o que
   permite pegar metade de uma pilha.
 
+Abre em **4,5 s em 3G rápido** (critério: < 5 s) e aguentou **92 min de voo contínuo sem um
+erro**, com o heap estável e o anel de chunks fixo em 489 colunas ao longo de 67 mil blocos — os
+dois medidos por `npm run slow-network` e `npm run soak`, que dirigem um Chrome de verdade.
+
 **192 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
 além de dois ícones de PWA de 6,7 KB, gerados por código.
 

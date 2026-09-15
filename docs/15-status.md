@@ -9,7 +9,7 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-14 22:50 — **o jogo testado por um robô: 3G medido, sessão longa rodando**
+**Última atualização:** 2026-09-15 00:25 — **92 minutos voando sem um erro: a sessão longa passou**
 
 ---
 
@@ -70,6 +70,10 @@ Medidas em 2026-09-14 21:16, com `npm test`, `npm run build` e
 | Heap em T0 | **20 MB**, estável na sessão | sem crescimento | overlay F3 no aparelho |
 | FPS em celular atual | **75, T2, RD 16, escala 1,00, render 2,6 ms** (S24 Ultra) | — | teste manual |
 | Abertura em 3G rápido | **4,48 s** até a tela de título | < 5 s (PROMPT.md §11) | `npm run slow-network` |
+| Sessão longa (voo contínuo) | **92,5 min, 0 erros, 0 travamentos** | 2 h sem crash (PROMPT.md §11) | `npm run soak` |
+| Heap na sessão longa | **37,8 MB no início, 44,2 no fim**; média por faixa de 15 min entre 42,8 e 47,2 | sem crescimento | `npm run soak` |
+| FPS na sessão longa | mediana **60**, mínimo 50, nenhuma amostra abaixo de 30 | 30 estáveis | `npm run soak` |
+| Mundo gerado na sessão longa | **67 621 blocos** percorridos, anel estável em 489 colunas | — | `npm run soak` |
 | Abertura em 3G lento | 9,66 s | — | `npm run slow-network` |
 | Abertura sem limite de rede | 2,89 s | — | `npm run slow-network` |
 | Bytes na rede até o título | **173,0 KB** (169,1 KB do bundle, servido em gzip) | < 350 KB | `npm run slow-network` |
@@ -1059,6 +1063,26 @@ num desktop. Num T0 essa metade cresce, e é ela, não o tamanho do bundle, que
 decide se o critério continua cumprido. O caminho para ganhar tempo, se um dia
 precisar, está do lado da CPU.
 
+**Resultado da primeira execução (2026-09-14 22:46 → 2026-09-15 00:19).** Noventa e dois
+minutos e meio de voo contínuo, encerrados a pedido do usuário antes dos 120 — **zero erros, zero
+travamentos**, 185 amostras. O que os números dizem:
+
+- **Não há vazamento.** O heap começou em 37,8 MB e terminou em 44,2, com as médias por faixa de
+  15 min entre 42,8 e 47,2 MB. As amostras finais mostram o dente de serra clássico do coletor
+  (37,6 → 44,5 → 52,0 → 63,2 → 41,7): ele sobe e **volta**, que é o contrário de vazar.
+- **O anel de chunks é limitado de verdade.** 489 colunas do começo ao fim, com **67 621 blocos**
+  percorridos em linha reta. O descarregamento acompanha o carregamento; se não acompanhasse, este
+  é o teste que teria mostrado, porque nada nele volta para onde já esteve.
+- **Nada engasga.** FPS mediana 60, mínimo 50, **nenhuma amostra abaixo de 30**. Tick mediano de
+  0,0 ms com pico de 6,1; render mediano de 1,0 ms com pico de 13,6.
+- **As entidades não acumulam.** Itens no chão oscilaram entre 125 e 311 de média por faixa de
+  10 min, subindo e **descendo** — os picos acompanham os de mob, que é o ciclo de noite e
+  amanhecer. Um vazamento de entidade seria uma curva que só sobe, e não é o caso.
+
+O que este teste **não** prova: que o jogo é jogável por duas horas. O robô voa em linha reta e não
+abre inventário, não constrói, não morre e não volta. Ele prova que pipeline, memória e entidades
+aguentam — o resto ainda pede mão humana, de preferência no celular.
+
 **Sessão longa — automatizada** (`npm run soak`). Um agente injetado na página
 entra no menu, cria um mundo criativo, liga o voo e segura o "para frente":
 voar em linha reta é o pior caso do pipeline, porque nunca para de pedir chunk
@@ -1352,13 +1376,12 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      ligada.
    - **No celular**, lembrar que ligar o áudio e a tela cheia exigem um toque na tela — o controle
      não serve de gesto para o navegador. O jogo avisa isso ao conectar.
-9. **Uma sessão longa de verdade.** O PROMPT.md §11 pede *"2 horas sem crash, sem perda de
-   progresso e sem travas"*. Agora existe `npm run soak`, que roda isso sozinho num Chrome headless
-   — o resultado da primeira execução está no §3. O que **o robô não cobre** e ainda vale a pena
-   fazer à mão: uma sessão longa **jogando de verdade**, com inventário, construção, morte e
-   volta, e principalmente **no celular**, que é o aparelho com o orçamento apertado. O robô voa em
-   linha reta; ele prova que o pipeline e a memória aguentam, não que o jogo é jogável por duas
-   horas.
+9. **Uma sessão longa jogando de verdade.** A metade mecânica do critério está cumprida:
+   `npm run soak` rodou 92,5 min de voo contínuo sem um erro, e os números estão no §2 e no §3.
+   O que o robô **não** cobre, e é o que sobra: uma sessão longa **jogando** — inventário,
+   construção, morte e volta, troca de dimensão —, e principalmente **no celular**, que é onde o
+   orçamento é apertado. Vale também deixar o `npm run soak` fechar os 120 min uma vez, já que a
+   primeira execução parou aos 92 por decisão de quem estava na máquina.
 10. ~~**Medir o tempo de abertura em 3G.**~~ **Feito em 2026-09-14**: 4,48 s no 3G rápido, dentro
    dos 5 s do critério (§2 e §3). O que sobrou como pergunta em aberto é a **outra metade do
    tempo**: ~2 s entre o documento pronto e a tela de título são CPU de boot, medidos num desktop.

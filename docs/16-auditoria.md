@@ -83,6 +83,24 @@ Um teste que mente é pior que nenhum: as três davam um verde perfeito medindo 
 | `~` | `docs/15-status.md` | §2 quatro métricas de rede; §3 seção nova; §6 itens 9 e 10 |
 | `~` | `docs/16-auditoria.md` | esta sessão |
 
+### Resultado da sessão longa
+
+Encerrada a pedido do usuário aos **92,5 min** dos 120 (*"pode finalizar o teste que já passou um
+bom tempo e já vou desligar a máquina"*). **Zero erros, zero travamentos**, 185 amostras.
+
+| | |
+|---|---|
+| Heap | 37,8 MB no início, 44,2 no fim; médias por faixa de 15 min entre 42,8 e 47,2 |
+| FPS | mediana 60, mínimo 50, nenhuma amostra abaixo de 30 |
+| Tick / render | 0,0 ms mediano (pico 6,1) / 1,0 ms mediano (pico 13,6) |
+| Mundo | 67 621 blocos percorridos, anel estável em 489 colunas do começo ao fim |
+| Entidades | itens no chão oscilando entre 125 e 311 de média, subindo **e descendo** |
+
+As três coisas que o teste era para pegar não apareceram: não há vazamento de heap (o dente de
+serra do coletor sobe e volta), o descarregamento de chunk acompanha o carregamento ao longo de
+67 mil blocos em linha reta, e as entidades não acumulam. O que ele não prova é que o jogo é
+**jogável** por duas horas — o robô voa reto e não abre inventário, não constrói e não morre.
+
 **Portões:** 1416 testes em 78 arquivos verdes · lint limpo · build limpo · 192,7 KB gzip de 350.
 
 ---

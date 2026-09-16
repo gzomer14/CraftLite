@@ -9,32 +9,37 @@
  * Duas geometrias, só:
  *
  * - **cruz** — dois quads na diagonal, dos dois lados: grama alta, flor, muda,
- *   plantação, teia. A tocha entra aqui também: a textura dela já é uma cruz e,
- *   com posição em meios-blocos (doc 01 §5.1), um poste fino não é
- *   representável.
+ *   plantação, teia.
  * - **caixas** — tudo o mais, com a lista vindo de `shapes.ts`: laje, escada,
- *   cerca, portão, alçapão, porta, grade, escada de mão, placa, quadro,
+ *   cerca, portão, alçapão, porta, grade, escada de mão, placa, quadro, cama,
  *   trilho e camada de neve.
+ * - **poste** — a tocha, que ganhou geometria própria quando o formato de
+ *   vértice passou a representar 1/16 de bloco. Até 2026-09-16 ela era uma
+ *   cruz, porque um poste de 2/16 colapsava no arredondamento.
  *
  * **Conexão de cerca e grade é calculada aqui**, não guardada no estado
  * (doc 04 §2.5): quatro consultas de vizinho no meshing custam menos que quatro
  * bits em cada voxel do save.
  *
- * Duas limitações herdadas do formato de vértice, conscientes: `u`/`v` são
+ * **Uma limitação herdada do formato de vértice**, consciente: `u`/`v` são
  * inteiros de 5 bits, então uma caixa parcial repete a textura inteira em vez
- * de mostrar só o pedaço correspondente; e a escada não tem variante de canto.
+ * de mostrar só o pedaço correspondente. É por isso que a tocha tem textura
+ * própria de poste, em faixas horizontais, e não um recorte da antiga.
  */
 
 import {
-  CPLX_BOXES, CPLX_CROSS, CPLX_RAIL, stageTexOf, shapeIdOf, type BlockTables,
+  CPLX_BOXES, CPLX_CROSS, CPLX_RAIL, CPLX_TORCH, stageTexOf, shapeIdOf, type BlockTables,
 } from './blockinfo';
 import { nbIndex } from './greedy';
 import {
-  BOX_STRIDE, FACING_STEP, MAX_BOXES, NOT_STAIRS, SHAPE_FENCE, SHAPE_FENCE_GATE, SHAPE_PANE,
-  SHAPE_STAIRS, boxesFor, stairCornerFrom,
+  BOX_STRIDE, FACING_STEP, MAX_BOXES, NOT_STAIRS, SHAPE_FENCE, SHAPE_FENCE_GATE,
+  SHAPE_PANE, SHAPE_STAIRS, TORCH_FLOOR_TOP, TORCH_HALF, TORCH_WALL_BASE, TORCH_WALL_TOP,
+  TORCH_WALL_Y0, TORCH_WALL_Y1, boxesFor, stairCornerFrom,
   railSlopeDir,
 } from './shapes';
-import { FACE_POS_Y } from '../../render/vertex';
+import {
+  FACE_NEG_X, FACE_NEG_Y, FACE_NEG_Z, FACE_POS_X, FACE_POS_Y, FACE_POS_Z,
+} from '../../render/vertex';
 import type { MeshBuilder } from '../../render/mesh';
 
 /** Cantos de cada face de uma caixa: 0 = mínimo do eixo, 1 = máximo. */
@@ -82,6 +87,15 @@ export function meshComplex(
 
         if (kind === CPLX_CROSS) {
           quads += emitCross(out, x, y, z, tex, blockLight, skyLight, tint);
+        } else if (kind === CPLX_TORCH) {
+          // A base da tocha de chão encosta no apoio: quando ele é opaco, a
+          // tampa de baixo é um quad que ninguém nunca vê.
+          const hidden = (bits & 7) > 3
+            && tables.occludes[blocks[nbIndex(x, y - 1, z)] & 0x3ff] === 1;
+          quads += emitTorch(
+            out, x, y, z, bits & 7, tables.texSide[id], tables.texBottom[id],
+            tables.texTop[id], blockLight, skyLight, hidden,
+          );
         } else if (kind === CPLX_RAIL) {
           quads += emitRail(out, x, y, z, bits & 0xf, tex, blockLight, skyLight, tint);
         } else if (kind === CPLX_BOXES) {
@@ -92,7 +106,7 @@ export function meshComplex(
           const count = boxesFor(shape, bits, links, BOXES);
           for (let b = 0; b < count; b++) {
             quads += emitBox(
-              blocks, tables, out, x, y, z, b, count, tex, blockLight, skyLight, tint,
+              blocks, tables, out, x, y, z, b, count, id, tex, blockLight, skyLight, tint,
             );
           }
         }
@@ -168,6 +182,87 @@ function emitCross(
 }
 
 /**
+ * Tocha: um poste de 2/16, de pé no chão ou **torto** na parede (M8).
+ *
+ * Os oito cantos saem de duas seções quadradas — a de baixo e a de cima — e as
+ * quatro laterais ligam uma à outra. Quando as duas seções estão desalinhadas,
+ * o poste inclina; é assim que a tocha de parede fica presa embaixo e afastada
+ * em cima, sem nenhuma matriz de rotação nem um segundo formato de vértice.
+ *
+ * Seis quads por tocha, contra dois da cruz que ela substituiu. O custo é real
+ * e está no orçamento de `tests/perf.test.ts`: tocha é decoração, não terreno.
+ */
+function emitTorch(
+  out: MeshBuilder, x: number, y: number, z: number, mount: number,
+  texSide: number, texBottom: number, texTop: number,
+  blockLight: number, skyLight: number, hideBottom: boolean,
+): number {
+  const h = TORCH_HALF;
+  const wall = mount <= 3;
+  const y0 = y + (wall ? TORCH_WALL_Y0 : 0);
+  const y1 = y + (wall ? TORCH_WALL_Y1 : TORCH_FLOOR_TOP);
+
+  let bx = x + 0.5; let bz = z + 0.5;
+  let tx = bx; let tz = bz;
+  if (wall) {
+    const step = FACING_STEP[mount];
+    bx += step[0] * TORCH_WALL_BASE;
+    bz += step[1] * TORCH_WALL_BASE;
+    tx += step[0] * TORCH_WALL_TOP;
+    tz += step[1] * TORCH_WALL_TOP;
+  }
+
+  // As quatro laterais, cada uma ligando a seção de baixo à de cima.
+  torchSide(out, FACE_POS_X, bx + h, bz + h, bx + h, bz - h, tx + h, tz - h, tx + h, tz + h,
+    y0, y1, texSide, blockLight, skyLight);
+  torchSide(out, FACE_NEG_X, bx - h, bz - h, bx - h, bz + h, tx - h, tz + h, tx - h, tz - h,
+    y0, y1, texSide, blockLight, skyLight);
+  torchSide(out, FACE_POS_Z, bx - h, bz + h, bx + h, bz + h, tx + h, tz + h, tx - h, tz + h,
+    y0, y1, texSide, blockLight, skyLight);
+  torchSide(out, FACE_NEG_Z, bx + h, bz - h, bx - h, bz - h, tx - h, tz - h, tx + h, tz - h,
+    y0, y1, texSide, blockLight, skyLight);
+
+  // Topo (a brasa) e base: as duas seções quadradas.
+  torchCap(out, FACE_POS_Y, tx, tz, y1, h, texTop, blockLight, skyLight);
+  if (hideBottom) return 5;
+  torchCap(out, FACE_NEG_Y, bx, bz, y0, h, texBottom, blockLight, skyLight);
+  return 6;
+}
+
+/** Uma lateral do poste: dois cantos embaixo, dois em cima. */
+function torchSide(
+  out: MeshBuilder, face: number,
+  ax: number, az: number, bxp: number, bzp: number,
+  cx: number, cz: number, dx: number, dz: number,
+  y0: number, y1: number, tex: number, blockLight: number, skyLight: number,
+): void {
+  CORNERS[0] = ax; CORNERS[1] = y0; CORNERS[2] = az;
+  CORNERS[3] = bxp; CORNERS[4] = y0; CORNERS[5] = bzp;
+  CORNERS[6] = cx; CORNERS[7] = y1; CORNERS[8] = cz;
+  CORNERS[9] = dx; CORNERS[10] = y1; CORNERS[11] = dz;
+  out.addPolyQuad(CORNERS, face, tex, blockLight, skyLight, 0, false);
+}
+
+/** Tampa quadrada do poste, no topo (`+Y`) ou na base (`−Y`). */
+function torchCap(
+  out: MeshBuilder, face: number, cx: number, cz: number, y: number, h: number,
+  tex: number, blockLight: number, skyLight: number,
+): void {
+  if (face === FACE_POS_Y) {
+    CORNERS[0] = cx - h; CORNERS[1] = y; CORNERS[2] = cz + h;
+    CORNERS[3] = cx + h; CORNERS[4] = y; CORNERS[5] = cz + h;
+    CORNERS[6] = cx + h; CORNERS[7] = y; CORNERS[8] = cz - h;
+    CORNERS[9] = cx - h; CORNERS[10] = y; CORNERS[11] = cz - h;
+  } else {
+    CORNERS[0] = cx - h; CORNERS[1] = y; CORNERS[2] = cz - h;
+    CORNERS[3] = cx + h; CORNERS[4] = y; CORNERS[5] = cz - h;
+    CORNERS[6] = cx + h; CORNERS[7] = y; CORNERS[8] = cz + h;
+    CORNERS[9] = cx - h; CORNERS[10] = y; CORNERS[11] = cz + h;
+  }
+  out.addPolyQuad(CORNERS, face, tex, blockLight, skyLight, 0, false);
+}
+
+/**
  * Trilho: **um quad só**, deitado ou inclinado (M7).
  *
  * A rampa é a única geometria do jogo que não é caixa alinhada aos eixos, e é
@@ -222,7 +317,7 @@ function setCorners(
 function emitBox(
   blocks: Uint16Array, tables: BlockTables, out: MeshBuilder,
   x: number, y: number, z: number, boxIndex: number, boxCount: number,
-  tex: number, blockLight: number, skyLight: number, tint: number,
+  id: number, tex: number, blockLight: number, skyLight: number, tint: number,
 ): number {
   const o = boxIndex * BOX_STRIDE;
   const x0 = BOXES[o]; const y0 = BOXES[o + 1]; const z0 = BOXES[o + 2];
@@ -243,10 +338,28 @@ function emitBox(
       CORNERS[k * 3 + 1] = y + y0 + corners[k * 3 + 1] * size[1];
       CORNERS[k * 3 + 2] = z + z0 + corners[k * 3 + 2] * size[2];
     }
-    out.addPolyQuad(CORNERS, face, tex, blockLight, skyLight, tint, false);
+    out.addPolyQuad(
+      CORNERS, face, faceTexOf(tables, id, tex, face), blockLight, skyLight, tint, false,
+    );
     quads++;
   }
   return quads;
+}
+
+/**
+ * Camada de textura de uma face da caixa.
+ *
+ * **Correção.** Até aqui toda face de toda caixa usava a textura de *lado*, e
+ * por isso o topo de uma laje, de uma escada ou de uma cama saía com o desenho
+ * da lateral. Quem tem textura por estado (o pó de redstone, cujo brilho é o
+ * estado) continua com a mesma em todas as faces: lá o estado é que manda, não
+ * a face.
+ */
+function faceTexOf(tables: BlockTables, id: number, tex: number, face: number): number {
+  if (tables.hasStages[id] === 1) return tex;
+  if (face === 2) return tables.texTop[id];
+  if (face === 3) return tables.texBottom[id];
+  return tables.texSide[id];
 }
 
 /** true se a face da caixa coincide com a borda do bloco naquele eixo. */

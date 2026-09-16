@@ -61,7 +61,12 @@ export function crackToneFor(brightness: number): { tone: number; alpha: number 
     : { tone: 0, alpha: 0.75 };
 }
 
-const CRACK_UNIFORMS = ['uViewProj', 'uOrigin', 'uAtlas', 'uAtlasTiles', 'uLayer', 'uCrackColor'] as const;
+const CRACK_UNIFORMS = [
+  'uViewProj', 'uOrigin', 'uScale', 'uAtlas', 'uAtlasTiles', 'uLayer', 'uCrackColor',
+] as const;
+
+/** Caixa envolvente de um bloco cúbico — o padrão de quem não passa forma. */
+const UNIT_BOX = new Float32Array([0, 0, 0, 1, 1, 1]);
 
 export class SelectionPass {
   private readonly ctx: GlContext;
@@ -115,8 +120,16 @@ export class SelectionPass {
    */
   highContrast = false;
 
-  /** Contorno wireframe do bloco mirado (doc 06 §5: preto, alpha 0.4). */
-  drawOutline(viewProj: Mat4, x: number, y: number, z: number): void {
+  /**
+   * Contorno wireframe do bloco mirado (doc 06 §5: preto, alpha 0.4).
+   *
+   * `bounds` é a caixa envolvente da forma, em fração de bloco
+   * (`boundsFor` de `world/mesh/shapes.ts`). Sem ela o contorno era sempre o
+   * cubo unitário, e mirar uma tocha acendia um cubo no ar em volta dela.
+   */
+  drawOutline(
+    viewProj: Mat4, x: number, y: number, z: number, bounds: Float32Array = UNIT_BOX,
+  ): void {
     const gl = this.ctx.gl;
     gl.useProgram(this.lineProgram);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.lineBuffer);
@@ -128,8 +141,15 @@ export class SelectionPass {
     // A folga maior do alto contraste descola a linha da face: é o que dá o
     // "grosso" sem depender de `lineWidth`, que a maioria das GPUs ignora.
     const gap = this.highContrast ? 0.008 : 0.002;
-    gl.uniform3f(this.lineUniforms.uOrigin, x - gap, y - gap, z - gap);
-    gl.uniform3f(this.lineUniforms.uScale, 1 + gap * 2, 1 + gap * 2, 1 + gap * 2);
+    gl.uniform3f(
+      this.lineUniforms.uOrigin, x + bounds[0] - gap, y + bounds[1] - gap, z + bounds[2] - gap,
+    );
+    gl.uniform3f(
+      this.lineUniforms.uScale,
+      bounds[3] - bounds[0] + gap * 2,
+      bounds[4] - bounds[1] + gap * 2,
+      bounds[5] - bounds[2] + gap * 2,
+    );
     if (this.highContrast) gl.uniform4f(this.lineUniforms.uColor, 1, 1, 1, 1);
     else gl.uniform4f(this.lineUniforms.uColor, 0, 0, 0, 0.4);
 
@@ -153,6 +173,7 @@ export class SelectionPass {
    */
   drawCrack(
     viewProj: Mat4, x: number, y: number, z: number, stage: number, brightness = 1,
+    bounds: Float32Array = UNIT_BOX,
   ): void {
     if (stage < 0 || stage > 9) return;
     const gl = this.ctx.gl;
@@ -170,7 +191,11 @@ export class SelectionPass {
       gl.uniform2f(this.crackUniforms.uAtlasTiles, this.atlas.tilesPerRow, 1 / this.atlas.tilesPerRow);
     }
     gl.uniformMatrix4fv(this.crackUniforms.uViewProj, false, viewProj);
-    gl.uniform3f(this.crackUniforms.uOrigin, x, y, z);
+    gl.uniform3f(this.crackUniforms.uOrigin, x + bounds[0], y + bounds[1], z + bounds[2]);
+    gl.uniform3f(
+      this.crackUniforms.uScale,
+      bounds[3] - bounds[0], bounds[4] - bounds[1], bounds[5] - bounds[2],
+    );
     gl.uniform1f(this.crackUniforms.uLayer, this.stageLayers[stage]);
     const { tone, alpha } = crackToneFor(brightness);
     gl.uniform4f(this.crackUniforms.uCrackColor, tone, tone, tone, alpha);

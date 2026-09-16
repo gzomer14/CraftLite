@@ -9,7 +9,7 @@
 
 import type { GlContext } from './gl';
 import {
-  BYTES_PER_VERTEX_FLOAT, BYTES_PER_VERTEX_PACKED,
+  BYTES_PER_VERTEX_FLOAT, BYTES_PER_VERTEX_PACKED, POSITION_SCALE,
   packWord0, packWord1, writeFloatVertex,
 } from './vertex';
 
@@ -163,18 +163,18 @@ export class MeshBuilder {
     texLayer: number, bl: number, sl: number, ao: number, tint: number,
   ): void {
     const n = this.vertexCount;
+    // Dezesseis avos: é a grade em que toda forma do jogo é descrita (laje,
+    // poste de cerca, tocha, porta), então arredondar aqui é exato.
+    const x16 = Math.round(x * POSITION_SCALE);
+    const y16 = Math.round(y * POSITION_SCALE);
+    const z16 = Math.round(z * POSITION_SCALE);
     if (this.packed) {
       const o = n * 2;
-      // Meios-blocos: multiplicar por 2 e arredondar mantém lajes e fluidos exatos.
-      this.words[o] = packWord0(
-        Math.round(x * 2), Math.round(y * 2), Math.round(z * 2), face, u, v,
-      );
-      this.words[o + 1] = packWord1(texLayer, bl, sl, ao, tint, 0);
+      this.words[o] = packWord0(x16, y16, z16, face);
+      this.words[o + 1] = packWord1(texLayer, bl, sl, ao, tint, u, v);
     } else {
       writeFloatVertex(
-        this.floats, n * 8,
-        Math.round(x * 2), Math.round(y * 2), Math.round(z * 2),
-        face, u, v, texLayer, bl, sl, ao, tint,
+        this.floats, n * 8, x16, y16, z16, face, u, v, texLayer, bl, sl, ao, tint,
       );
     }
     this.vertexCount = n + 1;

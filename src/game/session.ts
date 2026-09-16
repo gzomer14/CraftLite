@@ -49,6 +49,9 @@ import { Fluids } from '../world/fluids';
 import { Growth } from '../world/growth';
 import { Fire } from '../world/fire';
 import { Redstone } from '../world/redstone';
+import {
+  attachMultiBlocks, isBedAt, partnerIdOf, partnerOffset,
+} from '../world/multiblock';
 import { Travel } from './travel';
 import { extinguishPortal, ignitePortal, isPortalBlock } from './portal';
 import { isRail } from '../world/rails';
@@ -60,7 +63,8 @@ import type { World } from '../world/world';
 const CRAFTING_TABLE = ITEM_BY_NAME.get('crafting_table')?.id ?? -1;
 const FURNACE = ITEM_BY_NAME.get('furnace')?.id ?? -1;
 const CHEST = ITEM_BY_NAME.get('chest')?.id ?? -1;
-const BED = ITEM_BY_NAME.get('bed')?.id ?? -1;
+/** Deslocamento até a outra folha da porta, reusado — não aloca por clique. */
+const DOOR_PARTNER = new Int8Array(3);
 const ENCHANTING_TABLE = ITEM_BY_NAME.get('enchanting_table')?.id ?? -1;
 const BOOKSHELF = ITEM_BY_NAME.get('bookshelf')?.id ?? -1;
 const LAPIS = ITEM_BY_NAME.get('lapis_lazuli')?.id ?? -1;
@@ -288,6 +292,16 @@ export class Session {
     this.fire.attach();
     this.redstone.attach();
     this.rails.attach();
+    /*
+     * Porta e cama ocupam duas células (M8). O ouvinte fica **depois** dos
+     * outros de propósito: quando a metade órfã sai, o circuito e a luz já
+     * reagiram à primeira, e a segunda chega como uma mudança comum.
+     */
+    attachMultiBlocks(world, {
+      onChanged: (x, y, z, previous, state) => {
+        this.lighting.onBlockChanged(x, y, z, previous, state);
+      },
+    });
     this.fluids.onEvaporate = (x, y, z) => {
       this.events.onSound?.('block/evaporate', x, y, z);
     };
@@ -671,6 +685,22 @@ export class Session {
     if (next < 0) return false;
     if (!this.world.setBlock(x, y, z, next, 'player')) return false;
     this.lighting.onBlockChanged(x, y, z, current, next);
+    /*
+     * A porta tem duas folhas desde o M8, e as duas giram juntas: clicar na de
+     * baixo e ver só ela abrir seria pior que a porta de um bloco que ela
+     * substituiu. O bit de aberto é o mesmo nas duas, então basta copiá-lo.
+     */
+    if (partnerOffset(current, DOOR_PARTNER)) {
+      const px = x + DOOR_PARTNER[0];
+      const py = y + DOOR_PARTNER[1];
+      const pz = z + DOOR_PARTNER[2];
+      const other = this.world.getBlock(px, py, pz);
+      const otherNext = toggleOpenState(other);
+      if (otherNext >= 0 && blockIdOf(other) === partnerIdOf(blockIdOf(current))
+        && this.world.setBlock(px, py, pz, otherNext, 'player')) {
+        this.lighting.onBlockChanged(px, py, pz, other, otherNext);
+      }
+    }
     this.events.onSound?.('block/door', x, y, z);
     return true;
   }
@@ -834,7 +864,8 @@ export class Session {
    * Devolve true se a cama foi usada (mesmo que o sono seja negado).
    */
   private tryBed(x: number, y: number, z: number): boolean {
-    if (blockIdOf(this.world.getBlock(x, y, z)) !== BED) return false;
+    // Clicar em qualquer uma das duas metades deita na mesma cama (M8).
+    if (!isBedAt(this.world, x, y, z)) return false;
 
     this.spawnX = x;
     this.spawnY = y + 1;

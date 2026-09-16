@@ -14,7 +14,8 @@ export type Face = 'top' | 'bottom' | 'north' | 'south' | 'east' | 'west';
 export type BlockShape =
   | 'cube' | 'cross' | 'slab' | 'stairs' | 'fence' | 'fence_gate' | 'door' | 'trapdoor'
   | 'torch' | 'carpet' | 'flat' | 'liquid' | 'pane' | 'ladder' | 'sign' | 'painting'
-  | 'lever' | 'button' | 'plate' | 'repeater' | 'piston' | 'piston_head' | 'rail' | 'none';
+  | 'lever' | 'button' | 'plate' | 'repeater' | 'piston' | 'piston_head' | 'rail' | 'bed'
+  | 'none';
 
 /**
  * De que o bloco precisa para continuar existindo (M7).
@@ -25,6 +26,30 @@ export type BlockShape =
  * de `world/redstone.ts`, que já visita essas posições.
  */
 export type SupportKind = 'none' | 'below' | 'mount';
+
+/**
+ * Bloco que ocupa **duas células** (M8): porta e cama.
+ *
+ * As duas metades são dois ids, não um id com bit de "sou a metade de cima".
+ * O motivo é prático: cada metade tem textura própria — folha de cima e folha
+ * de baixo da porta, travesseiro e pé da cama —, e textura por face é uma
+ * coluna da tabela indexada por **id**. Com um bit de estado seria preciso
+ * levar o estado até `mesh/blockinfo.ts`, que hoje não o vê.
+ *
+ * Quem cuida da consistência das duas células é `world/multiblock.ts`: ele
+ * ouve `world.setBlock` e some com a metade órfã. Como **toda** mutação de
+ * voxel passa por lá (regra nº 3 do projeto), isso vale para o jogador, para a
+ * explosão, para o fogo e para o mob que quebra bloco, sem nenhum deles saber
+ * que existe porta de dois blocos.
+ */
+export interface MultiSpec {
+  /** Nome do bloco da outra metade. */
+  other: string;
+  /** Onde a outra metade fica: acima, abaixo, ou na direção dos bits 0..1. */
+  at: 'above' | 'below' | 'facing';
+  /** true na metade que o item coloca, que dropa e que responde ao clique. */
+  root: boolean;
+}
 
 export type ToolKind = 'none' | 'pickaxe' | 'axe' | 'shovel' | 'hoe' | 'shears' | 'sword';
 export type TintKind = 'none' | 'grass' | 'foliage' | 'water';
@@ -63,6 +88,8 @@ export interface BlockDef {
   itemless: boolean;
   /** Apoio de que o bloco precisa para ficar em pé (doc 04 §3, M7). */
   support: SupportKind;
+  /** Duas células em vez de uma (M8). `null` = bloco comum. */
+  multi: MultiSpec | null;
   /**
    * Desenhado no passe translúcido, com mistura alfa (M7).
    *
@@ -96,6 +123,7 @@ const DEFAULTS: Omit<BlockDef, 'id' | 'name' | 'display'> = {
   stages: [],
   itemless: false,
   support: 'none',
+  multi: null,
   translucent: false,
 };
 
@@ -219,8 +247,12 @@ const SPECS: BlockSpec[] = [
     tex: { top: 'block/furnace_side', side: 'block/furnace_side', bottom: 'block/furnace_side' } },
   { id: 54, name: 'chest', display: 'Baú', hardness: 2.5, ...wood(), opaque: false,
     tex: { top: 'block/chest_top', side: 'block/chest_side', bottom: 'block/chest_top' } },
-  { id: 55, name: 'torch', display: 'Tocha', tex: 'block/torch', shape: 'torch', solid: false,
-    opaque: false, lightAttenuation: 0, emission: 14, hardness: 0, sound: 'wood' },
+  // A tocha gruda no chão ou na parede (`support: 'mount'`), como alavanca e
+  // botão: quem mina o apoio derruba a tocha.
+  { id: 55, name: 'torch', display: 'Tocha', shape: 'torch', solid: false,
+    tex: { top: 'block/torch_top', side: 'block/torch', bottom: 'block/torch_bottom' },
+    opaque: false, lightAttenuation: 0, emission: 14, hardness: 0, sound: 'wood',
+    support: 'mount' },
   { id: 56, name: 'glass', display: 'Vidro', tex: 'block/glass', hardness: 0.3, opaque: false,
     lightAttenuation: 0, sound: 'glass' },
   { id: 57, name: 'glowstone', display: 'Pedra Luminosa', tex: 'block/glowstone', hardness: 0.3,
@@ -229,12 +261,16 @@ const SPECS: BlockSpec[] = [
   { id: 59, name: 'ladder', display: 'Escada de Mão', tex: 'block/ladder', shape: 'ladder',
     hardness: 0.4, solid: false, opaque: false, lightAttenuation: 0, ...wood() },
   { id: 60, name: 'oak_door', display: 'Porta de Carvalho', tex: 'block/oak_door', shape: 'door',
-    hardness: 3, opaque: false, lightAttenuation: 0, ...wood() },
+    hardness: 3, opaque: false, lightAttenuation: 0, ...wood(),
+    multi: { other: 'oak_door_top', at: 'above', root: true } },
   { id: 61, name: 'oak_fence', display: 'Cerca de Carvalho', tex: 'block/oak_planks', shape: 'fence',
     hardness: 2, opaque: false, lightAttenuation: 0, ...wood() },
-  { id: 62, name: 'bed', display: 'Cama', hardness: 0.2, solid: false,
+  // Cama: o **pé**. A cabeceira é `bed_head`, um bloco à frente (ver `MultiSpec`).
+  // Sólida de propósito, com 9/16 de altura: subir na cama é parte do móvel.
+  { id: 62, name: 'bed', display: 'Cama', hardness: 0.2, shape: 'bed',
     opaque: false, lightAttenuation: 0, sound: 'cloth',
-    tex: { top: 'block/bed_top', side: 'block/bed_side', bottom: 'block/bed_side' } },
+    tex: { top: 'block/bed_foot_top', side: 'block/bed_side', bottom: 'block/bed_side' },
+    multi: { other: 'bed_head', at: 'facing', root: true } },
   { id: 63, name: 'tnt', display: 'TNT', hardness: 0, sound: 'grass',
     tex: { top: 'block/tnt_top', side: 'block/tnt_side', bottom: 'block/tnt_bottom' } },
   { id: 64, name: 'stone_bricks', display: 'Tijolos de Pedra', tex: 'block/stone_bricks',
@@ -411,10 +447,18 @@ SPECS.push(
     solid: false, opaque: false, lightAttenuation: 0, hardness: 0, sound: 'stone',
     itemless: true, support: 'below', tex: 'block/redstone_dust_0', stages: dustStages() },
   { id: 103, name: 'redstone_torch', display: 'Tocha de Redstone', shape: 'torch',
-    tex: 'block/redstone_torch', solid: false, opaque: false, lightAttenuation: 0,
+    tex: {
+      top: 'block/redstone_torch_top', side: 'block/redstone_torch',
+      bottom: 'block/torch_bottom',
+    },
+    solid: false, opaque: false, lightAttenuation: 0,
     emission: 7, hardness: 0, sound: 'wood', support: 'below' },
   { id: 104, name: 'redstone_torch_off', display: 'Tocha de Redstone', shape: 'torch',
-    tex: 'block/redstone_torch_off', solid: false, opaque: false, lightAttenuation: 0,
+    tex: {
+      top: 'block/redstone_torch_off_top', side: 'block/redstone_torch_off',
+      bottom: 'block/torch_bottom',
+    },
+    solid: false, opaque: false, lightAttenuation: 0,
     hardness: 0, sound: 'wood', itemless: true, support: 'below' },
   { id: 105, name: 'lever', display: 'Alavanca', shape: 'lever', tex: 'block/lever',
     ...gadget('wood'), support: 'mount' },
@@ -503,6 +547,22 @@ SPECS.push(
   { id: 124, name: 'detector_rail', display: 'Trilho Detector', ...railBase(),
     tex: 'block/detector_rail',
     stages: railStages('block/detector_rail', 'block/detector_rail', 'block/detector_rail_on') },
+);
+
+/**
+ * Segundas metades dos blocos de duas células (M8).
+ *
+ * Ids no fim, como sempre — id vai para o save. As duas são `itemless`: o item
+ * é o da metade de baixo, e quebrar qualquer uma das duas dropa um só.
+ */
+SPECS.push(
+  { id: 126, name: 'oak_door_top', display: 'Porta de Carvalho', tex: 'block/oak_door_top',
+    shape: 'door', hardness: 3, opaque: false, lightAttenuation: 0, ...wood(), itemless: true,
+    multi: { other: 'oak_door', at: 'below', root: false } },
+  { id: 127, name: 'bed_head', display: 'Cama', hardness: 0.2, shape: 'bed',
+    opaque: false, lightAttenuation: 0, sound: 'cloth', itemless: true,
+    tex: { top: 'block/bed_top', side: 'block/bed_side', bottom: 'block/bed_side' },
+    multi: { other: 'bed', at: 'facing', root: false } },
 );
 
 /** Tabela final, indexada por id. Buracos ficam como `undefined`. */

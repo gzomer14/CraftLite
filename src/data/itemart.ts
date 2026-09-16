@@ -613,6 +613,69 @@ export const SHAPES: Record<string, readonly string[]> = {
     '................',
     '................',
   ],
+  /*
+   * Tocha, porta e cama (M8).
+   *
+   * Os três colocam bloco, então caíam no cubo isométrico de
+   * `render/itemsprites.ts` — e cubo é exatamente o que eles não são: a tocha
+   * virava um tijolo aceso, a porta um caixote e a cama um cubo de lã. Com
+   * silhueta própria, o slot mostra o objeto, e a mão desenha o mesmo desenho
+   * extrudado (`render/itemmodel.ts`).
+   */
+  torch: [
+    '................',
+    '................',
+    '.......AA.......',
+    '......AAAA......',
+    '......AaaA......',
+    '.......aa.......',
+    '.......MM.......',
+    '.......mm.......',
+    '.......mm.......',
+    '.......mm.......',
+    '.......mm.......',
+    '.......mm.......',
+    '.......md.......',
+    '.......dd.......',
+    '................',
+    '................',
+  ],
+  door: [
+    '................',
+    '....MMMMMMMM....',
+    '....MmmmmmmM....',
+    '....MmddddmM....',
+    '....MmddddmM....',
+    '....MmddddmM....',
+    '....Mmmmmm.M....',
+    '....MmmmmmAM....',
+    '....Mmmmmm.M....',
+    '....MmddddmM....',
+    '....MmddddmM....',
+    '....MmddddmM....',
+    '....MmmmmmmM....',
+    '....dddddddd....',
+    '................',
+    '................',
+  ],
+  bed: [
+    '................',
+    '................',
+    '................',
+    '..AAAAAAAA......',
+    '..AAAAAAAAMMM...',
+    '..MMMMMMMMMMMM..',
+    '.MmmmmmmmmmmmM..',
+    '.MmmmmmmmmmmmM..',
+    '.dddddddddddddM.',
+    '.a...........a..',
+    '.a...........a..',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
   string: [
     '................',
     '................',
@@ -764,5 +827,10 @@ function buildArt(): Record<string, ItemArt> {
   out.minecart = { shape: 'bowl', color: [142, 142, 150], accent: [92, 92, 100] };
   // Isqueiro (M7): a silhueta da barra de ferro com a pederneira de acento.
   out.flint_and_steel = { shape: 'ingot', color: [188, 188, 196], accent: [62, 58, 62] };
+  // Blocos com forma própria (M8): ver o comentário das silhuetas acima.
+  out.torch = { shape: 'torch', color: WOOD, accent: [255, 196, 88] };
+  out.redstone_torch = { shape: 'torch', color: WOOD, accent: [226, 58, 44] };
+  out.oak_door = { shape: 'door', color: [150, 118, 68], accent: [214, 214, 220] };
+  out.bed = { shape: 'bed', color: [196, 52, 52], accent: [238, 238, 232] };
   return out;
 }

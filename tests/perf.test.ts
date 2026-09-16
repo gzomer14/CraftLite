@@ -95,6 +95,36 @@ describe('orçamento de performance', () => {
     expect(ms).toBeLessThan(8);
   });
 
+  /*
+   * A tocha virou poste no M8: 5 ou 6 quads por tocha, contra 2 da cruz antiga.
+   * O caso que um jogador consegue construir é um **piso** coberto de tochas —
+   * 256 numa section, uma em cada célula da camada. É esse o orçamento; encher
+   * a section inteira é impossível, porque tocha precisa de apoio.
+   */
+  it('mesha uma section com um piso de tochas em menos de 2 ms', () => {
+    const torch = BLOCK_BY_NAME.get('torch')!.id;
+    const blocks = new Uint16Array(NB_VOLUME);
+    const light = new Uint8Array(NB_VOLUME).fill(0xf0);
+    for (let z = 1; z <= 16; z++) {
+      for (let x = 1; x <= 16; x++) {
+        blocks[(1 * 18 + z) * 18 + x] = makeState(STONE);
+        blocks[(2 * 18 + z) * 18 + x] = makeState(torch, MOUNT_FLOOR);
+      }
+    }
+    const mesher = new GreedyMesher(tables, true);
+    for (let i = 0; i < 3; i++) mesher.mesh(blocks, light);
+
+    const samples: number[] = [];
+    for (let i = 0; i < 20; i++) {
+      const t0 = performance.now();
+      mesher.mesh(blocks, light);
+      samples.push(performance.now() - t0);
+    }
+    const ms = median(samples);
+    console.log(`  tochas: ${ms.toFixed(2)} ms/section (256 tochas, mediana de 20)`);
+    expect(ms).toBeLessThan(2);
+  });
+
   it('extrai a vizinhança 18³ em menos de 2 ms', () => {
     const noise = new TerrainNoise(SEED);
     const world = new World(SEED);

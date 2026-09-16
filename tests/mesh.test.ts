@@ -13,13 +13,14 @@ function readVertices(data: ArrayBuffer, count: number) {
   const out: { x: number; y: number; z: number; face: number; u: number; v: number }[] = [];
   for (let i = 0; i < count; i++) {
     const w0 = w[i * 2];
+    const w1 = w[i * 2 + 1];
     out.push({
-      x: (w0 & 63) * 0.5,
-      y: ((w0 >>> 6) & 63) * 0.5,
-      z: ((w0 >>> 12) & 63) * 0.5,
-      face: (w0 >>> 18) & 7,
-      u: (w0 >>> 21) & 31,
-      v: (w0 >>> 26) & 31,
+      x: (w0 & 511) / 16,
+      y: ((w0 >>> 9) & 511) / 16,
+      z: ((w0 >>> 18) & 511) / 16,
+      face: (w0 >>> 27) & 7,
+      u: (w1 >>> 22) & 31,
+      v: (w1 >>> 27) & 31,
     });
   }
   return out;

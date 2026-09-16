@@ -82,6 +82,12 @@ export const BLOCK_LOOT: Record<string, LootEntry> = {
   // O braço não é item: quem o quebra fica com o pistão, que volta a recolher.
   piston_head: { drops: [] },
 
+  // Blocos de duas células (M8): a metade de cima é `itemless`, então sem
+  // linha aqui quebrá-la não daria nada — e uma porta quebrada pelo topo
+  // sumiria do mundo.
+  oak_door_top: { drops: [{ item: 'oak_door', count: 1 }] },
+  bed_head: { drops: [{ item: 'bed', count: 1 }] },
+
   // Nether (M7).
   nether_quartz_ore: { drops: [{ item: 'nether_quartz', count: 1, fortune: true }], xp: [2, 5] },
   // O portal não é bloco de mão nenhuma: quebrá-lo só apaga o portal.

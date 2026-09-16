@@ -114,6 +114,77 @@ fazer fornalha, cozinhar comida e dormir — sem bugs bloqueantes.
 
 ---
 
+## M8 — Presença dos objetos
+
+> Acrescentado em 2026-09-16, a pedido do usuário: *"gostaria que você fizesse uma revisão
+> completa no código (…) as texturas chapadas das ferramentas, a tocha que não parece uma tocha,
+> a cama e a porta que são blocos únicos"*. É um marco de **acabamento**, não de conteúdo: nada
+> aqui acrescenta mecânica, tudo aqui faz o que já existe parecer o que é.
+
+A causa-raiz dos três sintomas era a mesma e estava no formato de vértice: a posição era
+guardada em **meios-blocos**, então toda caixa mais fina que 0,5 colapsava no arredondamento.
+Poste de cerca, grade, porta, botão, alavanca, placa de pressão e o levantamento do trilho eram
+planos de espessura zero — não faltava textura, faltava **volume representável**.
+
+- [x] Posição do vértice em **1/16 de bloco** (9 bits por eixo), sem sair dos 8 bytes.
+- [x] Textura **por face** nas formas de caixa (o topo da laje deixa de usar o desenho da lateral).
+- [x] **Tocha** como poste de 2/16, com encaixe de chão e de parede, inclinada na parede, com
+      fagulha saindo da brasa.
+- [x] **Porta e cama** ocupando duas células, com as metades nascendo e morrendo juntas por
+      qualquer causa (jogador, explosão, fogo, pistão).
+- [x] **Item na mão extrudado**: frente, verso e uma borda por aresta da silhueta.
+- [x] **Contorno do bloco mirado** do tamanho da forma, e não sempre um cubo.
+- [x] Bloco que exige apoio cai quando o apoio some, **mesmo sem ser de redstone** (trilho comum,
+      tocha).
+- [ ] Placa com texto escrito pelo jogador, e quadro com arte gerada por código.
+- [ ] Escada de mão com degraus de verdade (hoje é uma chapa com a textura vazada).
+- [ ] Porta e alçapão nas outras madeiras; cama nas outras cores de lã.
+- [ ] Baú com tampa que abre, e fornalha com a boca acesa quando está queimando.
+
+**Critério de aceite:** num aparelho, olhar de perto uma tocha de parede, uma cerca isolada, uma
+porta fechada e uma picareta na mão, e não conseguir apontar nenhuma peça "chapada". Orçamento de
+meshing intocado: uma section com um piso de 256 tochas continua abaixo de 2 ms.
+
+---
+
+## M9 — Gente no mundo
+
+> Proposta de 2026-09-16. Depende do M8 só no espírito: primeiro as coisas parecem coisas,
+> depois o mundo fica habitado.
+
+- [ ] **Aldeão** com profissão, rotina de dia e noite (trabalha, dorme na cama, entra em casa ao
+      anoitecer) e troca por esmeralda — a tabela de trocas é dado, como tudo o mais.
+- [ ] **Aldeia de verdade**: várias casas ligadas por caminho, poço no meio, cercado de plantação,
+      e sino. Hoje a aldeia é um punhado de casas soltas.
+- [ ] **Golem de ferro** que nasce na aldeia e defende quem mora lá.
+- [ ] **Reputação**: bater em aldeão fecha as trocas por um tempo.
+- [ ] Sons de aldeia (bigorna ao longe, porta, sino) no mesmo sintetizador de sempre.
+
+**Critério de aceite:** chegar numa aldeia ao entardecer e ver os aldeões entrarem em casa
+sozinhos; trocar dois itens sem abrir nenhum menu que não exista hoje. 20 aldeões no tick sem
+passar de 1 ms (o orçamento atual de 20 mobs é 0,20 ms).
+
+---
+
+## M10 — Saber onde se está
+
+> Proposta de 2026-09-16. O jogo tem 10 biomas, duas dimensões e mundo infinito, e **nenhuma
+> forma de se localizar** além de olhar em volta.
+
+- [ ] **Bússola** e **relógio** como itens, desenhados com a agulha girando de verdade.
+- [ ] **Mapa** que preenche conforme o jogador anda, guardado no save como uma imagem pequena por
+      região (o `.clw` já tem miniatura — é a mesma máquina).
+- [ ] **Marcador** de ponto de interesse, colocado pelo jogador, visível na borda da tela.
+- [ ] **Tela de estatísticas**: blocos minerados, distância andada, mortes, tempo de jogo. Os
+      números já passam todos por `game/achievements.ts`.
+- [ ] **Modo espectador** no criativo: atravessar parede e voar sem colisão, que é a ferramenta de
+      quem constrói grande.
+
+**Critério de aceite:** sair da base, andar 500 blocos, e voltar usando só o mapa e o marcador.
+O mapa não pode custar mais que 1 ms por segundo de jogo nem crescer o save de forma ilimitada.
+
+---
+
 ## Testes obrigatórios (a manter verde desde M1)
 
 | Tipo | O que cobrir |

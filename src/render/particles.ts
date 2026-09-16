@@ -189,6 +189,35 @@ export class Particles {
   }
 
   /**
+   * Fagulha de tocha: sobe devagar, apaga rápido (M8).
+   *
+   * É o que faz a tocha **acesa** parecer acesa. A geometria dela virou um
+   * poste com a brasa no topo, e um poste parado não pisca; a fagulha é o
+   * movimento que o olho procura.
+   *
+   * Sobe porque a velocidade inicial vence a gravidade nos primeiros ticks e
+   * o arrasto come a diferença — a mesma física das outras, sem exceção.
+   */
+  emitFlame(x: number, y: number, z: number): void {
+    if (this.count >= this.limit) return;
+    const s = this.count++;
+    this.px[s] = x + (Math.random() - 0.5) * 0.12;
+    this.py[s] = y;
+    this.pz[s] = z + (Math.random() - 0.5) * 0.12;
+    this.vx[s] = 0;
+    this.vy[s] = 0.055;
+    this.vz[s] = 0;
+    this.life[s] = 6 + Math.floor(Math.random() * 5);
+    const o = s * 7;
+    // Da brasa ao amarelo claro: duas fagulhas seguidas não saem iguais.
+    const heat = 0.7 + Math.random() * 0.3;
+    this.instanceData[o + 3] = 1;
+    this.instanceData[o + 4] = 0.55 * heat + 0.2;
+    this.instanceData[o + 5] = 0.16 * heat;
+    this.instanceData[o + 6] = 0.045;
+  }
+
+  /**
    * Gotas de chuva caindo em volta do jogador (doc 03 §8).
    *
    * Reusa o mesmo pool e a mesma draw call: chuva não merece um passe próprio

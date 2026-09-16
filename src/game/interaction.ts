@@ -9,6 +9,7 @@
 
 import { defOf, makeState, stateBitsOf, AIR, type BlockDef } from '../data/blocks';
 import { MOUNT_CEILING, MOUNT_FLOOR, PISTON_STEP } from '../world/mesh/shapes';
+import { partnerOffset, placeMulti } from '../world/multiblock';
 import { EFFICIENCY } from '../data/enchants';
 import { efficiencyBonus, levelOf } from './enchanting';
 import { itemDef, stackTool, type ItemStack, type ToolSpec } from '../data/items';
@@ -261,22 +262,44 @@ export class Interaction {
       pz += target.nz;
     }
 
-    const existing = defOf(this.world.getBlock(px, py, pz));
-    if (!existing.replaceable && existing.shape !== 'none') return false;
+    if (!this.canReplaceAt(px, py, pz)) return false;
 
     // Não deixar o jogador se emparedar dentro de si mesmo.
     if (this.intersectsPlayer(px, py, pz)) return false;
 
     const bits = this.stateForPlacement(blockId, target);
+    if (bits < 0) return false;
     if (!this.hasSupport(blockId, bits, px, py, pz)) return false;
 
     const state = makeState(blockId, bits);
-    if (!this.world.setBlock(px, py, pz, state, 'player')) return false;
+    /*
+     * Porta e cama ocupam duas células (M8): as duas nascem na mesma chamada,
+     * ou nenhuma nasce. A segunda célula passa pelo mesmo teste de "cabe aqui"
+     * da primeira — é o que impede colocar uma porta com a folha de cima
+     * dentro da parede, ou uma cama com a cabeceira dentro do jogador.
+     */
+    const partner = PARTNER_POS;
+    const isMultiBlock = partnerCellOf(state, px, py, pz, partner);
+    if (isMultiBlock && this.intersectsPlayer(partner[0], partner[1], partner[2])) return false;
+    if (!placeMulti(this.world, px, py, pz, state, (ax, ay, az) => this.canReplaceAt(ax, ay, az))) {
+      return false;
+    }
 
     this.lighting.onBlockChanged(px, py, pz, AIR, state);
     this.onBlockPlaced?.(px, py, pz, state);
+    if (isMultiBlock) {
+      const other = this.world.getBlock(partner[0], partner[1], partner[2]);
+      this.lighting.onBlockChanged(partner[0], partner[1], partner[2], AIR, other);
+      this.onBlockPlaced?.(partner[0], partner[1], partner[2], other);
+    }
     this.placeCooldown = PLACE_COOLDOWN;
     return true;
+  }
+
+  /** true se a célula aceita receber bloco novo. */
+  private canReplaceAt(x: number, y: number, z: number): boolean {
+    const existing = defOf(this.world.getBlock(x, y, z));
+    return existing.replaceable || existing.shape === 'none';
   }
 
   /**
@@ -284,8 +307,11 @@ export class Interaction {
    *
    * Tronco pega o eixo da face clicada; escada, portão, porta, placa e quadro
    * pegam a direção do olhar; laje e alçapão pegam a metade em que o clique
-   * caiu; escada de mão e quadro grudam na parede clicada. É tudo derivado do
-   * `shape` da tabela — nenhum bloco tem caso próprio aqui.
+   * caiu; escada de mão, quadro e tocha grudam na parede clicada. É tudo
+   * derivado do `shape` da tabela — nenhum bloco tem caso próprio aqui.
+   *
+   * Devolve **−1** quando a posição clicada não serve para aquele bloco: é o
+   * caso da tocha no teto. Quem chama desiste da colocação.
    */
   private stateForPlacement(blockId: number, hit: RayHit): number {
     const def = defOf(makeState(blockId));
@@ -311,6 +337,21 @@ export class Interaction {
     }
     if (shape === 'stairs' || shape === 'fence_gate' || shape === 'door' || shape === 'sign') {
       return facingFromYaw(this.player.yaw);
+    }
+    /*
+     * A cama aponta para onde a **cabeceira** vai, que é para longe de quem
+     * coloca: deitar de costas para a parede é o gesto natural, e é o que o
+     * gênero faz.
+     */
+    if (shape === 'bed') return facing4FromLook(this.player.yaw);
+    /*
+     * Tocha: o mesmo encaixe de alavanca e botão, menos o teto. Tocha de
+     * cabeça para baixo não existe no gênero, e a geometria de `mesh/complex.ts`
+     * não a desenha — recusar a colocação é mais honesto que desenhar errado.
+     */
+    if (shape === 'torch') {
+      const mount = mountFromNormal(hit.nx, hit.ny, hit.nz);
+      return mount === MOUNT_CEILING ? -1 : mount;
     }
     // --- redstone (M7) ---------------------------------------------------
     if (shape === 'lever' || shape === 'button') {
@@ -345,6 +386,23 @@ export class Interaction {
 }
 
 const PLACE_BOX = createAabb();
+/** Célula da outra metade de um bloco de duas células, reusada por frame. */
+const PARTNER_POS = new Int32Array(3);
+const PARTNER_OFFSET = new Int8Array(3);
+
+/**
+ * Escreve em `out` a célula da segunda metade de `state`.
+ * Devolve false quando o bloco ocupa uma célula só.
+ */
+function partnerCellOf(
+  state: number, x: number, y: number, z: number, out: Int32Array,
+): boolean {
+  if (!partnerOffset(state, PARTNER_OFFSET)) return false;
+  out[0] = x + PARTNER_OFFSET[0];
+  out[1] = y + PARTNER_OFFSET[1];
+  out[2] = z + PARTNER_OFFSET[2];
+  return true;
+}
 
 function aabbOverlap(a: Float32Array, b: Float32Array): boolean {
   return a[0] < b[3] && a[3] > b[0]

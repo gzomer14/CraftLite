@@ -9,7 +9,8 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-15 00:25 — **92 minutos voando sem um erro: a sessão longa passou**
+**Última atualização:** 2026-09-16 10:10 — **M8: o que fazia tudo parecer chapado era um bit de
+posição**
 
 ---
 
@@ -34,6 +35,7 @@
 | **HUD** | coxa de frango desenhada no lugar do retângulo da fome; vida, ar, fome e armadura somem no Criativo | ✅ concluído | — |
 | **Câmera** | rotação lida por quadro desenhado, não no tick de 20 Hz | ✅ concluído | — |
 | **Toque, Modo A** | dedo que girou a câmera deixa de ser candidato a quebrar | ✅ concluído | — |
+| **M8** Presença dos objetos | vértice em 1/16 de bloco, tocha de verdade, porta e cama de duas células, item na mão com volume, contorno do tamanho da forma | ✅ concluído | **nada disso foi visto em aparelho ainda** |
 
 **O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
 ele irá pesar muito o jogo e trazer muita complexidade por enquanto desnecessária"*. O
@@ -46,18 +48,19 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-14 21:16, com `npm test`, `npm run build` e
+Medidas em 2026-09-16 10:05, com `npm test`, `npm run build` e
 `SIZE_BUDGET_KB=350 npm run size`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **192,7 KB** | < 350 KB | `npm run size` |
-| Testes | **1416**, 78 arquivos | manter verde | `npm test` |
-| Camadas de atlas | **156** | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
+| Bundle (gzip, tudo) | **196,7 KB** | < 350 KB | `npm run size` |
+| Testes | **1473**, 82 arquivos | manter verde | `npm test` |
+| Camadas de atlas | **162** | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Memória de áudio | **3,26 MB** (era 3,95 com três sons a menos) | < 3,5 MB | `tests/audio.test.ts` |
 | Geração de chunk | 5,7–6,2 ms (mediana; varia muito com a carga da máquina) | < 25 ms | `tests/perf.test.ts` |
 | Geração de chunk do Nether | 5,1 ms (mediana; 3,8 antes de a luz entrar) | < 25 ms | `tests/perf.test.ts` |
-| Meshing de section | 0,65 ms (mediana) | < 8 ms | `tests/perf.test.ts` |
+| Meshing de section | 0,67 ms (mediana) | < 8 ms | `tests/perf.test.ts` |
+| Meshing de um piso de 256 tochas | **1,13 ms** (o pior caso construível da forma nova) | < 2 ms | `tests/perf.test.ts` |
 | Tick de 20 mobs | 0,20 ms | << 50 ms | `tests/mobs.test.ts` |
 | Tick de circuito (fio de 64) | 0,82 ms | < 5 ms | `tests/perf.test.ts` |
 | Tick de fogo (256 chamas, o teto) | **0,03 ms** | < 2 ms | `tests/perf.test.ts` |
@@ -1109,6 +1112,47 @@ porque um teste que mente é pior que nenhum:
 
 ---
 
+### M8 — Presença dos objetos ✅
+Marco aberto em 2026-09-16 a pedido do usuário, depois de uma revisão do código inteiro. Ele é de
+**acabamento**: nada aqui acrescenta mecânica, tudo aqui faz o que já existe parecer o que é.
+
+**A causa dos três incômodos era a mesma, e não era textura.** O formato de vértice guardava a
+posição em **meios-blocos**, e isso não era detalhe de compressão: era uma regra de geometria.
+Toda caixa mais fina que 0,5 bloco colapsava no arredondamento — e é assim que quase toda forma do
+jogo é descrita. Poste de cerca (2/16) e grade (1/16) **sumiam**; porta, alçapão, placa e quadro
+(3/16) viravam planos de espessura zero; botão, alavanca, repetidor e placa de pressão idem; e o
+levantamento de 1/16 do trilho virava zero, deixando ele brigando com o chão no Z.
+
+A posição passou a ser em **1/16 de bloco** (9 bits por eixo). Os 3 bits a mais por eixo saíram de
+onde não faziam falta: `tint` tem quatro valores (2 bits bastam), `u`/`v` foram para a segunda
+palavra e o campo `flags`, que nunca teve leitor, saiu. **Continua em 8 bytes por vértice**, então
+o orçamento de memória de mesh do doc 02 §3 não muda.
+
+O que isso destravou, em ordem do que o jogador vê primeiro:
+
+| Era | Ficou |
+|---|---|
+| **Tocha** = dois quads cruzados com a textura de tocha — lia como flor marrom | poste de 2/16 com brasa no topo, encaixe de chão e de parede, **inclinada** na parede, textura em faixas (lateral de 2 px não guarda detalhe horizontal), fagulha saindo da ponta e tampa de baixo descartada quando o apoio a cobre |
+| **Porta** = um bloco de altura, textura repetida | duas células (`oak_door` + `oak_door_top`), folha de baixo com a maçaneta na divisa e folha de cima com a travessa; as duas giram juntas na mão e no circuito |
+| **Cama** = um cubo de lã | duas células (`bed` + `bed_head`), colchão de 9/16 com dois pés em cada ponta de fora, sólida (dá para subir), e clicar em qualquer metade deita na mesma cama |
+| **Item na mão** = quad chapado, invisível de perfil | sólido extrudado da própria silhueta: frente, verso e uma borda por aresta, com a borda amostrando **o pixel de dentro** — a lateral da lâmina sai com a cor da lâmina |
+| **Tocha/porta/cama no inventário** = cubo isométrico da textura | silhueta própria em `data/itemart.ts`, o mesmo desenho que a mão extruda |
+| **Contorno do bloco mirado** = sempre o cubo unitário | a envolvente da forma (`boundsFor`): laje acende meia caixa, tocha acende um poste |
+
+**A máquina que faltava para porta e cama é `world/multiblock.ts`**, e ela é pequena porque mora no
+lugar certo: um ouvinte de `world.onBlockChange`. Como **toda** mutação de voxel passa por
+`setBlock` (regra nº 3 do projeto), as duas metades morrem juntas para qualquer causa — jogador,
+explosão de creeper, fogo, pistão, importação de `.clw` — sem nenhum desses sistemas saber que
+existe porta de dois blocos. O comentário de `game/sleep.ts` que chamava a cama de um bloco de
+"desvio consciente até haver máquina de colocação/quebra" deixou de valer e saiu.
+
+**Custo medido:** a tocha passou de 2 para 5–6 quads. O pior caso que um jogador consegue construir
+— um piso inteiro de 256 tochas numa section — mesha em **1,13 ms**, dentro do orçamento de 8 ms
+por section e com um teto próprio de 2 ms em `tests/perf.test.ts`. Encher a section inteira é
+impossível: tocha precisa de apoio.
+
+**Pendência:** nada disto foi visto num aparelho. Ver §6.
+
 ---
 
 ## 4. Correções fora de marco
@@ -1118,6 +1162,11 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-16 | `render/vertex.ts`, `render/mesh.ts`, `render/shaders/terrain.glsl.ts` | **Toda caixa mais fina que meio bloco colapsava.** A posição do vértice era guardada em meios-blocos (6 bits por eixo), então `Math.round(x * 2)` achatava tudo: poste de cerca (2/16) e grade (1/16) **desapareciam** — uma cerca isolada não tinha geometria nenhuma —, porta, alçapão, placa e quadro (3/16) viravam planos de espessura zero, botão, alavanca e repetidor idem, e o levantamento de 1/16 do trilho virava zero, deixando ele brigando com o chão no Z. Era um bug do M1 que ninguém tinha nomeado, porque de longe um plano com a textura certa parece a peça. A precisão foi para **1/16 de bloco** sem sair dos 8 bytes por vértice. Relato do usuário que levou até ele: *"as texturas chapadas das ferramentas"*. |
+| 2026-09-16 | `world/mesh/complex.ts` | **Toda face de toda caixa usava a textura de lado.** O topo de uma laje, de uma escada ou da cama saía com o desenho da lateral. Não aparecia porque os materiais de laje e escada do jogo têm as seis faces iguais — apareceria na primeira laje de grama. |
+| 2026-09-16 | `world/redstone.ts` | **Bloco que exige apoio e não é de redstone nunca era conferido.** A fila só aceitava quem tinha papel no circuito, então `dropUnsupported` — que existe desde o M7 e está certo — nunca era chamada para **trilho comum**: minerar o bloco de baixo deixava o trilho flutuando. A tocha entrou no mesmo caso ao ganhar encaixe, e a correção vale para as duas. |
+| 2026-09-16 | `world/redstone.ts`, `game/session.ts` | **Porta de duas folhas e uma alavanca só alcança uma delas.** Com a porta ocupando duas células, energizar a de baixo abria só a de baixo — metade da porta continuava barrando a passagem. A folha tocada passou a arrastar a outra, tanto no circuito quanto no clique. |
+| 2026-09-16 | `data/structures.ts` | **A casa de aldeia nascia com a tocha boiando no meio da sala** e a cama de costas para a parede. Com a tocha virando poste com encaixe, o defeito ficou visível: ela foi para a parede norte, a cama deitou para dentro do cômodo com pé e cabeceira, e a porta passou a nascer com as duas metades. |
 | 2026-09-14 | `input/controls.ts`, `main.ts` | **A rotação da câmera acontecia a 20 Hz.** A posição do jogador é interpolada no render, mas a rotação não — `camera.yaw` recebe `player.yaw` direto —, e `player.yaw` só mudava no tick. Num display de 60 Hz o mesmo ângulo aparecia em três quadros seguidos e então pulava: o jogo rodava liso e a câmera andava *"de quadro em quadro, como se fosse movimentação por teclado"*. A leitura da câmera saiu do tick e passou a ser por quadro desenhado; interpolar a rotação teria adicionado um tick de atraso sem tirar o degrau, porque o passo continuaria sendo de 50 ms. Mouse e dedo entregam pixels e não escalam com o tempo; analógico entrega velocidade e escala, com o passo limitado a 100 ms para um engasgo não virar um giro. |
 | 2026-09-14 | `input/touch.ts` | **No Modo A, olhar em volta mostrava o anel de "vai quebrar" o tempo todo.** A reancoragem entregue horas antes — sair da folga reiniciava a contagem em vez de cancelá-la — fazia qualquer pausa no meio de um arrasto rearmar a quebra. Ela tinha sido a resposta para o toque longo que quase nunca disparava; na mão, o problema virou o oposto. Agora o dedo que passa de `TAP_SLOP` vira câmera e não volta a ser candidato a quebrar até ser levantado. Relato de campo: *"ele constantemente aparece a bolinha achando que eu vou começar a quebrar algo"*. |
 | 2026-09-14 | `input/uinav.ts` | **O foco do gamepad era invisível.** Toda a interface estiliza foco com `:focus-visible`, que o navegador acende a partir da **modalidade do último input** — e gamepad não é uma modalidade que ele conheça. Um `focus()` disparado de um laço de `requestAnimationFrame` depois de um toque na tela não acende anel nenhum: a navegação movia o foco corretamente e não mostrava nada. Relato de campo: *"parece que muitas vezes indo para botões nem existentes em tela"*. O documento passou a ganhar a classe `pad-nav` enquanto a navegação está em uso, com anel próprio; o primeiro toque ou tecla devolve a decisão ao navegador. |
@@ -1276,6 +1325,13 @@ redstone ✅  ──►  Nether ✅  ──►  trilhos ✅  ──►  import/e
 
 **O M7 fechou em 2026-09-13**, e com ele os oito marcos do `PROMPT.md`.
 
+**2026-09-16: abriu o M8**, a pedido do usuário e depois de uma revisão do código inteiro. Ele não
+estava no `PROMPT.md` e não acrescenta mecânica: é o marco de **acabamento** que faz o que já
+existe parecer o que é (§3). A parte entregue está fechada; o que ficou para depois está no
+[doc 14](14-roadmap.md) como a lista não marcada do M8 — placa com texto, quadro com arte, escada
+de mão com degraus, porta e alçapão nas outras madeiras, cama nas outras cores, baú que abre.
+O doc 14 também ganhou **M9 (gente no mundo)** e **M10 (saber onde se está)** como propostas.
+
 **2026-09-14: a lista de polimento também fechou.** Os dois blocos que o §6 carregava — as lacunas
 do doc 08 (teclas, sliders de som, resto de Vídeo, Acessibilidade) e as "oportunidades pequenas"
 (boneco, morcego, `sizeBytes`, grade de receita, canto de escada, miniatura, fogo, som no pack) —
@@ -1304,7 +1360,26 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
 
 ## 6. Próximo passo recomendado
 
-1. **Reconferir os menus com o controle**, que é o que mudou mais na última passada:
+1. **Olhar o M8 num aparelho.** É o item novo e o de maior risco: mexeu no **formato de vértice**,
+   que é o caminho por onde passa cada triângulo do mundo. Os testes provam a aritmética; o que
+   eles não provam é que a tela está certa. Em ordem de quanto pode estar errado:
+   - **uma cerca isolada e uma grade de vidro.** São as duas peças que literalmente **não
+     existiam** antes desta sessão — o poste colapsava para largura zero. Se alguma coisa
+     regrediu no formato de vértice, é aqui que aparece primeiro, e aparece como buraco;
+   - **uma tocha na parede e uma no chão**, de perto. A de parede tem que **inclinar** para longe
+     da parede, e a ponta tem que soltar fagulha de vez em quando. Se a chama parecer fria demais
+     ou animada demais, o número é o `2` de sondas por tick em `main.ts`;
+   - **uma porta**: colocar, abrir, fechar, quebrar pelo topo e quebrar pela base. Nos quatro
+     casos a porta inteira tem que sumir, e uma porta só tem que cair no chão;
+   - **uma cama**: colocar (a cabeceira vai para longe de quem coloca), subir em cima dela, dormir
+     clicando no pé **e** na cabeceira, e explodir uma das metades com creeper;
+   - **a mão**: pegar picareta, espada e tocha e olhar de lado. O item tem espessura agora; se
+     algum deles piscar ou desaparecer em certo ângulo, o número é `SPRITE_THICKNESS` em
+     `render/hand.ts`;
+   - **o contorno branco**: mirar uma laje, uma tocha e uma escada. O contorno é do tamanho da
+     peça, não mais um cubo;
+   - **uma aldeia**, se aparecer: tocha na parede, cama deitada para dentro, porta com duas folhas.
+2. **Reconferir os menus com o controle**, que é o que mudou mais na passada anterior:
    - **o foco tem que aparecer.** Empurrar o direcional numa tela precisa acender um anel amarelo
      no item escolhido. Se ele não acender, nada mais dessa lista importa — era essa a causa de
      *"indo para botões nem existentes em tela"*;
@@ -1314,13 +1389,13 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      subir sozinho, e o analógico tem que andar entre as casinhas;
    - **pegar o controle com a tela já aberta no dedo**: o primeiro aperto mostra onde o foco está
      e não aperta nada.
-2. ~~**Olhar em volta, e só isso.**~~ **Validado em campo em 2026-09-14**: a câmera por quadro e o
+3. ~~**Olhar em volta, e só isso.**~~ **Validado em campo em 2026-09-14**: a câmera por quadro e o
    Modo A que não acende mais o anel durante o arrasto foram confirmados no celular e no
    computador. Se a velocidade do analógico incomodar, o número é `padSensitivity` nas opções.
-3. **Trocar de modo pela pausa** e conferir que sair e voltar ao mundo devolve o modo aplicado.
+4. **Trocar de modo pela pausa** e conferir que sair e voltar ao mundo devolve o modo aplicado.
    No Criativo, vida, ar, fome e armadura somem do HUD; no Sobrevivência voltam — e a fome agora é
    uma coxa de frango, não um retângulo.
-4. **Jogar o que foi entregue em 2026-09-14.** É o único item com risco real: vinte opções novas,
+5. **Jogar o que foi entregue em 2026-09-14.** É o único item com risco real: vinte opções novas,
    um passe de render novo, um sistema de mundo novo e um mob novo — nenhum deles viu um aparelho.
    O que olhar, em ordem de quanto pode estar errado:
    - **Nuvens.** Elas são o único desenho que nunca foi visto. Conferir se a forma lê como nuvem e
@@ -1338,17 +1413,17 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      certa do corpo.
    - **Modo daltônico e contorno em alto contraste**, que são acessibilidade e só se avaliam
      olhando.
-5. **Reconferir a quebra.** Um clique — de mouse ou de dedo — tem que derrubar **um** bloco, no
+6. **Reconferir a quebra.** Um clique — de mouse ou de dedo — tem que derrubar **um** bloco, no
    criativo e no sobrevivência; segurando, o ritmo é de ~4 por segundo. E as plantas passaram a ser
    miráveis: grama alta, flores, mudas e cana agora quebram. Vale conferir que **minerar pedra não
    ficou mais lento** — é o que o intervalo foi desenhado para não fazer.
-6. **Reconferir o toque no celular.** O padrão agora é o **Modo B**, que é o que já funcionava —
+7. **Reconferir o toque no celular.** O padrão agora é o **Modo B**, que é o que já funcionava —
    então o primeiro teste é confirmar que nada regrediu nele. Depois vale voltar ao **Modo A** nas
    opções e ver se ele ficou utilizável: colocar e quebrar agora miram no **mesmo** lugar (o dedo),
    a mira central some, a folga de arraste dobrou, e arrastar para mirar e então segurar passou a
    funcionar em vez de travar o dedo. Se ainda falhar, o número a mexer é `HOLD_SLOP` em
    `input/touch.ts`.
-7. **Reconferir o inventário no celular.** As duas correções de 2026-09-14
+8. **Reconferir o inventário no celular.** As duas correções de 2026-09-14
    vieram de relato de campo e voltam para lá:
    - **toque longo num slot** pega metade com a mão vazia e solta uma unidade com a mão cheia.
      Montar uma receita de tábua por célula é o teste que importa. A dica aparece no painel, e o
@@ -1356,7 +1431,7 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
    - **largar item** agora arremessa na direção do olhar, e o que foi jogado fora só volta a ser
      coletável depois de dois segundos. Vale largar olhando para o chão e para uma parede, que é
      onde o arremesso sozinho não resolveria.
-8. **Voltar ao DualSense.** O reconhecimento por Bluetooth e a navegação básica já foram
+9. **Voltar ao DualSense.** O reconhecimento por Bluetooth e a navegação básica já foram
    confirmados em 2026-09-14; o que ainda não viu aparelho é a segunda passada. Em ordem de
    quanto pode estar errado:
    - **O cursor do analógico direito** com o inventário aberto. É o item novo e o mais fácil de
@@ -1376,18 +1451,18 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      ligada.
    - **No celular**, lembrar que ligar o áudio e a tela cheia exigem um toque na tela — o controle
      não serve de gesto para o navegador. O jogo avisa isso ao conectar.
-9. **Uma sessão longa jogando de verdade.** A metade mecânica do critério está cumprida:
+10. **Uma sessão longa jogando de verdade.** A metade mecânica do critério está cumprida:
    `npm run soak` rodou 92,5 min de voo contínuo sem um erro, e os números estão no §2 e no §3.
    O que o robô **não** cobre, e é o que sobra: uma sessão longa **jogando** — inventário,
    construção, morte e volta, troca de dimensão —, e principalmente **no celular**, que é onde o
    orçamento é apertado. Vale também deixar o `npm run soak` fechar os 120 min uma vez, já que a
    primeira execução parou aos 92 por decisão de quem estava na máquina.
-10. ~~**Medir o tempo de abertura em 3G.**~~ **Feito em 2026-09-14**: 4,48 s no 3G rápido, dentro
+11. ~~**Medir o tempo de abertura em 3G.**~~ **Feito em 2026-09-14**: 4,48 s no 3G rápido, dentro
    dos 5 s do critério (§2 e §3). O que sobrou como pergunta em aberto é a **outra metade do
    tempo**: ~2 s entre o documento pronto e a tela de título são CPU de boot, medidos num desktop.
    Vale repetir a medida no celular, porque é essa metade que cresce num T0 — e é ela, e não o
    tamanho do bundle, que decide se o critério continua cumprido.
-11. Oportunidades pequenas que sobraram, agora curtas:
+12. Oportunidades pequenas que sobraram, agora curtas:
    - **`.clw` com miniatura** já funciona, mas nenhum arquivo real foi exportado e reimportado
      desde a mudança para a v2 — é um teste manual de cinco minutos;
    - **som no resource pack** foi testado por formato, nunca com um `.ogg` de verdade num

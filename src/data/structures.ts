@@ -178,7 +178,10 @@ const MINESHAFT: StructureDef = {
     { kind: 'fill', block: 'rail', box: [0, 1, 1, 12, 1, 1], replace: 'air' },
     { kind: 'point', block: 'cobweb', box: [3, 2, 0, 3, 2, 0], replace: 'air' },
     { kind: 'point', block: 'cobweb', box: [8, 2, 2, 8, 2, 2], replace: 'air' },
-    { kind: 'point', block: 'torch', box: [6, 2, 1, 6, 2, 1], replace: 'air' },
+    // Tocha no piso de tábua, encostada na parede — estado 4 é o encaixe de
+    // chão (`MOUNT_FLOOR`). Ela boiava no meio do corredor quando tocha era
+    // uma cruz e não tinha encaixe nenhum.
+    { kind: 'point', block: 'torch', box: [4, 1, 0, 4, 1, 0], replace: 'air', state: 4 },
   ],
   chests: [{ at: [11, 1, 1], loot: 'mineshaft' }],
   placement: { attempts: 0.08, minY: 12, maxY: 38, surface: false },
@@ -206,14 +209,21 @@ const VILLAGE_HOUSE: StructureDef = {
     { kind: 'fill', block: 'cobblestone_slab', box: [0, 5, 0, 6, 5, 6], replace: 'any' },
     // Porta na parede norte e janelas de vidro nas laterais.
     { kind: 'fill', block: 'air', box: [3, 1, 0, 3, 2, 0], replace: 'any' },
+    // A porta ocupa duas células desde o M8: as duas metades entram aqui, senão
+    // a aldeia nasce com meia porta e o ouvinte de `world/multiblock.ts` — que
+    // ignora a geração de propósito — não tem o que consertar.
     { kind: 'point', block: 'oak_door', box: [3, 1, 0, 3, 1, 0], replace: 'any', state: 3 },
+    { kind: 'point', block: 'oak_door_top', box: [3, 2, 0, 3, 2, 0], replace: 'any', state: 3 },
     { kind: 'point', block: 'glass', box: [0, 2, 3, 0, 2, 3], replace: 'any' },
     { kind: 'point', block: 'glass', box: [6, 2, 3, 6, 2, 3], replace: 'any' },
     { kind: 'point', block: 'glass', box: [3, 2, 6, 3, 2, 6], replace: 'any' },
     // Mobília: mesa de trabalho, tocha e cama.
     { kind: 'point', block: 'crafting_table', box: [1, 1, 5, 1, 1, 5], replace: 'any' },
-    { kind: 'point', block: 'torch', box: [3, 3, 3, 3, 3, 3], replace: 'any' },
-    { kind: 'point', block: 'bed', box: [5, 1, 1, 5, 1, 1], replace: 'any' },
+    // Tocha pendurada na parede norte (encaixe 3 = apoio em −Z).
+    { kind: 'point', block: 'torch', box: [2, 2, 1, 2, 2, 1], replace: 'any', state: 3 },
+    // Cama com o pé em (5,1,1) e a cabeceira em (5,1,2): estado 2 é +Z.
+    { kind: 'point', block: 'bed', box: [5, 1, 1, 5, 1, 1], replace: 'any', state: 2 },
+    { kind: 'point', block: 'bed_head', box: [5, 1, 2, 5, 1, 2], replace: 'any', state: 3 },
   ],
   chests: [{ at: [1, 1, 1], loot: 'village' }],
   placement: {

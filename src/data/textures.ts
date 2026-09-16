@@ -480,6 +480,16 @@ export const TEXTURES: Record<string, TexRecipe> = {
       dither(0.04),
     ],
   },
+  /** Pé da cama: colcha inteira, sem travesseiro. */
+  'block/bed_foot_top': {
+    base: [176, 44, 44], noise: 'grain', scale: 10, variance: 0.06,
+    ops: [
+      outline(0, 0, 16, 16, [108, 28, 28]),
+      rect(1, 1, 14, 14, [196, 52, 52]),
+      rect(1, 1, 14, 1, [232, 96, 96], 0.6),
+      dither(0.04),
+    ],
+  },
   'block/bed_side': {
     base: [150, 124, 72], noise: 'stripes', scale: 1, variance: 0.08,
     ops: [
@@ -491,17 +501,35 @@ export const TEXTURES: Record<string, TexRecipe> = {
       dither(0.04),
     ],
   },
-  // Porta: era `block/oak_planks`. Dois painéis afundados e a maçaneta.
+  /*
+   * Porta (M8): duas folhas, uma por metade do bloco.
+   *
+   * Ela ocupa dois blocos desde 2026-09-16, então **a textura foi partida em
+   * duas**: a de baixo tem a maçaneta encostada na divisa, a de cima tem a
+   * almofada alta e a travessa. Com a mesma textura nas duas metades a porta
+   * lia como dois quadros empilhados, que é o defeito que ela tinha.
+   */
   'block/oak_door': {
     inherit: 'block/oak_planks',
     ops: [
       tintBy(0.88),
       outline(0, 0, 16, 16, [82, 64, 36]),
-      rect(2, 2, 12, 5, [150, 124, 72], 0.6),
-      outline(2, 2, 12, 5, [86, 68, 38]),
-      rect(2, 9, 12, 5, [150, 124, 72], 0.6),
-      outline(2, 9, 12, 5, [86, 68, 38]),
-      rect(12, 7, 2, 2, IRON_LIGHT),
+      rect(2, 4, 12, 10, [150, 124, 72], 0.6),
+      outline(2, 4, 12, 10, [86, 68, 38]),
+      rect(11, 1, 3, 2, IRON_LIGHT),
+      rect(11, 1, 3, 1, [196, 196, 204], 0.7),
+      dither(0.04),
+    ],
+  },
+  'block/oak_door_top': {
+    inherit: 'block/oak_planks',
+    ops: [
+      tintBy(0.88),
+      outline(0, 0, 16, 16, [82, 64, 36]),
+      rect(2, 2, 12, 9, [150, 124, 72], 0.6),
+      outline(2, 2, 12, 9, [86, 68, 38]),
+      rect(1, 12, 14, 2, [118, 96, 54]),
+      rect(11, 13, 3, 2, IRON_LIGHT),
       dither(0.04),
     ],
   },
@@ -657,9 +685,35 @@ export const TEXTURES: Record<string, TexRecipe> = {
   'block/wool_white': {
     base: [233, 236, 236], noise: 'grain', scale: 12, variance: 0.06, ops: [dither(0.04)],
   },
+  /*
+   * Tocha (M8): faixas horizontais, não uma cruz.
+   *
+   * A tocha deixou de ser dois quads cruzados e virou um poste de 2/16 de
+   * lado (`world/mesh/complex.ts`). A lateral do poste mostra a textura
+   * **inteira** espremida em dois pixels de largura — o formato de vértice não
+   * guarda recorte de UV —, então tudo que é detalhe horizontal se perde. Daí
+   * o desenho em faixas: cabo embaixo, carvão no meio, chama em cima. É a
+   * única leitura que sobrevive à compressão.
+   */
   'block/torch': {
-    base: [140, 108, 60], noise: 'flat', scale: 1, variance: 0,
-    ops: [alphaMask('cross', 0), blobs([255, 226, 130], 2, 2)],
+    base: [140, 108, 60], noise: 'grain', scale: 3, variance: 0.1,
+    ops: [
+      rect(0, 5, 16, 11, [132, 100, 56]),
+      rect(0, 4, 16, 2, [74, 52, 28]),
+      rect(0, 1, 16, 3, [255, 184, 64]),
+      rect(0, 0, 16, 1, [255, 242, 186]),
+      dither(0.04),
+    ],
+  },
+  /** Brasa vista de cima: o quadradinho de 2×2 no topo do poste. */
+  'block/torch_top': {
+    base: [255, 184, 64], noise: 'value', scale: 2, variance: 0.12,
+    ops: [rect(4, 4, 8, 8, [255, 242, 186]), dither(0.05)],
+  },
+  /** Corte do cabo, visto por baixo — só madeira, sem brasa. */
+  'block/torch_bottom': {
+    base: [116, 88, 48], noise: 'grain', scale: 3, variance: 0.1,
+    ops: [border([78, 58, 32], 1), dither(0.04)],
   },
 
   // --- fluidos (animados) -------------------------------------------------
@@ -684,12 +738,32 @@ export const TEXTURES: Record<string, TexRecipe> = {
   // --- redstone (M7) ------------------------------------------------------
   ...dustTextures(),
   'block/redstone_torch': {
-    base: [140, 108, 60], noise: 'flat', scale: 1, variance: 0,
-    ops: [alphaMask('cross', 0), blobs([255, 86, 64], 2, 2)],
+    inherit: 'block/torch',
+    ops: [
+      rect(0, 5, 16, 11, [132, 100, 56]),
+      rect(0, 4, 16, 2, [74, 52, 28]),
+      rect(0, 1, 16, 3, [226, 58, 44]),
+      rect(0, 0, 16, 1, [255, 132, 110]),
+      dither(0.04),
+    ],
+  },
+  'block/redstone_torch_top': {
+    base: [226, 58, 44], noise: 'value', scale: 2, variance: 0.12,
+    ops: [rect(4, 4, 8, 8, [255, 132, 110]), dither(0.05)],
   },
   'block/redstone_torch_off': {
-    base: [140, 108, 60], noise: 'flat', scale: 1, variance: 0,
-    ops: [alphaMask('cross', 0), blobs([104, 34, 30], 2, 2)],
+    inherit: 'block/torch',
+    ops: [
+      rect(0, 5, 16, 11, [132, 100, 56]),
+      rect(0, 4, 16, 2, [74, 52, 28]),
+      rect(0, 1, 16, 3, [104, 34, 30]),
+      rect(0, 0, 16, 1, [134, 48, 42]),
+      dither(0.04),
+    ],
+  },
+  'block/redstone_torch_off_top': {
+    base: [104, 34, 30], noise: 'value', scale: 2, variance: 0.1,
+    ops: [rect(4, 4, 8, 8, [134, 48, 42]), dither(0.05)],
   },
   'block/lever': {
     inherit: 'block/cobblestone',

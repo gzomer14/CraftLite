@@ -10,7 +10,8 @@ import {
   BOX_STRIDE, FENCE_COLLISION_HEIGHT, MAX_BOXES, MOUNT_CEILING, MOUNT_FLOOR, SHAPE_BUTTON,
   SHAPE_BY_NAME, SHAPE_DOOR, SHAPE_FENCE, SHAPE_FENCE_GATE, SHAPE_FLAT, SHAPE_LEVER,
   SHAPE_PISTON, SHAPE_PISTON_HEAD, SHAPE_PLATE, SHAPE_REPEATER, SHAPE_SLAB, SHAPE_STAIRS,
-  SHAPE_TRAPDOOR, boxesFor, collisionBoxesFor, mountForDir,
+  SHAPE_TRAPDOOR, SHAPE_BED, SHAPE_TORCH, TORCH_FLOOR_TOP, BED_HEIGHT,
+  boxesFor, boundsFor, collisionBoxesFor, mountForDir,
 } from '../src/world/mesh/shapes';
 import { BLOCKS, BLOCK_BY_NAME, makeState } from '../src/data/blocks';
 import { World } from '../src/world/world';
@@ -254,3 +255,75 @@ function flatWorld(topName: string): World {
   }
   return world;
 }
+
+/*
+ * Tocha e cama entraram no M8 com forma própria; a envolvente entrou junto,
+ * porque é dela que sai o contorno do bloco mirado.
+ */
+describe('tocha e cama', () => {
+  it('a tocha de chão é um poste fino e alto, não um cubo', () => {
+    expect(boxesFor(SHAPE_TORCH, MOUNT_FLOOR, 0, out)).toBe(1);
+    const [x0, y0, z0, x1, y1, z1] = box(0);
+    expect(x1 - x0).toBeCloseTo(2 / 16, 6);
+    expect(z1 - z0).toBeCloseTo(2 / 16, 6);
+    expect(y0).toBe(0);
+    expect(y1).toBeCloseTo(TORCH_FLOOR_TOP, 6);
+  });
+
+  it('a tocha de parede fica encostada na parede em que está presa', () => {
+    // Encaixe 0 = apoio em +X: a caixa toca a face x = 1.
+    boxesFor(SHAPE_TORCH, 0, 0, out);
+    expect(box(0)[3]).toBeCloseTo(1, 6);
+    // Encaixe 1 = apoio em −X: toca a face x = 0.
+    boxesFor(SHAPE_TORCH, 1, 0, out);
+    expect(box(0)[0]).toBeCloseTo(0, 6);
+  });
+
+  it('a cama é um colchão com dois pés na ponta de fora', () => {
+    const count = boxesFor(SHAPE_BED, 2, 0, out);
+    expect(count).toBe(3);
+    // O colchão cobre a célula inteira em X e Z.
+    expect(box(0)[0]).toBe(0);
+    expect(box(0)[3]).toBe(1);
+    expect(box(0)[4]).toBeCloseTo(BED_HEIGHT, 6);
+    // Os pés ficam do lado oposto à outra metade (que está em +Z).
+    for (let b = 1; b < count; b++) expect(box(b)[2]).toBeLessThan(0.5);
+  });
+
+  it('dá para andar por cima da cama: ela colide na altura do colchão', () => {
+    expect(collisionBoxesFor(SHAPE_BED, 2, out)).toBe(3);
+    expect(box(0)[4]).toBeCloseTo(BED_HEIGHT, 6);
+  });
+});
+
+describe('envolvente da forma', () => {
+  it('bloco sem forma de caixa envolve o cubo inteiro', () => {
+    const bounds = new Float32Array(6);
+    boundsFor(0, 0, bounds);
+    expect([...bounds]).toEqual([0, 0, 0, 1, 1, 1]);
+  });
+
+  it('a laje envolve meia altura', () => {
+    const bounds = new Float32Array(6);
+    boundsFor(SHAPE_SLAB, 0, bounds);
+    expect(bounds[4]).toBeCloseTo(0.5, 6);
+  });
+
+  it('a tocha envolve o poste, não o bloco', () => {
+    const bounds = new Float32Array(6);
+    boundsFor(SHAPE_TORCH, MOUNT_FLOOR, bounds);
+    expect(bounds[3] - bounds[0]).toBeCloseTo(2 / 16, 6);
+    expect(bounds[4]).toBeCloseTo(TORCH_FLOOR_TOP, 6);
+  });
+
+  /*
+   * A cerca é o caso que não pode encolher: a envolvente dela é o bloco
+   * inteiro, senão o contorno mudaria de tamanho conforme o vizinho.
+   */
+  it('a cerca envolve o bloco inteiro, com vizinho ou sem', () => {
+    const bounds = new Float32Array(6);
+    boundsFor(SHAPE_FENCE, 0, bounds);
+    expect(bounds[0]).toBe(0);
+    expect(bounds[3]).toBe(1);
+  });
+});

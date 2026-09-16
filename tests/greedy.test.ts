@@ -154,9 +154,8 @@ describe('GreedyMesher', () => {
       const ao: number[] = [];
       const uv: number[][] = [];
       for (let k = 0; k < 4; k++) {
-        const w0 = words[(q * 4 + k) * 2];
         const w1 = words[(q * 4 + k) * 2 + 1];
-        uv.push([(w0 >>> 21) & 31, (w0 >>> 26) & 31]);
+        uv.push([(w1 >>> 22) & 31, (w1 >>> 27) & 31]);
         ao.push((w1 >>> 18) & 3);
       }
       const w = uv[1][0];

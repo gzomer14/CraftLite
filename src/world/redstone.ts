@@ -33,6 +33,7 @@ import { redstoneDefOf, type RedstoneDef, type RedstoneKind } from '../data/reds
 import { MOUNT_CEILING, MOUNT_FLOOR, PISTON_STEP } from './mesh/shapes';
 import { WORLD_HEIGHT } from './chunk';
 import type { World } from './world';
+import { partnerIdOf, partnerOffset } from './multiblock';
 
 /** Teto de posições reavaliadas por tick. Mesma disciplina do doc 03 §9. */
 export const MAX_UPDATES_PER_TICK = 1024;
@@ -55,6 +56,8 @@ export const PISTON_LIMIT = 12;
  * nenhum dos três usa o 4 (`world/mesh/shapes.ts`).
  */
 const DOOR_POWERED_BIT = 16;
+/** Deslocamento até a outra folha da porta. Reusado — o tick não aloca. */
+const DOOR_PARTNER = new Int8Array(3);
 
 /** Folga em Y ao procurar a placa sob os pés de uma entidade. */
 const FOOT_EPSILON = 0.05;
@@ -104,6 +107,8 @@ interface Roles {
   conductive: Uint8Array;
   /** 1 = pistão não move este bloco (ver `isImmovable`). */
   immovable: Uint8Array;
+  /** 1 quando o bloco cai se perder o apoio (`support` da tabela de blocos). */
+  needsSupport: Uint8Array;
 }
 
 export const KIND_NONE = 0;
@@ -157,11 +162,13 @@ function buildRoles(): Roles {
     openBit: new Uint8Array(n),
     conductive: new Uint8Array(n),
     immovable: new Uint8Array(n),
+    needsSupport: new Uint8Array(n),
   };
   for (let id = 0; id < n; id++) {
     const def = BLOCKS[id];
     if (def === undefined) continue;
     roles.conductive[id] = def.opaque && def.solid ? 1 : 0;
+    roles.needsSupport[id] = def.support === 'none' ? 0 : 1;
     roles.immovable[id] = IMMOVABLE.has(def.name) || def.hardness < 0 ? 1 : 0;
     roles.openBit[id] = openBitOf(def);
 
@@ -269,7 +276,16 @@ export class Redstone {
   schedule(x: number, y: number, z: number): void {
     if (y < 0 || y >= WORLD_HEIGHT) return;
     const id = blockIdOf(this.world.getBlock(x, y, z));
-    if (ROLES.kind[id] === KIND_NONE) return;
+    /*
+     * Componente de circuito **ou** bloco que depende de apoio.
+     *
+     * A segunda metade da condição é uma correção de 2026-09-16: até aqui só
+     * quem tinha papel de redstone entrava na fila, então trilho comum e tocha
+     * — que declaram `support` na tabela de blocos e não são circuito — ficavam
+     * flutuando quando o bloco de baixo era minerado. A checagem em si já
+     * existia em `dropUnsupported`; o que faltava era alguém chamá-la.
+     */
+    if (ROLES.kind[id] === KIND_NONE && ROLES.needsSupport[id] === 0) return;
     const key = positionKey(x, y, z);
     if (this.queued.has(key)) return;
     this.queued.add(key);
@@ -340,8 +356,9 @@ export class Redstone {
     const state = this.world.getBlock(x, y, z);
     const id = blockIdOf(state);
     const kind = ROLES.kind[id];
-    if (kind === KIND_NONE) return;
+    // O apoio vem antes do papel: quem cai não precisa ser circuito.
     if (this.dropUnsupported(x, y, z, state, id)) return;
+    if (kind === KIND_NONE) return;
 
     switch (kind) {
       case KIND_WIRE: this.applyWire(x, y, z, state); break;
@@ -694,6 +711,25 @@ export class Redstone {
       ? bits | bit | DOOR_POWERED_BIT
       : (bits & ~bit) & ~DOOR_POWERED_BIT;
     this.replace(x, y, z, makeState(id, next));
+    /*
+     * A porta tem duas folhas (M8) e uma alavanca costuma alcançar só uma
+     * delas. A folha tocada arrasta a outra: sem isso, metade da porta abre e
+     * a outra metade continua barrando a passagem.
+     */
+    if (partnerOffset(state, DOOR_PARTNER)) {
+      const px = x + DOOR_PARTNER[0];
+      const py = y + DOOR_PARTNER[1];
+      const pz = z + DOOR_PARTNER[2];
+      const other = this.world.getBlock(px, py, pz);
+      const otherId = blockIdOf(other);
+      if (otherId === partnerIdOf(id) && ROLES.openBit[otherId] !== 0) {
+        const otherBits = stateBitsOf(other);
+        const otherNext = powered
+          ? otherBits | ROLES.openBit[otherId] | DOOR_POWERED_BIT
+          : (otherBits & ~ROLES.openBit[otherId]) & ~DOOR_POWERED_BIT;
+        if (otherNext !== otherBits) this.replace(px, py, pz, makeState(otherId, otherNext));
+      }
+    }
     this.events.onSound?.('block/door', x, y, z);
   }
 

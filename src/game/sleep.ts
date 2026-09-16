@@ -5,10 +5,10 @@
  * primeira noite deixa de existir como desafio — bastaria colocar a cama e
  * apertar o botão. Com ela, o jogador precisa **fechar o abrigo** antes.
  *
- * **Desvio consciente:** no gênero a cama ocupa dois blocos (cabeceira e pé).
- * Aqui ela é um bloco só, porque blocos multi-parte exigiriam a máquina de
- * estados de colocação/quebra que só chega no M6 com as portas e escadas. A
- * mecânica — definir spawn, pular a noite — é idêntica.
+ * **O desvio que havia aqui acabou (M8).** A cama era um bloco só, porque
+ * blocos de duas células exigiriam uma máquina de colocação e quebra que não
+ * existia. Ela existe agora, em `world/multiblock.ts`: a cama tem pé e
+ * cabeceira, e clicar em qualquer uma das duas deita na mesma cama.
  */
 
 import { TICKS_PER_DAY } from './daynight';

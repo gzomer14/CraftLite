@@ -29,6 +29,14 @@ export interface HighlightState {
   stage: number;
   /** Brilho médio da textura do bloco mirado (0..1), para tingir a fissura. */
   brightness: number;
+  /**
+   * Caixa envolvente da forma do bloco mirado, em fração de bloco.
+   *
+   * Quem preenche é `main.ts`, com `boundsFor`. O contorno e a rachadura saem
+   * do tamanho do que está sendo mirado — uma laje acende meia caixa, uma
+   * tocha acende um poste.
+   */
+  bounds: Float32Array;
 }
 
 /**
@@ -49,7 +57,10 @@ export class Renderer {
   readonly clouds: CloudsPass;
 
   /** Bloco mirado neste frame. Mutado no lugar pelo chamador. */
-  readonly highlight: HighlightState = { visible: false, x: 0, y: 0, z: 0, stage: -1, brightness: 1 };
+  readonly highlight: HighlightState = {
+    visible: false, x: 0, y: 0, z: 0, stage: -1, brightness: 1,
+    bounds: new Float32Array([0, 0, 0, 1, 1, 1]),
+  };
 
   /** Itens no chão, preenchidos pelo chamador antes do render. */
   itemRenderer: { render: (viewProj: Mat4, view: Mat4) => number; pending: number } | null = null;
@@ -289,10 +300,12 @@ export class Renderer {
     // 3b. contorno do bloco mirado e rachadura de quebra
     if (this.highlight.visible) {
       const h = this.highlight;
-      this.selection.drawOutline(this.camera.viewProj, h.x, h.y, h.z);
+      this.selection.drawOutline(this.camera.viewProj, h.x, h.y, h.z, h.bounds);
       calls++;
       if (h.stage >= 0) {
-        this.selection.drawCrack(this.camera.viewProj, h.x, h.y, h.z, h.stage, h.brightness);
+        this.selection.drawCrack(
+          this.camera.viewProj, h.x, h.y, h.z, h.stage, h.brightness, h.bounds,
+        );
         calls++;
       }
     }

@@ -4,8 +4,9 @@ Este repositório contém **a especificação completa** de um jogo de mundo abe
 navegador — um jogo de minerar-e-construir que roda em praticamente qualquer máquina, incluindo
 celulares antigos — e a **implementação em andamento**.
 
-**Estado atual: os oito marcos, de M0 a M7, estão concluídos, e nenhum documento normativo tem mais
-pendência de funcionalidade. Falta jogar em aparelho o que foi entregue depois do M7.**
+**Estado atual: os oito marcos, de M0 a M7, estão concluídos, e o M8 — acabamento visual — foi
+entregue em 2026-09-16. Nenhum documento normativo tem pendência de funcionalidade. Falta jogar em
+aparelho o que foi entregue depois do M7.**
 
 - **M0 — esqueleto:** Vite + TypeScript strict, renderer WebGL2 próprio com fallback WebGL1,
   detecção de tier, loop de 20 Hz com interpolação, gerador procedural de texturas alimentando um
@@ -72,6 +73,16 @@ pendência de funcionalidade. Falta jogar em aparelho o que foi entregue depois 
   espalha** — o `flammable` da tabela de blocos estava lá desde o M1 sem ninguém lendo —, o
   **morcego**, o **boneco do jogador** no inventário, **miniatura e tamanho** na tela de mundos,
   **canto de escada** e **som no resource pack**.
+- **M8 — presença dos objetos:** o acabamento que faltava, e a causa dos três sintomas era uma só.
+  A posição do vértice era guardada em **meios-blocos**, então toda caixa mais fina que 0,5
+  colapsava no arredondamento: poste de cerca e grade de vidro **não tinham geometria nenhuma**, e
+  porta, alçapão, botão e alavanca eram planos de espessura zero. A precisão foi para **1/16 de
+  bloco sem sair dos 8 bytes por vértice** — e com ela vieram a **tocha de verdade** (poste com
+  brasa, inclinada quando presa na parede, soltando fagulha), a **porta e a cama de duas células**,
+  o **item na mão extrudado** (a espada tem lado, e a lateral da lâmina tem a cor da lâmina) e o
+  **contorno do bloco mirado do tamanho da peça**. Blocos de duas células são uma linha na tabela:
+  quem garante que as duas metades morrem juntas mora no `setBlock`, então vale para o creeper, o
+  fogo e o pistão sem nenhum deles saber que porta tem duas metades.
 - **Controle:** DualSense, DualShock 4, Xbox e Switch Pro reconhecidos por fabricante/produto —
   o que muda entre eles é sobretudo o **nome do botão**, e o jogo passa a dizer `✕ ○ □ △` a quem
   segura um controle da Sony. Mapeamento completo do doc 09 §3, e **os menus navegáveis por
@@ -85,7 +96,7 @@ Abre em **4,5 s em 3G rápido** (critério: < 5 s) e aguentou **92 min de voo co
 erro**, com o heap estável e o anel de chunks fixo em 489 colunas ao longo de 67 mil blocos — os
 dois medidos por `npm run slow-network` e `npm run soak`, que dirigem um Chrome de verdade.
 
-**192 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
+**196 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
 além de dois ícones de PWA de 6,7 KB, gerados por código.
 
 Validado em aparelho alvo (**Galaxy J7 Metal**, Android 7, 2 GB, Mali-T830) em 2026-09-12:
@@ -98,7 +109,7 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 1416 testes (vitest)
+npm test           # 1473 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
 npm run icons      # regenera os ícones do PWA
@@ -176,7 +187,7 @@ src/
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      1416 testes, incluindo orçamento de performance e de luz
+tests/                      1473 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios
@@ -193,7 +204,7 @@ docs/
   11-persistencia-e-saves.md IndexedDB, formato de save, PWA
   12-multiplayer.md         ganchos de arquitetura, protocolo P2P
   13-assets-e-arte.md       texturas procedurais, sprites, fonte, licença
-  14-roadmap.md             8 marcos com checklist e critérios de aceite
+  14-roadmap.md             marcos com checklist e critérios de aceite (M0–M8 feitos, M9–M10 propostos)
   15-status.md              estado real: status por marco, pendências, próximo passo
   16-auditoria.md           histórico por sessão, com grid de arquivos
   mockups/                  14 wireframes SVG + generate.py

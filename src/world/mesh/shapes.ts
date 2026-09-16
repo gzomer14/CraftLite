@@ -44,6 +44,10 @@ export const SHAPE_REPEATER = 17;
 export const SHAPE_PISTON = 18;
 export const SHAPE_PISTON_HEAD = 19;
 export const SHAPE_RAIL = 20;
+/** Poste fino de pé, no chão ou inclinado na parede: a tocha (doc 04 §3). */
+export const SHAPE_TORCH = 21;
+/** Colchão com pés: metade da cama (doc 04 §3). */
+export const SHAPE_BED = 22;
 
 /**
  * Formas de trilho nos bits 0..3 do estado (M7), na codificação do gênero.
@@ -118,7 +122,8 @@ const PANE = 1 / 16;
  * física leem daqui, então desenho e colisão nunca divergem. */
 export const SHAPE_BY_NAME: Readonly<Record<string, number>> = {
   cross: SHAPE_CROSS,
-  torch: SHAPE_CROSS,
+  torch: SHAPE_TORCH,
+  bed: SHAPE_BED,
   slab: SHAPE_SLAB,
   carpet: SHAPE_CARPET,
   flat: SHAPE_FLAT,
@@ -248,6 +253,10 @@ export function boxesFor(
       return piston(state, out);
     case SHAPE_PISTON_HEAD:
       return pistonHead(state, out);
+    case SHAPE_TORCH:
+      return torchBox(state, out);
+    case SHAPE_BED:
+      return bed(state, out);
     case SHAPE_RAIL:
       // O desenho é um quad só (ver `mesh/complex.ts`); a caixa existe para
       // quem pergunta pela forma — hoje ninguém, porque trilho não colide.
@@ -256,6 +265,38 @@ export function boxesFor(
       return 0;
   }
 }
+
+/**
+ * Caixa que **envolve** a forma inteira, escrita em `out` como
+ * `[x0,y0,z0,x1,y1,z1]`.
+ *
+ * É o que o contorno do bloco mirado usa: até 2026-09-16 ele era sempre o cubo
+ * unitário, e mirar uma laje, uma tocha ou uma placa acendia um cubo inteiro no
+ * ar em volta dela. Com a envolvente, o contorno cobre o que o jogador está
+ * olhando.
+ *
+ * A cerca entra com **todos** os braços ligados de propósito: a envolvente dela
+ * é o bloco inteiro, e o contorno não pode mudar de tamanho conforme o vizinho.
+ */
+export function boundsFor(shape: number, state: number, out: Float32Array): void {
+  const count = boxesFor(shape, state, 0xf, BOUNDS_BOXES);
+  if (count === 0) {
+    out[0] = 0; out[1] = 0; out[2] = 0;
+    out[3] = 1; out[4] = 1; out[5] = 1;
+    return;
+  }
+  out[0] = Infinity; out[1] = Infinity; out[2] = Infinity;
+  out[3] = -Infinity; out[4] = -Infinity; out[5] = -Infinity;
+  for (let b = 0; b < count; b++) {
+    const o = b * BOX_STRIDE;
+    for (let a = 0; a < 3; a++) {
+      if (BOUNDS_BOXES[o + a] < out[a]) out[a] = BOUNDS_BOXES[o + a];
+      if (BOUNDS_BOXES[o + a + 3] > out[a + 3]) out[a + 3] = BOUNDS_BOXES[o + a + 3];
+    }
+  }
+}
+
+const BOUNDS_BOXES = new Float32Array(MAX_BOXES * BOX_STRIDE);
 
 /** Escreve uma caixa em `out[i]` e devolve `i + 1` como contagem. */
 function one(
@@ -478,6 +519,84 @@ function wallPlate(facing: number, out: Float32Array, y0: number, y1: number): n
   if (facing === 1) return one(out, 0, 0, y0, 0, THIN, y1, 1);
   if (facing === 2) return one(out, 0, 0, y0, 1 - THIN, 1, y1, 1);
   return one(out, 0, 0, y0, 0, 1, y1, THIN);
+}
+
+/**
+ * Tocha (doc 04 §3).
+ *
+ * **Era uma cruz de planta** até 2026-09-16 — dois quads na diagonal com a
+ * textura de tocha, que lia como "flor marrom" e não como tocha. Virou poste,
+ * porque o formato de vértice passou a representar 1/16 de bloco (ver
+ * `render/vertex.ts`); antes disso um poste de 2/16 colapsava no
+ * arredondamento, e a cruz era a saída honesta.
+ *
+ * O encaixe está nos bits 0..2, na mesma codificação de alavanca e botão:
+ * 0..3 = parede, `MOUNT_FLOOR` = chão. Teto não existe — tocha de cabeça para
+ * baixo não é do gênero, e `game/interaction.ts` recusa a colocação.
+ */
+export const TORCH_HALF = 1 / 16;
+/** Altura do poste plantado no chão. */
+export const TORCH_FLOOR_TOP = 10 / 16;
+/** Base e topo do poste preso na parede. */
+export const TORCH_WALL_Y0 = 3 / 16;
+export const TORCH_WALL_Y1 = 13 / 16;
+/** Distância do centro do bloco até o centro do poste, na base e no topo. */
+export const TORCH_WALL_BASE = 7 / 16;
+export const TORCH_WALL_TOP = 1 / 16;
+
+/**
+ * Caixa da tocha. A de parede é **inclinada** no desenho (ver `mesh/complex.ts`);
+ * aqui sai a caixa que a envolve, que é o que basta para quem pergunta pela
+ * forma — a tocha não colide com ninguém.
+ */
+function torchBox(state: number, out: Float32Array): number {
+  const mount = state & 7;
+  const h = TORCH_HALF;
+  if (mount === MOUNT_FLOOR || mount > 3) {
+    return one(out, 0, 0.5 - h, 0, 0.5 - h, 0.5 + h, TORCH_FLOOR_TOP, 0.5 + h);
+  }
+  const step = FACING_STEP[mount];
+  const near = 0.5 + step[0] * TORCH_WALL_TOP;
+  const far = 0.5 + step[0] * (TORCH_WALL_BASE + h);
+  const nearZ = 0.5 + step[1] * TORCH_WALL_TOP;
+  const farZ = 0.5 + step[1] * (TORCH_WALL_BASE + h);
+  return one(
+    out, 0,
+    Math.min(near, far) - (step[0] === 0 ? h : 0), TORCH_WALL_Y0,
+    Math.min(nearZ, farZ) - (step[1] === 0 ? h : 0),
+    Math.max(near, far) + (step[0] === 0 ? h : 0), TORCH_WALL_Y1,
+    Math.max(nearZ, farZ) + (step[1] === 0 ? h : 0),
+  );
+}
+
+/**
+ * Metade de cama: o colchão mais dois pés na ponta de fora (M8).
+ *
+ * bits 0..1 = a direção em que fica a **outra** metade. Os pés ficam do lado
+ * oposto a ela, que é o que faz as duas metades juntas parecerem um móvel com
+ * quatro pés, e não dois blocos encostados.
+ */
+export const BED_HEIGHT = 9 / 16;
+/** Altura dos pés, medida do chão até a base do colchão. */
+const BED_LEG = 3 / 16;
+const BED_LEG_SIZE = 3 / 16;
+
+function bed(state: number, out: Float32Array): number {
+  let count = one(out, 0, 0, BED_LEG, 0, 1, BED_HEIGHT, 1);
+  // A ponta de fora é o lado oposto ao da outra metade.
+  const outer = (state & 3) ^ 1;
+  const s = BED_LEG_SIZE;
+  const step = FACING_STEP[outer];
+  const x0 = step[0] > 0 ? 1 - s : 0;
+  const z0 = step[1] > 0 ? 1 - s : 0;
+  if (step[0] !== 0) {
+    count = one(out, count, x0, 0, 0, x0 + s, BED_LEG, s);
+    count = one(out, count, x0, 0, 1 - s, x0 + s, BED_LEG, 1);
+  } else {
+    count = one(out, count, 0, 0, z0, s, BED_LEG, z0 + s);
+    count = one(out, count, 1 - s, 0, z0, 1, BED_LEG, z0 + s);
+  }
+  return count;
 }
 
 // --- redstone (M7) ---------------------------------------------------------

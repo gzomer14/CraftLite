@@ -18,7 +18,7 @@ import { registerServiceWorker, showUpdateToast } from './core/pwa';
 import { detectTier, presetFor, readDeviceInfo } from './core/tier';
 import { DEG2RAD, createVec3, forwardFrom } from './core/math';
 import { BIOMES } from './data/biomes';
-import { BLOCK_BY_NAME, defOf, texOf } from './data/blocks';
+import { BLOCK_BY_NAME, defOf, stateBitsOf, texOf } from './data/blocks';
 import { ITEM_BY_NAME, itemDef, makeStack } from './data/items';
 import { MOB_BY_NAME, mobDef } from './data/mobs';
 import { nextObjective, objectiveFor } from './data/achievements';
@@ -63,6 +63,8 @@ import { SEA_LEVEL, type ChunkColumn } from './world/chunk';
 import { trySpawn } from './game/spawnplacement';
 import { ChunkPipeline } from './world/pipeline';
 import { World } from './world/world';
+import { emitTorchSparks } from './game/ambient';
+import { SHAPE_BY_NAME, boundsFor } from './world/mesh/shapes';
 
 /** Blocos que aparecem na hotbar inicial, até o inventário existir (M4). */
 /** Acima disto de cota usada, o doc 11 §4 manda avisar o jogador. */
@@ -865,6 +867,18 @@ async function boot(): Promise<void> {
       }
 
       renderer.particles.tick();
+      /*
+       * Fagulha de tocha (M8): duas sondas por tick num cubo de 17 blocos.
+       *
+       * Duas é pouco de propósito. Um punhado por segundo basta para uma sala
+       * com meia dúzia de tochas piscar o tempo todo, e o custo — duas
+       * consultas ao mundo — não aparece nem em T0. Quem baixa "Partículas" nas
+       * opções baixa isto junto: o teto do pool é o mesmo, e o emissor desiste
+       * sozinho quando ele enche.
+       */
+      emitTorchSparks(world, player.x, player.y, player.z, 2, (fx, fy, fz) => {
+        renderer.particles.emitFlame(fx, fy, fz);
+      });
       // Chuva: um punhado de gotas por tick em volta do jogador, no mesmo pool
       // das outras partículas (doc 03 §8).
       if (session.weather.isRaining) {
@@ -931,6 +945,10 @@ async function boot(): Promise<void> {
         // leitura de array, não cálculo por frame.
         atlas.averageColor(atlas.layerOf(texOf(defOf(target.state), 'side')), crackColor);
         h.brightness = crackColor[0] * 0.299 + crackColor[1] * 0.587 + crackColor[2] * 0.114;
+        // Contorno do tamanho da forma: uma consulta de tabela por frame.
+        boundsFor(
+          SHAPE_BY_NAME[defOf(target.state).shape] ?? 0, stateBitsOf(target.state), h.bounds,
+        );
       }
 
       drawEntities(alpha);

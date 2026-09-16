@@ -48,22 +48,22 @@ void main() {
   uint w0 = aPacked.x;
   uint w1 = aPacked.y;
 
-  // Posição em meios-blocos dentro da section.
+  // Posição em dezesseis avos de bloco dentro da section (0..256).
   vec3 local = vec3(
-    float(w0 & 63u),
-    float((w0 >> 6) & 63u),
-    float((w0 >> 12) & 63u)
-  ) * 0.5;
+    float(w0 & 511u),
+    float((w0 >> 9) & 511u),
+    float((w0 >> 18) & 511u)
+  ) * 0.0625;
 
-  uint face  = (w0 >> 18) & 7u;
-  float u    = float((w0 >> 21) & 31u);
-  float v    = float((w0 >> 26) & 31u);
+  uint face  = (w0 >> 27) & 7u;
 
   float layer = float(w1 & 1023u);
   float bl    = float((w1 >> 10) & 15u);
   float sl    = float((w1 >> 14) & 15u);
   uint ao     = (w1 >> 18) & 3u;
-  uint tint   = (w1 >> 20) & 15u;
+  uint tint   = (w1 >> 20) & 3u;
+  float u    = float((w1 >> 22) & 31u);
+  float v    = float((w1 >> 27) & 31u);
 
   vec4 world = vec4(uChunkOrigin + local, 1.0);
   gl_Position = uViewProj * world;
@@ -72,7 +72,7 @@ void main() {
 
   float light = max(bl, sl * uDayFactor);
   vLight = max(lightCurve(light), uMinSkyLight) * AO_LEVELS[ao] * FACE_SHADE[face];
-  vTint = TINTS[tint & 3u];
+  vTint = TINTS[tint];
   vFogDepth = gl_Position.w;
 }
 `;

@@ -3,15 +3,28 @@
  *
  * **8 bytes por vértice** — este é o número normativo, porque é ele que decide
  * o orçamento de memória de mesh (doc 02 §3). A divisão interna dos bits abaixo
- * ajusta o doc em um ponto: `u`/`v` usam 5 bits (não 4) porque uma corrida do
- * greedy meshing pode ter 16 tiles de comprimento, e 4 bits só chegam a 15.
- * Os 2 bits do AO foram para a segunda palavra para compensar; o total continua 8.
+ * ajusta o doc em dois pontos: `u`/`v` usam 5 bits (não 4) porque uma corrida do
+ * greedy meshing pode ter 16 tiles de comprimento, e 4 bits só chegam a 15; e a
+ * posição usa 9 bits por eixo, pelo motivo abaixo.
  *
- * palavra 0:  x:6 | y:6 | z:6 | face:3 | u:5 | v:5              (31 bits)
- * palavra 1:  texLayer:10 | blockLight:4 | skyLight:4 | ao:2 | tint:4 | flags:8
+ * palavra 0:  x:9 | y:9 | z:9 | face:3                                  (30 bits)
+ * palavra 1:  texLayer:10 | blockLight:4 | skyLight:4 | ao:2 | tint:2 | u:5 | v:5
  *
- * Posições são em **meios-blocos** dentro da section (0..32), o que permite
- * lajes, líquidos com altura e tochas sem um segundo formato.
+ * Posições são em **dezesseis avos de bloco** dentro da section (0..256).
+ *
+ * **Correção de 2026-09-16.** Até aqui a posição era em *meios-blocos* (6 bits
+ * por eixo), e isso não era um detalhe de compressão: era uma regra de
+ * geometria. Toda caixa mais fina que meio bloco **colapsava no arredondamento**
+ * — poste de cerca (2/16), grade (1/16), porta e alçapão (3/16), botão,
+ * alavanca, placa de pressão, repetidor e o levantamento do trilho viravam
+ * planos de espessura zero, e o poste de cerca sozinho desaparecia por
+ * completo. Era a causa-raiz de "as coisas parecem chapadas": não faltava
+ * textura, faltava **volume representável**.
+ *
+ * Os 3 bits a mais por eixo saem de onde não faziam falta: `tint` tem quatro
+ * valores (2 bits bastam), `u`/`v` mudaram para a segunda palavra e o campo
+ * `flags`, que nunca teve leitor, saiu. O total continua em 8 bytes, e o
+ * orçamento de memória de mesh do doc 02 §3 não muda.
  */
 
 export const BYTES_PER_VERTEX_PACKED = 8;
@@ -39,29 +52,32 @@ export const TINT_GRASS = 1;
 export const TINT_FOLIAGE = 2;
 export const TINT_WATER = 3;
 
+/** Sub-blocos por bloco na posição empacotada. */
+export const POSITION_SCALE = 16;
+
 export function packWord0(
-  xHalf: number, yHalf: number, zHalf: number, face: number, u: number, v: number,
+  x16: number, y16: number, z16: number, face: number,
 ): number {
   return (
-    (xHalf & 0x3f) |
-    ((yHalf & 0x3f) << 6) |
-    ((zHalf & 0x3f) << 12) |
-    ((face & 0x7) << 18) |
-    ((u & 0x1f) << 21) |
-    ((v & 0x1f) << 26)
+    (x16 & 0x1ff) |
+    ((y16 & 0x1ff) << 9) |
+    ((z16 & 0x1ff) << 18) |
+    ((face & 0x7) << 27)
   ) >>> 0;
 }
 
 export function packWord1(
-  texLayer: number, blockLight: number, skyLight: number, ao: number, tint: number, flags = 0,
+  texLayer: number, blockLight: number, skyLight: number, ao: number, tint: number,
+  u: number, v: number,
 ): number {
   return (
     (texLayer & 0x3ff) |
     ((blockLight & 0xf) << 10) |
     ((skyLight & 0xf) << 14) |
     ((ao & 0x3) << 18) |
-    ((tint & 0xf) << 20) |
-    ((flags & 0xff) << 24)
+    ((tint & 0x3) << 20) |
+    ((u & 0x1f) << 22) |
+    ((v & 0x1f) << 27)
   ) >>> 0;
 }
 
@@ -71,12 +87,12 @@ export function packWord1(
  */
 export function writeFloatVertex(
   out: Float32Array, offset: number,
-  xHalf: number, yHalf: number, zHalf: number, face: number, u: number, v: number,
+  x16: number, y16: number, z16: number, face: number, u: number, v: number,
   texLayer: number, blockLight: number, skyLight: number, ao: number, tint: number,
 ): void {
-  out[offset] = xHalf * 0.5;
-  out[offset + 1] = yHalf * 0.5;
-  out[offset + 2] = zHalf * 0.5;
+  out[offset] = x16 / POSITION_SCALE;
+  out[offset + 1] = y16 / POSITION_SCALE;
+  out[offset + 2] = z16 / POSITION_SCALE;
   out[offset + 3] = face;
   out[offset + 4] = u;
   out[offset + 5] = v;

@@ -12,8 +12,11 @@
  *  - **bloco** — cubo de 36 vértices tirado do atlas de blocos, uma camada por
  *    face. É a forma que o jogador reconhece: segurar terra tem que parecer
  *    segurar um cubo de terra.
- *  - **item** — quad da folha de sprites, o mesmo desenho do inventário e do
- *    item no chão. Espada chapada é o certo aqui: ela é 2D em todo lugar.
+ *  - **item** — a folha de sprites **extrudada** (`itemmodel.ts`): frente,
+ *    verso e uma borda por aresta da silhueta. Era um quad chapado até
+ *    2026-09-16, e chapado é o que o jogador via — uma espada de espessura zero
+ *    que desaparecia de perfil. O desenho é o mesmo do inventário; o que mudou
+ *    é que ele tem lado.
  *  - **mão vazia** — caixa em tom de pele, sem textura. Não há skin de jogador
  *    no projeto (doc 13 não prevê nenhuma), e inventar uma só para isto custaria
  *    uma camada de atlas por nada.
@@ -27,6 +30,9 @@ import {
 } from '../core/math';
 import { defOf, makeState, texOf, AIR } from '../data/blocks';
 import { itemDef } from '../data/items';
+import {
+  ITEM_FLOATS_PER_VERTEX, buildExtrudedSprite, extrudedVertexCapacity, maskFromSheet,
+} from './itemmodel';
 import { createProgram, uniformLocations, type GlContext } from './gl';
 import type { Atlas } from './atlas';
 import type { ItemSheet } from './itemsprites';
@@ -93,9 +99,7 @@ export class HandAnimation {
 const SKIN = [0.85, 0.66, 0.52] as const;
 
 /** 7 floats por vértice: posição, uv, camada e sombra de face. */
-const FLOATS_PER_VERTEX = 7;
-/** Cubo (36) é a maior das três formas. */
-const MAX_VERTICES = 36;
+const FLOATS_PER_VERTEX = ITEM_FLOATS_PER_VERTEX;
 
 const UNIFORMS = [
   'uProj', 'uModel', 'uAtlas', 'uSprites', 'uAtlasTiles', 'uSheet', 'uMode', 'uColor',
@@ -254,7 +258,7 @@ export class HandRenderer {
   private readonly uniforms: Record<(typeof UNIFORMS)[number], WebGLUniformLocation | null>;
   private readonly buffer: WebGLBuffer;
   private readonly sprites: WebGLTexture;
-  private readonly data = new Float32Array(MAX_VERTICES * FLOATS_PER_VERTEX);
+  private readonly data: Float32Array;
   private readonly proj: Mat4 = createMat4();
   private readonly model: Mat4 = createMat4();
   private readonly scratch: Mat4 = createMat4();
@@ -281,6 +285,15 @@ export class HandRenderer {
 
     this.program = createProgram(gl, use300 ? VS_300 : VS_100, use300 ? FS_300 : FS_100, 'hand');
     this.uniforms = uniformLocations(gl, this.program, UNIFORMS);
+
+    /*
+     * O buffer é dimensionado pelo **pior caso da extrusão**, não pelo cubo:
+     * um sprite em xadrez gasta quatro arestas por pixel. Alocar aqui uma vez
+     * é o que mantém a troca de item sem alocação nenhuma depois.
+     */
+    this.data = new Float32Array(
+      Math.max(36, extrudedVertexCapacity(sheet.width / sheet.columns)) * FLOATS_PER_VERTEX,
+    );
 
     const buffer = gl.createBuffer();
     if (buffer === null) throw new Error('Falha ao criar buffer da mão.');
@@ -347,7 +360,12 @@ export class HandRenderer {
           this.mode = 2;
           this.vertexCount = buildBox(this.data, 0.32, 0.9, 0.32);
         } else {
-          this.vertexCount = buildQuad(this.data, tile);
+          const size = this.sheet.width / this.sheet.columns;
+          this.vertexCount = buildExtrudedSprite(
+            this.data,
+            maskFromSheet(this.sheet.pixels, this.sheet.width, this.sheet.columns, size, tile),
+            tile, SPRITE_HALF, SPRITE_THICKNESS,
+          );
         }
       }
     }
@@ -450,12 +468,21 @@ function lerpTicks(previous: number, current: number, alpha: number): number {
   return previous + (current - previous) * alpha;
 }
 
-/** O bloco que o item coloca, se colocar algum. */
+/**
+ * O bloco **cúbico** que o item coloca, se colocar algum.
+ *
+ * A forma importa: tocha, porta, cama, escada de mão e trilho colocam bloco,
+ * mas desenhá-los como um cubo da textura deles é o que fazia a tocha na mão
+ * parecer um tijolo aceso. Quem não é cubo vai pelo sprite extrudado, que é o
+ * mesmo desenho do inventário e tem a forma certa.
+ */
 function blockOf(item: number): number | undefined {
   if (item === AIR) return undefined;
   const places = itemDef(item)?.placesBlock;
   if (places === undefined) return undefined;
-  return defOf(makeState(places)).id === places ? places : undefined;
+  const def = defOf(makeState(places));
+  if (def.id !== places || def.shape !== 'cube') return undefined;
+  return places;
 }
 
 /**
@@ -529,28 +556,17 @@ function buildBox(out: Float32Array, width: number, height: number, depth: numbe
 }
 
 /**
- * Quad do sprite do item, de pé no plano XY.
+ * Meia altura do sprite extrudado.
  *
  * Maior que o cubo de propósito: o sprite tem margem transparente em volta, e
  * com o mesmo tamanho do bloco a espada sairia visivelmente menor que a terra.
  */
-const QUAD_SIZE = 0.75;
-
-function buildQuad(out: Float32Array, tile: number): number {
-  const h = QUAD_SIZE;
-  const positions = [
-    -h, -h, 0, h, -h, 0, h, h, 0,
-    -h, -h, 0, h, h, 0, -h, h, 0,
-  ];
-  for (let v = 0; v < 6; v++) {
-    const o = v * FLOATS_PER_VERTEX;
-    out[o] = positions[v * 3];
-    out[o + 1] = positions[v * 3 + 1];
-    out[o + 2] = positions[v * 3 + 2];
-    out[o + 3] = FACE_UVS[v * 2];
-    out[o + 4] = FACE_UVS[v * 2 + 1];
-    out[o + 5] = tile;
-    out[o + 6] = 1;
-  }
-  return 6;
-}
+const SPRITE_HALF = 0.75;
+/**
+ * Espessura da chapa, em unidades de modelo.
+ *
+ * Dois pixels do sprite. Um só quase não se vê de frente; quatro fazem a
+ * espada parecer um tijolo — este é o número que o gênero usa e que lê como
+ * "objeto fino, mas objeto".
+ */
+const SPRITE_THICKNESS = (SPRITE_HALF * 2) * (2 / 16);

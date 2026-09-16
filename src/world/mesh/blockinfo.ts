@@ -10,8 +10,8 @@ import { BLOCKS, AIR, WATER, LAVA, texOf } from '../../data/blocks';
 import {
   SHAPE_BUTTON, SHAPE_CARPET, SHAPE_CROSS, SHAPE_DOOR, SHAPE_FENCE, SHAPE_FENCE_GATE, SHAPE_FLAT,
   SHAPE_LADDER, SHAPE_LEVER, SHAPE_NONE, SHAPE_PAINTING, SHAPE_PANE, SHAPE_PISTON,
-  SHAPE_PISTON_HEAD, SHAPE_PLATE, SHAPE_RAIL, SHAPE_REPEATER, SHAPE_SIGN, SHAPE_SLAB,
-  SHAPE_STAIRS, SHAPE_TRAPDOOR,
+  SHAPE_BED, SHAPE_PISTON_HEAD, SHAPE_PLATE, SHAPE_RAIL, SHAPE_REPEATER, SHAPE_SIGN, SHAPE_SLAB,
+  SHAPE_STAIRS, SHAPE_TORCH, SHAPE_TRAPDOOR,
 } from './shapes';
 import { layerOf, type LayerIndex } from '../../render/layers';
 import { TINT_FOLIAGE, TINT_GRASS, TINT_NONE, TINT_WATER } from '../../render/vertex';
@@ -35,6 +35,15 @@ export const CPLX_BOXES = 2;
  * um quad custa 1/6 do que a caixa achatada custava.
  */
 export const CPLX_RAIL = 3;
+/**
+ * Poste inclinável com topo próprio: a tocha (M8).
+ *
+ * Não cabe em `CPLX_BOXES` porque a tocha de parede é **torta** — a única
+ * geometria do jogo, junto com a rampa de trilho, que não é caixa alinhada aos
+ * eixos. E não cabe em `CPLX_CROSS` porque cruz é o que ela era e o que
+ * ninguém reconhecia como tocha.
+ */
+export const CPLX_TORCH = 4;
 
 /**
  * Quantas idades cabem na tabela de textura por estado (doc 04 §2.5).
@@ -49,7 +58,8 @@ export const MAX_STAGES = 16;
 /** Como cada `shape` da tabela de blocos é desenhada. */
 const COMPLEX_BY_SHAPE: Record<string, number> = {
   cross: CPLX_CROSS,
-  torch: CPLX_CROSS,
+  torch: CPLX_TORCH,
+  bed: CPLX_BOXES,
   slab: CPLX_BOXES,
   carpet: CPLX_BOXES,
   flat: CPLX_BOXES,
@@ -74,7 +84,8 @@ const COMPLEX_BY_SHAPE: Record<string, number> = {
 /** `SHAPE_*` de `shapes.ts` para cada `shape` da tabela de blocos. */
 const SHAPE_ID_BY_NAME: Record<string, number> = {
   cross: SHAPE_CROSS,
-  torch: SHAPE_CROSS,
+  torch: SHAPE_TORCH,
+  bed: SHAPE_BED,
   slab: SHAPE_SLAB,
   carpet: SHAPE_CARPET,
   flat: SHAPE_FLAT,

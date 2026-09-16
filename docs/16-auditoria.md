@@ -12,6 +12,112 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-16 · 09:20 → 10:10 · O que fazia tudo parecer chapado era um bit de posição
+
+**Pedido:** *"gostaria que você fizesse uma revisão completa no código para ir corrigindo possíveis
+furos, problemas de layout, problemas de performance (…) Algo que ainda me incomoda são as texturas
+chapadas das ferramentas, ou da tocha que não parece uma tocha verdadeira, ou da cama e porta que
+são simplesmente blocos únicos"*.
+
+**Resultado:** os três incômodos tinham **uma causa comum**, e ela não era textura.
+
+### A causa: meio bloco de precisão
+
+O formato de vértice guardava a posição em **meios-blocos** (6 bits por eixo). Toda caixa mais fina
+que 0,5 bloco colapsava no arredondamento — e é assim que quase toda forma do jogo é descrita:
+
+| Peça | Espessura declarada | O que a GPU recebia |
+|---|---|---|
+| Poste de cerca | 2/16 | **nada** — a cerca isolada era invisível |
+| Grade de vidro | 1/16 | nada |
+| Porta, alçapão, placa, quadro | 3/16 | um plano de espessura zero |
+| Botão, alavanca, repetidor | 2/16 | plano |
+| Trilho (levantado do chão) | 1/16 | colado no chão, brigando com ele no Z |
+
+Não faltava desenho: faltava **volume representável**. A posição passou a ser em **1/16 de bloco**
+(9 bits por eixo), e os 3 bits vieram de onde não faziam falta — `tint` tem quatro valores (2 bits
+bastam), `u`/`v` mudaram para a segunda palavra e o campo `flags`, que nunca teve leitor, saiu.
+**Continua em 8 bytes por vértice**, então o orçamento de memória de mesh do doc 02 §3 não muda.
+
+### O que isso destravou
+
+- **Tocha**: deixou de ser uma cruz de planta (era a saída honesta enquanto um poste de 2/16 não
+  cabia) e virou um poste com brasa no topo, encaixe de chão e de parede, **inclinada** na parede, e
+  com fagulha saindo da ponta.
+- **Porta e cama**: viraram blocos de **duas células**. A máquina que faltava é `world/multiblock.ts`
+  — e ela é pequena porque mora no `setBlock`: as duas metades morrem juntas para **qualquer** causa
+  (jogador, creeper, fogo, pistão), sem nenhum desses sistemas saber que porta tem duas metades.
+- **Item na mão**: o quad chapado virou sólido extrudado da própria silhueta, com as bordas
+  amostrando o pixel de dentro — a lateral da lâmina sai com a cor da lâmina.
+- **Contorno do bloco mirado**: passou a ter o tamanho da forma. Mirar uma tocha acendia um cubo.
+
+### Achados de revisão que não eram o pedido
+
+- **Textura de face em forma de caixa**: toda face usava a textura de *lado*. O topo de uma laje,
+  de uma escada ou de uma cama saía com o desenho da lateral.
+- **Bloco com apoio que não é de redstone nunca era conferido**: a fila de `world/redstone.ts` só
+  aceitava componente de circuito, então **trilho comum flutuava** quando o chão sumia. A checagem
+  já existia; faltava alguém chamá-la.
+- **Porta e circuito**: com duas folhas, uma alavanca alcança só uma delas — a folha tocada passou a
+  arrastar a outra, senão metade da porta abre e a outra metade barra a passagem.
+- **Aldeia**: a casa nascia com a tocha **boiando** no meio da sala e a cama contra a parede. Tocha
+  na parede, cama com pé e cabeceira para dentro, porta com as duas metades.
+
+### Arquivos
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/render/vertex.ts` | posição em 1/16 (9 bits/eixo), `u`/`v` e `tint` na palavra 1, `flags` removido |
+| `~` | `src/render/mesh.ts` | `vertex()` arredonda em dezesseis avos |
+| `~` | `src/render/shaders/terrain.glsl.ts` | descompactação nova (× 0,0625, face no bit 27) |
+| `+` | `src/world/multiblock.ts` | blocos de duas células: par, colocação, órfã e metade principal |
+| `~` | `src/world/mesh/shapes.ts` | `SHAPE_TORCH` e `SHAPE_BED`, geometria dos dois, `boundsFor` |
+| `~` | `src/world/mesh/complex.ts` | `emitTorch` (poste inclinado, tampa de baixo culled), textura por face |
+| `~` | `src/world/mesh/blockinfo.ts` | `CPLX_TORCH`; tocha e cama nas tabelas de forma |
+| `~` | `src/world/redstone.ts` | fila aceita quem depende de apoio; porta arrasta a outra folha |
+| `~` | `src/data/blocks.ts` | `MultiSpec`; tocha com encaixe e textura por face; cama sólida; `oak_door_top` (126) e `bed_head` (127) |
+| `~` | `src/data/textures.ts` | tocha em faixas + topo + base, tocha de redstone idem, porta partida em duas folhas, topo do pé da cama |
+| `~` | `src/data/itemart.ts` | silhuetas de tocha, porta e cama (eram cubos isométricos) |
+| `~` | `src/data/loot.ts` | metade de cima da porta e cabeceira da cama dropam o item inteiro |
+| `~` | `src/data/structures.ts` | casa de aldeia: tocha na parede, porta de duas metades, cama deitada para dentro; mina: tocha no piso |
+| `~` | `src/game/interaction.ts` | colocação de duas células, encaixe da tocha, recusa de tocha no teto |
+| `~` | `src/game/session.ts` | liga `attachMultiBlocks`; porta abre as duas folhas; cama responde pelas duas pontas |
+| `~` | `src/game/sleep.ts` | o "desvio consciente" da cama de um bloco deixou de existir |
+| `+` | `src/game/ambient.ts` | fagulha de tocha por sorteio, custo fixo por tick |
+| `+` | `src/render/itemmodel.ts` | extrusão do sprite de item, com fusão de corridas nas bordas |
+| `~` | `src/render/hand.ts` | item na mão extrudado; só bloco **cúbico** vira cubo na mão |
+| `~` | `src/render/particles.ts` | `emitFlame` |
+| `~` | `src/render/selection.ts` | contorno e rachadura seguem a envolvente da forma |
+| `~` | `src/render/shaders/overlay.glsl.ts` | `uScale` na rachadura |
+| `~` | `src/render/renderer.ts` | `HighlightState.bounds` |
+| `~` | `src/main.ts` | preenche a envolvente do bloco mirado; emite fagulha por tick |
+| `+` | `tests/multiblock.test.ts` | 15 testes: par, colocação, órfã por qualquer causa, cama vizinha que não é par |
+| `+` | `tests/itemmodel.test.ts` | 11 testes: espessura, fusão de corridas, UV da borda, capacidade |
+| `+` | `tests/ambient.test.ts` | 6 testes: ponta da tocha de chão e de parede, apagada não pisca, custo fixo |
+| `+` | `tests/placement.test.ts` | 11 testes: tocha nas 4 paredes e no chão, teto recusado, porta e cama de duas células, e o caminho inteiro com a sessão montada |
+| `~` | `tests/vertex.test.ts` | descompactação nova + regressão das caixas finas |
+| `~` | `tests/mesh.test.ts`, `tests/greedy.test.ts` | leitores de vértice atualizados |
+| `~` | `tests/complexmesh.test.ts` | tocha é poste, inclina na parede, e não desenha a tampa coberta |
+| `~` | `tests/shapes.test.ts` | caixas de tocha e cama, e envolvente por forma |
+| `~` | `tests/perf.test.ts` | piso de 256 tochas numa section |
+| `~` | `docs/14-roadmap.md` | M8 (este marco), M9 e M10 propostos |
+| `~` | `docs/15-status.md`, `docs/16-auditoria.md`, `README.md` | panorama, métricas, §4 |
+
+**Portões:** 1473 testes (82 arquivos), lint limpo, build limpo, **196,7 KB gzip** de 350.
+Meshing 0,67 ms/section; piso de 256 tochas 1,13 ms; 162 camadas de atlas de 256.
+
+**O que foi visto na tela, e o que não foi.** O jogo foi aberto no Chrome e jogado o suficiente
+para confirmar o que tinha risco de quebrar tudo: **o mundo desenha certo com o formato de vértice
+novo** (terreno, água, árvore, sem buraco nem geometria torta), a **tocha aparece como tocha no
+slot** da hotbar em vez de um cubo isométrico, e o **item na mão tem espessura** — dá para ver a
+face lateral sombreada da tocha e do bloco. O que **não** deu para ver foi a tocha, a porta e a
+cama **colocadas no mundo**: sem `pointer lock` no ambiente de automação, o único caminho de
+colocação disponível era o toque sintético, e ele não dispara o gesto de forma confiável. Essa
+parte ficou coberta por `tests/placement.test.ts`, que roda o caminho de verdade — inclusive com a
+sessão montada, para provar que a tocha não some no tick seguinte.
+
+---
+
 ## 2026-09-14 · 21:30 → 22:50 · Os dois critérios que faltavam viraram teste
 
 **Pedido:** *"para o teste de 2h você não consegue simplesmente abrir o Chrome aqui da minha

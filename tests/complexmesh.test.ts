@@ -9,10 +9,11 @@
 import { describe, expect, it } from 'vitest';
 import { GreedyMesher, NB_SIDE, nbIndex } from '../src/world/mesh/greedy';
 import {
-  CPLX_BOXES, CPLX_CROSS, CPLX_RAIL, buildBlockTables, stageTexOf,
+  CPLX_BOXES, CPLX_CROSS, CPLX_RAIL, CPLX_TORCH, buildBlockTables, stageTexOf,
 } from '../src/world/mesh/blockinfo';
 import { buildLayerIndex } from '../src/render/layers';
 import { BLOCK_BY_NAME, BLOCKS, makeState } from '../src/data/blocks';
+import { MOUNT_FLOOR } from '../src/world/mesh/shapes';
 import { STONE } from './helpers/blockids';
 
 const index = buildLayerIndex();
@@ -31,10 +32,21 @@ function empty(): { blocks: Uint16Array; light: Uint8Array } {
 const mesher = (): GreedyMesher => new GreedyMesher(tables, true);
 
 describe('tabelas de forma', () => {
-  it('planta, muda, plantação e tocha viram cruz', () => {
-    for (const name of ['tall_grass', 'dandelion', 'oak_sapling', 'wheat', 'torch']) {
+  it('planta, muda e plantação viram cruz', () => {
+    for (const name of ['tall_grass', 'dandelion', 'oak_sapling', 'wheat']) {
       const id = BLOCK_BY_NAME.get(name)!.id;
       expect(tables.complex[id]).toBe(CPLX_CROSS);
+    }
+  });
+
+  /*
+   * A tocha era cruz até 2026-09-16 e por isso lia como flor marrom. Virou
+   * poste quando o formato de vértice passou a representar 1/16 de bloco.
+   */
+  it('tocha comum e de redstone viram poste', () => {
+    for (const name of ['torch', 'redstone_torch', 'redstone_torch_off']) {
+      const id = BLOCK_BY_NAME.get(name)!.id;
+      expect(tables.complex[id]).toBe(CPLX_TORCH);
     }
   });
 
@@ -99,11 +111,53 @@ describe('geometria', () => {
     expect(out.cutout?.indexCount).toBe(24);
   });
 
-  it('a tocha também aparece', () => {
+  it('a tocha de chão é um poste de seis faces', () => {
     const { blocks, light } = empty();
-    blocks[nbIndex(4, 4, 4)] = makeState(TORCH);
+    blocks[nbIndex(4, 4, 4)] = makeState(TORCH, MOUNT_FLOOR);
     const out = mesher().mesh(blocks, light);
-    expect(out.cutout?.vertexCount).toBe(8);
+    expect(out.quads).toBe(6);
+    expect(out.cutout?.vertexCount).toBe(24);
+  });
+
+  /*
+   * A tampa de baixo do poste encosta no apoio: emiti-la é gastar um quad que
+   * ninguém vê. Com 256 tochas numa section, é 1/6 do custo.
+   */
+  it('a tocha de chão apoiada em bloco opaco não desenha a tampa de baixo', () => {
+    const { blocks, light } = empty();
+    blocks[nbIndex(4, 3, 4)] = makeState(STONE);
+    blocks[nbIndex(4, 4, 4)] = makeState(TORCH, MOUNT_FLOOR);
+    const out = mesher().mesh(blocks, light);
+    // 6 faces do cubo de pedra menos a de cima (coberta? não: a tocha é vazada)
+    // — o que importa é a tocha: 5 quads em vez de 6.
+    const torchQuads = out.quads - 6;
+    expect(torchQuads).toBe(5);
+  });
+
+  /*
+   * A tocha de parede é **torta**: a seção de cima fica mais longe da parede
+   * que a de baixo. Sem isso ela parece uma tocha flutuando ao lado do muro.
+   */
+  it('a tocha de parede inclina — o topo sai mais longe da parede que a base', () => {
+    const { blocks, light } = empty();
+    // Encaixe 0 = parede em +X: a base cola nela, o topo se afasta.
+    blocks[nbIndex(4, 4, 4)] = makeState(TORCH, 0);
+    const out = mesher().mesh(blocks, light);
+    const words = new Uint32Array(out.cutout!.vertices);
+    let baseX = 0;
+    let topX = 0;
+    let baseY = Infinity;
+    let topY = -Infinity;
+    for (let i = 0; i < out.cutout!.vertexCount; i++) {
+      const w0 = words[i * 2];
+      const x = (w0 & 511) / 16;
+      const y = ((w0 >>> 9) & 511) / 16;
+      if (y < baseY) { baseY = y; baseX = x; }
+      if (y > topY) { topY = y; topX = x; }
+    }
+    expect(baseY).toBeCloseTo(4 + 3 / 16, 5);
+    expect(topY).toBeCloseTo(4 + 13 / 16, 5);
+    expect(baseX).toBeGreaterThan(topX);
   });
 
   it('plantação em qualquer idade tem geometria', () => {

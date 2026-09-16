@@ -498,6 +498,45 @@ export function furrows(dark: Rgb): TexOp {
   };
 }
 
+/**
+ * Desenho escrito como texto, no mesmo formato da arte de item (doc 13 §2.4).
+ *
+ * Cada linha é uma linha do ladrilho e cada caractere um pixel:
+ *
+ * ```
+ *   .  vaza o pixel (alfa 0)      ' '  não mexe no que já está lá
+ *   qualquer outro  cor da paleta, opaca
+ * ```
+ *
+ * É o operador certo para **silhueta**: muda, samambaia, cana e arbusto seco
+ * não são ruído com máscara, são desenhos — e escritos assim dá para olhar o
+ * código e ver a planta. Ruído continua sendo ruído: pedra e terra não passam
+ * por aqui.
+ *
+ * Linha mais curta que o ladrilho simplesmente para onde acaba, o que evita
+ * contar espaços até a margem direita.
+ */
+export function pattern(rows: readonly string[], palette: Record<string, Rgb>): TexOp {
+  return (c) => {
+    for (let y = 0; y < N; y++) {
+      const row = rows[y];
+      if (row === undefined) continue;
+      for (let x = 0; x < N; x++) {
+        const ch = row[x];
+        if (ch === undefined || ch === ' ') continue;
+        const o = idx(x, y);
+        if (ch === '.') { c.data[o + 3] = 0; continue; }
+        const color = palette[ch];
+        if (color === undefined) continue;
+        c.data[o] = color[0];
+        c.data[o + 1] = color[1];
+        c.data[o + 2] = color[2];
+        c.data[o + 3] = 255;
+      }
+    }
+  };
+}
+
 /** Escurece/clareia globalmente — variantes de material. */
 export function tintBy(mul: number): TexOp {
   return (c) => {

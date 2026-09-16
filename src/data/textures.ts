@@ -8,7 +8,7 @@
 
 import {
   alphaMask, blobs, border, bricks, cropRows, dither, emboss, flow, furrows,
-  oreBlobs, outline, plankLines, rect, rings, speckle, stripes, tintBy,
+  oreBlobs, outline, pattern, plankLines, rect, rings, speckle, stripes, tintBy,
   type Rgb, type TexOp, type TexRecipe,
 } from '../render/texgen';
 
@@ -294,17 +294,92 @@ export const TEXTURES: Record<string, TexRecipe> = {
     base: [210, 210, 210], noise: 'cell', scale: 5, variance: 0.3,
     ops: [blobs([160, 160, 160], 8, 2.5), alphaMask('holes', 0.26)],
   },
+  /*
+   * Grama alta e flores (M8): silhueta, não um X.
+   *
+   * As três usavam `alphaMask('cross')`, que recorta **as duas diagonais do
+   * ladrilho**. Isso vinha de confundir a máscara com a geometria: a planta é
+   * desenhada em dois quads cruzados, e cada quad mostra o ladrilho inteiro —
+   * se o ladrilho também é um X, o resultado é uma estrela amarela, não uma
+   * flor. No inventário, onde o sprite passou a ser o ladrilho de frente, o X
+   * ficou impossível de ignorar.
+   *
+   * Agora são desenhos: touceira que nasce do chão, dente-de-leão com haste e
+   * papoula com botão. Continuam vazadas em volta, que é o que a cruz precisa.
+   *
+   * A grama continua **cinza** de propósito: ela é tingida pela cor do bioma
+   * (doc 04 §4), e tingir um desenho colorido daria verde sobre verde.
+   */
   'block/tall_grass': {
-    base: [230, 230, 230], noise: 'stripes', scale: 2, variance: 0.2,
-    ops: [alphaMask('cross', 0), dither(0.05)],
+    base: [230, 230, 230], noise: 'flat', scale: 1, variance: 0,
+    ops: [
+      pattern([
+        '................',
+        '..M.........M...',
+        '..M....M....M...',
+        '..M...MM....M...',
+        '.dM..MM.M..Md...',
+        '.dM..M..M..Md...',
+        '.dM.MM..M.MMd...',
+        '.dM.M...M.M.d...',
+        '.dM.M...MMM.d...',
+        '.dMMM...MM..d...',
+        '..dM.....M..d...',
+        '..dM.....M.dd...',
+        '...d.....M.d....',
+        '...d.....d.d....',
+        '................',
+        '................',
+      ], { M: [230, 230, 230], d: [176, 176, 176] }),
+      dither(0.05),
+    ],
   },
   'block/dandelion': {
     base: [92, 150, 62], noise: 'flat', scale: 1, variance: 0,
-    ops: [alphaMask('cross', 0), blobs([246, 226, 68], 3, 2)],
+    ops: [pattern([
+      '................',
+      '................',
+      '.......FF.......',
+      '......FAAF......',
+      '.....FAAAAF.....',
+      '......FAAF......',
+      '.......FF.......',
+      '.......h........',
+      '.......h........',
+      '....L..h........',
+      '...LLL.h..LL....',
+      '....L..hLLLL....',
+      '.......h..LL....',
+      '......hh........',
+      '................',
+      '................',
+    ], {
+      A: [246, 226, 68], F: [214, 186, 44], h: [78, 132, 54], L: [92, 150, 62],
+    })],
   },
   'block/poppy': {
     base: [92, 150, 62], noise: 'flat', scale: 1, variance: 0,
-    ops: [alphaMask('cross', 0), blobs([214, 62, 54], 3, 2)],
+    ops: [pattern([
+      '................',
+      '................',
+      '......FAAF......',
+      '.....FAAAAF.....',
+      '.....AAddAA.....',
+      '.....FAAAAF.....',
+      '......FAAF......',
+      '.......h........',
+      '.......h........',
+      '....L..h........',
+      '...LLL.h..LL....',
+      '....L..hLLLL....',
+      '.......h..LL....',
+      '......hh........',
+      '................',
+      '................',
+    ], {
+      A: [214, 62, 54], F: [166, 40, 36], d: [52, 40, 36],
+      h: [78, 132, 54], L: [92, 150, 62],
+    })],
   },
   'block/cactus_side': {
     base: [86, 132, 62], noise: 'value', scale: 6, variance: 0.1,
@@ -321,7 +396,7 @@ export const TEXTURES: Record<string, TexRecipe> = {
   'block/crafting_table_top': {
     inherit: 'block/oak_planks',
     ops: [
-      tintBy(0.88),
+      tintBy(1.08),
       rect(1, 1, 14, 14, [150, 124, 72], 0.5),
       outline(1, 1, 14, 14, [74, 58, 32]),
       // Grade 3×3 sulcada.
@@ -335,7 +410,7 @@ export const TEXTURES: Record<string, TexRecipe> = {
   'block/crafting_table_side': {
     inherit: 'block/oak_planks',
     ops: [
-      tintBy(0.78),
+      tintBy(1.02),
       // Tampo saliente, que é o que dá a silhueta de bancada de lado.
       rect(0, 0, 16, 3, [164, 136, 80]),
       rect(0, 3, 16, 1, [72, 56, 30]),
@@ -354,14 +429,49 @@ export const TEXTURES: Record<string, TexRecipe> = {
   },
   // Fornalha: pedra emoldurada em ferro. Antes era pedregulho 8% mais escuro,
   // indistinguível do próprio pedregulho.
+  /*
+   * Fornalha (redesenhada no M8): **boca**, grelha e moldura de ferro.
+   *
+   * O desenho anterior era pedregulho 18% mais escuro com uma moldura fina —
+   * de relance, uma pedra. Relato do jogador: *"a fornalha está muito feia,
+   * parece um bloco normal de pedra tanto no chão quanto no inventário"*.
+   *
+   * O que identifica uma fornalha é a **boca**: um buraco escuro com grelha na
+   * metade de baixo. Ela aparece nos quatro lados, e não só na frente como no
+   * gênero — o formato de vértice não guarda rotação de textura (doc 01 §5.1),
+   * então "frente" não é representável. Quatro bocas lêem como fornalha; uma
+   * pedra lisa não lê como nada.
+   */
   'block/furnace_side': {
     inherit: 'block/cobblestone',
     ops: [
-      tintBy(0.82),
-      outline(0, 0, 16, 16, IRON_DARK),
-      outline(1, 1, 14, 14, [96, 96, 102], 0.6),
-      rect(0, 7, 16, 1, IRON_DARK, 0.7),
-      dither(0.05),
+      tintBy(0.78),
+      // Moldura de ferro rebatida, com luz em cima e sombra embaixo.
+      border(IRON_DARK, 2),
+      rect(2, 2, 12, 1, [150, 150, 158], 0.7),
+      rect(2, 13, 12, 1, [52, 52, 58], 0.8),
+      // Boca: o buraco escuro que faz a peça ser reconhecida.
+      rect(3, 7, 10, 6, [30, 26, 26]),
+      outline(3, 7, 10, 6, IRON_DARK),
+      // Grelha: três barras verticais dentro da boca.
+      rect(5, 8, 1, 4, [92, 88, 92]),
+      rect(8, 8, 1, 4, [92, 88, 92]),
+      rect(11, 8, 1, 4, [92, 88, 92]),
+      // Soleira clara embaixo da boca, que dá profundidade ao buraco.
+      rect(3, 12, 10, 1, [120, 118, 124], 0.8),
+      dither(0.04),
+    ],
+  },
+  /** Topo: a mesma pedra com a boca de carga no meio. */
+  'block/furnace_top': {
+    inherit: 'block/cobblestone',
+    ops: [
+      tintBy(0.78),
+      border(IRON_DARK, 2),
+      rect(5, 5, 6, 6, [42, 38, 38]),
+      outline(5, 5, 6, 6, [124, 122, 128]),
+      rect(6, 6, 4, 1, [96, 92, 96], 0.7),
+      dither(0.04),
     ],
   },
   /*
@@ -374,11 +484,17 @@ export const TEXTURES: Record<string, TexRecipe> = {
   'block/furnace_lit': {
     inherit: 'block/furnace_side',
     ops: [
-      rect(4, 9, 8, 4, [58, 34, 22]),
-      rect(4, 10, 8, 3, [232, 124, 38]),
-      rect(5, 11, 6, 2, [255, 196, 96]),
-      rect(6, 12, 4, 1, [255, 236, 176]),
-      dither(0.05),
+      // A boca **inteira** cheia de brasa: é o contraste com a apagada que
+      // avisa, de longe e de relance, que a fundição está andando.
+      rect(4, 8, 9, 5, [214, 86, 22]),
+      rect(4, 9, 9, 4, [244, 146, 44]),
+      rect(5, 10, 7, 3, [255, 202, 100]),
+      rect(6, 11, 5, 2, [255, 242, 190]),
+      // As barras da grelha continuam visíveis, agora contra a brasa.
+      rect(5, 8, 1, 5, [138, 56, 20]),
+      rect(8, 8, 1, 5, [138, 56, 20]),
+      rect(11, 8, 1, 5, [138, 56, 20]),
+      dither(0.04),
     ],
   },
   'block/furnace_front': {
@@ -397,10 +513,20 @@ export const TEXTURES: Record<string, TexRecipe> = {
   },
   // Baú: madeira escura, tampa separada por uma faixa de ferro, fechadura no
   // meio. Antes era tábua com 15% menos brilho e uma borda de 1 px.
+  /*
+   * Baú: madeira **escura** com muito ferro.
+   *
+   * Ele e a bancada eram dois cubos de tábua clara com detalhes finos, e no
+   * slot de 16 px isso é o mesmo desenho — relato do jogador: *"a mesa de
+   * trabalho e o baú estão com textura muito semelhante, difícil distinguir
+   * batendo o olho"*. A separação agora é de **valor**, não de detalhe: o baú é
+   * escuro e ferrado, a bancada é clara com a grade sulcada. A forma ajuda o
+   * resto — o baú é menor que o bloco desde o M8 e tem tranca.
+   */
   'block/chest_side': {
     inherit: 'block/oak_planks',
     ops: [
-      tintBy(0.7),
+      tintBy(0.44),
       outline(0, 0, 16, 16, [52, 40, 22]),
       // Tampa: o terço de cima, mais claro, fechado por cinta de ferro.
       rect(1, 1, 14, 4, [134, 106, 58], 0.55),
@@ -415,7 +541,7 @@ export const TEXTURES: Record<string, TexRecipe> = {
   'block/chest_top': {
     inherit: 'block/oak_planks',
     ops: [
-      tintBy(0.72),
+      tintBy(0.48),
       outline(0, 0, 16, 16, [52, 40, 22]),
       // Duas cintas de ferro atravessando a tampa.
       rect(3, 0, 2, 16, IRON_DARK),
@@ -822,6 +948,195 @@ export const TEXTURES: Record<string, TexRecipe> = {
   'block/torch_bottom': {
     base: [116, 88, 48], noise: 'grain', scale: 3, variance: 0.1,
     ops: [border([78, 58, 32], 1), dither(0.04)],
+  },
+
+  /*
+   * Abóbora e melancia (M8): as duas eram **`block/oak_planks`**.
+   *
+   * Não é exagero de linguagem: a tabela de blocos apontava a textura da tábua
+   * de carvalho, então uma abóbora plantada no campo era um caixote de madeira
+   * com outro nome no tooltip. É a mesma classe de coisa que a cama ser lã e o
+   * TNT ser tábua, corrigidas antes — esta ficou para trás.
+   */
+  /** Acácia: era tronco e tábua de carvalho com outro nome. */
+  'block/acacia_log_side': {
+    base: [156, 116, 72], noise: 'grain', scale: 5, variance: 0.14,
+    ops: [stripes('v', 5, 0.18), border([96, 66, 40], 1), dither(0.05)],
+  },
+  'block/acacia_log_top': {
+    base: [186, 150, 96], noise: 'value', scale: 4, variance: 0.1,
+    ops: [rings(4, [124, 88, 52]), border([96, 66, 40], 1), dither(0.04)],
+  },
+  'block/acacia_planks': {
+    base: [196, 112, 62], noise: 'grain', scale: 6, variance: 0.1,
+    ops: [plankLines(5, [146, 76, 40]), dither(0.05)],
+  },
+  'block/pumpkin_side': {
+    base: [214, 126, 30], noise: 'value', scale: 6, variance: 0.08,
+    ops: [
+      // Gomos: sulcos verticais, que é o que faz abóbora ser abóbora.
+      rect(2, 0, 1, 16, [156, 84, 18]),
+      rect(7, 0, 1, 16, [156, 84, 18]),
+      rect(12, 0, 1, 16, [156, 84, 18]),
+      rect(3, 0, 1, 16, [236, 152, 52], 0.5),
+      rect(8, 0, 1, 16, [236, 152, 52], 0.5),
+      rect(13, 0, 1, 16, [236, 152, 52], 0.5),
+      border([138, 74, 16], 1),
+      dither(0.05),
+    ],
+  },
+  'block/pumpkin_top': {
+    inherit: 'block/pumpkin_side',
+    ops: [
+      tintBy(0.94),
+      // Cabinho no meio.
+      rect(6, 6, 4, 4, [128, 106, 44]),
+      rect(7, 7, 2, 2, [162, 138, 62]),
+      outline(6, 6, 4, 4, [86, 70, 30]),
+      dither(0.04),
+    ],
+  },
+  'block/melon_side': {
+    base: [96, 146, 46], noise: 'value', scale: 5, variance: 0.07,
+    ops: [
+      // Listras da casca, em zigue-zague largo.
+      rect(1, 0, 2, 16, [52, 96, 32]),
+      rect(6, 0, 2, 16, [52, 96, 32]),
+      rect(11, 0, 2, 16, [52, 96, 32]),
+      rect(3, 0, 1, 16, [138, 184, 70], 0.6),
+      rect(8, 0, 1, 16, [138, 184, 70], 0.6),
+      rect(13, 0, 1, 16, [138, 184, 70], 0.6),
+      border([40, 76, 26], 1),
+      dither(0.05),
+    ],
+  },
+  'block/melon_top': {
+    base: [110, 158, 52], noise: 'value', scale: 4, variance: 0.06,
+    ops: [
+      rect(3, 3, 10, 10, [206, 78, 72]),
+      outline(3, 3, 10, 10, [240, 238, 222]),
+      speckle([40, 34, 30], 0.08, 1),
+      border([40, 76, 26], 1),
+      dither(0.05),
+    ],
+  },
+
+  /*
+   * Plantas com silhueta própria (M8).
+   *
+   * Muda, samambaia, cana e arbusto seco apontavam **a mesma textura**: muda e
+   * trepadeira usavam `block/oak_leaves`, e as outras três `block/tall_grass`.
+   * No mundo isso vira quatro plantas idênticas com nomes diferentes, e no
+   * inventário, quatro cubos verdes iguais.
+   *
+   * Aqui elas são desenho, não ruído com máscara: `pattern` escreve o pixel a
+   * pixel, e dá para ler a planta no próprio código.
+   */
+  'block/oak_sapling': {
+    base: [96, 140, 52], noise: 'flat', scale: 1, variance: 0,
+    ops: [pattern([
+      '................',
+      '................',
+      '.......ff.......',
+      '......fMMf......',
+      '.....fMMMMf.....',
+      '....fMMddMMf....',
+      '....fMdMMdMf....',
+      '.....fMMMMf.....',
+      '......fMMf......',
+      '.......tt.......',
+      '.......tt.......',
+      '......ftt.......',
+      '.......tt.......',
+      '......tddt......',
+      '................',
+      '................',
+    ], {
+      M: [110, 164, 58], f: [74, 118, 40], d: [58, 94, 32],
+      t: [104, 76, 42],
+    })],
+  },
+  'block/fern': {
+    base: [96, 140, 52], noise: 'flat', scale: 1, variance: 0,
+    ops: [pattern([
+      '................',
+      '.......f........',
+      '......fMf.......',
+      '.....f.M.f......',
+      '....fM.M.Mf.....',
+      '...f.M.M.M.f....',
+      '..fM..MMM..Mf...',
+      '...f.M.M.M.f....',
+      '....fM.M.Mf.....',
+      '.....f.M.f......',
+      '......fMf.......',
+      '.......M........',
+      '.......M........',
+      '......dMd.......',
+      '................',
+      '................',
+    ], { M: [88, 136, 48], f: [62, 104, 36], d: [48, 82, 30] })],
+  },
+  'block/sugar_cane': {
+    base: [148, 190, 92], noise: 'flat', scale: 1, variance: 0,
+    ops: [pattern([
+      '....C..C........',
+      '....C..C...C....',
+      '....C..C...C....',
+      '...dC.dC...C....',
+      '....C..C..dC....',
+      '....C..C...C....',
+      '....C..C...C....',
+      '...dC..C...C....',
+      '....C.dC..dC....',
+      '....C..C...C....',
+      '....C..C...C....',
+      '....C..C..dC....',
+      '...dC..C...C....',
+      '....C..C...C....',
+      '....C..C...C....',
+      '....C..C...C....',
+    ], { C: [150, 194, 96], d: [104, 148, 62] })],
+  },
+  'block/dead_bush': {
+    base: [126, 96, 52], noise: 'flat', scale: 1, variance: 0,
+    ops: [pattern([
+      '................',
+      '................',
+      '..t.........t...',
+      '...t...t...t....',
+      '....t..t..t.....',
+      '.....t.t.t......',
+      '..t...ttt.......',
+      '...t..ttt..t....',
+      '....t.tTt.t.....',
+      '.......T.t......',
+      '.......T........',
+      '.......T........',
+      '......dTd.......',
+      '................',
+      '................',
+      '................',
+    ], { t: [134, 100, 54], T: [108, 78, 42], d: [86, 62, 34] })],
+  },
+  'block/vine': {
+    inherit: 'block/oak_leaves',
+    ops: [
+      tintBy(0.86),
+      // Fios pendurados: o resto vaza, senão a trepadeira é uma parede verde.
+      (c) => {
+        for (let y = 0; y < 16; y++) {
+          for (let x = 0; x < 16; x++) {
+            const fio = x % 5 < 2 && (x % 5 === 0 || (y + x) % 7 < 5);
+            if (!fio) c.data[((y * 16 + x) << 2) + 3] = 0;
+          }
+        }
+      },
+    ],
+  },
+  /** Folha de bétula: a mesma folhagem, mais clara e mais amarelada. */
+  'block/birch_leaves': {
+    inherit: 'block/oak_leaves', ops: [tintBy(1.12)],
   },
 
   // --- fluidos (animados) -------------------------------------------------

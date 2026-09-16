@@ -146,6 +146,15 @@ planos de espessura zero — não faltava textura, faltava **volume representáv
 - [x] **Fornalha acesa**: dois ids como a lâmpada de redstone, com emissão 13 e a boca em brasa.
 - [x] Porta nas outras madeiras (bétula e pinheiro), com receita por material — a genérica de
       `#planks` dava porta de carvalho com tábua de bétula.
+- [x] **Sprite do inventário segue a forma do bloco.** Ele desenhava sempre um cubo: cerca, laje,
+      placa, alçapão, escada e portão são todos de tábua e viravam **o mesmo desenho**. Agora a
+      silhueta sai de `boxesFor`, a mesma lista que o mundo desenha; planta e trilho aparecem como
+      o próprio ladrilho, de frente.
+- [x] **Texturas emprestadas.** Abóbora e melancia eram literalmente `block/oak_planks`; muda,
+      samambaia, cana e arbusto seco dividiam a grama alta; acácia usava carvalho. Cada uma tem a
+      sua.
+- [x] **Fornalha com cara de fornalha** (boca, grelha e moldura) e **baú que não se confunde com a
+      bancada** — a separação é de valor, não de detalhe.
 - [ ] Placa com texto escrito pelo jogador, e quadro com arte gerada por código.
 - [ ] Cama nas outras cores (depende de haver outras lãs: hoje só existe a branca).
 - [ ] Tampa do baú que **abre** de verdade — exige rotação, e a geometria do jogo é de caixas

@@ -88,6 +88,12 @@ aparelho o que foi entregue depois do M7.**
   chegava à tela —, a **escada de mão**, que era decoração e agora se escala, o **baú** com corpo,
   tampa e tranca, a **fornalha** que acende a boca e ilumina em volta enquanto queima, e a **porta**
   nas outras madeiras.
+  Na terceira passada, o **sprite do inventário passou a seguir a forma do bloco**: ele desenhava
+  sempre um cubo, e cerca, laje, placa, alçapão, escada e portão, todos de tábua, eram o mesmo
+  desenho no slot. A silhueta agora sai da mesma lista de caixas que o mundo desenha e que a física
+  colide, e planta e trilho aparecem como o próprio ladrilho. Junto foram embora as texturas
+  emprestadas — abóbora e melancia eram **literalmente** `block/oak_planks` —, a fornalha ganhou
+  boca e grelha, e o baú deixou de ser confundível com a bancada.
 - **Controle:** DualSense, DualShock 4, Xbox e Switch Pro reconhecidos por fabricante/produto —
   o que muda entre eles é sobretudo o **nome do botão**, e o jogo passa a dizer `✕ ○ □ △` a quem
   segura um controle da Sony. Mapeamento completo do doc 09 §3, e **os menus navegáveis por
@@ -101,7 +107,7 @@ Abre em **4,5 s em 3G rápido** (critério: < 5 s) e aguentou **92 min de voo co
 erro**, com o heap estável e o anel de chunks fixo em 489 colunas ao longo de 67 mil blocos — os
 dois medidos por `npm run slow-network` e `npm run soak`, que dirigem um Chrome de verdade.
 
-**198 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
+**201 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
 além de dois ícones de PWA de 6,7 KB, gerados por código.
 
 Validado em aparelho alvo (**Galaxy J7 Metal**, Android 7, 2 GB, Mali-T830) em 2026-09-12:
@@ -114,7 +120,7 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 1672 testes (vitest)
+npm test           # 1710 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
 npm run icons      # regenera os ícones do PWA
@@ -192,7 +198,7 @@ src/
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      1672 testes, incluindo orçamento de performance e de luz
+tests/                      1710 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios

@@ -12,6 +12,100 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-16 · 14:45 → 15:05 · Seis peças de tábua eram o mesmo desenho no slot
+
+**Pedido:** três relatos do jogador. *"Vários itens estão com textura que parece um bloco de madeira
+normal, mas na realidade colocando no chão são outros itens, como por exemplo a placa de madeira, a
+cerca, melancia, abóbora, alçapão, laje"*; *"a mesa de trabalho e o baú estão com textura muito
+semelhante, difícil distinguir batendo o olho no inventário"*; *"a fornalha está muito feia, parece
+um bloco normal de pedra tanto no chão quanto no inventário"*.
+
+**Resultado:** o primeiro relato tinha **duas** causas independentes, e uma delas era maior do que
+parecia.
+
+### Causa 1: o sprite ignorava a forma do bloco
+
+`drawBlockIsometric` desenhava sempre um **cubo** com a textura do bloco. Cerca, laje, placa,
+alçapão, escada e portão são todos de tábua de carvalho — como cubo, os seis saíam com o mesmo
+desenho. Não era falta de textura: era falta de **forma**.
+
+A silhueta passou a sair de `boxesFor`, a mesma lista que o mundo desenha e que a física colide.
+A projeção é a que o cubo já usava, escrita agora para um ponto qualquer do bloco:
+
+```
+x = 8 + (bx − bz)·8
+y = 1 + (bx + bz)·4 + (1 − by)·7
+```
+
+Com a caixa unitária ela reproduz o desenho antigo **pixel por pixel** — foi o critério para trocar.
+As caixas são ordenadas de trás para frente (pintor) por `x0 + z0`, com empate na altura, para a
+tampa do baú cobrir o corpo e não o contrário.
+
+Duas decisões de pose, que são de legibilidade e não de geometria: a **cerca** posa com dois braços
+opostos, porque uma cerca sem braço é um poste e ninguém reconhece um poste como cerca; e a
+**escada** posa com o degrau virado para a câmera, porque com o estado 0 o lado alto cai atrás e a
+silhueta sairia idêntica à de um cubo cheio — justamente o que este passe veio consertar.
+
+Planta e trilho saíram da isometria: eles aparecem como **o próprio ladrilho, de frente**. Um cubo
+de flor nunca fez sentido, e era o que havia.
+
+### Causa 2: textura emprestada, de verdade
+
+A varredura da tabela achou o resto:
+
+| Bloco | Apontava | Virou |
+|---|---|---|
+| Abóbora | `block/oak_planks` | gomos e cabinho |
+| Melancia | `block/oak_planks` | casca listrada, polpa no topo |
+| Acácia (tronco e tábua) | carvalho | madeira alaranjada própria |
+| Muda | `block/oak_leaves` | arvorezinha com tronco |
+| Samambaia, cana, arbusto seco | `block/tall_grass` | três silhuetas distintas |
+| Grama alta, dente-de-leão, papoula | um **X** recortado | touceira, flor com haste e folhas |
+
+O X merece nota: `alphaMask('cross')` recorta as **duas diagonais do ladrilho**, e isso vinha de
+confundir a máscara com a geometria. A planta é desenhada em dois quads cruzados e cada quad mostra
+o ladrilho inteiro — se o ladrilho também é um X, o resultado é uma estrela, não uma flor. Com o
+sprite virando ladrilho de frente, ficou impossível de ignorar.
+
+As plantas novas usam um operador novo, `pattern`: desenho escrito como texto, no mesmo formato da
+arte de item. Ruído continua sendo ruído; silhueta agora é silhueta.
+
+**Uma troca consciente:** muda, samambaia e cana saíram do tint de bioma. O tint multiplica a
+textura inteira pela cor do bioma e só funciona com desenho cinza — um tronco marrom de muda não
+pode ser pintado de verde. Trocou-se variação por bioma por saber o que é cada planta.
+
+### Fornalha e baú
+
+A **fornalha** era pedregulho 18% mais escuro com uma moldura fina: de relance, uma pedra. Ganhou
+**boca** — buraco escuro com grelha —, moldura de ferro rebatida e topo com boca de carga. A boca
+aparece nos quatro lados, e não só na frente como no gênero, porque o formato de vértice não guarda
+rotação de textura (doc 01 §5.1): quatro bocas lêem como fornalha, uma pedra lisa não lê como nada.
+A acesa passou a ter a boca **inteira** em brasa.
+
+**Baú e bancada** passavam na régua de legibilidade de 22 e mesmo assim se confundiam — porque a
+diferença era de **detalhe**, e 16 px não carregam detalhe. Virou diferença de **valor**: baú
+escuro e ferrado (0,44), bancada clara (1,02). A régua daquele par subiu para 44. A tranca do baú
+mudou de face: em −Z ela existiria só para quem olha por trás, já que a isometria mostra +X e +Z.
+
+### Arquivos
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/render/itemsprites.ts` | sprite por caixas com ordenação de pintor; planta e trilho de frente; pose de cerca e escada |
+| `~` | `src/render/texgen.ts` | operador `pattern`: desenho escrito como texto |
+| `~` | `src/data/textures.ts` | abóbora, melancia, acácia, muda, samambaia, cana, arbusto seco, trepadeira, folha de bétula, grama alta, dente-de-leão, papoula, fornalha (lado e topo), baú e bancada |
+| `~` | `src/data/blocks.ts` | as texturas emprestadas apontando para as próprias; fornalha com topo próprio; tint fora de muda, samambaia e cana |
+| `~` | `src/world/mesh/shapes.ts` | tranca do baú na face que o inventário mostra |
+| `+` | `tests/itemshapesprite.test.ts` | 20 testes: silhuetas distintas por forma, planta de frente, e o cubo intacto |
+| `~` | `tests/texgen.test.ts` | 12 pares novos de legibilidade, régua de 44 para baú/bancada, e a boca da fornalha medida por região |
+| `~` | `tests/shapes.test.ts` | face da tranca |
+| `~` | `docs/14-roadmap.md`, `docs/15-status.md`, `docs/16-auditoria.md`, `README.md` | M8 |
+
+**Portões:** 1710 testes (85 arquivos), lint limpo, build limpo, **200,9 KB gzip** de 350.
+181 camadas de atlas de 256; folha de sprites em volume 33,9 ms (eram 29,3), teto de 200.
+
+---
+
 ## 2026-09-16 · 13:50 → 14:40 · O vidro não estava fosco: ele não estava lá
 
 **Pedido:** *"Vamos seguir então com o desenvolvimento do M8. Queria também um ajuste para

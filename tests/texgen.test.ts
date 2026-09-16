@@ -198,6 +198,27 @@ describe('legibilidade das texturas', () => {
   const LEGIBLE = 22;
 
   const pairs: readonly [string, string][] = [
+    // Relato do jogador (2026-09-16): *"a mesa de trabalho e o baú estão com
+    // textura muito semelhante, difícil distinguir batendo o olho"*. O par
+    // passava na régua de 22 e ainda assim se confundia no slot, porque os dois
+    // eram cubos de tábua clara: a diferença era de detalhe fino, que 16 px
+    // não carregam. Agora é de **valor** — baú escuro, bancada clara.
+    ['block/chest_side', 'block/crafting_table_top'],
+    ['block/chest_top', 'block/crafting_table_top'],
+    // Abóbora e melancia eram literalmente `block/oak_planks`.
+    ['block/oak_planks', 'block/pumpkin_side'],
+    ['block/oak_planks', 'block/melon_side'],
+    ['block/oak_planks', 'block/acacia_planks'],
+    ['block/oak_log_side', 'block/acacia_log_side'],
+    // A fornalha "parecia um bloco normal de pedra": a boca é o que a separa.
+    ['block/cobblestone', 'block/furnace_side'],
+    ['block/stone', 'block/furnace_side'],
+    // Quatro plantas que apontavam a mesma textura.
+    ['block/tall_grass', 'block/oak_sapling'],
+    ['block/tall_grass', 'block/fern'],
+    ['block/tall_grass', 'block/sugar_cane'],
+    ['block/tall_grass', 'block/dead_bush'],
+    ['block/oak_leaves', 'block/oak_sapling'],
     ['block/oak_planks', 'block/chest_side'],
     ['block/oak_planks', 'block/chest_top'],
     ['block/oak_planks', 'block/crafting_table_side'],
@@ -212,6 +233,43 @@ describe('legibilidade das texturas', () => {
 
   it('a régua bate: carvalho e bétula são bem distintos', () => {
     expect(distance('block/oak_planks', 'block/birch_planks')).toBeGreaterThan(40);
+  });
+
+  /*
+   * Baú e bancada ficam lado a lado no inventário e são os dois de madeira: a
+   * régua comum de 22 não bastou na prática. Aqui o piso é o dobro.
+   */
+  /**
+   * Diferença média dentro de um retângulo do ladrilho.
+   *
+   * A régua de tile inteiro dilui mudança local: a boca da fornalha ocupa 60
+   * dos 256 pixels, e acender uma fogueira lá dentro mal mexe na média. O que
+   * o jogador enxerga é o contraste **onde ele olha**.
+   */
+  const regionDistance = (
+    a: string, b: string, x0: number, y0: number, w: number, h: number,
+  ): number => {
+    const pa = build(a);
+    const pb = build(b);
+    let total = 0;
+    for (let y = y0; y < y0 + h; y++) {
+      for (let x = x0; x < x0 + w; x++) {
+        const i = ((y * TEX_SIZE) + x) << 2;
+        total += (Math.abs(pa[i] - pb[i])
+          + Math.abs(pa[i + 1] - pb[i + 1])
+          + Math.abs(pa[i + 2] - pb[i + 2])) / 3;
+      }
+    }
+    return total / (w * h);
+  };
+
+  it('a fornalha acesa se vê de longe: a boca muda, e muito', () => {
+    expect(regionDistance('block/furnace_side', 'block/furnace_lit', 3, 7, 10, 6))
+      .toBeGreaterThan(60);
+  });
+
+  it('baú e bancada se separam de longe, não só no detalhe', () => {
+    expect(distance('block/chest_side', 'block/crafting_table_side')).toBeGreaterThan(44);
   });
 
   for (const [a, b] of pairs) {
@@ -286,7 +344,13 @@ describe('legibilidade das texturas', () => {
     // Cama era `block/wool_white` e TNT era `block/oak_planks`, literalmente a
     // mesma camada do atlas — zero de diferença, por construção. A face de
     // baixo fica de fora: o fundo da bancada é tábua mesmo, e ninguém o vê.
-    for (const name of ['bed', 'tnt', 'oak_door', 'chest', 'crafting_table', 'furnace']) {
+    for (const name of [
+      'bed', 'tnt', 'oak_door', 'chest', 'crafting_table', 'furnace',
+      // Acrescentados em 2026-09-16: os três primeiros apontavam
+      // `block/oak_planks`, e as plantas dividiam `block/tall_grass`.
+      'pumpkin', 'melon', 'acacia_planks', 'acacia_log',
+      'oak_sapling', 'fern', 'sugar_cane', 'dead_bush', 'vine', 'birch_leaves',
+    ]) {
       const def = BLOCK_BY_NAME.get(name);
       expect(def, name).toBeDefined();
       const tex = def!.tex;

@@ -9,8 +9,8 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-16 14:40 — **M8 em andamento: o vidro não estava fosco, não estava
-lá; e a escada de mão não escalava**
+**Última atualização:** 2026-09-16 15:05 — **M8 em andamento: o sprite do inventário passou a
+seguir a forma do bloco, e abóbora e melancia deixaram de ser tábua de carvalho**
 
 ---
 
@@ -48,14 +48,14 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-16 14:35, com `npm test`, `npm run build` e
+Medidas em 2026-09-16 15:00, com `npm test`, `npm run build` e
 `SIZE_BUDGET_KB=350 npm run size`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **198,3 KB** | < 350 KB | `npm run size` |
-| Testes | **1672**, 84 arquivos | manter verde | `npm test` |
-| Camadas de atlas | **167** | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
+| Bundle (gzip, tudo) | **200,9 KB** | < 350 KB | `npm run size` |
+| Testes | **1710**, 85 arquivos | manter verde | `npm test` |
+| Camadas de atlas | **181** | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Memória de áudio | **3,26 MB** (era 3,95 com três sons a menos) | < 3,5 MB | `tests/audio.test.ts` |
 | Geração de chunk | 5,7–6,2 ms (mediana; varia muito com a carga da máquina) | < 25 ms | `tests/perf.test.ts` |
 | Geração de chunk do Nether | 5,1 ms (mediana; 3,8 antes de a luz entrar) | < 25 ms | `tests/perf.test.ts` |
@@ -65,7 +65,7 @@ Medidas em 2026-09-16 14:35, com `npm test`, `npm run build` e
 | Tick de circuito (fio de 64) | 0,82 ms | < 5 ms | `tests/perf.test.ts` |
 | Tick de fogo (256 chamas, o teto) | **0,03 ms** | < 2 ms | `tests/perf.test.ts` |
 | Acabamento do estilo Nítido (atlas inteiro) | **2,1 ms**, uma vez no boot | < 60 ms | `tests/perf.test.ts` |
-| Folha de sprites em volume (32 px) | **29,3 ms**, uma vez no boot | < 200 ms | `tests/perf.test.ts` |
+| Folha de sprites em volume (32 px) | **33,9 ms**, uma vez no boot (eram 29,3 antes de o sprite seguir a forma) | < 200 ms | `tests/perf.test.ts` |
 | Mundo de RD 16 pronto | **165 pumps** (eram 1315) | — | `tests/dimensionrace.test.ts` |
 | Colunas em 40 ciclos com 4 vagas (RD 8) | **86** (eram 44) | — | `tests/dimensionrace.test.ts` |
 | FPS em T0 real (2017) | **60**, RD 4, escala 1,00 (Galaxy J7 Metal) | 30 estáveis | teste manual |
@@ -1175,6 +1175,28 @@ altura no fim, apagando a subida do tick inteiro.
 | **Fornalha** | queimava sem dar sinal | dois ids como a lâmpada; acesa tem emissão 13 e boca em brasa |
 | **Porta** | só carvalho, e `#planks` genérico dava carvalho com tábua de bétula | bétula e pinheiro, com receita por material |
 
+#### Terceira passada (2026-09-16, fim da tarde)
+
+**O sprite do inventário desenhava sempre um cubo.** Cerca, laje, placa, alçapão, escada e portão
+são todos de tábua de carvalho: como cubo, os seis eram **o mesmo desenho**. Relato do jogador:
+*"vários itens estão com textura que parece um bloco de madeira normal, mas na realidade colocando
+no chão são outros itens"*. A silhueta passou a sair de `boxesFor` — a mesma lista que o mundo
+desenha e que a física colide —, então forma nova nasce com sprite certo sem ninguém tocar no
+inventário. Planta e trilho saíram da isometria: eles aparecem como o próprio ladrilho, de frente,
+que é o desenho que existe deles.
+
+**E havia textura emprestada de verdade.** Abóbora e melancia apontavam `block/oak_planks`: eram
+caixotes de madeira com outro nome no tooltip. Muda, samambaia, cana e arbusto seco dividiam a
+grama alta; acácia usava carvalho; grama alta, dente-de-leão e papoula eram um **X** recortado nas
+diagonais do ladrilho, que é a máscara confundida com a geometria. Todas ganharam desenho próprio,
+escrito com o operador `pattern` — pixel a pixel, legível no código.
+
+**Fornalha e baú**, os outros dois relatos. A fornalha era pedregulho 18% mais escuro com uma
+moldura fina: virou boca, grelha e ferro rebatido, e a acesa agora tem a boca inteira em brasa. Baú
+e bancada eram dois cubos de tábua clara — a diferença era de detalhe fino, que 16 px não carregam.
+Agora é de **valor**: baú escuro e ferrado, bancada clara com a grade sulcada. A régua do teste
+subiu de 22 para 44 nesse par.
+
 **Pendência:** nada disto foi visto num aparelho. Ver §6. O que resta do marco está no
 [doc 14](14-roadmap.md): placa com texto, quadro com arte, cama em outras cores (depende de haver
 outras lãs) e a tampa do baú que abre — esta última exige rotação, que a geometria de caixas
@@ -1189,6 +1211,9 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-16 | `render/itemsprites.ts` | **O sprite do inventário ignorava a forma do bloco.** Ele desenhava sempre um cubo isométrico com a textura do bloco, e cerca, laje, placa, alçapão, escada e portão são todos de tábua: os seis eram **o mesmo desenho** no slot. A silhueta passou a sair de `boxesFor`, a mesma lista do mundo e da física; planta e trilho saíram da isometria e aparecem como o ladrilho de frente. Relato de campo: *"vários itens estão com textura que parece um bloco de madeira normal, mas na realidade colocando no chão são outros itens"*. |
+| 2026-09-16 | `data/blocks.ts`, `data/textures.ts` | **Abóbora e melancia eram `block/oak_planks`.** Literalmente: a tabela apontava a tábua de carvalho, então uma abóbora no campo era um caixote de madeira com outro nome. Na mesma varredura: muda, samambaia, cana e arbusto seco dividiam `block/tall_grass`, acácia usava tronco e tábua de carvalho, e grama alta, dente-de-leão e papoula eram um **X** — `alphaMask('cross')` recorta as diagonais do ladrilho, o que é a máscara confundida com a geometria dos dois quads cruzados. |
+| 2026-09-16 | `data/textures.ts` | **A fornalha parecia pedra e o baú parecia a bancada.** A fornalha era pedregulho 18% mais escuro com moldura fina; ganhou boca, grelha e ferro rebatido. Baú e bancada passavam na régua de legibilidade de 22 e mesmo assim se confundiam no slot, porque a diferença era de **detalhe** e 16 px não carregam detalhe: virou diferença de **valor**, e a régua daquele par subiu para 44. |
 | 2026-09-16 | `data/textures.ts` | **O vidro era invisível.** A receita pintava o ladrilho inteiro com `alpha: 0.28`, e o vidro é desenhado no passe recortado, cujo shader faz `discard` abaixo de 0,5: **zero pixels** passavam. Uma janela colocada não deixava rastro na tela e o slot do inventário parecia vazio — o jogador não tinha como saber que havia vidro ali. Virou moldura opaca com reflexo em diagonal e miolo vazado. O teste que entrou cobre a classe do bug, não o caso: todo bloco dos passes opaco e recortado precisa de pixel acima do corte. |
 | 2026-09-16 | `entity/player.ts`, `data/blocks.ts` | **A escada de mão não escalava.** Ela existia desde o M6 e não havia uma linha de código sobre escalar: o jogador atravessava como se fosse ar. Não era desvio consciente, era buraco. Entrou `climbable` na tabela — campo de física, não de forma — com subida a 0,2/tick, descida controlada a 0,15 e agachar segurando no lugar. |
 | 2026-09-16 | `entity/player.ts` | **O auto-step apagava a subida da escada.** Ele existe para vencer um degrau quando o horizontal trava, e na escada o horizontal trava sempre: levantava o corpo, tentava andar e **devolvia a altura** no fim. Empurrar para a frente na escada não saía do lugar. Na escada quem sobe é a escada. |
@@ -1415,7 +1440,12 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
    - **um poço com escada de mão**: descer, subir empurrando para a frente, parar no meio agachado.
      Se a subida parecer lenta ou rápida demais, o número é `CLIMB_SPEED` em `entity/player.ts`;
    - **um baú e uma fornalha**: o baú agora é menor que o bloco e tem tranca; a fornalha acende a
-     boca **e ilumina em volta** enquanto queima.
+     boca **e ilumina em volta** enquanto queima;
+   - **o inventário inteiro, de uma olhada só**. É o teste mais rápido desta passada: abrir o
+     inventário criativo e percorrer as abas. Nenhum par de itens diferentes pode sair com o mesmo
+     desenho — cerca, laje, placa, alçapão e escada eram todos o mesmo cubo de tábua, e abóbora e
+     melancia eram tábua também. Flor, muda, samambaia e cana agora aparecem como a planta, não
+     como cubo.
 2. **Reconferir os menus com o controle**, que é o que mudou mais na passada anterior:
    - **o foco tem que aparecer.** Empurrar o direcional numa tela precisa acender um anel amarelo
      no item escolhido. Se ele não acender, nada mais dessa lista importa — era essa a causa de

@@ -222,39 +222,55 @@ const SPECS: BlockSpec[] = [
   { id: 32, name: 'spruce_log', display: 'Tronco de Pinheiro', hardness: 2, ...wood(),
     tex: { top: 'block/spruce_log_top', side: 'block/spruce_log_side', bottom: 'block/spruce_log_top' } },
   { id: 33, name: 'acacia_log', display: 'Tronco de Acácia', hardness: 2, ...wood(),
-    tex: { top: 'block/oak_log_top', side: 'block/oak_log_side', bottom: 'block/oak_log_top' } },
+    tex: {
+      top: 'block/acacia_log_top', side: 'block/acacia_log_side',
+      bottom: 'block/acacia_log_top',
+    } },
   { id: 34, name: 'oak_planks', display: 'Tábuas de Carvalho', tex: 'block/oak_planks', hardness: 2, ...wood() },
   { id: 35, name: 'birch_planks', display: 'Tábuas de Bétula', tex: 'block/birch_planks', hardness: 2, ...wood() },
   { id: 36, name: 'spruce_planks', display: 'Tábuas de Pinheiro', tex: 'block/spruce_planks', hardness: 2, ...wood() },
-  { id: 37, name: 'acacia_planks', display: 'Tábuas de Acácia', tex: 'block/oak_planks', hardness: 2, ...wood() },
+  { id: 37, name: 'acacia_planks', display: 'Tábuas de Acácia', tex: 'block/acacia_planks',
+    hardness: 2, ...wood() },
   // Folhas: opaque=false para não esconder a face do vizinho, mas atenuam luz.
   { id: 38, name: 'oak_leaves', display: 'Folhas de Carvalho', tex: 'block/oak_leaves',
     hardness: 0.2, opaque: false, lightAttenuation: 1, tint: 'foliage', tool: 'shears',
     flammable: 30, sound: 'grass' },
-  { id: 39, name: 'birch_leaves', display: 'Folhas de Bétula', tex: 'block/oak_leaves',
+  { id: 39, name: 'birch_leaves', display: 'Folhas de Bétula', tex: 'block/birch_leaves',
     hardness: 0.2, opaque: false, lightAttenuation: 1, tint: 'foliage', tool: 'shears',
     flammable: 30, sound: 'grass' },
   { id: 40, name: 'spruce_leaves', display: 'Folhas de Pinheiro', tex: 'block/spruce_leaves',
     hardness: 0.2, opaque: false, lightAttenuation: 1, tint: 'foliage', tool: 'shears',
     flammable: 30, sound: 'grass' },
-  { id: 41, name: 'oak_sapling', display: 'Muda de Carvalho', tex: 'block/oak_leaves', ...plant(), tint: 'foliage' },
+  /*
+   * Muda, samambaia e cana **saíram do tint de bioma** (M8).
+   *
+   * O tint multiplica a textura inteira pela cor do bioma, e isso só funciona
+   * quando o desenho é cinza — é o que a grama alta faz. As três agora são
+   * desenho com cor própria, e um tronco marrom de muda não pode ser pintado
+   * de verde. Trocou-se variação por bioma por saber o que é cada planta.
+   */
+  { id: 41, name: 'oak_sapling', display: 'Muda de Carvalho', tex: 'block/oak_sapling', ...plant() },
   { id: 42, name: 'tall_grass', display: 'Grama Alta', tex: 'block/tall_grass', ...plant(), tint: 'grass' },
-  { id: 43, name: 'fern', display: 'Samambaia', tex: 'block/tall_grass', ...plant(), tint: 'foliage' },
+  { id: 43, name: 'fern', display: 'Samambaia', tex: 'block/fern', ...plant() },
   { id: 44, name: 'dandelion', display: 'Dente-de-leão', tex: 'block/dandelion', ...plant() },
   { id: 45, name: 'poppy', display: 'Papoula', tex: 'block/poppy', ...plant() },
   { id: 46, name: 'cactus', display: 'Cacto', hardness: 0.4, opaque: false, lightAttenuation: 0,
     sound: 'cloth', tex: { top: 'block/cactus_top', side: 'block/cactus_side', bottom: 'block/cactus_top' } },
-  { id: 47, name: 'sugar_cane', display: 'Cana-de-açúcar', tex: 'block/tall_grass', ...plant(), tint: 'foliage' },
-  { id: 48, name: 'dead_bush', display: 'Arbusto Morto', tex: 'block/tall_grass', ...plant() },
-  { id: 49, name: 'vine', display: 'Trepadeira', tex: 'block/oak_leaves', ...plant(), tint: 'foliage' },
-  { id: 50, name: 'pumpkin', display: 'Abóbora', tex: 'block/oak_planks', hardness: 1, ...wood() },
-  { id: 51, name: 'melon', display: 'Melancia', tex: 'block/oak_planks', hardness: 1, ...wood() },
+  { id: 47, name: 'sugar_cane', display: 'Cana-de-açúcar', tex: 'block/sugar_cane', ...plant() },
+  { id: 48, name: 'dead_bush', display: 'Arbusto Morto', tex: 'block/dead_bush', ...plant() },
+  { id: 49, name: 'vine', display: 'Trepadeira', tex: 'block/vine', ...plant(), tint: 'foliage' },
+  // As duas apontavam `block/oak_planks` — eram caixotes de madeira com outro
+  // nome no tooltip (corrigido no M8).
+  { id: 50, name: 'pumpkin', display: 'Abóbora', hardness: 1, ...wood(),
+    tex: { top: 'block/pumpkin_top', side: 'block/pumpkin_side', bottom: 'block/pumpkin_top' } },
+  { id: 51, name: 'melon', display: 'Melancia', hardness: 1, ...wood(),
+    tex: { top: 'block/melon_top', side: 'block/melon_side', bottom: 'block/melon_top' } },
 
   // --- 52..68 construídos / funcionais ------------------------------------
   { id: 52, name: 'crafting_table', display: 'Bancada', hardness: 2.5, ...wood(),
     tex: { top: 'block/crafting_table_top', side: 'block/crafting_table_side', bottom: 'block/oak_planks' } },
   { id: 53, name: 'furnace', display: 'Fornalha', hardness: 3.5, ...rock(),
-    tex: { top: 'block/furnace_side', side: 'block/furnace_side', bottom: 'block/furnace_side' } },
+    tex: { top: 'block/furnace_top', side: 'block/furnace_side', bottom: 'block/furnace_top' } },
   // Forma de baú desde o M8: caixa, tampa e tranca, menor que o bloco.
   { id: 54, name: 'chest', display: 'Baú', hardness: 2.5, ...wood(), opaque: false,
     shape: 'chest', lightAttenuation: 0,
@@ -587,7 +603,7 @@ SPECS.push(
    */
   { id: 128, name: 'furnace_lit', display: 'Fornalha', hardness: 3.5, ...rock(),
     emission: 13, itemless: true,
-    tex: { top: 'block/furnace_side', side: 'block/furnace_lit', bottom: 'block/furnace_side' } },
+    tex: { top: 'block/furnace_top', side: 'block/furnace_lit', bottom: 'block/furnace_top' } },
 );
 
 /**

@@ -351,9 +351,13 @@ describe('baú', () => {
     expect(box(1)[1]).toBeCloseTo(box(0)[4], 6);
   });
 
-  it('a tranca sai para fora da face da frente', () => {
+  /*
+   * A tranca fica na face +Z porque é uma das duas que a isometria do
+   * inventário mostra: em −Z ela existiria só para quem olha por trás.
+   */
+  it('a tranca sai para fora da face que o inventário mostra', () => {
     boxesFor(SHAPE_CHEST, 0, 0, out);
-    expect(box(2)[2]).toBeLessThan(box(0)[2]);
+    expect(box(2)[5]).toBeGreaterThan(box(0)[5]);
   });
 
   it('não chega ao teto do bloco: dá para pôr uma laje em cima sem encostar', () => {

@@ -663,10 +663,16 @@ function chest(out: Float32Array): number {
   const b = 1 - CHEST_MARGIN;
   let count = one(out, 0, a, 0, a, b, CHEST_BODY_TOP, b);
   count = one(out, count, a, CHEST_BODY_TOP, a, b, CHEST_TOP, b);
-  // Tranca: uma pastilha saindo da face −Z, na divisa das duas peças.
+  /*
+   * Tranca: uma pastilha na divisa entre corpo e tampa, saindo da face +Z.
+   *
+   * O lado importa. O baú não tem direção — ele é igual nas quatro faces —, e
+   * a isometria do inventário mostra **+X e +Z**: uma tranca em −Z ficaria
+   * escondida justamente no lugar onde ela ajuda a reconhecer a peça.
+   */
   count = one(
-    out, count, 7 / 16, CHEST_BODY_TOP - 2 / 16, a - 1 / 16,
-    9 / 16, CHEST_BODY_TOP + 2 / 16, a,
+    out, count, 7 / 16, CHEST_BODY_TOP - 2 / 16, b,
+    9 / 16, CHEST_BODY_TOP + 2 / 16, b + 1 / 16,
   );
   return count;
 }

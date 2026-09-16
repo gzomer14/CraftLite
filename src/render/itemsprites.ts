@@ -16,6 +16,10 @@
 
 import { BIOMES } from '../data/biomes';
 import { defOf, makeState, texOf } from '../data/blocks';
+import {
+  BOX_STRIDE, MAX_BOXES, MOUNT_FLOOR, SHAPE_BUTTON, SHAPE_BY_NAME, SHAPE_CROSS, SHAPE_LEVER,
+  SHAPE_NONE, SHAPE_RAIL, SHAPE_STAIRS, SHAPE_TORCH, boxesFor,
+} from '../world/mesh/shapes';
 import { ITEMS, type ItemDef } from '../data/items';
 import { ITEM_ART, SHAPES, type ItemArt } from '../data/itemart';
 import { ITEM_FINISHES, itemMaterialOf, type TextureStyleId } from '../data/texturestyle';
@@ -222,18 +226,28 @@ export function drawBlockIsometric(
    * e sozinho respondia por 80 dos 89 ms da folha.
    */
   const k = size / SPRITE_SIZE;
-  for (let v = 0; v < SPRITE_SIZE; v += STEP) {
-    for (let u = 0; u < SPRITE_SIZE; u += STEP) {
-      // topo: losango de (8,1) a (0,5), (8,9) e (16,5)
-      plot(out, size, (8 + (u - v) * 0.5) * k, (1 + (u + v) * 0.25) * k,
-        topPixels, u, v, SHADE_TOP, topTint);
-      // face esquerda (aresta superior de (0,5) a (8,9))
-      plot(out, size, (u * 0.5) * k, (5 + u * 0.25 + v * 0.4375) * k,
-        sidePixels, u, v, SHADE_LEFT, sideTint);
-      // face direita (aresta superior de (8,9) a (16,5))
-      plot(out, size, (8 + u * 0.5) * k, (9 - u * 0.25 + v * 0.4375) * k,
-        sidePixels, u, v, SHADE_RIGHT, sideTint);
-    }
+  const shape = SHAPE_BY_NAME[def.shape] ?? SHAPE_NONE;
+
+  /*
+   * Planta e trilho não são sólidos: o desenho deles é **o próprio ladrilho**.
+   *
+   * Em isométrica eles viravam um cubo de flor — e uma muda, uma samambaia e
+   * uma cana davam três cubos verdes iguais no inventário.
+   */
+  if (shape === SHAPE_CROSS || shape === SHAPE_RAIL) {
+    drawFlat(out, size, sidePixels, sideTint);
+    if (outlined && strokeThickness(out, size) > 2.6) outlineOpaque(out, size);
+    return;
+  }
+
+  const count = spriteBoxes(shape);
+  for (let b = 0; b < count; b++) {
+    const o = ORDER[b] * BOX_STRIDE;
+    drawBox(
+      out, size, k,
+      BOXES[o], BOXES[o + 1], BOXES[o + 2], BOXES[o + 3], BOXES[o + 4], BOXES[o + 5],
+      topPixels, sidePixels, topTint, sideTint,
+    );
   }
 
   // Contorno só faz sentido em cubo cheio. Numa textura vazada de traço fino
@@ -243,6 +257,138 @@ export function drawBlockIsometric(
   // cubo cheio (acima de 6) levam contorno.
   if (outlined && strokeThickness(out, size) > 2.6) outlineOpaque(out, size);
 }
+
+/**
+ * Caixas do bloco para o sprite, já ordenadas de trás para frente.
+ *
+ * Devolve quantas escreveu em `BOXES`, com a ordem de desenho em `ORDER`.
+ * Bloco cúbico — e qualquer forma sem lista de caixas — vira o cubo unitário,
+ * que é exatamente o que este módulo desenhava antes de existir a forma.
+ *
+ * **Estado e conexões são escolhidos para o slot, não para o mundo**: a cerca
+ * aparece com dois braços opostos, porque uma cerca sem braço nenhum é um
+ * poste e ninguém reconhece um poste como cerca.
+ */
+function spriteBoxes(shape: number): number {
+  let count = shape === SHAPE_NONE ? 0
+    : boxesFor(shape, SPRITE_STATE[shape] ?? 0, SPRITE_LINKS, BOXES);
+  if (count === 0) {
+    BOXES[0] = 0; BOXES[1] = 0; BOXES[2] = 0;
+    BOXES[3] = 1; BOXES[4] = 1; BOXES[5] = 1;
+    count = 1;
+  }
+  /*
+   * Pintor: o que está mais longe primeiro.
+   *
+   * A câmera isométrica olha do canto (+X, +Z), então a profundidade cresce com
+   * `x0 + z0`; empate se resolve pela altura, para a tampa do baú cobrir o
+   * corpo e não o contrário. São no máximo cinco caixas — ordenar por inserção
+   * é mais barato que montar um array e chamar `sort`, que alocaria.
+   */
+  for (let i = 0; i < count; i++) ORDER[i] = i;
+  for (let i = 1; i < count; i++) {
+    const box = ORDER[i];
+    const key = depthKey(box);
+    let j = i - 1;
+    while (j >= 0 && depthKey(ORDER[j]) > key) {
+      ORDER[j + 1] = ORDER[j];
+      j--;
+    }
+    ORDER[j + 1] = box;
+  }
+  return count;
+}
+
+function depthKey(box: number): number {
+  const o = box * BOX_STRIDE;
+  return (BOXES[o] + BOXES[o + 2]) * 4 + BOXES[o + 1];
+}
+
+/**
+ * Uma caixa em isométrica 2:1: topo, face `+Z` (esquerda) e face `+X` (direita).
+ *
+ * A projeção é a mesma que o cubo sempre usou, escrita agora em função de um
+ * ponto qualquer do bloco:
+ *
+ * ```
+ *   x = 8 + (bx − bz)·8
+ *   y = 1 + (bx + bz)·4 + (1 − by)·7
+ * ```
+ *
+ * Com a caixa unitária ela reproduz o desenho antigo pixel por pixel — foi o
+ * critério para trocar: laje e cerca passam a ter forma **sem** mexer no que
+ * já estava certo.
+ */
+function drawBox(
+  out: Uint8ClampedArray, size: number, k: number,
+  x0: number, y0: number, z0: number, x1: number, y1: number, z1: number,
+  topPixels: Uint8ClampedArray, sidePixels: Uint8ClampedArray,
+  topTint: Rgb | null, sideTint: Rgb | null,
+): void {
+  for (let v = 0; v < SPRITE_SIZE; v += STEP) {
+    for (let u = 0; u < SPRITE_SIZE; u += STEP) {
+      const fu = u / SPRITE_SIZE;
+      const fv = v / SPRITE_SIZE;
+
+      // Topo, em y1.
+      let bx = x0 + (x1 - x0) * fu;
+      let bz = z0 + (z1 - z0) * fv;
+      plot(out, size, isoX(bx, bz) * k, isoY(bx, y1, bz) * k,
+        topPixels, u, v, SHADE_TOP, topTint);
+
+      // Face +Z: a que aparece à esquerda.
+      bx = x0 + (x1 - x0) * fu;
+      let by = y1 - (y1 - y0) * fv;
+      plot(out, size, isoX(bx, z1) * k, isoY(bx, by, z1) * k,
+        sidePixels, u, v, SHADE_LEFT, sideTint);
+
+      // Face +X: a que aparece à direita.
+      bz = z1 - (z1 - z0) * fu;
+      by = y1 - (y1 - y0) * fv;
+      plot(out, size, isoX(x1, bz) * k, isoY(x1, by, bz) * k,
+        sidePixels, u, v, SHADE_RIGHT, sideTint);
+    }
+  }
+}
+
+function isoX(bx: number, bz: number): number {
+  return 8 + (bx - bz) * 8;
+}
+
+function isoY(bx: number, by: number, bz: number): number {
+  return 1 + (bx + bz) * 4 + (1 - by) * 7;
+}
+
+/** Ladrilho desenhado de frente, sem projeção: planta e trilho. */
+function drawFlat(
+  out: Uint8ClampedArray, size: number, pixels: Uint8ClampedArray, tint: Rgb | null,
+): void {
+  const k = size / SPRITE_SIZE;
+  for (let v = 0; v < SPRITE_SIZE; v += STEP) {
+    for (let u = 0; u < SPRITE_SIZE; u += STEP) {
+      plot(out, size, u * k, v * k, pixels, u, v, 1, tint);
+    }
+  }
+}
+
+const BOXES = new Float32Array(MAX_BOXES * BOX_STRIDE);
+const ORDER = new Uint8Array(MAX_BOXES);
+/** Cerca e grade aparecem com dois braços opostos (bits de `FACING_STEP`). */
+const SPRITE_LINKS = 0b0011;
+/** Estado com que cada forma posa no slot. O que não está aqui posa em 0. */
+const SPRITE_STATE: Readonly<Record<number, number>> = {
+  [SHAPE_TORCH]: MOUNT_FLOOR,
+  [SHAPE_LEVER]: MOUNT_FLOOR,
+  [SHAPE_BUTTON]: MOUNT_FLOOR,
+  /*
+   * A escada posa com o **degrau virado para a câmera**.
+   *
+   * O lado alto é `bits ^ 1`, então com estado 0 ele cai atrás e o degrau fica
+   * escondido: a silhueta saía idêntica à de um cubo cheio, que é justamente o
+   * que este passe veio consertar. Com 1, o corte aparece.
+   */
+  [SHAPE_STAIRS]: 1,
+};
 
 /**
  * Espessura média do traço: pixels opacos divididos pelos que fazem borda.

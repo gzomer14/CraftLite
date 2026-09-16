@@ -12,6 +12,99 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-16 · 13:50 → 14:40 · O vidro não estava fosco: ele não estava lá
+
+**Pedido:** *"Vamos seguir então com o desenvolvimento do M8. Queria também um ajuste para
+adicionar uma leve textura no 'Vidro' do jogo, para conseguir diferenciar que hoje realmente existe
+o vidro (…). Ele ainda precisa possibilitar o jogador de ver através dele, porém com alguma coisa
+para indicar ao jogador sua presença"*.
+
+**Resultado:** o vidro não era discreto demais — ele era **invisível**, e por um motivo mecânico.
+
+### O vidro
+
+A receita pintava o ladrilho inteiro com `alpha: 0.28` e recortava tudo fora da moldura. Só que
+vidro é desenhado no passe **recortado**, cujo shader faz `if (texel.a < 0.5) discard`. Medido:
+**zero pixels** acima do corte. Uma janela colocada não deixava rastro nenhum na tela, e o slot do
+inventário parecia vazio — exatamente o sintoma relatado.
+
+A correção não foi "deixar opaco", que tiraria a janela: é **moldura de 1 px** nas quatro bordas
+mais **duas riscas em diagonal** de reflexo, com o resto em alfa zero. 29% do ladrilho é desenho,
+71% é buraco de verdade. Não foi para o passe translúcido de propósito: lá o desenho é ordenado de
+trás para frente e não escreve profundidade, e vidro é justamente o bloco que se empilha em parede
+inteira — numa GPU de 2016 isso é preenchimento caro por um ganho que a moldura já dá.
+
+O teste que entrou cobre a **classe** do bug, não o caso: todo bloco desenhado nos passes opaco e
+recortado precisa de pelo menos um pixel acima do corte de alfa. São 195 asserções gerada da
+tabela; nenhum outro bloco estava na mesma situação.
+
+### Escada de mão: ela não escalava
+
+Buscando o que mais estava "chapado", apareceu um buraco maior que o visual: **a escada de mão era
+decoração**. Não havia uma linha de código sobre escalar em lugar nenhum — o jogador atravessava
+a escada como se fosse ar. Não estava registrado como desvio consciente porque nunca foi decidido.
+
+Agora ela sobe a 0,2 por tick (4 blocos/s, mais lento que andar de propósito), desce controlada a
+0,15, e **agachar segura no lugar**. O campo é `climbable` na tabela de blocos, não
+`shape === 'ladder'`: a propriedade é de física, e trepadeira e corrente sobem sem ter forma de
+escada.
+
+Uma coisa quebrou junto e é instrutiva: o **auto-step**. Ele existe para subir um degrau quando o
+horizontal trava — e na escada o horizontal trava sempre, porque ela vive colada numa parede. O
+passo levantava o corpo, tentava andar e **devolvia a altura** no fim, apagando a subida do tick
+inteiro: empurrar para a frente na escada não saía do lugar. Na escada, quem sobe é a escada.
+
+A forma acompanhou: dois montantes e três degraus, com o degrau 1/16 recuado — é a sombra entre as
+peças que faz o olho ler "degrau" em vez de "listra". A textura deixou de ser a escada desenhada
+com o vão vazado e virou madeira lisa, porque cada caixa mostra o ladrilho inteiro espremido na
+largura dela: com o recorte antigo, um montante de 2/16 podia calhar de amostrar o vão e sumir.
+
+### Baú e fornalha
+
+O **baú** era um cubo inteiro — encostado noutro cubo, só a textura o distinguia. Virou corpo,
+tampa e tranca, com 1/16 de folga em volta, que é o que faz dele um móvel pousado no chão. A tampa
+**não abre**: girar uma caixa em torno da dobradiça não é representável numa geometria alinhada aos
+eixos, e está registrado no doc 14 como o que falta.
+
+A **fornalha** queimava sem dar sinal: mesma textura, mesma luz. Agora são dois ids, como a lâmpada
+de redstone — a emissão é coluna da tabela indexada por id, e é ela que o flood fill lê. Acesa, ela
+tem emissão 13 e a boca em brasa; a troca avisa a luz, senão a textura acende e a caverna continua
+escura.
+
+### Portas das outras madeiras
+
+Bétula e pinheiro ganharam porta, com os ids **no fim da tabela**: `BUILD_PARTS` é percorrida por
+material, e uma peça nova no meio empurraria o id de tudo que vem depois — e id vai para o save.
+
+De quebra, uma correção de receita: a porta era `#planks` genérico, então seis tábuas de bétula
+davam uma porta de **carvalho**. Virou receita por material, junto com escada, laje e cerca.
+
+### Arquivos
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/data/textures.ts` | vidro com moldura e reflexo; boca acesa da fornalha; escada em madeira lisa; portas de bétula e pinheiro geradas |
+| `~` | `src/data/blocks.ts` | campo `climbable`; forma `chest`; `furnace_lit` (128); portas de bétula e pinheiro (129–132) |
+| `~` | `src/data/itemart.ts` | silhueta da escada de mão |
+| `~` | `src/data/loot.ts` | fornalha acesa e as metades de cima das portas novas |
+| `~` | `src/data/recipes.ts` | porta por material; a genérica de `#planks` saiu |
+| `~` | `src/entity/player.ts` | escalar: subir, descer controlado, segurar agachado, e auto-step desligado na escada |
+| `~` | `src/game/session.ts` | `syncFurnaceBlock`; fornalha acesa abre, cria contêiner e é minerada como fornalha |
+| `~` | `src/world/mesh/shapes.ts` | `SHAPE_CHEST`; escada com montantes e degraus |
+| `~` | `src/world/mesh/blockinfo.ts` | baú nas tabelas de forma |
+| `~` | `src/world/redstone.ts` | pistão não move fornalha acesa |
+| `+` | `tests/ladder.test.ts` | 11 testes: forma da escada e as cinco regras de escalada |
+| `+` | `tests/furnacelit.test.ts` | 5 testes: troca de bloco, luz que acompanha, e o conteúdo que sobrevive |
+| `~` | `tests/texgen.test.ts` | corte de alfa por bloco (a classe do bug do vidro) e a janela do vidro |
+| `~` | `tests/shapes.test.ts` | caixas do baú |
+| `~` | `tests/multiblock.test.ts` | portas de bétula e pinheiro |
+| `~` | `docs/14-roadmap.md`, `docs/15-status.md`, `docs/16-auditoria.md`, `README.md` | M8 avançado |
+
+**Portões:** 1672 testes (84 arquivos), lint limpo, build limpo, **198,3 KB gzip** de 350.
+167 camadas de atlas de 256; meshing 0,68 ms/section.
+
+---
+
 ## 2026-09-16 · 09:20 → 10:10 · O que fazia tudo parecer chapado era um bit de posição
 
 **Pedido:** *"gostaria que você fizesse uma revisão completa no código para ir corrigindo possíveis

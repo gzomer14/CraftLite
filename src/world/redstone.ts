@@ -148,7 +148,8 @@ const RAIL_POWERED_BIT = 16;
  * caros demais para o gênero mover (obsidiana).
  */
 const IMMOVABLE: ReadonlySet<string> = new Set([
-  'bedrock', 'obsidian', 'chest', 'furnace', 'enchanting_table', 'mob_spawner', 'piston_head',
+  'bedrock', 'obsidian', 'chest', 'furnace', 'furnace_lit', 'enchanting_table', 'mob_spawner',
+  'piston_head',
 ]);
 
 function buildRoles(): Roles {

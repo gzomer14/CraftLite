@@ -676,6 +676,29 @@ export const SHAPES: Record<string, readonly string[]> = {
     '................',
     '................',
   ],
+  /*
+   * Escada de mão (M8): com a textura virando madeira lisa, o cubo isométrico
+   * do slot ficaria idêntico a um bloco de tábua. A silhueta devolve os
+   * degraus, que é o que identifica a peça.
+   */
+  ladder: [
+    '................',
+    '..M..........M..',
+    '..M..........M..',
+    '..MMMMMMMMMMMM..',
+    '..MdddddddddM...',
+    '..M..........M..',
+    '..M..........M..',
+    '..MMMMMMMMMMMM..',
+    '..MdddddddddM...',
+    '..M..........M..',
+    '..M..........M..',
+    '..MMMMMMMMMMMM..',
+    '..MdddddddddM...',
+    '..d..........d..',
+    '..d..........d..',
+    '................',
+  ],
   string: [
     '................',
     '................',
@@ -832,5 +855,6 @@ function buildArt(): Record<string, ItemArt> {
   out.redstone_torch = { shape: 'torch', color: WOOD, accent: [226, 58, 44] };
   out.oak_door = { shape: 'door', color: [150, 118, 68], accent: [214, 214, 220] };
   out.bed = { shape: 'bed', color: [196, 52, 52], accent: [238, 238, 232] };
+  out.ladder = { shape: 'ladder', color: [146, 116, 68] };
   return out;
 }

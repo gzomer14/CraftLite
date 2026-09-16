@@ -7,7 +7,9 @@ import {
   TEX_SIZE, alphaMask, bricks, dither, oreBlobs, renderRecipe, speckle, tintBy,
 } from '../src/render/texgen';
 import { TEXTURES } from '../src/data/textures';
-import { BLOCK_BY_NAME } from '../src/data/blocks';
+import { BLOCKS, BLOCK_BY_NAME, texOf } from '../src/data/blocks';
+import { LAYER_CUTOUT, LAYER_OPAQUE, buildBlockTables } from '../src/world/mesh/blockinfo';
+import { buildLayerIndex } from '../src/render/layers';
 
 const SIZE = TEX_SIZE * TEX_SIZE * 4;
 const noResolve = (): Uint8ClampedArray => new Uint8ClampedArray(SIZE);
@@ -217,6 +219,68 @@ describe('legibilidade das texturas', () => {
       expect(distance(a, b)).toBeGreaterThan(LEGIBLE);
     });
   }
+
+  /*
+   * A regressão do vidro (2026-09-16): a receita dele pintava o ladrilho
+   * inteiro com `alpha: 0.28`, e o shader do passe recortado descarta tudo
+   * abaixo de 0,5. **Nenhum pixel sobrevivia** — uma janela colocada não
+   * deixava rastro na tela e o slot do inventário parecia vazio.
+   *
+   * O teste vale para a classe inteira do bug, não só para o vidro: todo bloco
+   * desenhado nos passes opaco e recortado precisa de pixel que passe do corte.
+   */
+  describe('todo bloco do passe recortado tem pixel que passa do corte de alfa', () => {
+    const index = buildLayerIndex();
+    const tables = buildBlockTables(index);
+
+    const opaques = (name: string): number => {
+      const recipe = TEXTURES[name];
+      if (recipe === undefined) return 1; // textura inexistente cai em `missing`
+      const px = build(name);
+      let n = 0;
+      for (let i = 3; i < px.length; i += 4) if (px[i] >= 128) n++;
+      return n;
+    };
+
+    for (const def of BLOCKS) {
+      if (def === undefined) continue;
+      const layer = tables.renderLayer[def.id];
+      if (layer !== LAYER_OPAQUE && layer !== LAYER_CUTOUT) continue;
+      const faces = new Set([
+        texOf(def, 'top'), texOf(def, 'side'), texOf(def, 'bottom'), ...def.stages,
+      ]);
+      for (const face of faces) {
+        it(`${def.name}: ${face}`, () => {
+          expect(opaques(face), `${face} some inteira no recorte de alfa`)
+            .toBeGreaterThan(0);
+        });
+      }
+    }
+  });
+
+  /*
+   * E o vidro, especificamente, precisa continuar sendo **janela**: moldura
+   * visível e miolo vazado. Opaco demais deixa de ser vidro; vazado demais
+   * volta a ser o bug.
+   */
+  it('o vidro mostra a moldura e deixa ver através', () => {
+    const px = build('block/glass');
+    let opaco = 0;
+    for (let i = 3; i < px.length; i += 4) if (px[i] >= 128) opaco++;
+    const total = TEX_SIZE * TEX_SIZE;
+    expect(opaco / total).toBeGreaterThan(0.15);
+    expect(opaco / total).toBeLessThan(0.45);
+    // As quatro bordas são a moldura: elas têm que estar inteiras.
+    const alpha = (x: number, y: number): number => px[((y * TEX_SIZE + x) << 2) + 3];
+    for (let i = 0; i < TEX_SIZE; i++) {
+      expect(alpha(i, 0)).toBeGreaterThanOrEqual(128);
+      expect(alpha(i, TEX_SIZE - 1)).toBeGreaterThanOrEqual(128);
+      expect(alpha(0, i)).toBeGreaterThanOrEqual(128);
+      expect(alpha(TEX_SIZE - 1, i)).toBeGreaterThanOrEqual(128);
+    }
+    // E o centro continua sendo buraco.
+    expect(alpha(8, 8)).toBe(0);
+  });
 
   it('nenhuma face visível de bloco construído é a camada crua de outro bloco', () => {
     // Cama era `block/wool_white` e TNT era `block/oak_planks`, literalmente a

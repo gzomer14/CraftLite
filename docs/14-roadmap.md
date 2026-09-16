@@ -136,14 +136,25 @@ planos de espessura zero — não faltava textura, faltava **volume representáv
 - [x] **Contorno do bloco mirado** do tamanho da forma, e não sempre um cubo.
 - [x] Bloco que exige apoio cai quando o apoio some, **mesmo sem ser de redstone** (trilho comum,
       tocha).
+- [x] **Vidro visível.** Ele era desenhado com alfa 0,28 no passe **recortado**, cujo shader
+      descarta tudo abaixo de 0,5: nenhum pixel sobrevivia e uma janela colocada não deixava rastro
+      na tela. Virou moldura opaca com reflexo em diagonal e miolo vazado — vê-se através e vê-se
+      que existe.
+- [x] **Escada de mão** com dois montantes e três degraus, e **que escala**: ela era decoração, o
+      jogador atravessava como se fosse ar.
+- [x] **Baú** com corpo, tampa e tranca, menor que o bloco.
+- [x] **Fornalha acesa**: dois ids como a lâmpada de redstone, com emissão 13 e a boca em brasa.
+- [x] Porta nas outras madeiras (bétula e pinheiro), com receita por material — a genérica de
+      `#planks` dava porta de carvalho com tábua de bétula.
 - [ ] Placa com texto escrito pelo jogador, e quadro com arte gerada por código.
-- [ ] Escada de mão com degraus de verdade (hoje é uma chapa com a textura vazada).
-- [ ] Porta e alçapão nas outras madeiras; cama nas outras cores de lã.
-- [ ] Baú com tampa que abre, e fornalha com a boca acesa quando está queimando.
+- [ ] Cama nas outras cores (depende de haver outras lãs: hoje só existe a branca).
+- [ ] Tampa do baú que **abre** de verdade — exige rotação, e a geometria do jogo é de caixas
+      alinhadas aos eixos (doc 04 §3). Precisa de um segundo formato de vértice para existir.
 
 **Critério de aceite:** num aparelho, olhar de perto uma tocha de parede, uma cerca isolada, uma
-porta fechada e uma picareta na mão, e não conseguir apontar nenhuma peça "chapada". Orçamento de
-meshing intocado: uma section com um piso de 256 tochas continua abaixo de 2 ms.
+porta fechada, uma janela de vidro e uma picareta na mão, e não conseguir apontar nenhuma peça
+"chapada" nem invisível. Descer um poço de escada sem cair. Orçamento de meshing intocado: uma
+section com um piso de 256 tochas continua abaixo de 2 ms.
 
 ---
 

@@ -61,6 +61,23 @@ const SNEAK_MULTIPLIER = 0.3;
 
 /** Arrasto dos fluidos (doc 06 §3). */
 const WATER_DRAG = 0.8;
+
+/**
+ * Escalar (M8): a escada de mão **não escalava**.
+ *
+ * Ela existia desde o M6 como decoração — bonita na parede, e o jogador
+ * passava por ela como se fosse ar. Não era desvio consciente registrado em
+ * lugar nenhum: era um buraco.
+ *
+ * Os números são os do gênero, por tick: subir a 0,2 (4 blocos/s, mais lento
+ * que andar, que é o ponto), descer controlado a 0,15 quando se está apenas
+ * encostado, e agachar **segura** no lugar. Segurar é o que permite parar no
+ * meio do poço para olhar em volta sem cair.
+ */
+const CLIMB_SPEED = 0.2;
+const CLIMB_FALL_SPEED = -0.15;
+/** Na escada o passo horizontal é curto: escorregar para fora dela irrita. */
+const CLIMB_HORIZONTAL = 0.12;
 const LAVA_DRAG = 0.5;
 /**
  * Empuxo por tick segurando pular. **Desvio consciente do doc 06 §3**, que
@@ -125,6 +142,8 @@ export class Player {
    */
   autoJump = false;
   inWater = false;
+  /** true quando o corpo está dentro de um bloco escalável (M8). */
+  onLadder = false;
   inLava = false;
 
   mode: GameMode = 'survival';
@@ -212,13 +231,32 @@ export class Player {
       this.vy = (this.vy + GRAVITY) * VERTICAL_DRAG;
     }
 
+    /*
+     * Escada: a vertical passa a ser **decisão**, não queda.
+     *
+     * Entra depois da gravidade e antes do pulo, porque é ela que a gravidade
+     * do tick acabou de sobrescrever — e antes do pulo porque na escada
+     * `input.jump` quer dizer "sobe", não "salta".
+     */
+    if (this.onLadder && !this.flying) {
+      if (this.vy < CLIMB_FALL_SPEED) this.vy = CLIMB_FALL_SPEED;
+      if (input.sneak) this.vy = 0;
+      else if (input.jump || input.forward > 0) this.vy = CLIMB_SPEED;
+      const horizontal = Math.hypot(this.vx, this.vz);
+      if (horizontal > CLIMB_HORIZONTAL) {
+        const k = CLIMB_HORIZONTAL / horizontal;
+        this.vx *= k;
+        this.vz *= k;
+      }
+    }
+
     // O pulo entra **depois** da gravidade, e sobrescreve a vertical.
     //
     // Ordem importa: com o impulso antes da gravidade, o primeiro tick moveria
     // 0.3332 em vez de 0.42 e o pulo chegaria a 0.83 blocos em vez dos ~1.25
     // do doc 06 §2 — não passaria em cima de um bloco inteiro.
     // O auto-pulo entra como se o jogador tivesse pressionado pular.
-    const wantsJump = input.jump || this.shouldAutoJump(world, input);
+    const wantsJump = (input.jump || this.shouldAutoJump(world, input)) && !this.onLadder;
     if (wantsJump) {
       if (this.onGround) {
         this.vy = JUMP_IMPULSE;
@@ -341,9 +379,17 @@ export class Player {
   private moveAndCollide(world: World): void {
     this.syncAabb();
     const before = this.y;
-    const result = moveWithCollision(
-      world, this.aabb, this.vx, this.vy, this.vz, this.onGround ? AUTO_STEP : 0,
-    );
+    /*
+     * Auto-step **não** vale na escada.
+     *
+     * Ele existe para subir um degrau quando o horizontal trava — e na escada o
+     * horizontal trava sempre, porque ela fica colada numa parede. O passo
+     * então levantava o corpo, tentava andar, e **devolvia a altura** no fim,
+     * apagando a subida do tick inteiro: empurrar para a frente na escada não
+     * saía do lugar. Quem sobe aqui é a escada.
+     */
+    const autoStep = this.onGround && !this.onLadder ? AUTO_STEP : 0;
+    const result = moveWithCollision(world, this.aabb, this.vx, this.vy, this.vz, autoStep);
 
     // A posição fica em double e recebe os deltas; ler de volta da AABB
     // (que é `Float32Array`) truncaria a precisão e faria a velocidade em
@@ -406,6 +452,14 @@ export class Player {
     const def = defOf(world.getBlock(bx, feet, bz));
     this.inWater = def.name === 'water';
     this.inLava = def.name === 'lava';
+    /*
+     * Escalável nos pés **ou** na cabeça: no topo do poço os pés já saíram da
+     * última escada enquanto o corpo ainda está nela, e sem a segunda consulta
+     * o jogador despencava justamente no último degrau.
+     */
+    const head = Math.floor(this.y + this.height - EPSILON);
+    this.onLadder = def.climbable
+      || (head !== feet && defOf(world.getBlock(bx, head, bz)).climbable);
   }
 
   /** Posição dos olhos interpolada para o render. */

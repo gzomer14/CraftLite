@@ -86,6 +86,10 @@ export const BLOCK_LOOT: Record<string, LootEntry> = {
   // linha aqui quebrá-la não daria nada — e uma porta quebrada pelo topo
   // sumiria do mundo.
   oak_door_top: { drops: [{ item: 'oak_door', count: 1 }] },
+  birch_door_top: { drops: [{ item: 'birch_door', count: 1 }] },
+  spruce_door_top: { drops: [{ item: 'spruce_door', count: 1 }] },
+  // Fornalha quebrada enquanto queima continua sendo uma fornalha.
+  furnace_lit: { drops: [{ item: 'furnace', count: 1 }] },
   bed_head: { drops: [{ item: 'bed', count: 1 }] },
 
   // Nether (M7).

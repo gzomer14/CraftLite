@@ -5,7 +5,7 @@
  * que o loop de sobrevivência inteiro possa ser testado sem GL nem DOM.
  */
 
-import { AIR, blockIdOf, defOf, makeState } from '../data/blocks';
+import { AIR, BLOCK_BY_NAME, blockIdOf, defOf, makeState, stateBitsOf } from '../data/blocks';
 import { ITEM_BY_NAME, itemDef, stackTool, type ItemStack } from '../data/items';
 import { blockSound } from '../audio/synth';
 import { MOB_BY_NAME, mobDef } from '../data/mobs';
@@ -62,6 +62,9 @@ import type { World } from '../world/world';
 
 const CRAFTING_TABLE = ITEM_BY_NAME.get('crafting_table')?.id ?? -1;
 const FURNACE = ITEM_BY_NAME.get('furnace')?.id ?? -1;
+/** Os dois ids de **bloco** da fornalha: apagada e acesa (M8). */
+const FURNACE_BLOCK = BLOCK_BY_NAME.get('furnace')?.id ?? -1;
+const FURNACE_LIT = BLOCK_BY_NAME.get('furnace_lit')?.id ?? -1;
 const CHEST = ITEM_BY_NAME.get('chest')?.id ?? -1;
 /** Deslocamento até a outra folha da porta, reusado — não aloca por clique. */
 const DOOR_PARTNER = new Int8Array(3);
@@ -571,8 +574,32 @@ export class Session {
 
   private tickFurnaces(): void {
     for (const container of this.containers.values()) {
-      if (container instanceof Furnace) container.tick();
+      if (!(container instanceof Furnace)) continue;
+      container.tick();
+      this.syncFurnaceBlock(container);
     }
+  }
+
+  /**
+   * A boca da fornalha acende enquanto ela queima (M8).
+   *
+   * São dois ids de bloco, como a lâmpada de redstone: a emissão de luz é
+   * coluna da tabela indexada por id. Trocar o bloco **precisa** avisar a luz,
+   * senão a fornalha acende na textura e a caverna em volta continua escura.
+   *
+   * A troca só acontece quando o estado muda de verdade — uma fornalha
+   * queimando por 80 ticks escreve um voxel, não oitenta.
+   */
+  private syncFurnaceBlock(furnace: Furnace): void {
+    const { x, y, z } = furnace;
+    const current = this.world.getBlock(x, y, z);
+    const id = blockIdOf(current);
+    if (id !== FURNACE_BLOCK && id !== FURNACE_LIT) return;
+    const wanted = furnace.isLit ? FURNACE_LIT : FURNACE_BLOCK;
+    if (id === wanted) return;
+    const next = makeState(wanted, stateBitsOf(current));
+    if (!this.world.setBlock(x, y, z, next, 'physics')) return;
+    this.lighting.onBlockChanged(x, y, z, current, next);
   }
 
   /** Dano de queda, chamado quando o jogador encosta no chão. */
@@ -1395,7 +1422,7 @@ export class Session {
 
   /** Cria o tile entity quando um baú ou fornalha é colocado. */
   private createContainerAt(x: number, y: number, z: number, blockId: number): void {
-    if (blockId === FURNACE) {
+    if (blockId === FURNACE || blockId === FURNACE_LIT) {
       this.containers.set(positionKey(x, y, z), new Furnace(x, y, z));
     } else if (blockId === CHEST) {
       this.containers.set(positionKey(x, y, z), new Container('chest', CHEST_SLOTS, x, y, z));
@@ -1429,9 +1456,9 @@ export class Session {
       this.setScreen('enchanting', this.enchantTable);
       return true;
     }
-    if (id === FURNACE || id === CHEST) {
+    if (id === FURNACE || id === FURNACE_LIT || id === CHEST) {
       const container = this.containerAtOrCreate(x, y, z, id);
-      if (id === FURNACE) {
+      if (id === FURNACE || id === FURNACE_LIT) {
         this.setScreen('furnace', container);
         return true;
       }
@@ -1448,7 +1475,7 @@ export class Session {
     const key = positionKey(x, y, z);
     let container = this.containers.get(key);
     if (container === undefined) {
-      container = blockId === FURNACE
+      container = blockId === FURNACE || blockId === FURNACE_LIT
         ? new Furnace(x, y, z)
         : new Container('chest', CHEST_SLOTS, x, y, z);
       this.containers.set(key, container);

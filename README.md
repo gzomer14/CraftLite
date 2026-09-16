@@ -83,6 +83,11 @@ aparelho o que foi entregue depois do M7.**
   **contorno do bloco mirado do tamanho da peça**. Blocos de duas células são uma linha na tabela:
   quem garante que as duas metades morrem juntas mora no `setBlock`, então vale para o creeper, o
   fogo e o pistão sem nenhum deles saber que porta tem duas metades.
+  Na segunda passada do marco vieram o **vidro** — que não estava fosco, estava **invisível**: a
+  textura tinha alfa 0,28 e o passe recortado descarta tudo abaixo de 0,5, então nenhum pixel dela
+  chegava à tela —, a **escada de mão**, que era decoração e agora se escala, o **baú** com corpo,
+  tampa e tranca, a **fornalha** que acende a boca e ilumina em volta enquanto queima, e a **porta**
+  nas outras madeiras.
 - **Controle:** DualSense, DualShock 4, Xbox e Switch Pro reconhecidos por fabricante/produto —
   o que muda entre eles é sobretudo o **nome do botão**, e o jogo passa a dizer `✕ ○ □ △` a quem
   segura um controle da Sony. Mapeamento completo do doc 09 §3, e **os menus navegáveis por
@@ -96,7 +101,7 @@ Abre em **4,5 s em 3G rápido** (critério: < 5 s) e aguentou **92 min de voo co
 erro**, com o heap estável e o anel de chunks fixo em 489 colunas ao longo de 67 mil blocos — os
 dois medidos por `npm run slow-network` e `npm run soak`, que dirigem um Chrome de verdade.
 
-**196 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
+**198 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
 além de dois ícones de PWA de 6,7 KB, gerados por código.
 
 Validado em aparelho alvo (**Galaxy J7 Metal**, Android 7, 2 GB, Mali-T830) em 2026-09-12:
@@ -109,7 +114,7 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 1473 testes (vitest)
+npm test           # 1672 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
 npm run icons      # regenera os ícones do PWA
@@ -187,7 +192,7 @@ src/
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      1473 testes, incluindo orçamento de performance e de luz
+tests/                      1672 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios

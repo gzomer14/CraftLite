@@ -15,7 +15,7 @@ export type BlockShape =
   | 'cube' | 'cross' | 'slab' | 'stairs' | 'fence' | 'fence_gate' | 'door' | 'trapdoor'
   | 'torch' | 'carpet' | 'flat' | 'liquid' | 'pane' | 'ladder' | 'sign' | 'painting'
   | 'lever' | 'button' | 'plate' | 'repeater' | 'piston' | 'piston_head' | 'rail' | 'bed'
-  | 'none';
+  | 'chest' | 'none';
 
 /**
  * De que o bloco precisa para continuar existindo (M7).
@@ -91,6 +91,15 @@ export interface BlockDef {
   /** Duas células em vez de uma (M8). `null` = bloco comum. */
   multi: MultiSpec | null;
   /**
+   * O jogador sobe por ele (M8).
+   *
+   * É campo e não `shape === 'ladder'` porque a propriedade é de **física**,
+   * não de desenho: trepadeira e corrente, quando existirem, sobem sem terem
+   * a forma de escada, e a física não deve aprender a lista de formas que
+   * calham de dar para escalar.
+   */
+  climbable: boolean;
+  /**
    * Desenhado no passe translúcido, com mistura alfa (M7).
    *
    * Até o M6 só a água era translúcida, e `mesh/blockinfo.ts` a reconhecia pelo
@@ -124,6 +133,7 @@ const DEFAULTS: Omit<BlockDef, 'id' | 'name' | 'display'> = {
   itemless: false,
   support: 'none',
   multi: null,
+  climbable: false,
   translucent: false,
 };
 
@@ -245,7 +255,9 @@ const SPECS: BlockSpec[] = [
     tex: { top: 'block/crafting_table_top', side: 'block/crafting_table_side', bottom: 'block/oak_planks' } },
   { id: 53, name: 'furnace', display: 'Fornalha', hardness: 3.5, ...rock(),
     tex: { top: 'block/furnace_side', side: 'block/furnace_side', bottom: 'block/furnace_side' } },
+  // Forma de baú desde o M8: caixa, tampa e tranca, menor que o bloco.
   { id: 54, name: 'chest', display: 'Baú', hardness: 2.5, ...wood(), opaque: false,
+    shape: 'chest', lightAttenuation: 0,
     tex: { top: 'block/chest_top', side: 'block/chest_side', bottom: 'block/chest_top' } },
   // A tocha gruda no chão ou na parede (`support: 'mount'`), como alavanca e
   // botão: quem mina o apoio derruba a tocha.
@@ -259,7 +271,8 @@ const SPECS: BlockSpec[] = [
     emission: 15, tool: 'pickaxe', sound: 'glass' },
   { id: 58, name: 'bookshelf', display: 'Estante', tex: 'block/bookshelf', hardness: 1.5, ...wood() },
   { id: 59, name: 'ladder', display: 'Escada de Mão', tex: 'block/ladder', shape: 'ladder',
-    hardness: 0.4, solid: false, opaque: false, lightAttenuation: 0, ...wood() },
+    hardness: 0.4, solid: false, opaque: false, lightAttenuation: 0, climbable: true,
+    ...wood() },
   { id: 60, name: 'oak_door', display: 'Porta de Carvalho', tex: 'block/oak_door', shape: 'door',
     hardness: 3, opaque: false, lightAttenuation: 0, ...wood(),
     multi: { other: 'oak_door_top', at: 'above', root: true } },
@@ -563,7 +576,54 @@ SPECS.push(
     opaque: false, lightAttenuation: 0, sound: 'cloth', itemless: true,
     tex: { top: 'block/bed_top', side: 'block/bed_side', bottom: 'block/bed_side' },
     multi: { other: 'bed', at: 'facing', root: false } },
+  /*
+   * Fornalha acesa (M8): o **mesmo** truque da lâmpada de redstone, dois ids em
+   * vez de um bit de estado. A emissão de luz é coluna da tabela indexada por
+   * id, e é ela que o flood fill de `world/lighting.ts` lê — um bit de estado
+   * não chegaria lá sem espalhar estado por todo o caminho da luz.
+   *
+   * Emissão 13, um a menos que a tocha: a boca da fornalha ilumina a oficina,
+   * mas quem quer iluminar um corredor continua precisando de tocha.
+   */
+  { id: 128, name: 'furnace_lit', display: 'Fornalha', hardness: 3.5, ...rock(),
+    emission: 13, itemless: true,
+    tex: { top: 'block/furnace_side', side: 'block/furnace_lit', bottom: 'block/furnace_side' } },
 );
+
+/**
+ * Portas das outras madeiras (M8).
+ *
+ * Elas **não** entram em `BUILD_PARTS` com escada, laje e cerca, por mais que
+ * seja ali que pareçam pertencer: aquela lista é percorrida por material, e uma
+ * peça nova no meio empurraria o id de tudo que vem depois — e id vai para o
+ * save. Ids novos no fim custam quatro linhas e não mexem em mundo nenhum.
+ *
+ * Cada porta são **dois** blocos, a folha de baixo e a de cima, como a de
+ * carvalho (ver `MultiSpec`).
+ */
+function doorSpecs(): BlockSpec[] {
+  const out: BlockSpec[] = [];
+  let id = 129;
+  for (const material of BUILD_MATERIALS) {
+    if (!material.wood || material.name === 'oak') continue;
+    const name = `${material.name}_door`;
+    out.push({
+      id: id++, name, display: `Porta de ${material.display}`, shape: 'door',
+      tex: `block/${name}`, hardness: 3, opaque: false, lightAttenuation: 0,
+      tool: 'axe', sound: 'wood', flammable: 5,
+      multi: { other: `${name}_top`, at: 'above', root: true },
+    });
+    out.push({
+      id: id++, name: `${name}_top`, display: `Porta de ${material.display}`, shape: 'door',
+      tex: `block/${name}_top`, hardness: 3, opaque: false, lightAttenuation: 0,
+      tool: 'axe', sound: 'wood', flammable: 5, itemless: true,
+      multi: { other: name, at: 'below', root: false },
+    });
+  }
+  return out;
+}
+
+SPECS.push(...doorSpecs());
 
 /** Tabela final, indexada por id. Buracos ficam como `undefined`. */
 export const BLOCKS: readonly BlockDef[] = buildTable();

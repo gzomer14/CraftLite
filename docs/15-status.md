@@ -9,8 +9,8 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-16 10:10 — **M8: o que fazia tudo parecer chapado era um bit de
-posição**
+**Última atualização:** 2026-09-16 14:40 — **M8 em andamento: o vidro não estava fosco, não estava
+lá; e a escada de mão não escalava**
 
 ---
 
@@ -35,7 +35,7 @@ posição**
 | **HUD** | coxa de frango desenhada no lugar do retângulo da fome; vida, ar, fome e armadura somem no Criativo | ✅ concluído | — |
 | **Câmera** | rotação lida por quadro desenhado, não no tick de 20 Hz | ✅ concluído | — |
 | **Toque, Modo A** | dedo que girou a câmera deixa de ser candidato a quebrar | ✅ concluído | — |
-| **M8** Presença dos objetos | vértice em 1/16 de bloco, tocha de verdade, porta e cama de duas células, item na mão com volume, contorno do tamanho da forma | ✅ concluído | **nada disso foi visto em aparelho ainda** |
+| **M8** Presença dos objetos | vértice em 1/16 de bloco, tocha de verdade, porta e cama de duas células, item na mão com volume, contorno do tamanho da forma, vidro visível, escada que escala, baú e fornalha acesa | 🚧 em andamento | placa com texto e quadro com arte; **nada disso foi visto em aparelho ainda** |
 
 **O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
 ele irá pesar muito o jogo e trazer muita complexidade por enquanto desnecessária"*. O
@@ -48,14 +48,14 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-16 10:05, com `npm test`, `npm run build` e
+Medidas em 2026-09-16 14:35, com `npm test`, `npm run build` e
 `SIZE_BUDGET_KB=350 npm run size`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **196,7 KB** | < 350 KB | `npm run size` |
-| Testes | **1473**, 82 arquivos | manter verde | `npm test` |
-| Camadas de atlas | **162** | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
+| Bundle (gzip, tudo) | **198,3 KB** | < 350 KB | `npm run size` |
+| Testes | **1672**, 84 arquivos | manter verde | `npm test` |
+| Camadas de atlas | **167** | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Memória de áudio | **3,26 MB** (era 3,95 com três sons a menos) | < 3,5 MB | `tests/audio.test.ts` |
 | Geração de chunk | 5,7–6,2 ms (mediana; varia muito com a carga da máquina) | < 25 ms | `tests/perf.test.ts` |
 | Geração de chunk do Nether | 5,1 ms (mediana; 3,8 antes de a luz entrar) | < 25 ms | `tests/perf.test.ts` |
@@ -1151,7 +1151,34 @@ existe porta de dois blocos. O comentário de `game/sleep.ts` que chamava a cama
 por section e com um teto próprio de 2 ms em `tests/perf.test.ts`. Encher a section inteira é
 impossível: tocha precisa de apoio.
 
-**Pendência:** nada disto foi visto num aparelho. Ver §6.
+#### Segunda passada (2026-09-16, tarde)
+
+**O vidro não estava fosco: ele não estava lá.** A receita pintava o ladrilho inteiro com
+`alpha: 0.28` e o vidro é desenhado no passe **recortado**, cujo shader descarta tudo abaixo de
+0,5 — **zero pixels** sobreviviam. Uma janela colocada não deixava rastro na tela e o slot parecia
+vazio. Virou moldura de 1 px mais duas riscas de reflexo, com o miolo em alfa zero: 29% de desenho,
+71% de buraco de verdade. Não foi para o passe translúcido de propósito — lá o desenho é ordenado
+de trás para frente e não escreve profundidade, e vidro é o bloco que se empilha em parede inteira.
+
+**A escada de mão não escalava.** Procurando o que mais estava chapado apareceu um buraco maior que
+o visual: não havia uma linha sobre escalar em lugar nenhum, e o jogador atravessava a escada como
+se fosse ar. Agora sobe a 0,2 por tick, desce controlada a 0,15 e **agachar segura no lugar**; o
+campo é `climbable` na tabela de blocos, porque a propriedade é de física e não de forma. O
+**auto-step** precisou ser desligado na escada: ele levantava o corpo, tentava andar e devolvia a
+altura no fim, apagando a subida do tick inteiro.
+
+| Peça | Era | Ficou |
+|---|---|---|
+| **Vidro** | invisível no mundo e no slot | moldura e reflexo, ainda vazado |
+| **Escada de mão** | chapa de 3/16 com textura vazada, e **decoração** | dois montantes e três degraus, e sobe-se por ela |
+| **Baú** | cubo inteiro | corpo, tampa e tranca, com folga de 1/16 em volta |
+| **Fornalha** | queimava sem dar sinal | dois ids como a lâmpada; acesa tem emissão 13 e boca em brasa |
+| **Porta** | só carvalho, e `#planks` genérico dava carvalho com tábua de bétula | bétula e pinheiro, com receita por material |
+
+**Pendência:** nada disto foi visto num aparelho. Ver §6. O que resta do marco está no
+[doc 14](14-roadmap.md): placa com texto, quadro com arte, cama em outras cores (depende de haver
+outras lãs) e a tampa do baú que abre — esta última exige rotação, que a geometria de caixas
+alinhadas aos eixos não representa.
 
 ---
 
@@ -1162,6 +1189,10 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-16 | `data/textures.ts` | **O vidro era invisível.** A receita pintava o ladrilho inteiro com `alpha: 0.28`, e o vidro é desenhado no passe recortado, cujo shader faz `discard` abaixo de 0,5: **zero pixels** passavam. Uma janela colocada não deixava rastro na tela e o slot do inventário parecia vazio — o jogador não tinha como saber que havia vidro ali. Virou moldura opaca com reflexo em diagonal e miolo vazado. O teste que entrou cobre a classe do bug, não o caso: todo bloco dos passes opaco e recortado precisa de pixel acima do corte. |
+| 2026-09-16 | `entity/player.ts`, `data/blocks.ts` | **A escada de mão não escalava.** Ela existia desde o M6 e não havia uma linha de código sobre escalar: o jogador atravessava como se fosse ar. Não era desvio consciente, era buraco. Entrou `climbable` na tabela — campo de física, não de forma — com subida a 0,2/tick, descida controlada a 0,15 e agachar segurando no lugar. |
+| 2026-09-16 | `entity/player.ts` | **O auto-step apagava a subida da escada.** Ele existe para vencer um degrau quando o horizontal trava, e na escada o horizontal trava sempre: levantava o corpo, tentava andar e **devolvia a altura** no fim. Empurrar para a frente na escada não saía do lugar. Na escada quem sobe é a escada. |
+| 2026-09-16 | `data/recipes.ts` | **Seis tábuas de bétula davam uma porta de carvalho.** A receita de porta era `#planks` genérica, herdada de quando só existia uma porta. Virou receita por material, junto com escada, laje e cerca. |
 | 2026-09-16 | `render/vertex.ts`, `render/mesh.ts`, `render/shaders/terrain.glsl.ts` | **Toda caixa mais fina que meio bloco colapsava.** A posição do vértice era guardada em meios-blocos (6 bits por eixo), então `Math.round(x * 2)` achatava tudo: poste de cerca (2/16) e grade (1/16) **desapareciam** — uma cerca isolada não tinha geometria nenhuma —, porta, alçapão, placa e quadro (3/16) viravam planos de espessura zero, botão, alavanca e repetidor idem, e o levantamento de 1/16 do trilho virava zero, deixando ele brigando com o chão no Z. Era um bug do M1 que ninguém tinha nomeado, porque de longe um plano com a textura certa parece a peça. A precisão foi para **1/16 de bloco** sem sair dos 8 bytes por vértice. Relato do usuário que levou até ele: *"as texturas chapadas das ferramentas"*. |
 | 2026-09-16 | `world/mesh/complex.ts` | **Toda face de toda caixa usava a textura de lado.** O topo de uma laje, de uma escada ou da cama saía com o desenho da lateral. Não aparecia porque os materiais de laje e escada do jogo têm as seis faces iguais — apareceria na primeira laje de grama. |
 | 2026-09-16 | `world/redstone.ts` | **Bloco que exige apoio e não é de redstone nunca era conferido.** A fila só aceitava quem tinha papel no circuito, então `dropUnsupported` — que existe desde o M7 e está certo — nunca era chamada para **trilho comum**: minerar o bloco de baixo deixava o trilho flutuando. A tocha entrou no mesmo caso ao ganhar encaixe, e a correção vale para as duas. |
@@ -1378,7 +1409,13 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      `render/hand.ts`;
    - **o contorno branco**: mirar uma laje, uma tocha e uma escada. O contorno é do tamanho da
      peça, não mais um cubo;
-   - **uma aldeia**, se aparecer: tocha na parede, cama deitada para dentro, porta com duas folhas.
+   - **uma aldeia**, se aparecer: tocha na parede, cama deitada para dentro, porta com duas folhas;
+   - **uma janela de vidro**, de perto e de longe: a moldura tem que aparecer e o miolo tem que
+     continuar sendo buraco. Duas vidraças lado a lado formam grade, que é o desenho certo;
+   - **um poço com escada de mão**: descer, subir empurrando para a frente, parar no meio agachado.
+     Se a subida parecer lenta ou rápida demais, o número é `CLIMB_SPEED` em `entity/player.ts`;
+   - **um baú e uma fornalha**: o baú agora é menor que o bloco e tem tranca; a fornalha acende a
+     boca **e ilumina em volta** enquanto queima.
 2. **Reconferir os menus com o controle**, que é o que mudou mais na passada anterior:
    - **o foco tem que aparecer.** Empurrar o direcional numa tela precisa acender um anel amarelo
      no item escolhido. Se ele não acender, nada mais dessa lista importa — era essa a causa de

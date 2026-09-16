@@ -48,6 +48,8 @@ export const SHAPE_RAIL = 20;
 export const SHAPE_TORCH = 21;
 /** Colchão com pés: metade da cama (doc 04 §3). */
 export const SHAPE_BED = 22;
+/** Caixa com tampa e tranca: o baú (doc 04 §3). */
+export const SHAPE_CHEST = 23;
 
 /**
  * Formas de trilho nos bits 0..3 do estado (M7), na codificação do gênero.
@@ -124,6 +126,7 @@ export const SHAPE_BY_NAME: Readonly<Record<string, number>> = {
   cross: SHAPE_CROSS,
   torch: SHAPE_TORCH,
   bed: SHAPE_BED,
+  chest: SHAPE_CHEST,
   slab: SHAPE_SLAB,
   carpet: SHAPE_CARPET,
   flat: SHAPE_FLAT,
@@ -235,7 +238,7 @@ export function boxesFor(
     case SHAPE_DOOR:
       return door(state, out);
     case SHAPE_LADDER:
-      return wallPlate(state & 3, out, 0, 1);
+      return ladder(state, out);
     case SHAPE_SIGN:
       return sign(state, out);
     case SHAPE_PAINTING:
@@ -257,6 +260,8 @@ export function boxesFor(
       return torchBox(state, out);
     case SHAPE_BED:
       return bed(state, out);
+    case SHAPE_CHEST:
+      return chest(out);
     case SHAPE_RAIL:
       // O desenho é um quad só (ver `mesh/complex.ts`); a caixa existe para
       // quem pergunta pela forma — hoje ninguém, porque trilho não colide.
@@ -499,6 +504,39 @@ function door(state: number, out: Float32Array): number {
 const ROTATE_CW: readonly number[] = [2, 3, 1, 0];
 
 /**
+ * Escada de mão: dois montantes e três degraus (M8).
+ *
+ * Era uma **chapa** de 3/16 com a textura vazada — de frente passava, de lado
+ * era uma folha de papel com desenho de escada. Agora é a peça de marcenaria
+ * que ela é, e cabe em cinco caixas, que é o teto de `MAX_BOXES`.
+ *
+ * Os degraus ficam 1/16 recuados em relação aos montantes: é essa sombra entre
+ * as peças que faz o olho ler "degrau" em vez de "listra".
+ *
+ * `state & 3` é a parede em que ela está pendurada, na mesma codificação de
+ * encaixe de alavanca e botão — por isso a geometria sai toda de `mounted`.
+ */
+const LADDER_DEPTH = 3 / 16;
+const LADDER_RAIL = 2 / 16;
+/** Alturas dos degraus, medidas da base do bloco. */
+const LADDER_RUNGS: readonly number[] = [2 / 16, 7 / 16, 12 / 16];
+
+function ladder(state: number, out: Float32Array): number {
+  const face = state & 3;
+  let count = mounted(out, 0, face, 1 / 16, 0, 0, 1 / 16 + LADDER_RAIL, 1, LADDER_DEPTH);
+  count = mounted(
+    out, count, face, 15 / 16 - LADDER_RAIL, 0, 0, 15 / 16, 1, LADDER_DEPTH,
+  );
+  for (let i = 0; i < LADDER_RUNGS.length; i++) {
+    const y = LADDER_RUNGS[i];
+    count = mounted(
+      out, count, face, 3 / 16, y, 1 / 16, 13 / 16, y + 2 / 16, LADDER_DEPTH - 1 / 16,
+    );
+  }
+  return count;
+}
+
+/**
  * Placa: poste central baixo mais a tábua na altura dos olhos.
  * bits 0–1 = para onde a face escrita aponta.
  */
@@ -596,6 +634,40 @@ function bed(state: number, out: Float32Array): number {
     count = one(out, count, 0, 0, z0, s, BED_LEG, z0 + s);
     count = one(out, count, 1 - s, 0, z0, 1, BED_LEG, z0 + s);
   }
+  return count;
+}
+
+/**
+ * Baú: caixa, tampa e tranca (M8).
+ *
+ * Era um cubo inteiro — encostado noutro cubo qualquer, a única coisa que o
+ * distinguia era a textura. O baú do gênero é **menor que o bloco**: sobra
+ * 1/16 em volta, e é essa folga que o faz parecer um móvel pousado no chão em
+ * vez de parte da parede.
+ *
+ * Três caixas: o corpo até 10/16, a tampa dali até 14/16, e a tranca saindo da
+ * frente. A divisa entre corpo e tampa é onde o olho procura a dobradiça.
+ *
+ * **Desvio consciente:** a tampa não abre. Abrir de verdade é girar uma caixa
+ * em torno da dobradiça, e a geometria deste jogo é de caixas **alinhadas aos
+ * eixos** (doc 04 §3) — não há como representar rotação sem um segundo formato
+ * de vértice. O que o jogador ganha é a forma; o que ele perde é a animação,
+ * que nunca existiu.
+ */
+const CHEST_MARGIN = 1 / 16;
+const CHEST_BODY_TOP = 10 / 16;
+const CHEST_TOP = 14 / 16;
+
+function chest(out: Float32Array): number {
+  const a = CHEST_MARGIN;
+  const b = 1 - CHEST_MARGIN;
+  let count = one(out, 0, a, 0, a, b, CHEST_BODY_TOP, b);
+  count = one(out, count, a, CHEST_BODY_TOP, a, b, CHEST_TOP, b);
+  // Tranca: uma pastilha saindo da face −Z, na divisa das duas peças.
+  count = one(
+    out, count, 7 / 16, CHEST_BODY_TOP - 2 / 16, a - 1 / 16,
+    9 / 16, CHEST_BODY_TOP + 2 / 16, a,
+  );
   return count;
 }
 

@@ -84,6 +84,36 @@ describe('tabela de duas células', () => {
   });
 });
 
+/*
+ * As portas das outras madeiras entraram no M8 com ids no fim da tabela, para
+ * não empurrar o id de nada. O que precisa valer para elas é o mesmo que vale
+ * para a de carvalho — inclusive o par apontando um para o outro.
+ */
+describe('portas das outras madeiras', () => {
+  for (const wood of ['birch', 'spruce']) {
+    it(`${wood}: as duas folhas se acham`, () => {
+      const base = BLOCK_BY_NAME.get(`${wood}_door`)!;
+      const top = BLOCK_BY_NAME.get(`${wood}_door_top`)!;
+      expect(isMultiRoot(base.id)).toBe(true);
+      expect(isMultiRoot(top.id)).toBe(false);
+      expect(partnerIdOf(base.id)).toBe(top.id);
+      expect(partnerIdOf(top.id)).toBe(base.id);
+      // A de cima não é item: quem dropa é a receita de `data/loot.ts`.
+      expect(top.itemless).toBe(true);
+    });
+
+    it(`${wood}: colocar escreve as duas células e quebrar leva as duas`, () => {
+      const world = flatWorld();
+      attachMultiBlocks(world);
+      const base = BLOCK_BY_NAME.get(`${wood}_door`)!.id;
+      expect(placeMulti(world, 6, 64, 6, makeState(base, 2), free(world))).toBe(true);
+      expect(blockIdOf(world.getBlock(6, 65, 6))).toBe(partnerIdOf(base));
+      world.setBlock(6, 65, 6, AIR, 'player');
+      expect(world.getBlock(6, 64, 6)).toBe(AIR);
+    });
+  }
+});
+
 describe('colocar', () => {
   it('a porta ocupa duas células de altura', () => {
     const world = flatWorld();

@@ -78,6 +78,9 @@ function buildingSet(material: string, base: string, wood: boolean): Recipe[] {
       { type: 'shaped', pattern: ['BSB', 'BSB'], key, result: { item: `${material}_fence`, count: 3 } },
       { type: 'shaped', pattern: ['SBS', 'SBS'], key, result: { item: `${material}_fence_gate`, count: 1 } },
       { type: 'shaped', pattern: ['BBB', 'BBB'], key, result: { item: `${material}_trapdoor`, count: 2 } },
+      // A porta saiu da receita genérica de `#planks` e virou por material: com
+      // as duas no ar, seis tábuas de bétula davam uma porta de carvalho.
+      { type: 'shaped', pattern: ['BB', 'BB', 'BB'], key, result: { item: `${material}_door`, count: 3 } },
     );
   }
   return out;
@@ -106,7 +109,6 @@ export const RECIPES: readonly Recipe[] = [
   { type: 'shaped', pattern: ['SS', 'SS'], key: { S: 'stone' }, result: { item: 'stone_bricks', count: 4 } },
   { type: 'shaped', pattern: ['CCC'], key: { C: 'cobblestone' }, result: { item: 'cobblestone_slab', count: 6 } },
   { type: 'shaped', pattern: ['PSP', 'PSP'], key: { P: '#planks', S: 'stick' }, result: { item: 'oak_fence', count: 3 } },
-  { type: 'shaped', pattern: ['PP', 'PP', 'PP'], key: { P: '#planks' }, result: { item: 'oak_door', count: 3 } },
   { type: 'shaped', pattern: ['SSS'], key: { S: 'sugar_cane' }, result: { item: 'paper', count: 3 } },
   { type: 'shapeless', ingredients: ['paper', 'paper', 'paper', 'leather'], result: { item: 'book', count: 1 } },
   { type: 'shaped', pattern: ['PPP', 'BBB', 'PPP'], key: { P: '#planks', B: 'book' }, result: { item: 'bookshelf', count: 1 } },

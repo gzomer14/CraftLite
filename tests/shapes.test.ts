@@ -10,7 +10,7 @@ import {
   BOX_STRIDE, FENCE_COLLISION_HEIGHT, MAX_BOXES, MOUNT_CEILING, MOUNT_FLOOR, SHAPE_BUTTON,
   SHAPE_BY_NAME, SHAPE_DOOR, SHAPE_FENCE, SHAPE_FENCE_GATE, SHAPE_FLAT, SHAPE_LEVER,
   SHAPE_PISTON, SHAPE_PISTON_HEAD, SHAPE_PLATE, SHAPE_REPEATER, SHAPE_SLAB, SHAPE_STAIRS,
-  SHAPE_TRAPDOOR, SHAPE_BED, SHAPE_TORCH, TORCH_FLOOR_TOP, BED_HEIGHT,
+  SHAPE_TRAPDOOR, SHAPE_BED, SHAPE_CHEST, SHAPE_TORCH, TORCH_FLOOR_TOP, BED_HEIGHT,
   boxesFor, boundsFor, collisionBoxesFor, mountForDir,
 } from '../src/world/mesh/shapes';
 import { BLOCKS, BLOCK_BY_NAME, makeState } from '../src/data/blocks';
@@ -325,5 +325,40 @@ describe('envolvente da forma', () => {
     boundsFor(SHAPE_FENCE, 0, bounds);
     expect(bounds[0]).toBe(0);
     expect(bounds[3]).toBe(1);
+  });
+});
+
+/*
+ * O baú era um cubo inteiro: encostado noutro cubo, só a textura o distinguia.
+ * A folga em volta é o que faz dele um móvel pousado no chão.
+ */
+describe('baú', () => {
+  it('é corpo, tampa e tranca', () => {
+    expect(boxesFor(SHAPE_CHEST, 0, 0, out)).toBe(3);
+  });
+
+  it('sobra folga em volta: ele é menor que o bloco', () => {
+    boxesFor(SHAPE_CHEST, 0, 0, out);
+    const corpo = box(0);
+    expect(corpo[0]).toBeCloseTo(1 / 16, 6);
+    expect(corpo[3]).toBeCloseTo(15 / 16, 6);
+    expect(corpo[2]).toBeCloseTo(1 / 16, 6);
+    expect(corpo[5]).toBeCloseTo(15 / 16, 6);
+  });
+
+  it('a tampa senta em cima do corpo, sem vão nem sobreposição', () => {
+    boxesFor(SHAPE_CHEST, 0, 0, out);
+    expect(box(1)[1]).toBeCloseTo(box(0)[4], 6);
+  });
+
+  it('a tranca sai para fora da face da frente', () => {
+    boxesFor(SHAPE_CHEST, 0, 0, out);
+    expect(box(2)[2]).toBeLessThan(box(0)[2]);
+  });
+
+  it('não chega ao teto do bloco: dá para pôr uma laje em cima sem encostar', () => {
+    const bounds = new Float32Array(6);
+    boundsFor(SHAPE_CHEST, 0, bounds);
+    expect(bounds[4]).toBeCloseTo(14 / 16, 6);
   });
 });

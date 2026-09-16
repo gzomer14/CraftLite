@@ -62,6 +62,43 @@ function dustCross(color: Rgb): TexOp {
   };
 }
 
+/**
+ * Portas das outras madeiras (M8): a mesma marcenaria do carvalho, sobre a
+ * tábua de cada uma. Escrever à mão seria copiar o mesmo bloco de `ops` três
+ * vezes e deixar as três divergirem na primeira mudança.
+ */
+function doorOps(top: boolean): TexOp[] {
+  if (top) {
+    return [
+      tintBy(0.88),
+      outline(0, 0, 16, 16, [82, 64, 36]),
+      rect(2, 2, 12, 9, [150, 124, 72], 0.6),
+      outline(2, 2, 12, 9, [86, 68, 38]),
+      rect(1, 12, 14, 2, [118, 96, 54]),
+      rect(11, 13, 3, 2, IRON_LIGHT),
+      dither(0.04),
+    ];
+  }
+  return [
+    tintBy(0.88),
+    outline(0, 0, 16, 16, [82, 64, 36]),
+    rect(2, 4, 12, 10, [150, 124, 72], 0.6),
+    outline(2, 4, 12, 10, [86, 68, 38]),
+    rect(11, 1, 3, 2, IRON_LIGHT),
+    rect(11, 1, 3, 1, [196, 196, 204], 0.7),
+    dither(0.04),
+  ];
+}
+
+function woodDoorTextures(): Record<string, TexRecipe> {
+  const out: Record<string, TexRecipe> = {};
+  for (const wood of ['birch', 'spruce']) {
+    out[`block/${wood}_door`] = { inherit: `block/${wood}_planks`, ops: doorOps(false) };
+    out[`block/${wood}_door_top`] = { inherit: `block/${wood}_planks`, ops: doorOps(true) };
+  }
+  return out;
+}
+
 /** Uma receita de pó por nível de brilho. */
 function dustTextures(): Record<string, TexRecipe> {
   const cores: Rgb[] = [[72, 14, 14], [132, 26, 24], [186, 38, 32], [244, 68, 52]];
@@ -327,6 +364,23 @@ export const TEXTURES: Record<string, TexRecipe> = {
       dither(0.05),
     ],
   },
+  /*
+   * Fornalha acesa (M8): a mesma pedra, com a boca cheia de brasa.
+   *
+   * A diferença tem que ser visível **de longe e de relance** — é o que diz ao
+   * jogador que a fundição está andando sem ele abrir a tela. Daí a boca
+   * inteira acesa, e não uma fagulha.
+   */
+  'block/furnace_lit': {
+    inherit: 'block/furnace_side',
+    ops: [
+      rect(4, 9, 8, 4, [58, 34, 22]),
+      rect(4, 10, 8, 3, [232, 124, 38]),
+      rect(5, 11, 6, 2, [255, 196, 96]),
+      rect(6, 12, 4, 1, [255, 236, 176]),
+      dither(0.05),
+    ],
+  },
   'block/furnace_front': {
     inherit: 'block/cobblestone',
     ops: [
@@ -371,9 +425,63 @@ export const TEXTURES: Record<string, TexRecipe> = {
       dither(0.05),
     ],
   },
+  /*
+   * Vidro (corrigido no M8): moldura opaca, brilho de canto, miolo vazado.
+   *
+   * **Era invisível.** A receita antiga pintava o ladrilho inteiro com
+   * `alpha: 0.28` e recortava tudo fora da moldura — só que o vidro é desenhado
+   * no passe **recortado**, cujo shader descarta qualquer pixel abaixo de
+   * alfa 0,5. Nenhum pixel passava: uma janela colocada não deixava rastro
+   * nenhum na tela, e no inventário o slot parecia vazio.
+   *
+   * A correção não é "deixar opaco". O que o jogador precisa é **ver através e
+   * saber que há vidro ali**, e quem resolve isso em 16 px é o que a pixel art
+   * sempre fez: uma **moldura** de 1 px e um **reflexo** em diagonal. Tudo o
+   * mais fica com alfa zero, então a janela continua sendo janela — ~80% do
+   * ladrilho é buraco de verdade, não translucidez.
+   *
+   * Vale notar por que não foi para o passe translúcido, que daria um véu
+   * azulado bonito: lá o desenho é ordenado de trás para frente e não escreve
+   * profundidade, e vidro é justamente o bloco que o jogador empilha em parede
+   * inteira. Numa GPU de 2016 isso é preenchimento caro por um ganho que a
+   * moldura já entrega.
+   */
   'block/glass': {
-    base: [222, 238, 244], noise: 'flat', scale: 1, variance: 0, alpha: 0.28,
-    ops: [alphaMask('frame', 0), border([182, 208, 218], 1)],
+    base: [226, 240, 246], noise: 'flat', scale: 1, variance: 0, alpha: 0,
+    ops: [
+      // Moldura: as quatro bordas do ladrilho, opacas.
+      (c) => {
+        for (let y = 0; y < 16; y++) {
+          for (let x = 0; x < 16; x++) {
+            if (x !== 0 && y !== 0 && x !== 15 && y !== 15) continue;
+            const o = (y * 16 + x) << 2;
+            const canto = (x === 0 || x === 15) && (y === 0 || y === 15);
+            c.data[o] = canto ? 236 : 196;
+            c.data[o + 1] = canto ? 246 : 222;
+            c.data[o + 2] = canto ? 250 : 232;
+            c.data[o + 3] = 255;
+          }
+        }
+      },
+      // Reflexo: duas riscas na diagonal, como luz batendo na vidraça.
+      (c) => {
+        const risca = (x0: number, y0: number, n: number, cor: Rgb) => {
+          for (let i = 0; i < n; i++) {
+            const x = x0 + i;
+            const y = y0 + i;
+            if (x < 1 || y < 1 || x > 14 || y > 14) continue;
+            const o = (y * 16 + x) << 2;
+            c.data[o] = cor[0];
+            c.data[o + 1] = cor[1];
+            c.data[o + 2] = cor[2];
+            c.data[o + 3] = 255;
+          }
+        };
+        risca(3, 10, 5, [244, 250, 252]);
+        risca(4, 10, 5, [214, 232, 240]);
+        risca(9, 3, 3, [244, 250, 252]);
+      },
+    ],
   },
   'block/glowstone': {
     base: [200, 160, 96], noise: 'cell', scale: 4, variance: 0.2,
@@ -521,6 +629,7 @@ export const TEXTURES: Record<string, TexRecipe> = {
       dither(0.04),
     ],
   },
+  ...woodDoorTextures(),
   'block/oak_door_top': {
     inherit: 'block/oak_planks',
     ops: [
@@ -535,20 +644,19 @@ export const TEXTURES: Record<string, TexRecipe> = {
   },
 
   // --- apoio de estrutura e decoração (M6) --------------------------------
+  /*
+   * Escada de mão (M8): madeira lisa, sem recorte.
+   *
+   * A textura **era** a escada inteira desenhada com o vão vazado, porque a
+   * geometria era uma chapa só. Agora montante e degrau são caixas de verdade
+   * (`world/mesh/shapes.ts`), e cada caixa mostra o ladrilho inteiro espremido
+   * na largura dela — com o recorte antigo, um montante de 2/16 podia calhar
+   * de amostrar o vão e sumir. Aqui é madeira, e quem desenha a escada é a
+   * forma.
+   */
   'block/ladder': {
-    base: [140, 112, 66], noise: 'flat', scale: 1, variance: 0,
-    ops: [
-      (c) => {
-        // Dois montantes e os degraus; o resto é vazado.
-        for (let y = 0; y < 16; y++) {
-          for (let x = 0; x < 16; x++) {
-            const rail = x < 3 || x > 12;
-            const rung = y % 5 < 2;
-            if (!rail && !rung) c.data[((y * 16 + x) << 2) + 3] = 0;
-          }
-        }
-      },
-    ],
+    base: [146, 116, 68], noise: 'grain', scale: 5, variance: 0.12,
+    ops: [border([104, 82, 46], 1), dither(0.04)],
   },
   'block/mossy_cobblestone': {
     inherit: 'block/cobblestone',

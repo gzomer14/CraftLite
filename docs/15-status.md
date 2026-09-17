@@ -9,8 +9,8 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-17 11:44 — **M8 fechado (placa com texto, quadro com arte, oito
-cores e a tampa do baú que abre) e as montanhas deixaram de ser pilares verticais**
+**Última atualização:** 2026-09-17 12:21 — **M8 fechado e validado em aparelho; a placa ganhou uma
+tábua que se lê e um campo de texto só**
 
 ---
 
@@ -35,8 +35,9 @@ cores e a tampa do baú que abre) e as montanhas deixaram de ser pilares vertica
 | **HUD** | coxa de frango desenhada no lugar do retângulo da fome; vida, ar, fome e armadura somem no Criativo | ✅ concluído | — |
 | **Câmera** | rotação lida por quadro desenhado, não no tick de 20 Hz | ✅ concluído | — |
 | **Toque, Modo A** | dedo que girou a câmera deixa de ser candidato a quebrar | ✅ concluído | — |
-| **M8** Presença dos objetos | vértice em 1/16 de bloco, tocha de verdade, porta e cama de duas células, item na mão com volume, contorno do tamanho da forma, vidro visível, escada que escala, baú e fornalha acesa, placa com texto, quadro com arte, oito cores de lã e cama, tampa de baú que abre | ✅ concluído | **nada disso foi visto em aparelho ainda** |
-| **Terreno** pós-M8 | blend 5×5 do `heightOffset` de bioma e teto macio: a parede de 29 blocos entre montanha e planície virou encosta, e o platô chapado em Y=124 virou cordilheira | ✅ concluído | muda o terreno gerado: **mundo antigo ganha costura** (ver §4) |
+| **M8** Presença dos objetos | vértice em 1/16 de bloco, tocha de verdade, porta e cama de duas células, item na mão com volume, contorno do tamanho da forma, vidro visível, escada que escala, baú e fornalha acesa, placa com texto, quadro com arte, oito cores de lã e cama, tampa de baú que abre | ✅ **validado em campo em 2026-09-17** | — |
+| **Terreno** pós-M8 | blend 5×5 do `heightOffset` de bioma e teto macio: a parede de 29 blocos entre montanha e planície virou encosta, e o platô chapado em Y=124 virou cordilheira | ✅ **validado em campo** | muda o terreno gerado: **mundo antigo ganha costura** (ver §4) |
+| **Placa, 2ª passada** | tábua lisa e clara no lugar da tábua de carvalho com rabisco, e um campo de texto só com quebra de linha interpretada | ✅ concluído | — |
 
 **O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
 ele irá pesar muito o jogo e trazer muita complexidade por enquanto desnecessária"*. O
@@ -49,13 +50,13 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-17 11:44, com `npm test`, `npm run build` e
+Medidas em 2026-09-17 12:21, com `npm test`, `npm run build` e
 `SIZE_BUDGET_KB=350 npm run size`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **208,3 KB** (eram 200,9 antes da fonte, dos quadros e das oito cores) | < 350 KB | `npm run size` |
-| Testes | **1812**, 89 arquivos | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **208,8 KB** (eram 200,9 antes da fonte, dos quadros e das oito cores) | < 350 KB | `npm run size` |
+| Testes | **1823**, 89 arquivos | manter verde | `npm test` |
 | Camadas de atlas | **212** (eram 181; +28 de lã e cama coloridas, +3 de quadro) | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Memória de áudio | **3,26 MB** (era 3,95 com três sons a menos) | < 3,5 MB | `tests/audio.test.ts` |
 | Geração de chunk | **6,2 ms** (mediana; o blend de bioma custou ~0,2 ms) | < 25 ms | `tests/perf.test.ts` |
@@ -82,7 +83,7 @@ Medidas em 2026-09-17 11:44, com `npm test`, `npm run build` e
 | Mundo gerado na sessão longa | **67 621 blocos** percorridos, anel estável em 489 colunas | — | `npm run soak` |
 | Abertura em 3G lento | 9,66 s | — | `npm run slow-network` |
 | Abertura sem limite de rede | 2,89 s | — | `npm run slow-network` |
-| Bytes na rede até o título | **178,2 KB** estimados (174,3 KB do bundle, servido em gzip; a medida de campo é de 2026-09-14, com 169,1) | < 350 KB | `npm run slow-network` |
+| Bytes na rede até o título | **178,7 KB** estimados (174,8 KB do bundle, servido em gzip; a medida de campo é de 2026-09-14, com 169,1) | < 350 KB | `npm run slow-network` |
 
 ---
 
@@ -1267,6 +1268,52 @@ save — o bit está no bloco. Ele se conserta sozinho no primeiro uso (abrir e 
 lista de tampas no save para resolver um caso que o jogador desfaz clicando seria pior que o
 sintoma.
 
+
+#### Quinta passada — a placa, depois de ser usada (2026-09-17, tarde)
+
+Os cinco itens do roteiro de aparelho passaram — *"todos os 5 testes passaram perfeitamente"* — e o
+único defeito relatado foi da placa, nos dois lados dela: o que se lê e o que se digita.
+
+**A tábua escondia o texto.** A placa era tábua de carvalho com **três linhas de rabisco** desenhadas
+por cima — a "escrita" ilegível que fazia o olho reconhecer uma placa quando não havia texto de
+verdade. Agora há, e o rabisco virou justamente o ruído que o cobria. Relato: *"por conta de sua
+textura mal dá para visualizar o texto escrito"*.
+
+O erro não era só de tom, era de **agitação**. Medido na área de escrita do ladrilho:
+
+| | Luminância média | Desvio | O que isso faz |
+|---|---|---|---|
+| Tábua de carvalho (era) | 118 | **25,9** | sulco de tábua cortando a letra na horizontal |
+| + rabisco por cima | — | — | pontos escuros do tamanho de um traço de letra |
+| Tinta do texto | 24,8 | — | — |
+| Tábua da placa (é) | **172** | **4,7** | fundo calmo, sem nada do tamanho da letra |
+
+A placa passou a ter textura própria — a única superfície do jogo desenhada para servir de **fundo
+de leitura**: grão de variância baixa, sem `plankLines`, moldura de 1 px e um fio claro por dentro
+dela para dar relevo de tábua aplainada sem pôr linha escura na área escrita.
+
+**Quatro campos era um campo a mais que o necessário.** Relato: *"essa divisão por linhas também
+ficou horrorosa para digitar na placa, não tem como adicionar um único campo de texto, e o próprio
+código interpreta se houve uma quebra de linha"*. Sim: quem escreve pensa em frase, não em linhas.
+
+O editor virou um `<textarea>` e a distribuição virou `wrapSignText`, em `game/signs.ts`, com duas
+regras nesta ordem: **a quebra digitada manda** (um `Enter` é uma linha, e linha vazia continua
+vazia — é assim que se centra uma palavra na terceira linha), e **o que sobra da largura desce por
+palavra**. Palavra maior que a placa é cortada na força, porque não tem para onde descer.
+
+Um detalhe que custou um teste vermelho: a quebra tem de acontecer **antes** da normalização.
+`toFontText` troca por espaço tudo que a fonte não desenha, e `\n` é uma dessas coisas — normalizar
+primeiro apagava exatamente a quebra que o jogador acabara de digitar.
+
+**E o campo não é reescrito enquanto se digita.** Reescrever o texto para a forma quebrada exigiria
+devolver o cursor ao lugar certo a cada tecla, e a quebra por palavra come o espaço do ponto de
+quebra: o cursor pularia. Em vez disso, embaixo do campo há uma **prévia** de quatro linhas com a
+largura exata da placa, na cor da tábua e da tinta. Quem vê a prévia não precisa adivinhar a regra —
+e um aviso aparece quando o que foi digitado não cabe nas quatro linhas.
+
+`Ctrl+Enter` confirma, porque `Enter` sozinho agora é quebra de linha, que é o ponto de ter um campo
+só.
+
 ---
 
 ### Terreno — as montanhas eram pilares verticais ✅ — 2026-09-17
@@ -1338,6 +1385,7 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-17 | `data/textures.ts` | **A textura da placa escondia o texto da placa.** Ela era tábua de carvalho com três linhas de rabisco desenhadas por cima — a "escrita" ilegível que fazia o olho reconhecer uma placa **quando não havia texto de verdade**. Quando passou a haver, o rabisco virou o ruído que o cobria, e o sulco da tábua cortava a letra na horizontal. Não era só tom: a área de escrita tinha desvio de luminância de 25,9 contra uma tinta de 24,8, ou seja, o fundo variava mais que o contraste da letra. Virou textura própria, de média 172 e desvio 4,7 — a única superfície do jogo desenhada para servir de fundo de leitura. Relato: *"por conta de sua textura mal dá para visualizar o texto escrito"*. |
 | 2026-09-17 | `world/gen/heightfield.ts` (era `gen/terrain.ts`) | **O `heightOffset` do bioma entrava em degrau.** Entre montanha (offset 26) e planície (offset 2) o terreno subia **29 blocos em um bloco** de distância, e onde a fronteira se esfarela a parede virava fileira de pilares. O doc 03 §4.3 pede média ponderada 5×5 a cada 4 blocos e diz, com estas palavras, que *"sem isso, aparecem paredes retas entre biomas"* — o código nunca fez isso, e o comentário de `terrain.ts` **afirmava que fazia**: chamava a grade esparsa de ruído de "o blend 5×5 do doc 03 §4.3". Ela suaviza a entrada, não a saída. Relato do usuário: *"as montanhas eram literalmente verticais (…) simplesmente pilares enormes verticais, e vários um do lado do outro"*. |
 | 2026-09-17 | `world/gen/heightfield.ts` | **O teto do mundo achatava as montanhas.** A altura terminava num `clamp` duro em 124 e **54,3% das colunas de montanha** batiam nele: a cordilheira virava um platô liso, com topo chapado e lado vertical, e a faixa de altura de montanha inteira era 118..124. Virou teto macio — uma hipérbole que se aproxima de 124 sem encostar —, e a faixa passou a 90..117, que é o que o doc 03 §4.3 pede. |
 | 2026-09-17 | `world/gen/structures.ts` | **A estrutura era assentada na altura do canto do chunk.** `pickY` pedia `sampleColumn(noise, ox, oz, 0, 0)`, e no caminho de grade os argumentos `ox, oz` eram **ignorados**: a altura devolvida era sempre a do canto `(0,0)` do chunk que estava sendo gerado, não a do lugar da estrutura. Casa de aldeia perto da borda nascia enterrada ou boiando. Agora a altura vem do mesmo campo com margem que o gerador usa. |
@@ -1546,6 +1594,13 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
 para ele ficou vazia. O que resta no roteiro são as duas propostas — **M9 (gente no mundo)** e
 **M10 (saber onde se está)** —, nenhuma iniciada.
 
+**E foi validado no mesmo dia, em aparelho.** O usuário rodou os cinco itens do roteiro de campo
+(terreno, placa, baú, quadros e cama colorida) e relatou: *"todos os 5 testes passaram
+perfeitamente"*. O único defeito foi da placa — a textura que escondia o texto e o editor de quatro
+campos —, e os dois foram corrigidos na mesma sessão (§3, quinta passada). **Com isso o M8 e a
+correção de terreno deixam de ter pendência de aparelho.** O que continua sem ter rodado em celular
+é o que foi entregue em 2026-09-14 (§6).
+
 **A pendência que este dia criou é de outra natureza: o mundo salvo.** A correção do terreno mudou a
 função que gera altura, e terreno é função da seed. Quem já tem mundo vai ver uma **costura** entre
 o que já foi gerado e o que ainda não foi — parede reta na fronteira. Não há migração possível e
@@ -1559,30 +1614,16 @@ estão propostos, mas não dá para uma segunda paleta de 16 cores.
 
 ## 6. Próximo passo recomendado
 
-1. **Criar um mundo novo e voar.** É o item mais rápido e o que fecha o relato desta sessão: o
-   terreno mudou de regra e a montanha tem de ler como montanha. O que olhar:
-   - **a fronteira de uma cordilheira**, que era onde a parede de 29 blocos aparecia. Tem de ser
-     encosta, não degrau, e não pode haver pilar solto de um bloco de largura;
-   - **o topo da montanha**: ele não pode mais ser uma mesa lisa. O pico mais alto da seed medida
-     ficou em Y=117, sete blocos abaixo do teto do mundo;
-   - **uma aldeia**, se aparecer: as casas eram assentadas na altura do canto do chunk e agora são
-     na altura do lugar delas. Casa enterrada ou boiando é regressão.
-   - **Mundo antigo ganha costura** e isso é esperado (§5): para avaliar o terreno, mundo novo.
+1. ~~**Criar um mundo novo e voar.**~~ ~~**Olhar as quatro peças novas do M8 num aparelho.**~~
+   **Feitos em 2026-09-17**: *"todos os 5 testes passaram perfeitamente"*. Terreno, placa, baú,
+   quadros e cama colorida foram vistos em aparelho. O único defeito foi da placa — textura que
+   escondia o texto e editor de quatro campos — e saiu na mesma sessão (§3, quinta passada).
+   **O que ainda não foi visto da placa é a correção dela**: reabrir o editor num celular,
+   escrever uma frase corrida e conferir que a prévia mostra a quebra que a placa vai fazer, e que
+   `Ctrl+Enter` confirma. Se a letra estiver pequena demais para ler de longe, o número é
+   `SIGN_COLUMNS` em `game/signs.ts` — menos colunas, letra maior.
 
-2. **Olhar as quatro peças novas do M8 num aparelho**, em ordem de quanto pode estar errado:
-   - **uma placa**: colocar (o editor abre sozinho), escrever com acento, confirmar, e ler de longe
-     e de perto. O texto tem de estar na face que olha para quem plantou, centrado, e sumir a mais
-     de 32 blocos. **No celular**, conferir que o teclado do sistema sobe ao abrir o editor — e
-     **só** ali. Se a letra estiver pequena demais para ler, o número é `SIGN_COLUMNS` em
-     `game/signs.ts` (menos colunas = letra maior);
-   - **um baú**: abrir e ver a tampa levantar; fechar e ver ela voltar. Num baú duplo as duas
-     tampas se movem. Quebrar com a tampa levantada não pode deixar nada para trás;
-   - **quatro quadros lado a lado**: têm de sair telas diferentes, porque a arte vem da posição;
-   - **lã e cama coloridas**: tingir lã branca com corante, fazer uma cama de cada cor e **dormir
-     numa que não seja a vermelha**. Dormir sai da forma do bloco, não do id — se uma cor não
-     deixar dormir, o erro é de tabela, não de lógica.
-
-3. **Olhar o resto do M8 num aparelho.** Mexeu no **formato de vértice**, que é o caminho por onde
+2. **Olhar o resto do M8 num aparelho.** Mexeu no **formato de vértice**, que é o caminho por onde
    passa cada triângulo do mundo. Os testes provam a aritmética; o que eles não provam é que a tela
    está certa. Em ordem de quanto pode estar errado:
    - **uma cerca isolada e uma grade de vidro.** São as duas peças que literalmente **não
@@ -1612,7 +1653,7 @@ estão propostos, mas não dá para uma segunda paleta de 16 cores.
      desenho — cerca, laje, placa, alçapão e escada eram todos o mesmo cubo de tábua, e abóbora e
      melancia eram tábua também. Flor, muda, samambaia e cana agora aparecem como a planta, não
      como cubo.
-4. **Reconferir os menus com o controle**, que é o que mudou mais na passada anterior:
+3. **Reconferir os menus com o controle**, que é o que mudou mais na passada anterior:
    - **o foco tem que aparecer.** Empurrar o direcional numa tela precisa acender um anel amarelo
      no item escolhido. Se ele não acender, nada mais dessa lista importa — era essa a causa de
      *"indo para botões nem existentes em tela"*;
@@ -1622,13 +1663,13 @@ estão propostos, mas não dá para uma segunda paleta de 16 cores.
      subir sozinho, e o analógico tem que andar entre as casinhas;
    - **pegar o controle com a tela já aberta no dedo**: o primeiro aperto mostra onde o foco está
      e não aperta nada.
-5. ~~**Olhar em volta, e só isso.**~~ **Validado em campo em 2026-09-14**: a câmera por quadro e o
+4. ~~**Olhar em volta, e só isso.**~~ **Validado em campo em 2026-09-14**: a câmera por quadro e o
    Modo A que não acende mais o anel durante o arrasto foram confirmados no celular e no
    computador. Se a velocidade do analógico incomodar, o número é `padSensitivity` nas opções.
-6. **Trocar de modo pela pausa** e conferir que sair e voltar ao mundo devolve o modo aplicado.
+5. **Trocar de modo pela pausa** e conferir que sair e voltar ao mundo devolve o modo aplicado.
    No Criativo, vida, ar, fome e armadura somem do HUD; no Sobrevivência voltam — e a fome agora é
    uma coxa de frango, não um retângulo.
-7. **Jogar o que foi entregue em 2026-09-14.** É o único item com risco real: vinte opções novas,
+6. **Jogar o que foi entregue em 2026-09-14.** É o único item com risco real: vinte opções novas,
    um passe de render novo, um sistema de mundo novo e um mob novo — nenhum deles viu um aparelho.
    O que olhar, em ordem de quanto pode estar errado:
    - **Nuvens.** Elas são o único desenho que nunca foi visto. Conferir se a forma lê como nuvem e
@@ -1646,17 +1687,17 @@ estão propostos, mas não dá para uma segunda paleta de 16 cores.
      certa do corpo.
    - **Modo daltônico e contorno em alto contraste**, que são acessibilidade e só se avaliam
      olhando.
-8. **Reconferir a quebra.** Um clique — de mouse ou de dedo — tem que derrubar **um** bloco, no
+7. **Reconferir a quebra.** Um clique — de mouse ou de dedo — tem que derrubar **um** bloco, no
    criativo e no sobrevivência; segurando, o ritmo é de ~4 por segundo. E as plantas passaram a ser
    miráveis: grama alta, flores, mudas e cana agora quebram. Vale conferir que **minerar pedra não
    ficou mais lento** — é o que o intervalo foi desenhado para não fazer.
-9. **Reconferir o toque no celular.** O padrão agora é o **Modo B**, que é o que já funcionava —
+8. **Reconferir o toque no celular.** O padrão agora é o **Modo B**, que é o que já funcionava —
    então o primeiro teste é confirmar que nada regrediu nele. Depois vale voltar ao **Modo A** nas
    opções e ver se ele ficou utilizável: colocar e quebrar agora miram no **mesmo** lugar (o dedo),
    a mira central some, a folga de arraste dobrou, e arrastar para mirar e então segurar passou a
    funcionar em vez de travar o dedo. Se ainda falhar, o número a mexer é `HOLD_SLOP` em
    `input/touch.ts`.
-10. **Reconferir o inventário no celular.** As duas correções de 2026-09-14
+9. **Reconferir o inventário no celular.** As duas correções de 2026-09-14
    vieram de relato de campo e voltam para lá:
    - **toque longo num slot** pega metade com a mão vazia e solta uma unidade com a mão cheia.
      Montar uma receita de tábua por célula é o teste que importa. A dica aparece no painel, e o
@@ -1664,7 +1705,7 @@ estão propostos, mas não dá para uma segunda paleta de 16 cores.
    - **largar item** agora arremessa na direção do olhar, e o que foi jogado fora só volta a ser
      coletável depois de dois segundos. Vale largar olhando para o chão e para uma parede, que é
      onde o arremesso sozinho não resolveria.
-11. **Voltar ao DualSense.** O reconhecimento por Bluetooth e a navegação básica já foram
+10. **Voltar ao DualSense.** O reconhecimento por Bluetooth e a navegação básica já foram
    confirmados em 2026-09-14; o que ainda não viu aparelho é a segunda passada. Em ordem de
    quanto pode estar errado:
    - **O cursor do analógico direito** com o inventário aberto. É o item novo e o mais fácil de
@@ -1684,18 +1725,18 @@ estão propostos, mas não dá para uma segunda paleta de 16 cores.
      ligada.
    - **No celular**, lembrar que ligar o áudio e a tela cheia exigem um toque na tela — o controle
      não serve de gesto para o navegador. O jogo avisa isso ao conectar.
-12. **Uma sessão longa jogando de verdade.** A metade mecânica do critério está cumprida:
+11. **Uma sessão longa jogando de verdade.** A metade mecânica do critério está cumprida:
    `npm run soak` rodou 92,5 min de voo contínuo sem um erro, e os números estão no §2 e no §3.
    O que o robô **não** cobre, e é o que sobra: uma sessão longa **jogando** — inventário,
    construção, morte e volta, troca de dimensão —, e principalmente **no celular**, que é onde o
    orçamento é apertado. Vale também deixar o `npm run soak` fechar os 120 min uma vez, já que a
    primeira execução parou aos 92 por decisão de quem estava na máquina.
-13. ~~**Medir o tempo de abertura em 3G.**~~ **Feito em 2026-09-14**: 4,48 s no 3G rápido, dentro
+12. ~~**Medir o tempo de abertura em 3G.**~~ **Feito em 2026-09-14**: 4,48 s no 3G rápido, dentro
    dos 5 s do critério (§2 e §3). O que sobrou como pergunta em aberto é a **outra metade do
    tempo**: ~2 s entre o documento pronto e a tela de título são CPU de boot, medidos num desktop.
    Vale repetir a medida no celular, porque é essa metade que cresce num T0 — e é ela, e não o
    tamanho do bundle, que decide se o critério continua cumprido.
-14. Oportunidades pequenas que sobraram, agora curtas:
+13. Oportunidades pequenas que sobraram, agora curtas:
    - **`.clw` com miniatura** já funciona, mas nenhum arquivo real foi exportado e reimportado
      desde a mudança para a v2 — é um teste manual de cinco minutos;
    - **som no resource pack** foi testado por formato, nunca com um `.ogg` de verdade num

@@ -62,8 +62,13 @@ const MAX_GLYPHS = 1024;
 /** Além disto o texto não é legível e só custa preenchimento. */
 export const SIGN_TEXT_DISTANCE = 32;
 
-/** Cor da tinta: o marrom bem escuro que se lê sobre madeira clara. */
-const INK: readonly [number, number, number] = [0.13, 0.09, 0.05];
+/**
+ * Cor da tinta: o marrom bem escuro que se lê sobre madeira clara.
+ *
+ * Exportada porque o teste mede o contraste dela contra a tábua da placa — foi
+ * esse par que falhou em campo, e é ele que a régua tem de vigiar.
+ */
+export const SIGN_INK: readonly [number, number, number] = [0.13, 0.09, 0.05];
 
 /**
  * Eixo horizontal do texto para cada `facing` da placa, e de que lado da tábua
@@ -222,7 +227,7 @@ export class SignTextPass {
     gl.vertexAttribPointer(1, 2, gl.FLOAT, false, bytes, 12);
 
     gl.uniformMatrix4fv(this.uniforms.uViewProj, false, viewProj);
-    gl.uniform3f(this.uniforms.uColor, INK[0], INK[1], INK[2]);
+    gl.uniform3f(this.uniforms.uColor, SIGN_INK[0], SIGN_INK[1], SIGN_INK[2]);
     gl.uniform1i(this.uniforms.uFont, 0);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.texture);

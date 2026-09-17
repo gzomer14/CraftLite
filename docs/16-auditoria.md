@@ -12,6 +12,70 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-17 · 12:10 → 12:21 · A placa escondia o que a placa escrevia
+
+**Pedido:** *"Todos os 5 testes passaram perfeitamente. Só a placa que por conta de sua textura mal
+dá para visualizar o texto escrito (…) essa divisão por linhas também ficou horrorosa para digitar
+na placa, não tem como adicionar um único campo de texto, e o próprio código interpreta se houve
+uma quebra de linha (…) Podemos ainda limitar a 4 linhas, porém em um único campo de texto. Outra
+coisa, pode adicionar o .abacusai ao gitignore"*.
+
+**Resultado:** o M8 e a correção de terreno foram **validados em aparelho**, e os dois defeitos da
+placa saíram — o de ler e o de escrever.
+
+### A tábua escondia o texto
+
+A placa era tábua de carvalho com **três linhas de rabisco** desenhadas por cima: a "escrita"
+ilegível que fazia o olho reconhecer uma placa **quando não havia texto de verdade**. Quando passou
+a haver, o rabisco virou o ruído que o cobria.
+
+O erro não era só de tom, era de **agitação** — medido na área de escrita do ladrilho:
+
+| | Luminância média | Desvio |
+|---|---|---|
+| Tábua de carvalho (era), mais o rabisco | 118 | **25,9** |
+| Tinta do texto | 24,8 | — |
+| Tábua da placa (é) | **172** | **4,7** |
+
+O fundo variava mais do que a letra contrastava. A placa ganhou textura própria — a única superfície
+do jogo desenhada para servir de fundo de leitura: grão de variância baixa, sem `plankLines` (o
+sulco da tábua corta a letra na horizontal), moldura de 1 px e um fio claro por dentro dela.
+
+### Quatro campos era um campo a mais
+
+Quem escreve pensa em frase, não em linhas. O editor virou um `<textarea>` e a distribuição virou
+`wrapSignText`, com duas regras: a quebra digitada manda (linha vazia continua vazia, que é como se
+centra uma palavra na terceira linha) e o que sobra da largura desce **por palavra** — cortar
+"FERRARIA" no meio seria pior que descer a palavra inteira. Palavra maior que a placa é cortada na
+força, porque não tem para onde descer.
+
+Um teste vermelho pagou um detalhe: a quebra tem de acontecer **antes** da normalização.
+`toFontText` troca por espaço tudo que a fonte não desenha, e `\n` é uma dessas coisas — normalizar
+primeiro apagava exatamente a quebra que o jogador acabara de digitar.
+
+O campo **não** é reescrito enquanto se digita: isso exigiria devolver o cursor ao lugar certo a
+cada tecla, e a quebra por palavra come o espaço do ponto de quebra. Em vez disso há uma **prévia**
+de quatro linhas na largura exata da placa, na cor da tábua e da tinta. `Ctrl+Enter` confirma,
+porque `Enter` agora é quebra de linha.
+
+### Arquivos
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/data/textures.ts` | `block/oak_sign` deixou de herdar a tábua de carvalho e de ter rabisco: virou tábua lisa e clara, desenhada para ser fundo de leitura. |
+| `~` | `src/game/signs.ts` | `wrapSignText` (quebra digitada + quebra por palavra, teto de 4 linhas) e `signTextToInput` (o caminho de volta, para reabrir o editor). |
+| `~` | `src/ui/screens/signeditor.ts` | Um `<textarea>` no lugar de quatro campos, com prévia das quatro linhas na largura da placa, aviso de excesso e `Ctrl+Enter` para confirmar. |
+| `~` | `src/render/signtext.ts` | `SIGN_INK` exportada — é contra ela que o teste mede o contraste da tábua. |
+| `~` | `tests/sign.test.ts` | +11 testes: oito da quebra de linha e três da régua de legibilidade da tábua (mais clara que a tinta **e** mais calma que a tábua comum). |
+| `~` | `.gitignore` | `.abacusai/`, diretório de ferramenta externa. |
+| `~` | `docs/15-status.md` | §1 (validação em campo + 2ª passada da placa), §2 (métricas), §3 (quinta passada), §4 (o bug da textura), §5 e §6 (roteiro de aparelho com os cinco itens riscados). |
+| `~` | `README.md` | Contagem de testes, bundle e a validação em aparelho. |
+
+**Portões:** `npm test` 1823 testes em 89 arquivos, `npm run lint` limpo, `npm run build` ok,
+`SIZE_BUDGET_KB=350 npm run size` 208,8 KB de 350 (60%).
+
+---
+
 ## 2026-09-17 · 10:36 → 11:44 · As montanhas eram pilares, e o M8 fechou
 
 **Pedido:** duas coisas. *"Verifique para mim qual o estado atual do projeto, e o que falta ainda

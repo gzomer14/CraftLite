@@ -828,20 +828,34 @@ export const TEXTURES: Record<string, TexRecipe> = {
     base: [120, 100, 74], noise: 'flat', scale: 1, variance: 0,
     ops: [railBed([176, 176, 184]), railGlow([226, 72, 60])],
   },
+  /*
+   * Placa (M8, retrabalhada em 2026-09-17).
+   *
+   * Ela era tábua de carvalho com **três linhas de rabisco** desenhadas por
+   * cima — a "escrita" ilegível que fazia o olho ler "placa" quando não havia
+   * texto de verdade. Agora há: o jogador escreve, e o rabisco virou justamente
+   * o ruído que escondia o que ele escreveu. Relato de campo: *"por conta de
+   * sua textura mal dá para visualizar o texto escrito"*.
+   *
+   * Então a tábua desta placa é **lisa e clara**, e é a única superfície do
+   * jogo desenhada para servir de fundo de leitura: sem sulco de tábua (o
+   * `plankLines` da tábua comum corta a letra na horizontal), com o grão em
+   * variância baixa e uma moldura de 1 px.
+   *
+   * Medido na área de escrita: a tábua de carvalho tinha luminância média 118
+   * com desvio de **25,9** — e o rabisco escuro por cima —, contra uma tinta de
+   * 24,8. Esta tem média **172 com desvio 4,7**: mais clara e, sobretudo,
+   * **calma**. O que escondia a letra não era só o tom, era a agitação do
+   * fundo competindo com ela no mesmo tamanho de pixel.
+   */
   'block/oak_sign': {
-    inherit: 'block/oak_planks',
+    base: [196, 170, 118], noise: 'grain', scale: 14, variance: 0.035,
     ops: [
-      border([92, 72, 42], 1),
-      (c) => {
-        // Três linhas de "escrita" ilegível — o que o olho lê como placa.
-        for (let line = 0; line < 3; line++) {
-          const y = 5 + line * 3;
-          for (let x = 3; x < 13; x += 2) {
-            const o = (y * 16 + x) << 2;
-            c.data[o] = 60; c.data[o + 1] = 46; c.data[o + 2] = 28;
-          }
-        }
-      },
+      border([132, 106, 62], 1),
+      // Um fio claro logo dentro da moldura: dá relevo de tábua aplainada sem
+      // pôr nenhuma linha escura dentro da área de escrita.
+      outline(1, 1, 14, 14, [214, 192, 146]),
+      dither(0.02),
     ],
   },
   /*

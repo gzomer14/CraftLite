@@ -7,3 +7,5 @@ coverage/
 .vite/
 .vscode/*
 !.vscode/extensions.json
+# Diretório de ferramenta externa, não do projeto.
+.abacusai/

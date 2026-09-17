@@ -5,8 +5,8 @@ navegador — um jogo de minerar-e-construir que roda em praticamente qualquer m
 celulares antigos — e a **implementação em andamento**.
 
 **Estado atual: os oito marcos, de M0 a M7, estão concluídos, e o M8 — acabamento visual — fechou
-em 2026-09-17. Nenhum documento normativo tem pendência de funcionalidade. Falta jogar em aparelho
-o que foi entregue depois do M7.**
+em 2026-09-17 e foi validado em aparelho no mesmo dia. Nenhum documento normativo tem pendência de
+funcionalidade. Falta jogar em aparelho o que foi entregue no acabamento pós-M7 (2026-09-14).**
 
 - **M0 — esqueleto:** Vite + TypeScript strict, renderer WebGL2 próprio com fallback WebGL1,
   detecção de tier, loop de 20 Hz com interpolação, gerador procedural de texturas alimentando um
@@ -101,6 +101,13 @@ o que foi entregue depois do M7.**
   metades saem da forma e do `multi` — e a **tampa do baú que abre**, que o roteiro dava como
   impossível sem um formato de vértice novo: o mesher já escreve quad de quatro cantos arbitrários
   desde a tocha torta, e o formato guarda posição, não transformação.
+  Depois de ir a campo, a placa voltou para a bancada duas vezes: a tábua dela era a de carvalho com
+  três linhas de rabisco — a "escrita" ilegível que fazia o olho reconhecer uma placa **quando não
+  havia texto de verdade** —, e o rabisco virou justamente o ruído que escondia o que o jogador
+  escreveu. Agora ela é a única superfície do jogo desenhada para servir de **fundo de leitura**
+  (luminância média 172 com desvio 4,7, contra 118 e 25,9 da tábua comum). E o editor, que era um
+  campo por linha, virou **um campo só**: `Enter` quebra onde o jogador quiser, o resto desce por
+  palavra, e uma prévia mostra exatamente o que a placa vai dizer.
 - **Terreno, pós-M8:** as montanhas eram **pilares verticais**. A altura do bioma entrava em degrau
   — 29 blocos de desnível em um bloco entre montanha e planície —, o que o doc 03 §4.3 já previa
   ("sem isso, aparecem paredes retas entre biomas") e que o código nunca implementou; e o teto do
@@ -133,7 +140,7 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 1812 testes (vitest)
+npm test           # 1823 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
 npm run icons      # regenera os ícones do PWA
@@ -211,7 +218,7 @@ src/
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      1812 testes, incluindo orçamento de performance e de luz
+tests/                      1823 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios

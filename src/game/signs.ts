@@ -40,6 +40,80 @@ export function sanitizeSignLine(text: string): string {
   return toFontText(text).slice(0, SIGN_COLUMNS).replace(/\s+$/, '');
 }
 
+/**
+ * Distribui um texto corrido nas quatro linhas da placa.
+ *
+ * **Por que existe.** O editor era quatro campos, um por linha, e quem escreve
+ * não pensa em linhas — pensa em frase. Relato de campo: *"essa divisão por
+ * linhas também ficou horrorosa para digitar na placa"*. Agora é um campo só,
+ * e é esta função que decide onde a frase quebra.
+ *
+ * Duas regras, nesta ordem:
+ *
+ * 1. **A quebra que o jogador digitou manda.** Um `Enter` é uma linha nova, e
+ *    uma linha vazia continua vazia — é assim que se centra uma palavra na
+ *    terceira linha.
+ * 2. **O que sobra da largura desce inteiro.** A quebra é por palavra: cortar
+ *    "FERRARIA" em "FERRAR"/"IA" no meio de uma frase seria pior do que descer
+ *    a palavra. Palavra maior que a placa (15 letras) não tem para onde descer
+ *    e é cortada na força.
+ *
+ * O que passar da quarta linha é descartado aqui, e não na hora de desenhar:
+ * assim o que o editor mostra é exatamente o que a placa vai dizer, e o save
+ * nunca guarda o que ninguém vai ver.
+ */
+export function wrapSignText(text: string): string[] {
+  const out: string[] = [];
+  // Quebrar **antes** de normalizar: `toFontText` troca por espaço tudo que a
+  // fonte não desenha, e `\n` é uma dessas coisas. Normalizar primeiro apagaria
+  // exatamente a quebra que o jogador digitou.
+  for (const line of text.split('\n')) {
+    const raw = toFontText(line);
+    if (out.length >= SIGN_LINES) break;
+    // Linha em branco é intenção: vale como linha.
+    if (raw.trim().length === 0) {
+      out.push('');
+      continue;
+    }
+    for (const wrapped of wrapLine(raw)) {
+      if (out.length >= SIGN_LINES) break;
+      out.push(wrapped);
+    }
+  }
+  while (out.length < SIGN_LINES) out.push('');
+  return out;
+}
+
+/** Quebra uma linha por palavra, cortando na força a que não couber sozinha. */
+function wrapLine(text: string): string[] {
+  const out: string[] = [];
+  let line = '';
+  for (const word of text.split(' ')) {
+    if (word.length === 0) continue;
+    if (line.length === 0) {
+      line = word;
+    } else if (line.length + 1 + word.length <= SIGN_COLUMNS) {
+      line += ` ${word}`;
+      continue;
+    } else {
+      out.push(line);
+      line = word;
+    }
+    // A palavra sozinha pode já não caber: corta o que passar.
+    while (line.length > SIGN_COLUMNS) {
+      out.push(line.slice(0, SIGN_COLUMNS));
+      line = line.slice(SIGN_COLUMNS);
+    }
+  }
+  if (line.length > 0) out.push(line);
+  return out;
+}
+
+/** O texto de uma placa como frase única, para reabrir o editor. */
+export function signTextToInput(lines: readonly string[]): string {
+  return lines.join('\n').replace(/\n+$/, '');
+}
+
 /** Uma placa escrita: posição e texto. */
 interface Sign {
   x: number;

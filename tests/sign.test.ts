@@ -13,8 +13,12 @@ import {
   glyphCell, glyphOf, toFontText,
 } from '../src/data/font';
 import { buildFontSheet } from '../src/render/fontgen';
-import { SIGN_COLUMNS, SIGN_LINES, SignStore, sanitizeSignLine } from '../src/game/signs';
-import { writeSignQuads } from '../src/render/signtext';
+import {
+  SIGN_COLUMNS, SIGN_LINES, SignStore, sanitizeSignLine, signTextToInput, wrapSignText,
+} from '../src/game/signs';
+import { SIGN_INK, writeSignQuads } from '../src/render/signtext';
+import { TEXTURES } from '../src/data/textures';
+import { TEX_SIZE, renderRecipe } from '../src/render/texgen';
 
 describe('fonte de bitmap', () => {
   it('cabe na folha', () => {
@@ -112,6 +116,110 @@ describe('normalização de texto', () => {
     expect(sanitizeSignLine('abcdefghijklmnopqrst')).toBe('ABCDEFGHIJKLMNO');
     expect(sanitizeSignLine('oi   ')).toBe('OI');
     expect(sanitizeSignLine('abcdefghijklmn  ').length).toBeLessThanOrEqual(SIGN_COLUMNS);
+  });
+});
+
+describe('quebra do texto em linhas', () => {
+  it('uma frase curta cabe em uma linha', () => {
+    expect(wrapSignText('casa do joao')).toEqual(['CASA DO JOAO', '', '', '']);
+  });
+
+  it('a quebra que o jogador digitou manda', () => {
+    expect(wrapSignText('casa\ndo\njoao')).toEqual(['CASA', 'DO', 'JOAO', '']);
+  });
+
+  it('linha em branco digitada vale como linha', () => {
+    // É assim que se centra uma palavra na terceira linha.
+    expect(wrapSignText('a\n\nb')).toEqual(['A', '', 'B', '']);
+  });
+
+  it('o que passa da largura desce por palavra, não no meio dela', () => {
+    const lines = wrapSignText('bem vindo a nossa fazenda de trigo');
+    for (const line of lines) expect(line.length).toBeLessThanOrEqual(SIGN_COLUMNS);
+    // Nenhuma palavra foi partida: juntar de volta devolve a frase.
+    expect(lines.join(' ').trim().replace(/\s+/g, ' ')).toBe('BEM VINDO A NOSSA FAZENDA DE TRIGO');
+  });
+
+  it('palavra maior que a placa é cortada na força', () => {
+    // Não tem para onde descer: 20 letras não cabem em 15.
+    const lines = wrapSignText('ABCDEFGHIJKLMNOPQRST');
+    expect(lines[0]).toBe('ABCDEFGHIJKLMNO');
+    expect(lines[1]).toBe('PQRST');
+  });
+
+  it('sempre devolve exatamente quatro linhas', () => {
+    for (const text of ['', 'a', 'a\nb\nc\nd\ne\nf', 'x '.repeat(80)]) {
+      expect(wrapSignText(text)).toHaveLength(SIGN_LINES);
+    }
+  });
+
+  it('o que passa da quarta linha é descartado', () => {
+    const lines = wrapSignText('um\ndois\ntres\nquatro\ncinco');
+    expect(lines).toEqual(['UM', 'DOIS', 'TRES', 'QUATRO']);
+  });
+
+  it('nenhuma linha passa da largura, com qualquer entrada', () => {
+    const entradas = [
+      'a'.repeat(200), 'palavra '.repeat(30), '\n'.repeat(20),
+      'sótão àgua çedilha', '   espaços   no   meio   ',
+    ];
+    for (const texto of entradas) {
+      for (const line of wrapSignText(texto)) {
+        expect(line.length, `"${line}" de "${texto.slice(0, 20)}"`).toBeLessThanOrEqual(SIGN_COLUMNS);
+      }
+    }
+  });
+
+  it('reabrir o editor devolve o que foi escrito', () => {
+    const texto = 'bem vindo\na fazenda';
+    const lines = wrapSignText(texto);
+    // O ciclo fecha: o que volta para o campo dá as mesmas linhas.
+    expect(wrapSignText(signTextToInput(lines))).toEqual(lines);
+    expect(signTextToInput(['A', 'B', '', ''])).toBe('A\nB');
+  });
+});
+
+describe('a tábua da placa serve de fundo de leitura', () => {
+  /** Resolve `inherit` recursivamente, como o atlas faz no boot. */
+  const cache = new Map<string, Uint8ClampedArray>();
+  const build = (name: string): Uint8ClampedArray => {
+    const hit = cache.get(name);
+    if (hit !== undefined) return hit;
+    const data = renderRecipe(TEXTURES[name], 1, build);
+    cache.set(name, data);
+    return data;
+  };
+
+  /** Luminância média e desvio dentro da área escrita de um ladrilho. */
+  function area(name: string): { mean: number; sd: number } {
+    const px = build(name);
+    const vals: number[] = [];
+    for (let y = 2; y < 14; y++) {
+      for (let x = 2; x < 14; x++) {
+        const o = (y * TEX_SIZE + x) * 4;
+        vals.push(0.299 * px[o] + 0.587 * px[o + 1] + 0.114 * px[o + 2]);
+      }
+    }
+    const mean = vals.reduce((a, v) => a + v, 0) / vals.length;
+    const sd = Math.sqrt(vals.reduce((a, v) => a + (v - mean) ** 2, 0) / vals.length);
+    return { mean, sd };
+  }
+
+  const ink = 255 * (0.299 * SIGN_INK[0] + 0.587 * SIGN_INK[1] + 0.114 * SIGN_INK[2]);
+
+  it('é bem mais clara que a tinta', () => {
+    // Relato de campo (2026-09-17): *"por conta de sua textura mal dá para
+    // visualizar o texto escrito"*. A tábua era `oak_planks`, de média 118.
+    expect(area('block/oak_sign').mean - ink).toBeGreaterThan(120);
+  });
+
+  it('e é calma: o fundo não compete com a letra', () => {
+    // Esta é a régua que importa. A tábua comum tem desvio 25,9 **e** tinha
+    // três linhas de rabisco desenhadas por cima: o que escondia a letra era a
+    // agitação do fundo no mesmo tamanho de pixel, não só o tom.
+    const board = area('block/oak_sign');
+    expect(board.sd).toBeLessThan(8);
+    expect(board.sd).toBeLessThan(area('block/oak_planks').sd / 2);
   });
 });
 

@@ -15,6 +15,7 @@ import {
   Container, DoubleChestView, EnchantTable, Furnace, CHEST_SLOTS, ENCHANT_ITEM, ENCHANT_LAPIS,
   type ContainerView,
 } from './container';
+import { SignStore, emptySignText } from './signs';
 import {
   armorDurabilityCost, armorTotals, attackCooldownOf, attackDamageOf,
   HIT_KNOCKBACK, HIT_KNOCKBACK_UP, type ArmorTotals,
@@ -66,6 +67,7 @@ const FURNACE = ITEM_BY_NAME.get('furnace')?.id ?? -1;
 const FURNACE_BLOCK = BLOCK_BY_NAME.get('furnace')?.id ?? -1;
 const FURNACE_LIT = BLOCK_BY_NAME.get('furnace_lit')?.id ?? -1;
 const CHEST = ITEM_BY_NAME.get('chest')?.id ?? -1;
+const OAK_SIGN = BLOCK_BY_NAME.get('oak_sign')?.id ?? -1;
 /** Deslocamento até a outra folha da porta, reusado — não aloca por clique. */
 const DOOR_PARTNER = new Int8Array(3);
 const ENCHANTING_TABLE = ITEM_BY_NAME.get('enchanting_table')?.id ?? -1;
@@ -142,6 +144,11 @@ export interface SessionEvents {
   /** Conquista desbloqueada — toast no canto (doc 08 §3.4). */
   onAchievement?: (title: string, description: string) => void;
   /**
+   * O jogador quer escrever numa placa (M8). Quem ouve abre o editor; a
+   * sessão não conhece DOM e não sabe o que é um teclado.
+   */
+  onSignEdit?: (x: number, y: number, z: number, lines: readonly string[]) => void;
+  /**
    * A dimensão vai mudar (M7): quem ouve troca pipeline, save e céu. Chamado
    * **antes** de o mundo novo ter chunk nenhum.
    */
@@ -183,6 +190,10 @@ export class Session {
 
   /** Tile entities por posição empacotada. */
   private readonly containers = new Map<number, Container>();
+  /** Texto das placas, a tile entity que não é contêiner (M8). */
+  readonly signs = new SignStore();
+  /** Baús com a tampa levantada, como triplas `(x, y, z)` (M8). */
+  private readonly openLids: number[] = [];
   /** Grade 3×3 da bancada aberta (a 2×2 vive no inventário). */
   private readonly benchGrid: Container;
   /** Mesa de encantamento, uma só e reusada — ver `EnchantTable`. */
@@ -354,12 +365,16 @@ export class Session {
       this.spawnDrops(x, y, z, state);
       this.spawnBlockXp(x, y, z, state);
       this.removeContainerAt(x, y, z);
+      this.signs.remove(x, y, z);
       this.fluids.scheduleAround(x, y, z);
       this.breakPortalAround(x, y, z);
       this.damageTool();
     };
     this.interaction.onBlockPlaced = (x, y, z, state) => {
       this.createContainerAt(x, y, z, blockIdOf(state));
+      // Placa recém-plantada abre o editor sozinha: colocar e não poder
+      // escrever obrigaria a descobrir que é preciso clicar nela de novo.
+      if (blockIdOf(state) === OAK_SIGN) this.editSignAt(x, y, z);
       this.fluids.scheduleAround(x, y, z);
       this.achievements.place(defOf(state).name);
     };
@@ -1096,6 +1111,8 @@ export class Session {
     this.riding = -1;
     this.ridingCart = -1;
     this.containers.clear();
+    this.signs.clear();
+    this.openLids.length = 0;
     this.spawners.clear();
     this.closeScreen();
   }
@@ -1456,6 +1473,10 @@ export class Session {
       this.setScreen('enchanting', this.enchantTable);
       return true;
     }
+    if (id === OAK_SIGN) {
+      this.editSignAt(x, y, z);
+      return true;
+    }
     if (id === FURNACE || id === FURNACE_LIT || id === CHEST) {
       const container = this.containerAtOrCreate(x, y, z, id);
       if (id === FURNACE || id === FURNACE_LIT) {
@@ -1465,6 +1486,7 @@ export class Session {
       // Baú colado em outro baú abre os dois de uma vez (doc 08 §3.9).
       const neighbor = this.findDoubleChest(x, y, z);
       this.setScreen('chest', neighbor === null ? container : neighbor);
+      this.openChest(x, y, z);
       return true;
     }
     return false;
@@ -1519,7 +1541,45 @@ export class Session {
     if (this.openScreen === 'none') return;
     // Devolve o que estiver na grade de craft, senão os itens somem.
     this.returnCraftGrid();
+    this.closeChestLids();
     this.setScreen('none', null);
+  }
+
+  /**
+   * Levanta a tampa do baú aberto — e a do par, se for baú duplo (M8).
+   *
+   * A tampa é **estado de bloco**, não animação: ver `mesh/complex.ts`. Por
+   * isso abrir custa um `setBlock`, que suja a section e a remesha uma vez.
+   */
+  private openChest(x: number, y: number, z: number): void {
+    this.closeChestLids();
+    this.setChestLid(x, y, z, true);
+    for (const [dx, dz] of CHEST_NEIGHBORS) {
+      if (blockIdOf(this.world.getBlock(x + dx, y, z + dz)) !== CHEST) continue;
+      this.setChestLid(x + dx, y, z + dz, true);
+      break;
+    }
+  }
+
+  /** Fecha toda tampa que este jogador tenha levantado. */
+  private closeChestLids(): void {
+    const open = this.openLids;
+    for (let i = 0; i < open.length; i += 3) {
+      this.setChestLid(open[i], open[i + 1], open[i + 2], false);
+    }
+    open.length = 0;
+  }
+
+  private setChestLid(x: number, y: number, z: number, open: boolean): void {
+    const state = this.world.getBlock(x, y, z);
+    if (blockIdOf(state) !== CHEST) return;
+    const bits = stateBitsOf(state);
+    const next = makeState(CHEST, open ? bits | 1 : bits & ~1);
+    if (next === state) return;
+    // `source: 'player'` é a mesma porta de sempre: nenhuma mutação de voxel
+    // escapa do `setBlock` (regra nº 3 do projeto).
+    this.world.setBlock(x, y, z, next, 'player');
+    if (open) this.openLids.push(x, y, z);
   }
 
   /** Devolve os ingredientes da grade ao inventário ao fechar. */
@@ -1812,6 +1872,16 @@ export class Session {
     this.containers.set(positionKey(container.x, container.y, container.z), container);
   }
 
+  /** Pede ao dono da UI que abra o editor da placa nesta posição. */
+  private editSignAt(x: number, y: number, z: number): void {
+    this.events.onSignEdit?.(x, y, z, this.signs.get(x, y, z) ?? emptySignText());
+  }
+
+  /** Escreve o texto da placa. Chamado pelo editor quando ele fecha. */
+  writeSign(x: number, y: number, z: number, lines: readonly string[]): void {
+    this.signs.set(x, y, z, lines);
+  }
+
   /** Semeia o bloco de estado após colocar — usado por `main.ts`. */
   static blockState(id: number): number {
     return makeState(id);
@@ -1828,6 +1898,11 @@ function positionKey(x: number, y: number, z: number): number {
 }
 
 /** Visão do jogador entregue aos mobs — reusada, nunca recriada por tick. */
+/** Os quatro vizinhos horizontais, para achar a outra metade do baú duplo. */
+const CHEST_NEIGHBORS: readonly (readonly [number, number])[] = [
+  [1, 0], [-1, 0], [0, 1], [0, -1],
+];
+
 /** Os seis vizinhos, para a varredura de portal quebrado. */
 const PORTAL_NEIGHBORS: readonly (readonly [number, number, number])[] = [
   [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1],

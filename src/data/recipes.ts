@@ -8,6 +8,7 @@
  */
 
 import { ITEM_BY_NAME } from './items';
+import { DYES, DYE_SOURCES } from './dyes';
 
 /** Um ingrediente é um item, ou uma tag (prefixada com `#`). */
 export type Ingredient = string;
@@ -33,7 +34,8 @@ export const TAGS: Record<string, readonly string[]> = {
   planks: ['oak_planks', 'birch_planks', 'spruce_planks', 'acacia_planks'],
   logs: ['oak_log', 'birch_log', 'spruce_log', 'acacia_log'],
   coals: ['coal', 'charcoal'],
-  wool: ['white_wool'],
+  // Toda lã serve onde a receita pede lã: linha, quadro e cama (M8).
+  wool: DYES.map((dye) => (dye.name === 'white' ? 'white_wool' : `${dye.name}_wool`)),
   stone_crafting: ['cobblestone'],
 };
 
@@ -112,7 +114,6 @@ export const RECIPES: readonly Recipe[] = [
   { type: 'shaped', pattern: ['SSS'], key: { S: 'sugar_cane' }, result: { item: 'paper', count: 3 } },
   { type: 'shapeless', ingredients: ['paper', 'paper', 'paper', 'leather'], result: { item: 'book', count: 1 } },
   { type: 'shaped', pattern: ['PPP', 'BBB', 'PPP'], key: { P: '#planks', B: 'book' }, result: { item: 'bookshelf', count: 1 } },
-  { type: 'shaped', pattern: ['WWW', 'PPP'], key: { W: '#wool', P: '#planks' }, result: { item: 'bed', count: 1 } },
   { type: 'shaped', pattern: ['WWW'], key: { W: 'wheat' }, result: { item: 'bread', count: 1 } },
   { type: 'shaped', pattern: ['III', 'III', 'III'], key: { I: 'iron_ingot' }, result: { item: 'iron_block', count: 1 } },
   { type: 'shaped', pattern: ['GGG', 'GGG', 'GGG'], key: { G: 'gold_ingot' }, result: { item: 'gold_block', count: 1 } },
@@ -210,7 +211,52 @@ export const RECIPES: readonly Recipe[] = [
     result: { item: 'detector_rail', count: 6 } },
   { type: 'shaped', pattern: ['I.I', 'III'], key: { I: 'iron_ingot' },
     result: { item: 'minecart', count: 1 } },
+  ...dyeRecipes(),
 ];
+
+/**
+ * Corantes, lã tingida e cama colorida (M8).
+ *
+ * Três famílias saem de uma tabela só (`data/dyes.ts`): o corante, a lã que ele
+ * tinge e a cama que a lã faz. Cor nova é **uma linha** lá, nenhuma aqui — que
+ * é a regra do doc 05 §2 aplicada a conteúdo.
+ *
+ * A cama vermelha é `bed` e não `bed_red` porque o id 62 já era dela antes das
+ * cores existirem, e id vai para o save.
+ */
+function dyeRecipes(): Recipe[] {
+  const out: Recipe[] = [];
+  for (const source of DYE_SOURCES) {
+    // O verde sai da fornalha (`data/smelting.ts`), não da bancada.
+    if (source.smelted === true) continue;
+    if (source.from !== undefined) {
+      out.push({
+        type: 'shapeless', ingredients: [source.from],
+        result: { item: `${source.dye}_dye`, count: 2 },
+      });
+    } else if (source.mix !== undefined) {
+      out.push({
+        type: 'shapeless', ingredients: [source.mix[0], source.mix[1]],
+        result: { item: `${source.dye}_dye`, count: 2 },
+      });
+    }
+  }
+  for (const dye of DYES) {
+    const wool = dye.name === 'white' ? 'white_wool' : `${dye.name}_wool`;
+    // Tingir: qualquer lã mais o corante. Repintar lã colorida também vale.
+    if (dye.name !== 'white') {
+      out.push({
+        type: 'shapeless', ingredients: ['#wool', `${dye.name}_dye`],
+        result: { item: wool, count: 1 },
+      });
+    }
+    out.push({
+      type: 'shaped', pattern: ['WWW', 'PPP'], key: { W: wool, P: '#planks' },
+      result: { item: dye.name === 'red' ? 'bed' : `bed_${dye.name}`, count: 1 },
+    });
+  }
+  return out;
+}
 
 /**
  * Resolve um ingrediente (item ou tag) em ids concretos.

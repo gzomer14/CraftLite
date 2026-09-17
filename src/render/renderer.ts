@@ -66,6 +66,11 @@ export class Renderer {
   itemRenderer: { render: (viewProj: Mat4, view: Mat4) => number; pending: number } | null = null;
   /** Mobs e flechas, preenchidos pelo chamador antes do render. */
   mobRenderer: { render: (viewProj: Mat4, sky: SkyParams) => number; pending: number } | null = null;
+  /**
+   * Texto das placas (M8). Preenchido pelo chamador antes do render, como os
+   * mobs: o renderizador não conhece a `Session` que guarda o texto.
+   */
+  signTextPass: { flush: (viewProj: Mat4) => number } | null = null;
   /** Item na mão em primeira pessoa; `null` desliga o passe. */
   handRenderer: {
     render: (aspect: number, alpha: number, light: number) => number;
@@ -296,6 +301,10 @@ export class Renderer {
     if (this.itemRenderer !== null && this.itemRenderer.pending > 0) {
       calls += this.itemRenderer.render(this.camera.viewProj, this.camera.view);
     }
+
+    // 3a. texto das placas: depois do terreno, para a tábua escondê-lo de
+    // trás, e antes do translúcido, para se ver texto através da água.
+    if (this.signTextPass !== null) calls += this.signTextPass.flush(this.camera.viewProj);
 
     // 3b. contorno do bloco mirado e rachadura de quebra
     if (this.highlight.visible) {

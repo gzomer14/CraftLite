@@ -11,6 +11,7 @@ import {
   oreBlobs, outline, pattern, plankLines, rect, rings, speckle, stripes, tintBy,
   type Rgb, type TexOp, type TexRecipe,
 } from '../render/texgen';
+import { DYES, type DyeDef } from './dyes';
 
 const STONE_DARK: [number, number, number] = [86, 86, 86];
 const WOOD_DARK: [number, number, number] = [96, 78, 44];
@@ -701,40 +702,6 @@ export const TEXTURES: Record<string, TexRecipe> = {
     base: [150, 124, 86], noise: 'value', scale: 5, variance: 0.08,
     ops: [outline(0, 0, 16, 16, [116, 94, 64]), dither(0.05)],
   },
-  // Cama: era `block/wool_white`, um cubo de lã. Agora travesseiro e colcha no
-  // topo, e estrado de madeira com o colchão aparecendo na lateral.
-  'block/bed_top': {
-    base: [176, 44, 44], noise: 'grain', scale: 10, variance: 0.06,
-    ops: [
-      outline(0, 0, 16, 16, [108, 28, 28]),
-      rect(2, 1, 12, 5, [238, 238, 232]),
-      outline(2, 1, 12, 5, [198, 198, 192]),
-      rect(1, 8, 14, 7, [196, 52, 52]),
-      rect(1, 8, 14, 1, [232, 96, 96], 0.6),
-      dither(0.04),
-    ],
-  },
-  /** Pé da cama: colcha inteira, sem travesseiro. */
-  'block/bed_foot_top': {
-    base: [176, 44, 44], noise: 'grain', scale: 10, variance: 0.06,
-    ops: [
-      outline(0, 0, 16, 16, [108, 28, 28]),
-      rect(1, 1, 14, 14, [196, 52, 52]),
-      rect(1, 1, 14, 1, [232, 96, 96], 0.6),
-      dither(0.04),
-    ],
-  },
-  'block/bed_side': {
-    base: [150, 124, 72], noise: 'stripes', scale: 1, variance: 0.08,
-    ops: [
-      plankLines(4, WOOD_DARK),
-      rect(0, 3, 16, 6, [196, 52, 52]),
-      rect(0, 3, 16, 1, [238, 238, 232]),
-      rect(0, 9, 16, 1, [108, 28, 28]),
-      border([104, 84, 48], 1),
-      dither(0.04),
-    ],
-  },
   /*
    * Porta (M8): duas folhas, uma por metade do bloco.
    *
@@ -877,31 +844,111 @@ export const TEXTURES: Record<string, TexRecipe> = {
       },
     ],
   },
+  /*
+   * Quadros (M8). Eram **um** desenho só: um morro e um sol, redesenhados por
+   * um laço, e uma parede de quadros repetia a mesma imagem. Agora são quatro
+   * telas escritas pixel a pixel com o operador `pattern` — que é a forma
+   * legível de desenhar 16×16 no código — e qual delas aparece sai da posição
+   * do bloco (`stateForPlacement`), então o mural nasce variado sozinho.
+   *
+   * A moldura de 1 px é a mesma nas quatro: é ela que faz o quadro ler como
+   * quadro, e não como adesivo colado na parede.
+   */
   'block/painting': {
-    base: [122, 92, 56], noise: 'flat', scale: 1, variance: 0,
-    ops: [
-      border([70, 50, 28], 2),
-      (c) => {
-        // Uma paisagem abstrata determinística: céu, morro e sol.
-        for (let y = 2; y < 14; y++) {
-          for (let x = 2; x < 14; x++) {
-            const o = (y * 16 + x) << 2;
-            const hill = y > 9 + ((x * 7 + c.seed) % 3);
-            if (hill) {
-              c.data[o] = 58; c.data[o + 1] = 108; c.data[o + 2] = 52;
-            } else {
-              c.data[o] = 122; c.data[o + 1] = 168; c.data[o + 2] = 226;
-            }
-          }
-        }
-        for (let y = 3; y < 6; y++) {
-          for (let x = 10; x < 13; x++) {
-            const o = (y * 16 + x) << 2;
-            c.data[o] = 248; c.data[o + 1] = 226; c.data[o + 2] = 120;
-          }
-        }
-      },
-    ],
+    base: [70, 50, 28], noise: 'flat', scale: 1, variance: 0,
+    ops: [pattern([
+      'WWWWWWWWWWWWWWWW',
+      'WssssssssssssssW',
+      'WsssssssssSSSssW',
+      'WssssssssSSSSSsW',
+      'WssssssssSSSSSsW',
+      'WsssssssssSSSssW',
+      'WssssssssssssssW',
+      'WssslllssssssssW',
+      'WsslllllsssssssW',
+      'WsslllllsssssssW',
+      'WsssstsssssssssW',
+      'WsssstsssssssssW',
+      'WggggggggggggggW',
+      'WggGgggggggGgggW',
+      'WGGGGGGGGGGGGGGW',
+      'WWWWWWWWWWWWWWWW',
+    ], {
+      W: [70, 50, 28], s: [122, 168, 226], S: [248, 226, 120],
+      g: [88, 150, 60], G: [58, 108, 52], t: [92, 66, 38], l: [60, 124, 50],
+    })],
+  },
+  'block/painting_sunflower': {
+    base: [70, 50, 28], noise: 'flat', scale: 1, variance: 0,
+    ops: [pattern([
+      'WWWWWWWWWWWWWWWW',
+      'WbbbbbbbbbbbbbbW',
+      'WbbbbbPPPPbbbbbW',
+      'WbbbPPPPPPPPbbbW',
+      'WbbPPPPCCPPPPbbW',
+      'WbPPPPCCCCPPPPbW',
+      'WbPPPCCCCCCPPPbW',
+      'WbPPPCCCCCCPPPbW',
+      'WbPPPPCCCCPPPPbW',
+      'WbbPPPPCCPPPPbbW',
+      'WbbbPPPPPPPPbbbW',
+      'WbbbbbPPPPbbbbbW',
+      'WbbbbbbttbbbbbbW',
+      'WbbbbLLttbbbbbbW',
+      'WbbbbbbttLLbbbbW',
+      'WWWWWWWWWWWWWWWW',
+    ], {
+      W: [70, 50, 28], b: [44, 68, 40], P: [248, 204, 64],
+      C: [110, 74, 36], t: [60, 120, 50], L: [78, 150, 60],
+    })],
+  },
+  'block/painting_skull': {
+    base: [70, 50, 28], noise: 'flat', scale: 1, variance: 0,
+    ops: [pattern([
+      'WWWWWWWWWWWWWWWW',
+      'WkkkkkkkkkkkkkkW',
+      'WkkkkBBBBBBkkkkW',
+      'WkkkBBBBBBBBkkkW',
+      'WkkBBBBBBBBBBkkW',
+      'WkkBBeeBBeeBBkkW',
+      'WkkBBeeBBeeBBkkW',
+      'WkkBBBBBBBBBBkkW',
+      'WkkBBBBeeBBBBkkW',
+      'WkkkBBBBBBBBkkkW',
+      'WkkkkBBBBBBkkkkW',
+      'WkkkkBdBdBBkkkkW',
+      'WkkkkkkkkkkkkkkW',
+      'WkkkkkkkkkkkkkkW',
+      'WkkkkkkkkkkkkkkW',
+      'WWWWWWWWWWWWWWWW',
+    ], {
+      W: [70, 50, 28], k: [18, 16, 20], B: [226, 220, 200],
+      e: [26, 22, 26], d: [150, 144, 128],
+    })],
+  },
+  'block/painting_night': {
+    base: [70, 50, 28], noise: 'flat', scale: 1, variance: 0,
+    ops: [pattern([
+      'WWWWWWWWWWWWWWWW',
+      'WnnnnnnnnnnnnnnW',
+      'WnnrnnnnnnnnrnnW',
+      'WnnnnnnmmnnnnnnW',
+      'WnnnnnmmmmnnnnnW',
+      'WnnnnnmmmmnnnnnW',
+      'WnnnnnnmmnnnnnrW',
+      'WnnnnnnnnnnnnnnW',
+      'WnnnnnnppnnnnnnW',
+      'WnnnnnMMMMnnppnW',
+      'WnnnnMMMMMMMMMnW',
+      'WnnnMMMMMMMMMMMW',
+      'WnnMMMMMMMMMMMMW',
+      'WnMMMMMMMMMMMMMW',
+      'WMMMMMMMMMMMMMMW',
+      'WWWWWWWWWWWWWWWW',
+    ], {
+      W: [70, 50, 28], n: [24, 28, 58], m: [232, 232, 216],
+      M: [52, 56, 84], p: [200, 206, 222], r: [200, 200, 230],
+    })],
   },
 
   'block/iron_block': {
@@ -1391,6 +1438,74 @@ export const ANIMATED_OPS: Record<string, (frame: number, total: number) => TexO
   'block/water': (frame, total) => flow(2, frame, total),
   'block/lava': (frame, total) => flow(4, frame, total),
 };
+
+/*
+ * Lã e cama coloridas (M8), geradas a partir de `data/dyes.ts`.
+ *
+ * Ficam **depois** da tabela escrita à mão porque a ordem dela define o índice
+ * de camada: acrescentar no fim não move nenhuma textura existente de lugar.
+ *
+ * As três receitas de cama eram escritas à mão, em vermelho, e viraram estas —
+ * uma cama vermelha continua saindo igual, só que agora pela mesma conta que
+ * faz a azul. Era esse o desvio que impedia a cama de ter cor: o vermelho
+ * estava no desenho, não no dado.
+ */
+
+/** Lã: o tecido é o ruído `grain`, que é o que lê como fio. */
+function woolRecipe(dye: DyeDef): TexRecipe {
+  return { base: dye.wool, noise: 'grain', scale: 12, variance: 0.06, ops: [dither(0.04)] };
+}
+
+/** Cabeceira: travesseiro em cima, colcha embaixo. */
+function bedHeadRecipe(dye: DyeDef): TexRecipe {
+  return {
+    base: dye.wool, noise: 'grain', scale: 10, variance: 0.06,
+    ops: [
+      outline(0, 0, 16, 16, dye.shade),
+      rect(2, 1, 12, 5, [238, 238, 232]),
+      outline(2, 1, 12, 5, [198, 198, 192]),
+      rect(1, 8, 14, 7, dye.quilt),
+      rect(1, 8, 14, 1, dye.highlight, 0.6),
+      dither(0.04),
+    ],
+  };
+}
+
+/** Pé da cama: colcha inteira, sem travesseiro. */
+function bedFootRecipe(dye: DyeDef): TexRecipe {
+  return {
+    base: dye.wool, noise: 'grain', scale: 10, variance: 0.06,
+    ops: [
+      outline(0, 0, 16, 16, dye.shade),
+      rect(1, 1, 14, 14, dye.quilt),
+      rect(1, 1, 14, 1, dye.highlight, 0.6),
+      dither(0.04),
+    ],
+  };
+}
+
+/** Lateral: estrado de madeira com o colchão aparecendo. */
+function bedSideRecipe(dye: DyeDef): TexRecipe {
+  return {
+    base: [150, 124, 72], noise: 'stripes', scale: 1, variance: 0.08,
+    ops: [
+      plankLines(4, WOOD_DARK),
+      rect(0, 3, 16, 6, dye.quilt),
+      rect(0, 3, 16, 1, [238, 238, 232]),
+      rect(0, 9, 16, 1, dye.shade),
+      border([104, 84, 48], 1),
+      dither(0.04),
+    ],
+  };
+}
+
+for (const dye of DYES) {
+  // A branca já existe escrita à mão desde o M4 e é a base do tingimento.
+  if (dye.name !== 'white') TEXTURES[`block/wool_${dye.name}`] = woolRecipe(dye);
+  TEXTURES[`block/bed_${dye.name}_top`] = bedHeadRecipe(dye);
+  TEXTURES[`block/bed_${dye.name}_foot_top`] = bedFootRecipe(dye);
+  TEXTURES[`block/bed_${dye.name}_side`] = bedSideRecipe(dye);
+}
 
 /** Ordem estável de geração — o índice de camada é resolvido por nome. */
 export const TEXTURE_NAMES: readonly string[] = Object.keys(TEXTURES);

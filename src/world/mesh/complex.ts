@@ -28,11 +28,13 @@
  */
 
 import {
-  CPLX_BOXES, CPLX_CROSS, CPLX_RAIL, CPLX_TORCH, stageTexOf, shapeIdOf, type BlockTables,
+  CPLX_BOXES, CPLX_CHEST, CPLX_CROSS, CPLX_RAIL, CPLX_TORCH,
+  stageTexOf, shapeIdOf, type BlockTables,
 } from './blockinfo';
 import { nbIndex } from './greedy';
 import {
-  BOX_STRIDE, FACING_STEP, MAX_BOXES, NOT_STAIRS, SHAPE_FENCE, SHAPE_FENCE_GATE,
+  BOX_STRIDE, CHEST_BODY_TOP, CHEST_LID_ANGLE, CHEST_MARGIN, CHEST_TOP,
+  FACING_STEP, MAX_BOXES, NOT_STAIRS, SHAPE_FENCE, SHAPE_FENCE_GATE,
   SHAPE_PANE, SHAPE_STAIRS, TORCH_FLOOR_TOP, TORCH_HALF, TORCH_WALL_BASE, TORCH_WALL_TOP,
   TORCH_WALL_Y0, TORCH_WALL_Y1, boxesFor, stairCornerFrom,
   railSlopeDir,
@@ -95,6 +97,11 @@ export function meshComplex(
           quads += emitTorch(
             out, x, y, z, bits & 7, tables.texSide[id], tables.texBottom[id],
             tables.texTop[id], blockLight, skyLight, hidden,
+          );
+        } else if (kind === CPLX_CHEST) {
+          quads += emitChest(
+            out, x, y, z, (bits & 1) !== 0,
+            tables.texTop[id], tables.texSide[id], tables.texBottom[id], blockLight, skyLight,
           );
         } else if (kind === CPLX_RAIL) {
           quads += emitRail(out, x, y, z, bits & 0xf, tex, blockLight, skyLight, tint);
@@ -260,6 +267,71 @@ function torchCap(
     CORNERS[9] = cx - h; CORNERS[10] = y; CORNERS[11] = cz + h;
   }
   out.addPolyQuad(CORNERS, face, tex, blockLight, skyLight, 0, false);
+}
+
+/**
+ * Baú (M8): corpo, tranca e uma tampa que gira na dobradiça de trás.
+ *
+ * A dobradiça é a aresta de cima do lado −Z, porque a tranca está em +Z e é ela
+ * que diz onde é a frente. O ângulo é binário — fechado ou aberto — e não uma
+ * animação: cada quadro de animação seria um estado de bloco novo, e estado
+ * novo é `setBlock`, que suja a section, remesha e marca o chunk para salvar.
+ * Quatro disso por abertura de baú custaria mais que o movimento vale. Abrir e
+ * fechar custa **um** remesh de uma section (0,67 ms medidos) cada.
+ */
+function emitChest(
+  out: MeshBuilder, x: number, y: number, z: number, open: boolean,
+  texTop: number, texSide: number, texBottom: number,
+  blockLight: number, skyLight: number,
+): number {
+  const a = CHEST_MARGIN;
+  const b = 1 - CHEST_MARGIN;
+  let quads = 0;
+
+  // Corpo e tranca: caixas comuns, iguais abertas ou fechadas.
+  quads += chestBox(out, x, y, z, a, 0, a, b, CHEST_BODY_TOP, b, 0,
+    texTop, texSide, texBottom, blockLight, skyLight);
+  quads += chestBox(
+    out, x, y, z, 7 / 16, CHEST_BODY_TOP - 2 / 16, b, 9 / 16, CHEST_BODY_TOP + 2 / 16,
+    b + 1 / 16, 0, texTop, texSide, texBottom, blockLight, skyLight,
+  );
+  // Tampa: a mesma caixa, girada em volta da dobradiça quando aberta.
+  quads += chestBox(out, x, y, z, a, CHEST_BODY_TOP, a, b, CHEST_TOP, b,
+    open ? CHEST_LID_ANGLE : 0, texTop, texSide, texBottom, blockLight, skyLight);
+  return quads;
+}
+
+/**
+ * Uma caixa do baú, girada por `angle` em volta do eixo X que passa pela
+ * dobradiça — a aresta `(y = CHEST_TOP, z = CHEST_MARGIN)`.
+ *
+ * Com `angle` zero é uma caixa alinhada aos eixos como qualquer outra; o seno e
+ * o cosseno saem 0 e 1 e as contas se reduzem à identidade.
+ */
+function chestBox(
+  out: MeshBuilder, x: number, y: number, z: number,
+  x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, angle: number,
+  texTop: number, texSide: number, texBottom: number,
+  blockLight: number, skyLight: number,
+): number {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  for (let face = 0; face < 6; face++) {
+    const corner = BOX_FACES[face];
+    const tex = face === 2 ? texTop : face === 3 ? texBottom : texSide;
+    for (let i = 0; i < 4; i++) {
+      const lx = corner[i * 3] === 0 ? x0 : x1;
+      const ly = corner[i * 3 + 1] === 0 ? y0 : y1;
+      const lz = corner[i * 3 + 2] === 0 ? z0 : z1;
+      const dy = ly - CHEST_TOP;
+      const dz = lz - CHEST_MARGIN;
+      CORNERS[i * 3] = x + lx;
+      CORNERS[i * 3 + 1] = y + CHEST_TOP + dz * sin + dy * cos;
+      CORNERS[i * 3 + 2] = z + CHEST_MARGIN + dz * cos - dy * sin;
+    }
+    out.addPolyQuad(CORNERS, face, tex, blockLight, skyLight, 0, false);
+  }
+  return 6;
 }
 
 /**

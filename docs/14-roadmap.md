@@ -155,15 +155,30 @@ planos de espessura zero — não faltava textura, faltava **volume representáv
       sua.
 - [x] **Fornalha com cara de fornalha** (boca, grelha e moldura) e **baú que não se confunde com a
       bancada** — a separação é de valor, não de detalhe.
-- [ ] Placa com texto escrito pelo jogador, e quadro com arte gerada por código.
-- [ ] Cama nas outras cores (depende de haver outras lãs: hoje só existe a branca).
-- [ ] Tampa do baú que **abre** de verdade — exige rotação, e a geometria do jogo é de caixas
-      alinhadas aos eixos (doc 04 §3). Precisa de um segundo formato de vértice para existir.
+- [x] **Placa com texto escrito pelo jogador.** Fonte 5×7 em `data/font.ts` (acento é composição,
+      não glifo), folha de 128×128 gerada por código, texto guardado por posição e desenhado num
+      passe próprio — um quad por glifo, como os mobs. Não entra no mesh do chunk porque é
+      **por instância**: duas placas do mesmo bloco escrevem coisas diferentes.
+- [x] **Quadro com arte gerada por código.** Quatro telas escritas com o operador `pattern` —
+      paisagem, girassol, caveira e montanha à noite — escolhidas pela **posição** do bloco, nos
+      bits 2–3 do estado. Era um desenho só, e uma parede de quadros repetia a mesma imagem.
+- [x] **Cama nas outras cores**, e as lãs que faltavam: oito cores saindo de `data/dyes.ts`, com
+      corante, lã, cama e receitas derivados dela. A cama colorida não custou **uma linha** de
+      lógica: dormir e morrer em duas metades saem de `shape: 'bed'` e de `multi`.
+      Oito e não dezesseis por orçamento de atlas — cada cor custa quatro camadas e o teto é 256.
+- [x] **Tampa do baú que abre de verdade.** ~~Exige rotação, e a geometria do jogo é de caixas
+      alinhadas aos eixos (doc 04 §3); precisa de um segundo formato de vértice para existir.~~
+      **Não precisava.** O mesher já escreve quad de quatro cantos arbitrários (`addPolyQuad`) —
+      é assim que a tocha de parede fica torta e que a rampa de trilho existe. O formato de vértice
+      guarda **posição**, não transformação: a tampa girada é a mesma caixa com os oito cantos
+      rodados na CPU, na hora de meshar. Abrir é um bit no estado do bloco e um remesh de uma
+      section; a animação quadro a quadro é que custaria caro, e por isso o ângulo é binário.
 
 **Critério de aceite:** num aparelho, olhar de perto uma tocha de parede, uma cerca isolada, uma
 porta fechada, uma janela de vidro e uma picareta na mão, e não conseguir apontar nenhuma peça
-"chapada" nem invisível. Descer um poço de escada sem cair. Orçamento de meshing intocado: uma
-section com um piso de 256 tochas continua abaixo de 2 ms.
+"chapada" nem invisível. Descer um poço de escada sem cair. Ler uma placa escrita. Orçamento de
+meshing intocado: uma section com um piso de 256 tochas continua abaixo de 2 ms. **Falta só a
+parte do aparelho** — o resto está entregue e medido (doc 15 §2 e §3).
 
 ---
 

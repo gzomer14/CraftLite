@@ -9,6 +9,8 @@
  * (rotação, nível de fluido, idade de plantação…). Ver doc 04 §2.5.
  */
 
+import { DYES } from './dyes';
+
 export type Face = 'top' | 'bottom' | 'north' | 'south' | 'east' | 'west';
 
 export type BlockShape =
@@ -296,9 +298,11 @@ const SPECS: BlockSpec[] = [
     hardness: 2, opaque: false, lightAttenuation: 0, ...wood() },
   // Cama: o **pé**. A cabeceira é `bed_head`, um bloco à frente (ver `MultiSpec`).
   // Sólida de propósito, com 9/16 de altura: subir na cama é parte do móvel.
-  { id: 62, name: 'bed', display: 'Cama', hardness: 0.2, shape: 'bed',
+  { id: 62, name: 'bed', display: 'Cama Vermelha', hardness: 0.2, shape: 'bed',
     opaque: false, lightAttenuation: 0, sound: 'cloth',
-    tex: { top: 'block/bed_foot_top', side: 'block/bed_side', bottom: 'block/bed_side' },
+    tex: {
+      top: 'block/bed_red_foot_top', side: 'block/bed_red_side', bottom: 'block/bed_red_side',
+    },
     multi: { other: 'bed_head', at: 'facing', root: true } },
   { id: 63, name: 'tnt', display: 'TNT', hardness: 0, sound: 'grass',
     tex: { top: 'block/tnt_top', side: 'block/tnt_side', bottom: 'block/tnt_bottom' } },
@@ -362,7 +366,8 @@ const SPECS: BlockSpec[] = [
   { id: 79, name: 'oak_sign', display: 'Placa de Carvalho', tex: 'block/oak_sign', shape: 'sign',
     solid: false, opaque: false, lightAttenuation: 0, hardness: 1, ...wood() },
   { id: 80, name: 'painting', display: 'Quadro', tex: 'block/painting', shape: 'painting',
-    solid: false, opaque: false, lightAttenuation: 0, hardness: 0.2, sound: 'wood' },
+    solid: false, opaque: false, lightAttenuation: 0, hardness: 0.2, sound: 'wood',
+    stages: paintingStages() },
 ];
 
 /**
@@ -446,6 +451,23 @@ SPECS.push(...buildingSpecs());
  * índice 16 do bit de energizado nunca chega aqui porque `stageTexOf` satura em
  * `MAX_STAGES - 1`. Trilho motorizado passa a textura acesa como `powered`.
  */
+/**
+ * Telas do quadro (M8): bits 0..1 são a parede, bits 2..3 escolhem a arte.
+ *
+ * `stages` é indexado pelos seis bits de estado inteiros, então a tabela repete
+ * cada tela quatro vezes — uma por parede. Sai mais barato que um campo novo no
+ * `BlockDef` para o que é, no fim, textura por estado.
+ */
+function paintingStages(): readonly string[] {
+  const art = [
+    'block/painting', 'block/painting_sunflower',
+    'block/painting_skull', 'block/painting_night',
+  ];
+  const out: string[] = [];
+  for (let state = 0; state < 16; state++) out.push(art[(state >> 2) & 3]);
+  return out;
+}
+
 function railStages(
   straight: string, curved: string, powered = straight,
 ): readonly string[] {
@@ -588,9 +610,9 @@ SPECS.push(
   { id: 126, name: 'oak_door_top', display: 'Porta de Carvalho', tex: 'block/oak_door_top',
     shape: 'door', hardness: 3, opaque: false, lightAttenuation: 0, ...wood(), itemless: true,
     multi: { other: 'oak_door', at: 'below', root: false } },
-  { id: 127, name: 'bed_head', display: 'Cama', hardness: 0.2, shape: 'bed',
+  { id: 127, name: 'bed_head', display: 'Cama Vermelha', hardness: 0.2, shape: 'bed',
     opaque: false, lightAttenuation: 0, sound: 'cloth', itemless: true,
-    tex: { top: 'block/bed_top', side: 'block/bed_side', bottom: 'block/bed_side' },
+    tex: { top: 'block/bed_red_top', side: 'block/bed_red_side', bottom: 'block/bed_red_side' },
     multi: { other: 'bed', at: 'facing', root: false } },
   /*
    * Fornalha acesa (M8): o **mesmo** truque da lâmpada de redstone, dois ids em
@@ -640,6 +662,50 @@ function doorSpecs(): BlockSpec[] {
 }
 
 SPECS.push(...doorSpecs());
+SPECS.push(...dyedSpecs());
+
+/**
+ * Lã e cama coloridas (M8), geradas a partir de `data/dyes.ts`.
+ *
+ * A lã branca (id 66) e a cama vermelha (62/127) já existiam e ficam onde
+ * estão: id vai para o save, e mover um id é corromper mundo salvo. As outras
+ * sete de cada nascem aqui.
+ *
+ * A cama colorida não precisa de **uma linha** de lógica em lugar nenhum:
+ * dormir, quebrar as duas metades juntas e mirar a forma certa saem todos de
+ * `shape: 'bed'` e de `multi`, que são dado. É o teste de que a máquina de
+ * duas células do M8 ficou no lugar certo.
+ */
+function dyedSpecs(): BlockSpec[] {
+  const out: BlockSpec[] = [];
+  let id = 200;
+  for (const dye of DYES) {
+    if (dye.name !== 'white') {
+      out.push({
+        id: id++, name: `${dye.name}_wool`, display: `Lã ${dye.feminine}`,
+        tex: `block/wool_${dye.name}`, hardness: 0.8,
+        tool: 'shears', flammable: 30, sound: 'cloth',
+      });
+    }
+    if (dye.name === 'red') continue; // a vermelha é a cama de sempre
+    const bed = `bed_${dye.name}`;
+    out.push({
+      id: id++, name: bed, display: `Cama ${dye.feminine}`, hardness: 0.2, shape: 'bed',
+      opaque: false, lightAttenuation: 0, sound: 'cloth',
+      tex: {
+        top: `block/${bed}_foot_top`, side: `block/${bed}_side`, bottom: `block/${bed}_side`,
+      },
+      multi: { other: `${bed}_head`, at: 'facing', root: true },
+    });
+    out.push({
+      id: id++, name: `${bed}_head`, display: `Cama ${dye.feminine}`, hardness: 0.2, shape: 'bed',
+      opaque: false, lightAttenuation: 0, sound: 'cloth', itemless: true,
+      tex: { top: `block/${bed}_top`, side: `block/${bed}_side`, bottom: `block/${bed}_side` },
+      multi: { other: bed, at: 'facing', root: false },
+    });
+  }
+  return out;
+}
 
 /** Tabela final, indexada por id. Buracos ficam como `undefined`. */
 export const BLOCKS: readonly BlockDef[] = buildTable();

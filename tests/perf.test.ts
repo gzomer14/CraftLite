@@ -268,6 +268,7 @@ describe('orçamento de performance', () => {
       }
       samples.push(performance.now() - t0);
     }
+    console.log(`  acabamento Nítido: ${median(samples).toFixed(1)} ms (atlas inteiro)`);
     expect(median(samples)).toBeLessThan(60);
   });
 
@@ -283,6 +284,7 @@ describe('orçamento de performance', () => {
       buildItemSheet(source, undefined, { size: HD_SPRITE_SIZE, style: 'nitido' });
       samples.push(performance.now() - t0);
     }
+    console.log(`  folha de sprites: ${median(samples).toFixed(1)} ms (mediana de 3)`);
     expect(median(samples)).toBeLessThan(200);
   });
 

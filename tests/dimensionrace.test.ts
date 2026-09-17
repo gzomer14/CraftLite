@@ -452,9 +452,10 @@ describe('o save respondendo durante a troca de dimensão', () => {
     };
   }
 
-  /** `SaveGame` precisa de pouco da sessão: lista de baús e de veículos. */
+  /** `SaveGame` precisa de pouco da sessão: baús, placas e veículos. */
   const stubSession = (): Session => ({
     tileEntities: [],
+    signs: { records: () => [], restore: () => { /* nada */ } },
     vehicleSnapshot: () => [],
     restoreContainer: () => { /* nada */ },
     restoreVehicles: () => { /* nada */ },

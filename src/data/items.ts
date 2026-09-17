@@ -8,6 +8,7 @@
  */
 
 import { BLOCK_BY_NAME, BLOCKS, type ToolKind } from './blocks';
+import { DYES } from './dyes';
 
 /** Id de bloco por nome, para os itens que colocam um bloco de outro nome. */
 function blockIdByName(name: string): number {
@@ -224,6 +225,8 @@ const SIMPLE_ITEMS: SimpleItem[] = [
   { name: 'ink_sac', display: 'Saco de Tinta' },
   { name: 'spider_eye', display: 'Olho de Aranha', food: { hunger: 2, saturation: 3.2, eatTicks: 32 } },
   { name: 'ender_pearl', display: 'Pérola do Fim', maxStack: 16 },
+  // --- corantes (M8). Gerados da tabela de cores, no fim para não mover id. -
+  ...DYES.map((dye) => ({ name: `${dye.name}_dye`, display: `Corante ${dye.display}` })),
 ];
 
 for (const item of SIMPLE_ITEMS) {

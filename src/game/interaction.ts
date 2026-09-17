@@ -329,11 +329,22 @@ export class Interaction {
     }
     if (shape === 'ladder' || shape === 'painting') {
       // Gruda na parede clicada: a face oposta à normal do acerto.
-      if (hit.nx > 0) return 1;
-      if (hit.nx < 0) return 0;
-      if (hit.nz > 0) return 3;
-      if (hit.nz < 0) return 2;
-      return facingFromYaw(this.player.yaw);
+      let facing = facingFromYaw(this.player.yaw);
+      if (hit.nx > 0) facing = 1;
+      else if (hit.nx < 0) facing = 0;
+      else if (hit.nz > 0) facing = 3;
+      else if (hit.nz < 0) facing = 2;
+      if (shape !== 'painting') return facing;
+      /*
+       * Qual das quatro telas (M8). Sai da **posição**, não de sorteio: uma
+       * parede de quadros nasce variada, e recolocar o quadro no mesmo lugar
+       * devolve a mesma arte — o jogador que não gostou anda um bloco.
+       */
+      const spot = hit.x + hit.nx;
+      const spotY = hit.y + hit.ny;
+      const spotZ = hit.z + hit.nz;
+      const art = Math.abs(spot * 31 + spotY * 17 + spotZ * 13) & 3;
+      return facing | (art << 2);
     }
     if (shape === 'stairs' || shape === 'fence_gate' || shape === 'door' || shape === 'sign') {
       return facingFromYaw(this.player.yaw);

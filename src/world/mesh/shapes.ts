@@ -654,9 +654,16 @@ function bed(state: number, out: Float32Array): number {
  * de vértice. O que o jogador ganha é a forma; o que ele perde é a animação,
  * que nunca existiu.
  */
-const CHEST_MARGIN = 1 / 16;
-const CHEST_BODY_TOP = 10 / 16;
-const CHEST_TOP = 14 / 16;
+export const CHEST_MARGIN = 1 / 16;
+export const CHEST_BODY_TOP = 10 / 16;
+export const CHEST_TOP = 14 / 16;
+/**
+ * Quanto a tampa gira ao abrir, em radianos (M8).
+ *
+ * 95° e não 90 para a tampa passar do prumo e ficar apoiada para trás: parada
+ * exatamente em pé ela lê como parede, não como tampa aberta.
+ */
+export const CHEST_LID_ANGLE = (95 * Math.PI) / 180;
 
 function chest(out: Float32Array): number {
   const a = CHEST_MARGIN;

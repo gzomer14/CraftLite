@@ -10,7 +10,9 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AUTOSAVE_TICKS, SaveManager } from '../src/save/savemanager';
-import { SaveGame, containerFrom, tileFrom, type TileRecord } from '../src/game/savegame';
+import {
+  SaveGame, containerFrom, tileFrom, type ContainerRecord, type TileRecord,
+} from '../src/game/savegame';
 import { trySpawn } from '../src/game/spawnplacement';
 import { newWorldMeta } from '../src/ui/menuflow';
 import { Session } from '../src/game/session';
@@ -315,7 +317,7 @@ describe('tile entities', () => {
   });
 
   it('registro corrompido não derruba o carregamento', () => {
-    const record = { kind: 'chest', x: 0, y: 0, z: 0, slots: [] } as TileRecord;
+    const record = { kind: 'chest', x: 0, y: 0, z: 0, slots: [] } as ContainerRecord;
     const container = containerFrom(record);
     expect(container.size).toBe(0);
   });

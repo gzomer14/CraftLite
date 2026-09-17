@@ -16,6 +16,7 @@
 import { ChunkColumn } from '../world/chunk';
 import { computeChunkLight } from '../world/gen/terrain';
 import { Container, Furnace, type ContainerKind } from './container';
+import type { SignRecord } from './signs';
 import { INVENTORY_SIZE } from './inventory';
 import { TICKS_PER_DAY } from './daynight';
 import { DIM_OVERWORLD } from '../data/dimensions';
@@ -27,8 +28,15 @@ import type { Session, VehicleRecord } from './session';
 /** Id do jogador local. O multiplayer do M7 vai usar outros (doc 12). */
 export const LOCAL_PLAYER = 'local';
 
-/** Tile entity serializada. `slots` são triplas [item, count, damage]. */
-export interface TileRecord {
+/**
+ * Tile entity serializada. Duas famílias dividem a mesma lista no save: o
+ * contêiner, que guarda itens, e a placa, que guarda texto (M8). O `kind`
+ * separa as duas na leitura.
+ */
+export type TileRecord = ContainerRecord | SignRecord;
+
+/** Contêiner serializado. `slots` são triplas [item, count, damage]. */
+export interface ContainerRecord {
   kind: ContainerKind;
   x: number;
   y: number;
@@ -118,7 +126,7 @@ export class SaveGame {
    * carregar com a nova.
    */
   switchDimension(dimension: number): void {
-    const tiles = this.session.tileEntities.map(tileFrom);
+    const tiles = this.tileRecords();
     const vehicles = this.session.vehicleSnapshot();
     this.switching = this.finishSwitch(dimension, tiles, vehicles)
       .finally(() => { this.switching = null; });
@@ -138,10 +146,23 @@ export class SaveGame {
     }
   }
 
-  /** Traz baús e veículos da dimensão que acabou de entrar. */
+  /** Contêineres e placas da dimensão atual, na mesma lista. */
+  private tileRecords(): TileRecord[] {
+    const out: TileRecord[] = this.session.tileEntities.map(tileFrom);
+    for (const sign of this.session.signs.records()) out.push(sign);
+    return out;
+  }
+
+  /** Um registro lido do save volta a ser placa ou contêiner. */
+  private restoreTile(record: TileRecord): void {
+    if (record.kind === 'sign') this.session.signs.restore(record);
+    else this.session.restoreContainer(containerFrom(record));
+  }
+
+  /** Traz baús, placas e veículos da dimensão que acabou de entrar. */
   private async loadDimensionState(): Promise<void> {
     const tiles = await this.manager.loadTiles<TileRecord>();
-    for (const record of tiles) this.session.restoreContainer(containerFrom(record));
+    for (const record of tiles) this.restoreTile(record);
     this.session.restoreVehicles(await this.manager.loadVehicles<VehicleRecord>());
   }
 
@@ -301,7 +322,7 @@ export class SaveGame {
       this.meta.gameMode = this.player.mode;
       await this.manager.flush();
       await this.manager.savePlayer(this.snapshot());
-      await this.manager.saveTiles(this.session.tileEntities.map(tileFrom));
+      await this.manager.saveTiles(this.tileRecords());
       await this.manager.saveVehicles(this.session.vehicleSnapshot());
       // Mede **depois** de gravar os chunks: senão o número seria o do mundo
       // de antes deste save.
@@ -324,7 +345,7 @@ export class SaveGame {
 }
 
 /** Container → registro serializável. */
-export function tileFrom(container: Container): TileRecord {
+export function tileFrom(container: Container): ContainerRecord {
   const slots: number[] = new Array(container.size * 3).fill(0);
   const enchants: number[] = new Array(container.size).fill(0);
   for (let i = 0; i < container.size; i++) {
@@ -347,7 +368,7 @@ export function tileFrom(container: Container): TileRecord {
 }
 
 /** Registro serializado → container vivo. */
-export function containerFrom(record: TileRecord): Container {
+export function containerFrom(record: ContainerRecord): Container {
   const size = record.slots.length / 3;
   const container = record.kind === 'furnace'
     ? new Furnace(record.x, record.y, record.z)

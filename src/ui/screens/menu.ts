@@ -264,6 +264,7 @@ function injectMenuStyle(): void {
 .menu-field select{flex:0 0 42%;min-height:36px;background:#0e141b;color:#fff;
   border:2px solid #000;padding:6px;font:13px/1 ui-monospace,monospace}
 .menu-field output{flex:0 0 64px;text-align:right;opacity:.8}
+.menu-hint{margin:2px 0 6px;font-size:12px;opacity:.7}
 /* Tecla remapeável: o botão mostra a tecla atual, fica amarelo enquanto espera
    e vermelho quando duas ações dividem a mesma tecla (doc 08 §3.11). */
 .menu-screen button.keybind{flex:0 0 42%;min-width:120px;min-height:36px;padding:6px 8px;

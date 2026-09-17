@@ -1,0 +1,112 @@
+/**
+ * Cores do jogo: corante, lã e cama (doc 14 — M8).
+ *
+ * **Uma tabela, três famílias.** A cor é a única coisa que muda entre uma lã
+ * vermelha e uma azul, entre uma cama vermelha e uma azul, e entre os dois
+ * corantes que as tingem. Descrever a cor uma vez e derivar bloco, item,
+ * textura e receita dela é o que permite acrescentar uma cor nova mexendo em
+ * **uma linha** — a regra nº 3 do projeto aplicada a conteúdo.
+ *
+ * **Por que oito e não dezesseis.** Cada cor custa quatro camadas de atlas
+ * (a lã e as três da cama) e o doc 02 §3 fecha em 256. Dezesseis cores
+ * levariam o total a 265 e estourariam o orçamento de memória de textura de
+ * T0. Oito cabem com folga e cobrem o arco que se usa para construir: os três
+ * primários, os dois que se misturam a partir deles, e a escala do branco ao
+ * preto.
+ */
+
+import type { Rgb } from '../render/texgen';
+
+export interface DyeDef {
+  /** Sufixo usado em `<cor>_wool`, `bed_<cor>` e `<cor>_dye`. */
+  name: string;
+  display: string;
+  /** Adjetivo concordando com "Lã" (feminino) e "Cama" (feminino). */
+  feminine: string;
+  /** Cor da lã. */
+  wool: Rgb;
+  /** Colcha da cama — a mesma cor, um tom abaixo, para o pano ler como pano. */
+  quilt: Rgb;
+  /** Vinco da colcha: mais escuro ainda. */
+  shade: Rgb;
+  /** Destaque da dobra de cima. */
+  highlight: Rgb;
+}
+
+/**
+ * As oito cores. A ordem é a do arco: neutros nas pontas, primários no meio.
+ * **Não reordene** — nada depende disso hoje, mas a ordem é a do inventário.
+ */
+export const DYES: readonly DyeDef[] = [
+  {
+    name: 'white', display: 'Branco', feminine: 'Branca',
+    wool: [233, 236, 236], quilt: [222, 226, 226], shade: [166, 170, 170],
+    highlight: [248, 250, 250],
+  },
+  {
+    name: 'red', display: 'Vermelho', feminine: 'Vermelha',
+    wool: [160, 40, 40], quilt: [196, 52, 52], shade: [108, 28, 28],
+    highlight: [232, 96, 96],
+  },
+  {
+    name: 'orange', display: 'Laranja', feminine: 'Laranja',
+    wool: [216, 122, 38], quilt: [228, 134, 46], shade: [150, 80, 22],
+    highlight: [246, 176, 96],
+  },
+  {
+    name: 'yellow', display: 'Amarelo', feminine: 'Amarela',
+    wool: [230, 198, 62], quilt: [236, 206, 74], shade: [166, 140, 34],
+    highlight: [250, 232, 140],
+  },
+  {
+    name: 'green', display: 'Verde', feminine: 'Verde',
+    wool: [84, 136, 54], quilt: [94, 148, 60], shade: [52, 90, 34],
+    highlight: [140, 190, 100],
+  },
+  {
+    name: 'blue', display: 'Azul', feminine: 'Azul',
+    wool: [58, 84, 168], quilt: [66, 94, 184], shade: [34, 52, 114],
+    highlight: [116, 146, 226],
+  },
+  {
+    name: 'purple', display: 'Roxo', feminine: 'Roxa',
+    wool: [116, 58, 158], quilt: [128, 66, 172], shade: [74, 34, 104],
+    highlight: [172, 116, 212],
+  },
+  {
+    name: 'black', display: 'Preto', feminine: 'Preta',
+    wool: [32, 32, 36], quilt: [40, 40, 46], shade: [18, 18, 22],
+    highlight: [76, 76, 84],
+  },
+];
+
+export const DYE_BY_NAME: ReadonlyMap<string, DyeDef> = new Map(DYES.map((d) => [d.name, d]));
+
+/**
+ * De onde vem cada corante.
+ *
+ * Quatro saem de coisa que já existia no mundo e dois se misturam a partir
+ * desses — é o que faz a paleta ter **economia** em vez de ser oito receitas
+ * soltas. O preto sair do saco de tinta da lula e o branco do osso é o gênero;
+ * o verde sair do cacto na fornalha também.
+ */
+export interface DyeSource {
+  dye: string;
+  /** Item que vira corante numa receita sem forma, ou `null` se é mistura. */
+  from?: string;
+  /** Duas cores que se misturam (`shapeless`). */
+  mix?: readonly [string, string];
+  /** true = sai da fornalha, não da bancada. */
+  smelted?: boolean;
+}
+
+export const DYE_SOURCES: readonly DyeSource[] = [
+  { dye: 'white', from: 'bone' },
+  { dye: 'red', from: 'poppy' },
+  { dye: 'yellow', from: 'dandelion' },
+  { dye: 'blue', from: 'lapis_lazuli' },
+  { dye: 'black', from: 'ink_sac' },
+  { dye: 'green', from: 'cactus', smelted: true },
+  { dye: 'orange', mix: ['red_dye', 'yellow_dye'] },
+  { dye: 'purple', mix: ['red_dye', 'blue_dye'] },
+];

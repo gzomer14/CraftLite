@@ -44,6 +44,21 @@ export const CPLX_RAIL = 3;
  * ninguém reconhecia como tocha.
  */
 export const CPLX_TORCH = 4;
+/**
+ * Caixa com uma tampa que **gira**: o baú (M8).
+ *
+ * O doc 14 dizia que tampa de baú "exige rotação, e a geometria do jogo é de
+ * caixas alinhadas aos eixos (doc 04 §3) — precisa de um segundo formato de
+ * vértice para existir". **Não precisa.** O mesher já escreve quad de quatro
+ * cantos arbitrários (`addPolyQuad`), que é como a tocha de parede fica torta e
+ * como a rampa de trilho existe; o que o formato de vértice guarda é posição,
+ * não transformação. A tampa girada é a mesma caixa com os oito cantos
+ * rodados na CPU, na hora de meshar.
+ *
+ * O corpo e a tranca continuam saindo de `boxesFor`, que é o que a física e o
+ * contorno leem: abrir o baú não muda onde se esbarra nem onde se mira.
+ */
+export const CPLX_CHEST = 5;
 
 /**
  * Quantas idades cabem na tabela de textura por estado (doc 04 §2.5).
@@ -60,7 +75,7 @@ const COMPLEX_BY_SHAPE: Record<string, number> = {
   cross: CPLX_CROSS,
   torch: CPLX_TORCH,
   bed: CPLX_BOXES,
-  chest: CPLX_BOXES,
+  chest: CPLX_CHEST,
   slab: CPLX_BOXES,
   carpet: CPLX_BOXES,
   flat: CPLX_BOXES,

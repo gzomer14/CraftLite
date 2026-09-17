@@ -12,6 +12,124 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-17 · 10:36 → 11:44 · As montanhas eram pilares, e o M8 fechou
+
+**Pedido:** duas coisas. *"Verifique para mim qual o estado atual do projeto, e o que falta ainda
+implementar"*; e, depois do diagnóstico, *"Continue então o desenvolvimento do M8, para
+finaliza-lo"* mais um relato de campo: *"criei um mundo do zero, criativo, e sai voando um
+pouquinho (…) começou a gerar diversas montanhas, porém as montanhas eram literalmente verticais
+(…) simplesmente pilares enormes verticais, e vários um do lado do outro"*.
+
+**Resultado:** o bug do terreno tinha **duas** causas, as duas medidas antes de qualquer correção; e
+os quatro itens que faltavam no M8 foram entregues, incluindo o que o próprio doc 14 dava como
+impossível sem um formato de vértice novo.
+
+### O terreno: parede de bioma e teto duro
+
+O doc 03 §4.3 pede média ponderada 5×5 a cada 4 blocos da altura de bioma e diz, com todas as
+letras, que *"sem isso, aparecem paredes retas entre biomas"*. O código nunca fez isso — e o
+comentário de `gen/terrain.ts` **afirmava que fazia**, chamando a grade esparsa de ruído de "o blend
+5×5 do doc 03 §4.3". Ela suaviza a entrada (os mapas de ruído), não a saída (o `heightOffset`), e o
+degrau de 24 pontos entre montanha e planície passava inteiro: **29 blocos de desnível em um bloco
+de distância**. A segunda causa era o `clamp` duro no teto do mundo, em que **54,3% das colunas de
+montanha** batiam — a cordilheira virava um platô liso em Y=124, com topo chapado e lado vertical.
+
+Medido na região mais montanhosa da seed 12345, num quadrado de 256×256 blocos:
+
+| | Antes | Depois |
+|---|---|---|
+| Maior degrau entre vizinhos | 37 blocos | **6** |
+| Vizinhos com degrau ≥ 6 | 3,10% | **0,040%** |
+| Colunas no teto do mundo | 10,3% | **0%** |
+| Faixa da montanha | 118..124 | **90..117** |
+| Geração de chunk | 6,2 ms | **6,2 ms** |
+
+Dois bugs antigos caíram junto: `structures.ts` pedia altura com `sampleColumn(noise, ox, oz, 0, 0)`
+e as coordenadas eram **ignoradas** no caminho de grade (a estrutura era assentada na altura do
+canto do chunk), e a decoração usava um caminho ~25× mais caro por coluna.
+
+**Isto muda o terreno gerado:** mundo antigo ganha costura entre o que já foi gerado e o que ainda
+não foi. Não há migração — terreno é função da seed, e a função mudou.
+
+### M8: os quatro que faltavam
+
+- **Placa com texto**: fonte 5×7 escrita em binário (acento é composição, não glifo), folha de
+  128×128 gerada por código, texto guardado por posição com o ciclo de vida do baú, passe próprio
+  com um quad por glifo e `discard` por alfa. Editor com `<input>` de verdade, porque no celular o
+  teclado do sistema sabe acento e corretor e nada disso se reimplementa em canvas.
+- **Quadro com arte**: quatro telas escritas com `pattern`, escolhidas pela posição do bloco.
+- **Oito cores**: `data/dyes.ts` vira a tabela de onde saem lã, cama, corante e receitas. A cama
+  colorida não custou uma linha de lógica — dormir e morrer em duas metades saem da forma e do
+  `multi`, que são dado.
+- **Tampa do baú**: o doc 14 dizia que exigia um segundo formato de vértice. Não exigia — o mesher
+  já escreve quad de quatro cantos arbitrários desde a tocha torta e a rampa de trilho, e o formato
+  guarda **posição**, não transformação.
+
+### Arquivos
+
+**Terreno**
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `+` | `src/world/gen/heightfield.ts` | Módulo novo: blend 5×5 do `heightOffset`/`heightScale` a cada 4 blocos com kernel binomial, teto macio no lugar do `clamp`, e janela com 16 blocos de margem para decoração e estrutura lerem a mesma altura do gerador. |
+| `~` | `src/world/gen/terrain.ts` | Perdeu a grade esparsa e o `sampleColumn`, que foram para o módulo novo; `TerrainNoise` ganhou o campo `field`, que tem o mesmo ciclo de vida do ruído. |
+| `~` | `src/world/gen/decorate.ts` | Passou a receber `HeightField` em vez de `TerrainNoise`; a altura da árvore vem da mesma janela que o gerador usou. |
+| `~` | `src/world/gen/structures.ts` | Idem, e a altura da estrutura passou a ser a do lugar dela, não a do canto do chunk. |
+| `+` | `tests/heightfield.test.ts` | 8 testes: sem parede vertical, sem coluna no teto, montanha ainda com 27 blocos de amplitude, teto macio crescente, e o mesmo número pedido por chunks vizinhos. |
+
+**Placa com texto**
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `+` | `src/data/font.ts` | Fonte 5×7, 76 caracteres, com acento por composição. |
+| `+` | `src/render/fontgen.ts` | Folha RGBA de 128×128, branca com alfa zero. |
+| `+` | `src/render/signtext.ts` | Passe do texto: um quad por glifo, buffer pré-alocado, corte em 32 blocos. |
+| `+` | `src/render/shaders/signtext.glsl.ts` | Shader com `discard` por alfa, em 100 e 300. |
+| `+` | `src/game/signs.ts` | `SignStore`: quatro linhas por posição, normalização e registros de save. |
+| `+` | `src/ui/screens/signeditor.ts` | Tela de edição com quatro campos, Enter desce linha e confirma na última. |
+| `~` | `src/game/session.ts` | `signs`, evento `onSignEdit`, abre o editor ao colocar e ao usar, apaga o texto ao quebrar e ao trocar de dimensão. |
+| `~` | `src/game/savegame.ts` | `TileRecord` virou união: contêiner ou placa, na mesma lista do save. |
+| `~` | `src/render/renderer.ts` | Slot `signTextPass`, desenhado depois do terreno e antes do translúcido. |
+| `~` | `src/main.ts` | Monta o passe e o editor, e alimenta o passe por quadro com as placas perto. |
+| `~` | `src/ui/screens/menu.ts` | Estilo `.menu-hint`, para a dica de tamanho de linha. |
+| `+` | `tests/sign.test.ts` | 24 testes: nenhum par de glifos com o mesmo desenho, folha sem tinta fora da célula, guarda e geometria. |
+| `+` | `tests/signsession.test.ts` | 9 testes de fiação: editor abre com o texto certo, quebrar leva o texto, tampa do baú abre e fecha. |
+
+**Quadro, cores e tampa do baú**
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `+` | `src/data/dyes.ts` | Oito cores, com os tons de lã, colcha, vinco e destaque, e de onde vem cada corante. |
+| `~` | `src/data/textures.ts` | Quatro quadros escritos com `pattern`; as três receitas de cama saíram de escritas à mão em vermelho para geradas por cor; lã colorida. |
+| `~` | `src/data/blocks.ts` | `paintingStages()`, lã e cama coloridas geradas (ids a partir de 200), cama base virou "Cama Vermelha". |
+| `~` | `src/data/items.ts` | Oito corantes, no fim da lista para não mover id. |
+| `~` | `src/data/itemart.ts` | Sprite de corante e de cama por cor. |
+| `~` | `src/data/recipes.ts` | `dyeRecipes()`: corante por fonte e por mistura, tingir lã, e uma cama por cor. A tag `#wool` passou a listar as oito. |
+| `~` | `src/data/smelting.ts` | Cacto → corante verde, o único que sai da fornalha. |
+| `~` | `src/game/interaction.ts` | O quadro escolhe a tela pela posição; a parede continua nos bits 0–1. |
+| `~` | `src/world/mesh/shapes.ts` | Constantes do baú exportadas e `CHEST_LID_ANGLE`. |
+| `~` | `src/world/mesh/blockinfo.ts` | `CPLX_CHEST`, com o comentário que desmente o doc 14. |
+| `~` | `src/world/mesh/complex.ts` | `emitChest`/`chestBox`: caixa com os oito cantos rodados na CPU. |
+| `~` | `src/game/session.ts` | Abre e fecha a tampa (e a do par, no baú duplo) pelo `setBlock` de sempre. |
+| `+` | `tests/m8finish.test.ts` | 13 testes: tela por estado, toda cor com bloco/item/textura/receita, forma do baú intocada ao abrir. |
+
+**Testes e docs tocados de tabela**
+
+| | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `tests/texgen.test.ts` | Seis pares de quadro e quatro de cor entraram na régua de legibilidade. |
+| `~` | `tests/savegame.test.ts` | Usa `ContainerRecord` onde o registro é de contêiner. |
+| `~` | `tests/dimensionrace.test.ts` | A sessão falsa ganhou `signs`. |
+| `~` | `tests/perf.test.ts` | Passou a imprimir o tempo do acabamento do atlas e o da folha de sprites. |
+| `~` | `docs/14-roadmap.md` | Os quatro itens do M8 marcados, com o porquê de a tampa do baú não precisar de formato novo. |
+| `~` | `docs/15-status.md` | §1 (M8 fechado + linha do terreno), §2 (métricas), §3 (quarta passada e o terreno), §4 (três bugs), §5 (costura no mundo antigo, folga do atlas), §6 (roteiro de aparelho reordenado). |
+| `~` | `README.md` | Contagem de testes, bundle e o estado do M8. |
+
+**Portões:** `npm test` 1812 testes em 89 arquivos, `npm run lint` limpo, `npm run build` ok,
+`SIZE_BUDGET_KB=350 npm run size` 208,3 KB de 350 (60%).
+
+---
+
 ## 2026-09-16 · 14:45 → 15:05 · Seis peças de tábua eram o mesmo desenho no slot
 
 **Pedido:** três relatos do jogador. *"Vários itens estão com textura que parece um bloco de madeira

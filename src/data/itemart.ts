@@ -18,6 +18,7 @@
  * isométrica a partir das próprias texturas, no boot (ver `render/itemsprites.ts`).
  */
 
+import { DYES } from './dyes';
 import type { Rgb } from '../render/texgen';
 
 export interface ItemArt {
@@ -856,5 +857,15 @@ function buildArt(): Record<string, ItemArt> {
   out.oak_door = { shape: 'door', color: [150, 118, 68], accent: [214, 214, 220] };
   out.bed = { shape: 'bed', color: [196, 52, 52], accent: [238, 238, 232] };
   out.ladder = { shape: 'ladder', color: [146, 116, 68] };
+  /*
+   * Corante e cama coloridos (M8). São a mesma silhueta em oito cores — o
+   * caso que este módulo existe para resolver: o desenho é o papel, a cor é o
+   * dado. A cama vermelha é `bed` por motivo de id (ver `data/blocks.ts`).
+   */
+  for (const dye of DYES) {
+    out[`${dye.name}_dye`] = { shape: 'dust', color: dye.wool };
+    const bed = dye.name === 'red' ? 'bed' : `bed_${dye.name}`;
+    out[bed] = { shape: 'bed', color: dye.quilt, accent: [238, 238, 232] };
+  }
   return out;
 }

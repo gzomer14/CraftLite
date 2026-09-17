@@ -55,6 +55,8 @@ import { CreativeScreen } from './ui/containers/creative';
 import { MenuFlow, newWorldMeta } from './ui/menuflow';
 import { DeathScreen } from './ui/screens/death';
 import { PauseMenu } from './ui/screens/pause';
+import { SignEditor } from './ui/screens/signeditor';
+import { SIGN_TEXT_DISTANCE, SignTextPass } from './render/signtext';
 import { Hud } from './ui/hud';
 import { ScreenMode } from './ui/screenmode';
 import { TouchUi } from './ui/touchui';
@@ -308,6 +310,15 @@ async function boot(): Promise<void> {
       audio.playUi('ui/click', 0.5);
     },
     onDeath: (message) => deathScreen.show(message),
+    /*
+     * Escrever numa placa (M8). A sessão só avisa; quem sabe o que é um campo
+     * de texto é a UI. Solta o ponteiro pela mesma razão que um baú: com o
+     * mouse capturado não há como clicar no campo nem ver o cursor.
+     */
+    onSignEdit: (x, y, z, lines) => {
+      controls.mouse.exitLock();
+      signEditor.open(x, y, z, lines);
+    },
     onPickup: () => {
       if (settings.get('vibration')) navigator.vibrate?.(6);
       audio.playUi('player/pickup', 0.5);
@@ -337,6 +348,8 @@ async function boot(): Promise<void> {
   const inventory = session.inventory;
   const interaction = session.interaction;
   const itemRenderer = new ItemRenderer(ctx, itemSprites.raw);
+  const signTextPass = new SignTextPass(ctx);
+  renderer.signTextPass = signTextPass;
   // Item na mão (doc 01 §191). O passe é uma draw call e limpa a profundidade,
   // então não disputa com nada — mas continua desligável em Opções.
   const handRenderer = new HandRenderer(ctx, atlas, itemSprites.raw);
@@ -493,6 +506,14 @@ async function boot(): Promise<void> {
         location.reload();
       })();
     },
+  });
+
+  const signEditor = new SignEditor({
+    onDone: (x, y, z, lines) => {
+      session.writeSign(x, y, z, lines);
+      audio.playUi('ui/click', 0.5);
+    },
+    onClose: () => { /* o jogo continua rodando: a placa não pausa nada */ },
   });
 
   const touchUi = new TouchUi(settings, controls.touch.buttons, {
@@ -952,6 +973,21 @@ async function boot(): Promise<void> {
       }
 
       drawEntities(alpha);
+
+      /*
+       * Texto das placas (M8): só o que está perto o bastante para ser lido.
+       * O corte por distância é o que limita o passe — sem ele, um mural de
+       * placas a 200 blocos custaria preenchimento por letra ilegível.
+       */
+      signTextPass.begin();
+      if (session.signs.size > 0) {
+        session.signs.forEach((sx, sy, sz, lines) => {
+          const dx = sx + 0.5 - player.x;
+          const dz = sz + 0.5 - player.z;
+          if (dx * dx + dz * dz > SIGN_TEXT_DISTANCE * SIGN_TEXT_DISTANCE) return;
+          signTextPass.add(sx, sy, sz, stateBitsOf(world.getBlock(sx, sy, sz)) & 3, lines);
+        });
+      }
 
       // Itens no chão: um billboard por entidade, tudo numa draw call.
       itemRenderer.begin();

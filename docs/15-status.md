@@ -9,8 +9,8 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-16 15:05 — **M8 em andamento: o sprite do inventário passou a
-seguir a forma do bloco, e abóbora e melancia deixaram de ser tábua de carvalho**
+**Última atualização:** 2026-09-17 11:44 — **M8 fechado (placa com texto, quadro com arte, oito
+cores e a tampa do baú que abre) e as montanhas deixaram de ser pilares verticais**
 
 ---
 
@@ -35,7 +35,8 @@ seguir a forma do bloco, e abóbora e melancia deixaram de ser tábua de carvalh
 | **HUD** | coxa de frango desenhada no lugar do retângulo da fome; vida, ar, fome e armadura somem no Criativo | ✅ concluído | — |
 | **Câmera** | rotação lida por quadro desenhado, não no tick de 20 Hz | ✅ concluído | — |
 | **Toque, Modo A** | dedo que girou a câmera deixa de ser candidato a quebrar | ✅ concluído | — |
-| **M8** Presença dos objetos | vértice em 1/16 de bloco, tocha de verdade, porta e cama de duas células, item na mão com volume, contorno do tamanho da forma, vidro visível, escada que escala, baú e fornalha acesa | 🚧 em andamento | placa com texto e quadro com arte; **nada disso foi visto em aparelho ainda** |
+| **M8** Presença dos objetos | vértice em 1/16 de bloco, tocha de verdade, porta e cama de duas células, item na mão com volume, contorno do tamanho da forma, vidro visível, escada que escala, baú e fornalha acesa, placa com texto, quadro com arte, oito cores de lã e cama, tampa de baú que abre | ✅ concluído | **nada disso foi visto em aparelho ainda** |
+| **Terreno** pós-M8 | blend 5×5 do `heightOffset` de bioma e teto macio: a parede de 29 blocos entre montanha e planície virou encosta, e o platô chapado em Y=124 virou cordilheira | ✅ concluído | muda o terreno gerado: **mundo antigo ganha costura** (ver §4) |
 
 **O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
 ele irá pesar muito o jogo e trazer muita complexidade por enquanto desnecessária"*. O
@@ -48,24 +49,26 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-16 15:00, com `npm test`, `npm run build` e
+Medidas em 2026-09-17 11:44, com `npm test`, `npm run build` e
 `SIZE_BUDGET_KB=350 npm run size`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **200,9 KB** | < 350 KB | `npm run size` |
-| Testes | **1710**, 85 arquivos | manter verde | `npm test` |
-| Camadas de atlas | **181** | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
+| Bundle (gzip, tudo) | **208,3 KB** (eram 200,9 antes da fonte, dos quadros e das oito cores) | < 350 KB | `npm run size` |
+| Testes | **1812**, 89 arquivos | manter verde | `npm test` |
+| Camadas de atlas | **212** (eram 181; +28 de lã e cama coloridas, +3 de quadro) | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Memória de áudio | **3,26 MB** (era 3,95 com três sons a menos) | < 3,5 MB | `tests/audio.test.ts` |
-| Geração de chunk | 5,7–6,2 ms (mediana; varia muito com a carga da máquina) | < 25 ms | `tests/perf.test.ts` |
+| Geração de chunk | **6,2 ms** (mediana; o blend de bioma custou ~0,2 ms) | < 25 ms | `tests/perf.test.ts` |
 | Geração de chunk do Nether | 5,1 ms (mediana; 3,8 antes de a luz entrar) | < 25 ms | `tests/perf.test.ts` |
-| Meshing de section | 0,67 ms (mediana) | < 8 ms | `tests/perf.test.ts` |
-| Meshing de um piso de 256 tochas | **1,13 ms** (o pior caso construível da forma nova) | < 2 ms | `tests/perf.test.ts` |
+| Meshing de section | 0,64 ms (mediana) | < 8 ms | `tests/perf.test.ts` |
+| Meshing de um piso de 256 tochas | **1,10 ms** (o pior caso construível da forma nova) | < 2 ms | `tests/perf.test.ts` |
 | Tick de 20 mobs | 0,20 ms | << 50 ms | `tests/mobs.test.ts` |
-| Tick de circuito (fio de 64) | 0,82 ms | < 5 ms | `tests/perf.test.ts` |
+| Tick de circuito (fio de 64) | 0,83 ms | < 5 ms | `tests/perf.test.ts` |
 | Tick de fogo (256 chamas, o teto) | **0,03 ms** | < 2 ms | `tests/perf.test.ts` |
-| Acabamento do estilo Nítido (atlas inteiro) | **2,1 ms**, uma vez no boot | < 60 ms | `tests/perf.test.ts` |
-| Folha de sprites em volume (32 px) | **33,9 ms**, uma vez no boot (eram 29,3 antes de o sprite seguir a forma) | < 200 ms | `tests/perf.test.ts` |
+| Acabamento do estilo Nítido (atlas inteiro) | **3,0 ms**, uma vez no boot (eram 2,1 com 31 texturas a menos) | < 60 ms | `tests/perf.test.ts` |
+| Folha de sprites em volume (32 px) | **36,6 ms**, uma vez no boot (eram 33,9 antes dos corantes e das camas coloridas) | < 200 ms | `tests/perf.test.ts` |
+| Maior degrau entre colunas vizinhas | **6 blocos** (eram 37: a parede de bioma) | sem parede vertical | `tests/heightfield.test.ts` |
+| Colunas chapadas no teto do mundo | **0%** (eram 10,3% da região, 54,3% das de montanha) | zero | `tests/heightfield.test.ts` |
 | Mundo de RD 16 pronto | **165 pumps** (eram 1315) | — | `tests/dimensionrace.test.ts` |
 | Colunas em 40 ciclos com 4 vagas (RD 8) | **86** (eram 44) | — | `tests/dimensionrace.test.ts` |
 | FPS em T0 real (2017) | **60**, RD 4, escala 1,00 (Galaxy J7 Metal) | 30 estáveis | teste manual |
@@ -79,7 +82,7 @@ Medidas em 2026-09-16 15:00, com `npm test`, `npm run build` e
 | Mundo gerado na sessão longa | **67 621 blocos** percorridos, anel estável em 489 colunas | — | `npm run soak` |
 | Abertura em 3G lento | 9,66 s | — | `npm run slow-network` |
 | Abertura sem limite de rede | 2,89 s | — | `npm run slow-network` |
-| Bytes na rede até o título | **173,0 KB** (169,1 KB do bundle, servido em gzip) | < 350 KB | `npm run slow-network` |
+| Bytes na rede até o título | **178,2 KB** estimados (174,3 KB do bundle, servido em gzip; a medida de campo é de 2026-09-14, com 169,1) | < 350 KB | `npm run slow-network` |
 
 ---
 
@@ -1197,10 +1200,134 @@ e bancada eram dois cubos de tábua clara — a diferença era de detalhe fino, 
 Agora é de **valor**: baú escuro e ferrado, bancada clara com a grade sulcada. A régua do teste
 subiu de 22 para 44 nesse par.
 
-**Pendência:** nada disto foi visto num aparelho. Ver §6. O que resta do marco está no
-[doc 14](14-roadmap.md): placa com texto, quadro com arte, cama em outras cores (depende de haver
-outras lãs) e a tampa do baú que abre — esta última exige rotação, que a geometria de caixas
-alinhadas aos eixos não representa.
+**Pendência:** nada disto foi visto num aparelho. Ver §6. O que restava do marco — placa com texto,
+quadro com arte, cama em outras cores e a tampa do baú — foi entregue na passada seguinte.
+
+---
+
+#### Quarta passada — o fechamento (2026-09-17)
+
+Os quatro itens que faltavam no [doc 14](14-roadmap.md) foram entregues, **incluindo o que o
+próprio doc dava como impossível sem um formato de vértice novo**.
+
+**Placa com texto escrito pelo jogador.** O item exigiu quatro peças que não existiam:
+
+| Peça | Onde | O que é |
+|---|---|---|
+| **Fonte** | `data/font.ts` | 5×7 por glifo, escrita em binário para a letra aparecer no código. 76 caracteres: caixa alta, dígitos, 24 sinais e 14 acentuados. **Acento é composição**, não glifo: Á, Â, Ã, À e Ü são a letra base mais uma marca de duas linhas, e Ç é o C com a cedilha — guardar os 14 inteiros seria repetir a letra e deixar o Â divergir do A na primeira correção. |
+| **Folha** | `render/fontgen.ts` | RGBA de 128×128, branca com alfa zero no resto. A cor sai do shader: a mesma folha serve texto escuro sobre tábua clara e o contrário. 64 KB, montada uma vez no boot. |
+| **Guarda** | `game/signs.ts` | A primeira *tile entity* que não é contêiner. Quatro linhas de 15 caracteres, por posição, e o mesmo ciclo de vida do baú — nasce ao colocar, morre ao quebrar. Placa em branco **não** ocupa registro, senão o save cresceria com placa vazia. |
+| **Passe** | `render/signtext.ts` | Um quad por glifo, num buffer dinâmico, como os mobs. Não entra no mesh do chunk porque o texto é **por instância**: duas placas do mesmo bloco no mesmo estado escrevem coisas diferentes, e meshar a section a cada letra digitada seria o caminho errado. Usa `discard` por alfa em vez de mistura, então a profundidade resolve a ordem sozinha. Corta em 32 blocos: além disso a letra não é legível e só custa preenchimento. |
+
+A tela de edição (`ui/screens/signeditor.ts`) usa `<input>` de verdade, e não um teclado desenhado:
+no celular o teclado é do sistema — ele sabe acento, corretor e idioma, e nada disso se reimplementa
+em canvas. A regra de 2026-09-14 de **nunca deixar o teclado subir sozinho** continua valendo e não
+briga com isto: aqui o jogador pediu para escrever. Colocar uma placa já abre o editor, porque
+colocar e não poder escrever obrigaria a descobrir que é preciso clicar de novo.
+
+**Quadro com arte.** Eram **um** desenho só — um morro e um sol desenhados por um laço —, então uma
+parede de quadros repetia a mesma imagem. Agora são quatro telas escritas pixel a pixel com o
+operador `pattern`: paisagem, girassol, caveira e montanha à noite. Qual delas aparece sai da
+**posição** do bloco, não de sorteio: um mural nasce variado sozinho, e recolocar o quadro no mesmo
+lugar devolve a mesma arte. Os bits 0–1 do estado continuam sendo a parede e os bits 2–3 viraram a
+tela, indexados pela tabela `stages` que o pó de redstone e o trilho já usavam.
+
+**Oito cores.** A cama não tinha cor porque **só existia lã branca** — e, pior, o vermelho da cama
+estava no desenho, não no dado: as três receitas de textura eram escritas à mão em vermelho.
+`data/dyes.ts` passou a ser a tabela, e dela saem quatro famílias:
+
+- **lã** nas oito cores (branco, vermelho, laranja, amarelo, verde, azul, roxo, preto);
+- **cama** nas mesmas oito, com pé e cabeceira — e **nenhuma linha de lógica nova**: dormir, quebrar
+  as duas metades juntas e mirar a forma certa saem de `shape: 'bed'` e de `multi`, que são dado. É
+  a prova de que a máquina de duas células do M8 ficou no lugar certo;
+- **corante** como item, com sprite próprio por cor;
+- **receitas**: quatro corantes saem de coisa que já existia (osso, papoula, dente-de-leão,
+  lápis-lazúli, saco de tinta), o verde sai do cacto na fornalha, e laranja e roxo se **misturam** a
+  partir dos outros — é isso que dá economia à paleta em vez de oito receitas soltas.
+
+**Oito e não dezesseis** por orçamento de atlas: cada cor custa quatro camadas (a lã e as três da
+cama) e o doc 02 §3 fecha em 256. Dezesseis levariam o total a 265. Oito deixam o atlas em **212**.
+
+**A tampa do baú abre — e não precisou de formato de vértice novo.** O doc 14 dizia que ela "exige
+rotação, e a geometria do jogo é de caixas alinhadas aos eixos (doc 04 §3); precisa de um segundo
+formato de vértice para existir". **Estava errado, e a prova já estava no repositório:** o mesher
+escreve quad de quatro cantos arbitrários (`addPolyQuad`) desde que a tocha de parede ficou torta e
+desde que a rampa de trilho existe. O que o formato de vértice guarda é **posição**, não
+transformação — a tampa girada é a mesma caixa com os oito cantos rodados na CPU, na hora de meshar.
+
+O ângulo é binário — fechada ou aberta a 95° — e não uma animação, e essa foi a única decisão de
+orçamento aqui: cada quadro de animação seria um estado de bloco novo, e estado novo é `setBlock`,
+que suja a section, remesha e marca o chunk para salvar. Abrir e fechar custa **um** remesh de uma
+section (0,64 ms medidos) cada. O corpo e a tranca continuam saindo de `boxesFor`, que é o que a
+física e o contorno leem: abrir o baú não muda onde se esbarra nem onde se mira. Baú duplo abre as
+duas tampas.
+
+**O que ficou de fora, e por quê:** um baú deixado aberto quando o jogo é fechado volta aberto no
+save — o bit está no bloco. Ele se conserta sozinho no primeiro uso (abrir e fechar), e guardar uma
+lista de tampas no save para resolver um caso que o jogador desfaz clicando seria pior que o
+sintoma.
+
+---
+
+### Terreno — as montanhas eram pilares verticais ✅ — 2026-09-17
+
+**Relato do usuário:** *"criei um mundo do zero, criativo, e sai voando um pouquinho para ver a
+geração de mundo. Do nada, começou a gerar diversas montanhas, porém as montanhas eram literalmente
+verticais, vários blocos de altura só que totalmente verticais, não parecia nem um pouco com
+montanhas verdadeiras, e sim simplesmente pilares enormes verticais, e vários um do lado do outro."*
+
+**Duas causas, as duas medidas antes de mexer em uma linha.**
+
+**Causa 1: o degrau do bioma entrava inteiro.** A altura de uma coluna depende do bioma
+(`heightOffset`, `heightScale` do doc 03 §4.3), e bioma é uma *classificação*: muda de degrau.
+Entre montanha (offset 26, escala 2,2) e planície (offset 2), o terreno subia **29 blocos em um
+bloco de distância**. E onde a fronteira se esfarela — porque o `detail` de 1/60 faz o `h0` cruzar o
+limiar de montanha para frente e para trás — a parede vira uma fileira de pilares soltos, que é
+exatamente o que a captura de tela mostra.
+
+**O doc 03 §4.3 já previa o sintoma**, com estas palavras: *"Blend de biomas: amostrar 5×5 pontos ao
+redor (a cada 4 blocos) e fazer média ponderada da altura (…). **Sem isso, aparecem paredes retas
+entre biomas.**"* O código nunca fez isso. O comentário de `gen/terrain.ts` afirmava que a grade
+esparsa de ruído "**é** o blend 5×5 do doc 03 §4.3" — e não era: ela suaviza a **entrada** (os mapas
+de ruído) e deixa a **saída** (o `heightOffset`) passar em degrau.
+
+**Causa 2: o teto do mundo.** A altura terminava num `clamp` duro em `WORLD_HEIGHT − 4 = 124`.
+**54,3% das colunas de montanha** batiam nele: a cordilheira inteira virava um platô liso na cota
+124 — topo chapado, lado vertical. A faixa de altura de montanha inteira era **118..124**, sete
+blocos, metade colados no teto.
+
+**A cura.** `world/gen/heightfield.ts`, um módulo novo com uma responsabilidade:
+
+- **média ponderada 5×5 a cada 4 blocos** do `heightOffset` e do `heightScale`, com kernel binomial,
+  exatamente como o doc 03 §4.3 manda;
+- **teto macio**: uma hipérbole que se aproxima de 124 sem nunca encostar, no lugar do `clamp`. Um
+  `clamp` achata todo mundo na mesma cota — é isso que transforma cordilheira em platô;
+- **margem de 16 blocos** na janela preparada, porque decoração e estruturas sorteiam posição nos 8
+  chunks vizinhos e precisam da mesma altura que o gerador de lá vai usar. Perguntar a outra fonte
+  faria a árvore do vizinho nascer flutuando.
+
+**De quebra, dois bugs antigos caíram junto** (§4): `structures.ts` pedia a altura com
+`sampleColumn(noise, ox, oz, 0, 0)` — as coordenadas `ox, oz` eram **ignoradas** no caminho de
+grade, e a estrutura era assentada na altura do canto `(0,0)` do chunk em geração; e a decoração
+usava um caminho de amostragem ~25× mais caro por coluna, que agora sai da mesma janela.
+
+**O resultado, medido na região mais montanhosa da seed 12345 (256×256 blocos):**
+
+| | Antes | Depois |
+|---|---|---|
+| Maior degrau entre colunas vizinhas | **37 blocos** | **6** |
+| Vizinhos com degrau ≥ 6 | 3,10% | **0,040%** |
+| Colunas chapadas no teto | 10,3% (54,3% das de montanha) | **0%** |
+| Faixa de altura da montanha | 118..124 | **90..117** (o doc 03 pede 90–124) |
+| Geração de chunk | 6,2 ms | **6,2 ms** |
+
+O custo ficou dentro do ruído de medição porque a rede lenta de ruído passou a ser amostrada a cada
+8 blocos em vez de 4 (os mapas variam entre 1/800 e 1/2000 — 8 blocos é fino demais para o olho) e
+porque nó exato de rede não interpola.
+
+**Isto muda o terreno gerado.** Mundo criado antes desta sessão continua com os chunks que já
+gravou; os chunks novos nascem com a regra nova, e a fronteira entre os dois fica visível como uma
+costura. Não há migração possível — o terreno é função da seed, e a função mudou. **Mundo novo.**
 
 ---
 
@@ -1211,6 +1338,9 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-17 | `world/gen/heightfield.ts` (era `gen/terrain.ts`) | **O `heightOffset` do bioma entrava em degrau.** Entre montanha (offset 26) e planície (offset 2) o terreno subia **29 blocos em um bloco** de distância, e onde a fronteira se esfarela a parede virava fileira de pilares. O doc 03 §4.3 pede média ponderada 5×5 a cada 4 blocos e diz, com estas palavras, que *"sem isso, aparecem paredes retas entre biomas"* — o código nunca fez isso, e o comentário de `terrain.ts` **afirmava que fazia**: chamava a grade esparsa de ruído de "o blend 5×5 do doc 03 §4.3". Ela suaviza a entrada, não a saída. Relato do usuário: *"as montanhas eram literalmente verticais (…) simplesmente pilares enormes verticais, e vários um do lado do outro"*. |
+| 2026-09-17 | `world/gen/heightfield.ts` | **O teto do mundo achatava as montanhas.** A altura terminava num `clamp` duro em 124 e **54,3% das colunas de montanha** batiam nele: a cordilheira virava um platô liso, com topo chapado e lado vertical, e a faixa de altura de montanha inteira era 118..124. Virou teto macio — uma hipérbole que se aproxima de 124 sem encostar —, e a faixa passou a 90..117, que é o que o doc 03 §4.3 pede. |
+| 2026-09-17 | `world/gen/structures.ts` | **A estrutura era assentada na altura do canto do chunk.** `pickY` pedia `sampleColumn(noise, ox, oz, 0, 0)`, e no caminho de grade os argumentos `ox, oz` eram **ignorados**: a altura devolvida era sempre a do canto `(0,0)` do chunk que estava sendo gerado, não a do lugar da estrutura. Casa de aldeia perto da borda nascia enterrada ou boiando. Agora a altura vem do mesmo campo com margem que o gerador usa. |
 | 2026-09-16 | `render/itemsprites.ts` | **O sprite do inventário ignorava a forma do bloco.** Ele desenhava sempre um cubo isométrico com a textura do bloco, e cerca, laje, placa, alçapão, escada e portão são todos de tábua: os seis eram **o mesmo desenho** no slot. A silhueta passou a sair de `boxesFor`, a mesma lista do mundo e da física; planta e trilho saíram da isometria e aparecem como o ladrilho de frente. Relato de campo: *"vários itens estão com textura que parece um bloco de madeira normal, mas na realidade colocando no chão são outros itens"*. |
 | 2026-09-16 | `data/blocks.ts`, `data/textures.ts` | **Abóbora e melancia eram `block/oak_planks`.** Literalmente: a tabela apontava a tábua de carvalho, então uma abóbora no campo era um caixote de madeira com outro nome. Na mesma varredura: muda, samambaia, cana e arbusto seco dividiam `block/tall_grass`, acácia usava tronco e tábua de carvalho, e grama alta, dente-de-leão e papoula eram um **X** — `alphaMask('cross')` recorta as diagonais do ladrilho, o que é a máscara confundida com a geometria dos dois quads cruzados. |
 | 2026-09-16 | `data/textures.ts` | **A fornalha parecia pedra e o baú parecia a bancada.** A fornalha era pedregulho 18% mais escuro com moldura fina; ganhou boca, grelha e ferro rebatido. Baú e bancada passavam na régua de legibilidade de 22 e mesmo assim se confundiam no slot, porque a diferença era de **detalhe** e 16 px não carregam detalhe: virou diferença de **valor**, e a régua daquele par subiu para 44. |
@@ -1412,13 +1542,49 @@ nenhum controle físico na mesa. Ver §6.
 dimensão no protocolo do worker são genéricos — uma terceira dimensão é uma entrada na tabela e um
 gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca de mundo precisa.
 
+**2026-09-17: o M8 fechou** com os quatro itens que faltavam (§3), e a lista não marcada do doc 14
+para ele ficou vazia. O que resta no roteiro são as duas propostas — **M9 (gente no mundo)** e
+**M10 (saber onde se está)** —, nenhuma iniciada.
+
+**A pendência que este dia criou é de outra natureza: o mundo salvo.** A correção do terreno mudou a
+função que gera altura, e terreno é função da seed. Quem já tem mundo vai ver uma **costura** entre
+o que já foi gerado e o que ainda não foi — parede reta na fronteira. Não há migração possível e
+não vale inventar uma: a saída é mundo novo.
+
+**E sobrou uma folga menor no atlas.** As oito cores levaram o total de camadas de 181 para 212, de
+um teto de 256 (doc 02 §3). Restam **44 camadas** para o que vier — o que dá para M9 e M10 como
+estão propostos, mas não dá para uma segunda paleta de 16 cores.
+
 ---
 
 ## 6. Próximo passo recomendado
 
-1. **Olhar o M8 num aparelho.** É o item novo e o de maior risco: mexeu no **formato de vértice**,
-   que é o caminho por onde passa cada triângulo do mundo. Os testes provam a aritmética; o que
-   eles não provam é que a tela está certa. Em ordem de quanto pode estar errado:
+1. **Criar um mundo novo e voar.** É o item mais rápido e o que fecha o relato desta sessão: o
+   terreno mudou de regra e a montanha tem de ler como montanha. O que olhar:
+   - **a fronteira de uma cordilheira**, que era onde a parede de 29 blocos aparecia. Tem de ser
+     encosta, não degrau, e não pode haver pilar solto de um bloco de largura;
+   - **o topo da montanha**: ele não pode mais ser uma mesa lisa. O pico mais alto da seed medida
+     ficou em Y=117, sete blocos abaixo do teto do mundo;
+   - **uma aldeia**, se aparecer: as casas eram assentadas na altura do canto do chunk e agora são
+     na altura do lugar delas. Casa enterrada ou boiando é regressão.
+   - **Mundo antigo ganha costura** e isso é esperado (§5): para avaliar o terreno, mundo novo.
+
+2. **Olhar as quatro peças novas do M8 num aparelho**, em ordem de quanto pode estar errado:
+   - **uma placa**: colocar (o editor abre sozinho), escrever com acento, confirmar, e ler de longe
+     e de perto. O texto tem de estar na face que olha para quem plantou, centrado, e sumir a mais
+     de 32 blocos. **No celular**, conferir que o teclado do sistema sobe ao abrir o editor — e
+     **só** ali. Se a letra estiver pequena demais para ler, o número é `SIGN_COLUMNS` em
+     `game/signs.ts` (menos colunas = letra maior);
+   - **um baú**: abrir e ver a tampa levantar; fechar e ver ela voltar. Num baú duplo as duas
+     tampas se movem. Quebrar com a tampa levantada não pode deixar nada para trás;
+   - **quatro quadros lado a lado**: têm de sair telas diferentes, porque a arte vem da posição;
+   - **lã e cama coloridas**: tingir lã branca com corante, fazer uma cama de cada cor e **dormir
+     numa que não seja a vermelha**. Dormir sai da forma do bloco, não do id — se uma cor não
+     deixar dormir, o erro é de tabela, não de lógica.
+
+3. **Olhar o resto do M8 num aparelho.** Mexeu no **formato de vértice**, que é o caminho por onde
+   passa cada triângulo do mundo. Os testes provam a aritmética; o que eles não provam é que a tela
+   está certa. Em ordem de quanto pode estar errado:
    - **uma cerca isolada e uma grade de vidro.** São as duas peças que literalmente **não
      existiam** antes desta sessão — o poste colapsava para largura zero. Se alguma coisa
      regrediu no formato de vértice, é aqui que aparece primeiro, e aparece como buraco;
@@ -1446,7 +1612,7 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      desenho — cerca, laje, placa, alçapão e escada eram todos o mesmo cubo de tábua, e abóbora e
      melancia eram tábua também. Flor, muda, samambaia e cana agora aparecem como a planta, não
      como cubo.
-2. **Reconferir os menus com o controle**, que é o que mudou mais na passada anterior:
+4. **Reconferir os menus com o controle**, que é o que mudou mais na passada anterior:
    - **o foco tem que aparecer.** Empurrar o direcional numa tela precisa acender um anel amarelo
      no item escolhido. Se ele não acender, nada mais dessa lista importa — era essa a causa de
      *"indo para botões nem existentes em tela"*;
@@ -1456,13 +1622,13 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      subir sozinho, e o analógico tem que andar entre as casinhas;
    - **pegar o controle com a tela já aberta no dedo**: o primeiro aperto mostra onde o foco está
      e não aperta nada.
-3. ~~**Olhar em volta, e só isso.**~~ **Validado em campo em 2026-09-14**: a câmera por quadro e o
+5. ~~**Olhar em volta, e só isso.**~~ **Validado em campo em 2026-09-14**: a câmera por quadro e o
    Modo A que não acende mais o anel durante o arrasto foram confirmados no celular e no
    computador. Se a velocidade do analógico incomodar, o número é `padSensitivity` nas opções.
-4. **Trocar de modo pela pausa** e conferir que sair e voltar ao mundo devolve o modo aplicado.
+6. **Trocar de modo pela pausa** e conferir que sair e voltar ao mundo devolve o modo aplicado.
    No Criativo, vida, ar, fome e armadura somem do HUD; no Sobrevivência voltam — e a fome agora é
    uma coxa de frango, não um retângulo.
-5. **Jogar o que foi entregue em 2026-09-14.** É o único item com risco real: vinte opções novas,
+7. **Jogar o que foi entregue em 2026-09-14.** É o único item com risco real: vinte opções novas,
    um passe de render novo, um sistema de mundo novo e um mob novo — nenhum deles viu um aparelho.
    O que olhar, em ordem de quanto pode estar errado:
    - **Nuvens.** Elas são o único desenho que nunca foi visto. Conferir se a forma lê como nuvem e
@@ -1480,17 +1646,17 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      certa do corpo.
    - **Modo daltônico e contorno em alto contraste**, que são acessibilidade e só se avaliam
      olhando.
-6. **Reconferir a quebra.** Um clique — de mouse ou de dedo — tem que derrubar **um** bloco, no
+8. **Reconferir a quebra.** Um clique — de mouse ou de dedo — tem que derrubar **um** bloco, no
    criativo e no sobrevivência; segurando, o ritmo é de ~4 por segundo. E as plantas passaram a ser
    miráveis: grama alta, flores, mudas e cana agora quebram. Vale conferir que **minerar pedra não
    ficou mais lento** — é o que o intervalo foi desenhado para não fazer.
-7. **Reconferir o toque no celular.** O padrão agora é o **Modo B**, que é o que já funcionava —
+9. **Reconferir o toque no celular.** O padrão agora é o **Modo B**, que é o que já funcionava —
    então o primeiro teste é confirmar que nada regrediu nele. Depois vale voltar ao **Modo A** nas
    opções e ver se ele ficou utilizável: colocar e quebrar agora miram no **mesmo** lugar (o dedo),
    a mira central some, a folga de arraste dobrou, e arrastar para mirar e então segurar passou a
    funcionar em vez de travar o dedo. Se ainda falhar, o número a mexer é `HOLD_SLOP` em
    `input/touch.ts`.
-8. **Reconferir o inventário no celular.** As duas correções de 2026-09-14
+10. **Reconferir o inventário no celular.** As duas correções de 2026-09-14
    vieram de relato de campo e voltam para lá:
    - **toque longo num slot** pega metade com a mão vazia e solta uma unidade com a mão cheia.
      Montar uma receita de tábua por célula é o teste que importa. A dica aparece no painel, e o
@@ -1498,7 +1664,7 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
    - **largar item** agora arremessa na direção do olhar, e o que foi jogado fora só volta a ser
      coletável depois de dois segundos. Vale largar olhando para o chão e para uma parede, que é
      onde o arremesso sozinho não resolveria.
-9. **Voltar ao DualSense.** O reconhecimento por Bluetooth e a navegação básica já foram
+11. **Voltar ao DualSense.** O reconhecimento por Bluetooth e a navegação básica já foram
    confirmados em 2026-09-14; o que ainda não viu aparelho é a segunda passada. Em ordem de
    quanto pode estar errado:
    - **O cursor do analógico direito** com o inventário aberto. É o item novo e o mais fácil de
@@ -1518,18 +1684,18 @@ gerador. E `renderer.chunks.clear()`, que não existia, é o que qualquer troca 
      ligada.
    - **No celular**, lembrar que ligar o áudio e a tela cheia exigem um toque na tela — o controle
      não serve de gesto para o navegador. O jogo avisa isso ao conectar.
-10. **Uma sessão longa jogando de verdade.** A metade mecânica do critério está cumprida:
+12. **Uma sessão longa jogando de verdade.** A metade mecânica do critério está cumprida:
    `npm run soak` rodou 92,5 min de voo contínuo sem um erro, e os números estão no §2 e no §3.
    O que o robô **não** cobre, e é o que sobra: uma sessão longa **jogando** — inventário,
    construção, morte e volta, troca de dimensão —, e principalmente **no celular**, que é onde o
    orçamento é apertado. Vale também deixar o `npm run soak` fechar os 120 min uma vez, já que a
    primeira execução parou aos 92 por decisão de quem estava na máquina.
-11. ~~**Medir o tempo de abertura em 3G.**~~ **Feito em 2026-09-14**: 4,48 s no 3G rápido, dentro
+13. ~~**Medir o tempo de abertura em 3G.**~~ **Feito em 2026-09-14**: 4,48 s no 3G rápido, dentro
    dos 5 s do critério (§2 e §3). O que sobrou como pergunta em aberto é a **outra metade do
    tempo**: ~2 s entre o documento pronto e a tela de título são CPU de boot, medidos num desktop.
    Vale repetir a medida no celular, porque é essa metade que cresce num T0 — e é ela, e não o
    tamanho do bundle, que decide se o critério continua cumprido.
-12. Oportunidades pequenas que sobraram, agora curtas:
+14. Oportunidades pequenas que sobraram, agora curtas:
    - **`.clw` com miniatura** já funciona, mas nenhum arquivo real foi exportado e reimportado
      desde a mudança para a v2 — é um teste manual de cinco minutos;
    - **som no resource pack** foi testado por formato, nunca com um `.ogg` de verdade num

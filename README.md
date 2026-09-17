@@ -4,9 +4,9 @@ Este repositório contém **a especificação completa** de um jogo de mundo abe
 navegador — um jogo de minerar-e-construir que roda em praticamente qualquer máquina, incluindo
 celulares antigos — e a **implementação em andamento**.
 
-**Estado atual: os oito marcos, de M0 a M7, estão concluídos, e o M8 — acabamento visual — foi
-entregue em 2026-09-16. Nenhum documento normativo tem pendência de funcionalidade. Falta jogar em
-aparelho o que foi entregue depois do M7.**
+**Estado atual: os oito marcos, de M0 a M7, estão concluídos, e o M8 — acabamento visual — fechou
+em 2026-09-17. Nenhum documento normativo tem pendência de funcionalidade. Falta jogar em aparelho
+o que foi entregue depois do M7.**
 
 - **M0 — esqueleto:** Vite + TypeScript strict, renderer WebGL2 próprio com fallback WebGL1,
   detecção de tier, loop de 20 Hz com interpolação, gerador procedural de texturas alimentando um
@@ -94,6 +94,19 @@ aparelho o que foi entregue depois do M7.**
   colide, e planta e trilho aparecem como o próprio ladrilho. Junto foram embora as texturas
   emprestadas — abóbora e melancia eram **literalmente** `block/oak_planks` —, a fornalha ganhou
   boca e grelha, e o baú deixou de ser confundível com a bancada.
+  A quarta passada fechou o marco: **placa com texto escrito pelo jogador** (fonte 5×7 gerada por
+  código, com acento por composição, desenhada no mundo num passe de um quad por glifo), **quadro
+  com quatro telas** escolhidas pela posição do bloco, **oito cores** de lã, cama e corante saindo
+  de uma tabela só — a cama colorida não custou uma linha de lógica, porque dormir e morrer em duas
+  metades saem da forma e do `multi` — e a **tampa do baú que abre**, que o roteiro dava como
+  impossível sem um formato de vértice novo: o mesher já escreve quad de quatro cantos arbitrários
+  desde a tocha torta, e o formato guarda posição, não transformação.
+- **Terreno, pós-M8:** as montanhas eram **pilares verticais**. A altura do bioma entrava em degrau
+  — 29 blocos de desnível em um bloco entre montanha e planície —, o que o doc 03 §4.3 já previa
+  ("sem isso, aparecem paredes retas entre biomas") e que o código nunca implementou; e o teto do
+  mundo era um `clamp` duro em que 54% das colunas de montanha batiam, achatando a cordilheira num
+  platô. Com a média 5×5 e um teto macio, o maior degrau entre colunas vizinhas caiu de **37 para
+  6 blocos** e nenhuma coluna encosta mais no teto, sem custo de geração.
 - **Controle:** DualSense, DualShock 4, Xbox e Switch Pro reconhecidos por fabricante/produto —
   o que muda entre eles é sobretudo o **nome do botão**, e o jogo passa a dizer `✕ ○ □ △` a quem
   segura um controle da Sony. Mapeamento completo do doc 09 §3, e **os menus navegáveis por
@@ -107,7 +120,7 @@ Abre em **4,5 s em 3G rápido** (critério: < 5 s) e aguentou **92 min de voo co
 erro**, com o heap estável e o anel de chunks fixo em 489 colunas ao longo de 67 mil blocos — os
 dois medidos por `npm run slow-network` e `npm run soak`, que dirigem um Chrome de verdade.
 
-**201 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
+**208 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
 além de dois ícones de PWA de 6,7 KB, gerados por código.
 
 Validado em aparelho alvo (**Galaxy J7 Metal**, Android 7, 2 GB, Mali-T830) em 2026-09-12:
@@ -120,7 +133,7 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 1710 testes (vitest)
+npm test           # 1812 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
 npm run icons      # regenera os ícones do PWA
@@ -198,7 +211,7 @@ src/
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      1710 testes, incluindo orçamento de performance e de luz
+tests/                      1812 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios

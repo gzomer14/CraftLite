@@ -27,7 +27,7 @@ import {
 } from '../../data/structures';
 import { hash2, hash3 } from '../../core/rng';
 import { SECTION_SIZE, WORLD_HEIGHT, type ChunkColumn } from '../chunk';
-import { sampleColumn, type TerrainNoise } from './terrain';
+import type { HeightField } from './heightfield';
 
 /** Sal do RNG de estrutura — separado do terreno, dos minérios e da decoração. */
 const SALT_STRUCTURE = 40;
@@ -57,31 +57,31 @@ function blockId(name: string): number {
  * Chamado por `generateChunk`, depois da decoração.
  */
 export function placeStructures(
-  chunk: ChunkColumn, seed: number, noise: TerrainNoise,
+  chunk: ChunkColumn, seed: number, field: HeightField,
 ): void {
   for (let dz = -SEARCH_RADIUS; dz <= SEARCH_RADIUS; dz++) {
     for (let dx = -SEARCH_RADIUS; dx <= SEARCH_RADIUS; dx++) {
-      placeFromOrigin(chunk, seed, noise, chunk.cx + dx, chunk.cz + dz);
+      placeFromOrigin(chunk, seed, field, chunk.cx + dx, chunk.cz + dz);
     }
   }
 }
 
 /** Todas as estruturas que nascem no chunk de origem `(ocx, ocz)`. */
 function placeFromOrigin(
-  chunk: ChunkColumn, seed: number, noise: TerrainNoise, ocx: number, ocz: number,
+  chunk: ChunkColumn, seed: number, field: HeightField, ocx: number, ocz: number,
 ): void {
   for (let i = 0; i < STRUCTURES.length; i++) {
     const def = STRUCTURES[i];
     // A aldeia tem regra de região própria; as demais são por chunk.
     if (def.name === 'village_house' || def.name === 'village_well') continue;
-    tryPlace(chunk, seed, noise, def, ocx, ocz, i);
+    tryPlace(chunk, seed, field, def, ocx, ocz, i);
   }
-  placeVillage(chunk, seed, noise, ocx, ocz);
+  placeVillage(chunk, seed, field, ocx, ocz);
 }
 
 /** Tentativas por chunk da estrutura, com posição sorteada dentro dele. */
 function tryPlace(
-  chunk: ChunkColumn, seed: number, noise: TerrainNoise,
+  chunk: ChunkColumn, seed: number, field: HeightField,
   def: StructureDef, ocx: number, ocz: number, salt: number,
 ): void {
   const attempts = def.placement.attempts;
@@ -96,31 +96,31 @@ function tryPlace(
     const spot = hash3(seed, ocx, attempt + 64, ocz, SALT_STRUCTURE + salt);
     const ox = ocx * SECTION_SIZE + (spot & 15);
     const oz = ocz * SECTION_SIZE + ((spot >>> 4) & 15);
-    const oy = pickY(def, ox, oz, spot, noise);
+    const oy = pickY(def, ox, oz, spot, field);
     if (oy < 0) continue;
-    if (!biomeAllows(def, noise, ox, oz)) continue;
+    if (!biomeAllows(def, field, ox, oz)) continue;
     stamp(chunk, seed, def, ox, oy, oz);
   }
 }
 
 /** Altura da estrutura: sorteada na faixa, ou assentada na superfície. */
 function pickY(
-  def: StructureDef, ox: number, oz: number, spot: number, noise: TerrainNoise,
+  def: StructureDef, ox: number, oz: number, spot: number, field: HeightField,
 ): number {
   if (!def.placement.surface) {
     const span = def.placement.maxY - def.placement.minY;
     return def.placement.minY + ((spot >>> 8) % Math.max(1, span + 1));
   }
-  const height = sampleColumn(noise, ox, oz, 0, 0).height;
+  const height = field.heightAt(ox, oz);
   // Assenta com o piso um bloco acima do chão; abaixo do mar não se constrói.
   if (height < 62) return -1;
   return height + 1;
 }
 
-function biomeAllows(def: StructureDef, noise: TerrainNoise, ox: number, oz: number): boolean {
+function biomeAllows(def: StructureDef, field: HeightField, ox: number, oz: number): boolean {
   const allowed = def.placement.biomes;
   if (allowed === undefined || allowed.length === 0) return true;
-  const biome = BIOMES[sampleColumn(noise, ox, oz, 0, 0).biome];
+  const biome = BIOMES[field.sample(ox, oz).biome];
   return allowed.indexOf(biome.name) >= 0;
 }
 
@@ -129,7 +129,7 @@ function biomeAllows(def: StructureDef, noise: TerrainNoise, ox: number, oz: num
  * (doc 03 §7). Os aldeões nascem junto com o poço.
  */
 function placeVillage(
-  chunk: ChunkColumn, seed: number, noise: TerrainNoise, ocx: number, ocz: number,
+  chunk: ChunkColumn, seed: number, field: HeightField, ocx: number, ocz: number,
 ): void {
   const regionX = Math.floor(ocx / VILLAGE_REGION);
   const regionZ = Math.floor(ocz / VILLAGE_REGION);
@@ -156,8 +156,8 @@ function placeVillage(
   const offset = hash2(seed, ocx, ocz, SALT_VILLAGE + 2);
   const ox = ocx * SECTION_SIZE + 2 + (offset & 7);
   const oz = ocz * SECTION_SIZE + 2 + ((offset >>> 3) & 7);
-  if (!biomeAllows(def, noise, ox, oz)) return;
-  const oy = pickY(def, ox, oz, offset, noise);
+  if (!biomeAllows(def, field, ox, oz)) return;
+  const oy = pickY(def, ox, oz, offset, field);
   if (oy < 0) return;
 
   stamp(chunk, seed, def, ox, oy, oz);

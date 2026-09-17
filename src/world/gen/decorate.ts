@@ -13,16 +13,17 @@
  *    dele. Como o sorteio vem de `rngAt(seed, cx, cz)`, os dois lados chegam
  *    exatamente ao mesmo resultado, em qualquer ordem de geração e com qualquer
  *    número de workers.
- * 2. **A altura do terreno vem de `sampleColumn` direto**, sem a grade esparsa
- *    do laço de geração: é ~25× mais caro por coluna, mas são poucas dezenas de
- *    colunas por chunk, não 4096.
+ * 2. **A altura do terreno vem do mesmo `HeightField` que o gerador usou**, e é
+ *    por isso que ele tem margem: a janela preparada cobre 16 blocos para fora
+ *    do chunk, que é exatamente o alcance de uma árvore de vizinho. Perguntar a
+ *    outra fonte daria outra altura e a árvore nasceria flutuando.
  */
 
 import { BIOMES } from '../../data/biomes';
 import { AIR, makeState } from '../../data/blocks';
 import { Rng, hash2 } from '../../core/rng';
 import { SEA_LEVEL, SECTION_SIZE, WORLD_HEIGHT, type ChunkColumn } from '../chunk';
-import { sampleColumn, type TerrainNoise } from './terrain';
+import type { HeightField } from './heightfield';
 
 /** Sal do RNG de decoração — separado dos usados pelo terreno e pelos minérios. */
 const SALT_DECOR = 20;
@@ -81,23 +82,23 @@ const SOIL = new Set([8, 9, 6, 15]); // grass_block, podzol, dirt, snow_block
  * Decora `chunk`, escrevendo também o que transborda dos 8 vizinhos.
  * Deve rodar **antes** do heightmap e da luz do céu.
  */
-export function decorate(chunk: ChunkColumn, seed: number, noise: TerrainNoise): void {
+export function decorate(chunk: ChunkColumn, seed: number, field: HeightField): void {
   for (let dz = -1; dz <= 1; dz++) {
     for (let dx = -1; dx <= 1; dx++) {
-      decorateFrom(chunk, seed, noise, chunk.cx + dx, chunk.cz + dz);
+      decorateFrom(chunk, seed, field, chunk.cx + dx, chunk.cz + dz);
     }
   }
 }
 
 /** Sorteia as features do chunk `(ncx, ncz)` e escreve o que cai em `chunk`. */
 function decorateFrom(
-  chunk: ChunkColumn, seed: number, noise: TerrainNoise, ncx: number, ncz: number,
+  chunk: ChunkColumn, seed: number, field: HeightField, ncx: number, ncz: number,
 ): void {
   const rng = new Rng(hash2(seed, ncx, ncz, SALT_DECOR), SALT_DECOR);
 
   // O bioma do centro do chunk decide o que cresce nele: variar por coluna
   // deixaria meia árvore de acácia dentro da floresta.
-  const center = sampleColumn(noise, ncx * SECTION_SIZE + 8, ncz * SECTION_SIZE + 8);
+  const center = field.sample(ncx * SECTION_SIZE + 8, ncz * SECTION_SIZE + 8);
   const biome = BIOMES[center.biome];
   const spec = biome === undefined ? undefined : DECOR[biome.name];
   if (spec === undefined) return;
@@ -105,30 +106,30 @@ function decorateFrom(
   if (spec.tree !== undefined) {
     const count = countOf(rng, spec.tree.perChunk);
     for (let i = 0; i < count; i++) {
-      placeTree(chunk, noise, rng, ncx, ncz, spec.tree.kind);
+      placeTree(chunk, field, rng, ncx, ncz, spec.tree.kind);
     }
   }
   if (spec.grass !== undefined) {
     for (let i = 0; i < spec.grass; i++) {
-      placePlant(chunk, noise, rng, ncx, ncz, rng.nextFloat() < 0.25 ? FERN : TALL_GRASS);
+      placePlant(chunk, field, rng, ncx, ncz, rng.nextFloat() < 0.25 ? FERN : TALL_GRASS);
     }
   }
   if (spec.flowers !== undefined) {
     for (let i = 0; i < spec.flowers; i++) {
-      placePlant(chunk, noise, rng, ncx, ncz, rng.nextFloat() < 0.5 ? DANDELION : POPPY);
+      placePlant(chunk, field, rng, ncx, ncz, rng.nextFloat() < 0.5 ? DANDELION : POPPY);
     }
   }
   if (spec.deadBush !== undefined) {
     for (let i = 0; i < spec.deadBush; i++) {
-      placePlant(chunk, noise, rng, ncx, ncz, DEAD_BUSH, true);
+      placePlant(chunk, field, rng, ncx, ncz, DEAD_BUSH, true);
     }
   }
   if (spec.cactus !== undefined) {
     const count = countOf(rng, spec.cactus);
-    for (let i = 0; i < count; i++) placeCactus(chunk, noise, rng, ncx, ncz);
+    for (let i = 0; i < count; i++) placeCactus(chunk, field, rng, ncx, ncz);
   }
   if (spec.sugarCane !== undefined) {
-    for (let i = 0; i < spec.sugarCane; i++) placeSugarCane(chunk, noise, rng, ncx, ncz);
+    for (let i = 0; i < spec.sugarCane; i++) placeSugarCane(chunk, field, rng, ncx, ncz);
   }
 }
 
@@ -143,9 +144,9 @@ function countOf(rng: Rng, value: number): number {
  * `sandy` aceita areia (cacto, arbusto morto).
  */
 function groundHeight(
-  chunk: ChunkColumn, noise: TerrainNoise, wx: number, wz: number, sandy: boolean,
+  chunk: ChunkColumn, field: HeightField, wx: number, wz: number, sandy: boolean,
 ): number {
-  const sample = sampleColumn(noise, wx, wz);
+  const sample = field.sample(wx, wz);
   const height = sample.height;
   if (height < SEA_LEVEL + 1 || height >= WORLD_HEIGHT - 12) return -1;
 
@@ -171,11 +172,11 @@ function groundHeight(
 }
 
 function placeTree(
-  chunk: ChunkColumn, noise: TerrainNoise, rng: Rng, ncx: number, ncz: number, kind: TreeKind,
+  chunk: ChunkColumn, field: HeightField, rng: Rng, ncx: number, ncz: number, kind: TreeKind,
 ): void {
   const wx = ncx * SECTION_SIZE + rng.nextInt(SECTION_SIZE);
   const wz = ncz * SECTION_SIZE + rng.nextInt(SECTION_SIZE);
-  const ground = groundHeight(chunk, noise, wx, wz, false);
+  const ground = groundHeight(chunk, field, wx, wz, false);
   if (ground < 0) return;
 
   const base = ground + 1;
@@ -256,22 +257,22 @@ function growAcacia(
 }
 
 function placePlant(
-  chunk: ChunkColumn, noise: TerrainNoise, rng: Rng,
+  chunk: ChunkColumn, field: HeightField, rng: Rng,
   ncx: number, ncz: number, state: number, sandy = false,
 ): void {
   const wx = ncx * SECTION_SIZE + rng.nextInt(SECTION_SIZE);
   const wz = ncz * SECTION_SIZE + rng.nextInt(SECTION_SIZE);
-  const ground = groundHeight(chunk, noise, wx, wz, sandy);
+  const ground = groundHeight(chunk, field, wx, wz, sandy);
   if (ground < 0) return;
   setIfAir(chunk, wx, ground + 1, wz, state);
 }
 
 function placeCactus(
-  chunk: ChunkColumn, noise: TerrainNoise, rng: Rng, ncx: number, ncz: number,
+  chunk: ChunkColumn, field: HeightField, rng: Rng, ncx: number, ncz: number,
 ): void {
   const wx = ncx * SECTION_SIZE + rng.nextInt(SECTION_SIZE);
   const wz = ncz * SECTION_SIZE + rng.nextInt(SECTION_SIZE);
-  const ground = groundHeight(chunk, noise, wx, wz, true);
+  const ground = groundHeight(chunk, field, wx, wz, true);
   if (ground < 0) return;
   const height = 1 + rng.nextInt(3);
   for (let y = 1; y <= height; y++) setIfAir(chunk, wx, ground + y, wz, CACTUS);
@@ -279,11 +280,11 @@ function placeCactus(
 
 /** Cana só nasce coladinha na água, como no gênero. */
 function placeSugarCane(
-  chunk: ChunkColumn, noise: TerrainNoise, rng: Rng, ncx: number, ncz: number,
+  chunk: ChunkColumn, field: HeightField, rng: Rng, ncx: number, ncz: number,
 ): void {
   const wx = ncx * SECTION_SIZE + rng.nextInt(SECTION_SIZE);
   const wz = ncz * SECTION_SIZE + rng.nextInt(SECTION_SIZE);
-  const sample = sampleColumn(noise, wx, wz);
+  const sample = field.sample(wx, wz);
   // Praia: a coluna tem que estar a um ou dois blocos acima do mar.
   if (sample.height < SEA_LEVEL || sample.height > SEA_LEVEL + 1) return;
   const height = 1 + rng.nextInt(3);

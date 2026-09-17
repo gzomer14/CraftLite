@@ -5,30 +5,20 @@
  * em qualquer ordem e em qualquer worker. Não toca no `World` — devolve uma
  * `ChunkColumn` pronta.
  *
- * Ordem do pipeline: ruído 2D → bioma (com blend 5×5) → altura por splines →
- * terreno base → cavernas → superfície → minérios → skylight colunar.
+ * Ordem do pipeline: campo de altura e bioma (`heightfield.ts`, que já faz o
+ * blend 5×5 do doc 03 §4.3) → terreno base → cavernas → superfície → minérios →
+ * skylight colunar.
  */
 
-import { BIOMES, BIOME_OCEAN, pickBiome } from '../../data/biomes';
+import { BIOMES } from '../../data/biomes';
 import { AIR, BEDROCK, GRAVEL, SAND, STONE, WATER, LAVA, defOf } from '../../data/blocks';
 import { Noise, valueNoise3 } from '../../core/noise';
 import { hash2, hash3 } from '../../core/rng';
+import { clamp } from '../../core/math';
 import { decorate } from './decorate';
+import { HeightField } from './heightfield';
 import { placeStructures } from './structures';
-import { clamp, spline } from '../../core/math';
 import { ChunkColumn, SEA_LEVEL, SECTION_SIZE, WORLD_HEIGHT } from '../chunk';
-
-/** Frequências do doc 03 §4.1, em 1/blocos. */
-const FREQ_CONTINENT = 1 / 2000;
-const FREQ_EROSION = 1 / 1500;
-const FREQ_TEMPERATURE = 1 / 1200;
-const FREQ_HUMIDITY = 1 / 1000;
-const FREQ_WEIRDNESS = 1 / 800;
-const FREQ_DETAIL = 1 / 60;
-
-/** Spline de continentalidade do doc 03 §4.2 — oceano em −1, planalto em +1. */
-const CONT_X = [-1.0, -0.4, -0.15, 0.0, 0.3, 0.6, 1.0];
-const CONT_Y = [32, 48, 60, 65, 72, 84, 100];
 
 /**
  * Limiares das cavernas, **calibrados empiricamente**.
@@ -102,125 +92,15 @@ export class TerrainNoise {
     this.cheese = new Noise(seed, SALT_CHEESE);
     this.spaghettiA = new Noise(seed, SALT_SPAGHETTI_A);
     this.spaghettiB = new Noise(seed, SALT_SPAGHETTI_B);
-  }
-}
-
-/** Amostra de coluna: o que os mapas 2D dizem sobre um `(x,z)`. */
-export interface ColumnSample {
-  height: number;
-  biome: number;
-  temperature: number;
-  humidity: number;
-  erosion: number;
-  continent: number;
-}
-
-const SAMPLE: ColumnSample = {
-  height: 0, biome: 0, temperature: 0, humidity: 0, erosion: 0, continent: 0,
-};
-
-/**
- * Grade esparsa de ruído 2D.
- *
- * Os mapas de continentalidade, erosão, temperatura, umidade e esquisitice têm
- * frequências entre 1/800 e 1/2000 — variam devagar demais para justificar uma
- * amostra por bloco. Amostramos a cada 4 blocos e interpolamos, o que **é** o
- * blend 5×5 do doc 03 §4.3 e derruba o custo de geração de ~6400 amostras de
- * FBM por chunk para 25. Sem isso, voar dá hitch.
- *
- * O `detail` (1/60) continua por coluna: é ele que dá a rugosidade local.
- */
-const GRID_STEP = 4;
-const GRID_SIDE = SECTION_SIZE / GRID_STEP + 1; // 5
-const GRID_POINTS = GRID_SIDE * GRID_SIDE;
-
-const gridContinent = new Float32Array(GRID_POINTS);
-const gridErosion = new Float32Array(GRID_POINTS);
-const gridTemperature = new Float32Array(GRID_POINTS);
-const gridHumidity = new Float32Array(GRID_POINTS);
-const gridWeirdness = new Float32Array(GRID_POINTS);
-
-function fillGrid(noise: TerrainNoise, cx: number, cz: number): void {
-  for (let gz = 0; gz < GRID_SIDE; gz++) {
-    for (let gx = 0; gx < GRID_SIDE; gx++) {
-      const wx = cx * SECTION_SIZE + gx * GRID_STEP;
-      const wz = cz * SECTION_SIZE + gz * GRID_STEP;
-      const i = gz * GRID_SIDE + gx;
-      gridContinent[i] = noise.continent.fbm2(wx, wz, 4, FREQ_CONTINENT);
-      gridErosion[i] = noise.erosion.fbm2(wx, wz, 4, FREQ_EROSION);
-      gridTemperature[i] = noise.temperature.fbm2(wx, wz, 3, FREQ_TEMPERATURE);
-      gridHumidity[i] = noise.humidity.fbm2(wx, wz, 3, FREQ_HUMIDITY);
-      gridWeirdness[i] = noise.weirdness.fbm2(wx, wz, 3, FREQ_WEIRDNESS);
-    }
-  }
-}
-
-/** Interpolação bilinear na grade, para um bloco local `(lx, lz)`. */
-function sampleGrid(grid: Float32Array, lx: number, lz: number): number {
-  const fx = lx / GRID_STEP;
-  const fz = lz / GRID_STEP;
-  const x0 = Math.min(GRID_SIDE - 2, fx | 0);
-  const z0 = Math.min(GRID_SIDE - 2, fz | 0);
-  const tx = fx - x0;
-  const tz = fz - z0;
-  const i = z0 * GRID_SIDE + x0;
-  const a = grid[i] + (grid[i + 1] - grid[i]) * tx;
-  const b = grid[i + GRID_SIDE] + (grid[i + GRID_SIDE + 1] - grid[i + GRID_SIDE]) * tx;
-  return a + (b - a) * tz;
-}
-
-/**
- * Altura e bioma de uma coluna. `out` é reusado: não chame duas vezes esperando
- * manter o resultado anterior.
- *
- * Se `useGrid` for falso, amostra os mapas 2D direto — caminho usado só fora do
- * laço de geração (debug, testes), porque é ~25× mais caro.
- */
-export function sampleColumn(
-  noise: TerrainNoise, wx: number, wz: number, lx = -1, lz = -1,
-): ColumnSample {
-  let cont: number;
-  let ero: number;
-  let temp: number;
-  let humid: number;
-  let weird: number;
-
-  if (lx >= 0) {
-    cont = sampleGrid(gridContinent, lx, lz);
-    ero = sampleGrid(gridErosion, lx, lz);
-    temp = sampleGrid(gridTemperature, lx, lz);
-    humid = sampleGrid(gridHumidity, lx, lz);
-    weird = sampleGrid(gridWeirdness, lx, lz);
-  } else {
-    cont = noise.continent.fbm2(wx, wz, 4, FREQ_CONTINENT);
-    ero = noise.erosion.fbm2(wx, wz, 4, FREQ_EROSION);
-    temp = noise.temperature.fbm2(wx, wz, 3, FREQ_TEMPERATURE);
-    humid = noise.humidity.fbm2(wx, wz, 3, FREQ_HUMIDITY);
-    weird = noise.weirdness.fbm2(wx, wz, 3, FREQ_WEIRDNESS);
+    this.field = new HeightField(this);
   }
 
-  const base = spline(CONT_X, CONT_Y, cont);
-  // Erosão alta (+1) achata o relevo; baixa (−1) dá amplitude de montanha.
-  const amplitude = 3 + (1 - (ero + 1) / 2) * 25;
-
-  // Domain warping deixa as encostas orgânicas em vez de onduladas (doc 03 §4.1).
-  const detail = noise.detail.warpedFbm2(wx, wz, 3, FREQ_DETAIL, 12);
-  let h = base + detail * amplitude + weird * 4;
-
-  const biome = pickBiome(Math.round(h), SEA_LEVEL, temp, humid, ero);
-  const def = BIOMES[biome];
-  if (biome !== BIOME_OCEAN) {
-    h += def.heightOffset;
-    h += detail * amplitude * (def.heightScale - 1) * 0.5;
-  }
-
-  SAMPLE.height = Math.round(clamp(h, 4, WORLD_HEIGHT - 4));
-  SAMPLE.biome = biome;
-  SAMPLE.temperature = temp;
-  SAMPLE.humidity = humid;
-  SAMPLE.erosion = ero;
-  SAMPLE.continent = cont;
-  return SAMPLE;
+  /**
+   * Campo de altura e bioma desta seed. Mora aqui porque tem o mesmo ciclo de
+   * vida do ruído — um por worker — e porque `prepare` reusa os buffers dele a
+   * cada chunk em vez de alocar.
+   */
+  readonly field: HeightField;
 }
 
 export interface GenerateOptions {
@@ -246,13 +126,14 @@ export function generateChunk(
   const heights = HEIGHT_SCRATCH;
   const biomes = BIOME_SCRATCH;
 
-  // 1–3. mapas 2D na grade esparsa, depois bioma e altura por coluna
-  fillGrid(noise, cx, cz);
+  // 1–3. campo de altura e bioma, já com o blend do doc 03 §4.3
+  const field = noise.field;
+  field.prepare(cx, cz);
   for (let lz = 0; lz < SECTION_SIZE; lz++) {
     for (let lx = 0; lx < SECTION_SIZE; lx++) {
       const wx = cx * SECTION_SIZE + lx;
       const wz = cz * SECTION_SIZE + lz;
-      const s = sampleColumn(noise, wx, wz, lx, lz);
+      const s = field.sample(wx, wz);
       const i = (lz << 4) | lx;
       heights[i] = s.height;
       biomes[i] = s.biome;
@@ -299,11 +180,11 @@ export function generateChunk(
   if (withOres) placeOres(chunk, seed, cx, cz, heights);
 
   // 8. árvores e plantas — antes do heightmap e da luz, que precisam vê-las.
-  if (withDecoration) decorate(chunk, seed, noise);
+  if (withDecoration) decorate(chunk, seed, field);
 
   // 9. estruturas — depois da decoração, para a casa não nascer com árvore
   // dentro; antes do heightmap e da luz, que precisam vê-las (doc 03 §7).
-  if (withStructures) placeStructures(chunk, seed, noise);
+  if (withStructures) placeStructures(chunk, seed, field);
 
   chunk.recomputeHeightMap();
   computeChunkLight(chunk);

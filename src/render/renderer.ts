@@ -9,6 +9,7 @@
 import { Camera } from './camera';
 import { ChunkRenderer } from './chunkrenderer';
 import { CloudsPass } from './clouds';
+import { FallingBlockMeshes } from './fallingblocks';
 import { Particles } from './particles';
 import { SelectionPass } from './selection';
 import { SkyPass } from './sky';
@@ -71,6 +72,20 @@ export class Renderer {
    * mobs: o renderizador não conhece a `Session` que guarda o texto.
    */
   signTextPass: { flush: (viewProj: Mat4) => number } | null = null;
+  /**
+   * Blocos caindo (doc 03 §9), desenhados no passe opaco do terreno. Quem
+   * preenche é o chamador; a luz vem de `blockLightAt`, porque o renderizador
+   * não conhece o mundo.
+   */
+  fallingBlocks: {
+    readonly active: number;
+    forEach(fn: (x: number, y: number, z: number, state: number) => void, alpha: number): void;
+  } | null = null;
+  /** Luz empacotada `céu << 4 | bloco` numa posição de mundo. */
+  blockLightAt: ((x: number, y: number, z: number) => number) | null = null;
+  private readonly fallingMeshes: FallingBlockMeshes;
+  private fallingCalls = 0;
+
   /** Item na mão em primeira pessoa; `null` desliga o passe. */
   handRenderer: {
     render: (aspect: number, alpha: number, light: number) => number;
@@ -134,6 +149,7 @@ export class Renderer {
     this.clouds = new CloudsPass(ctx);
     this.clouds.mode = preset.clouds;
     this.chunks = new ChunkRenderer(ctx);
+    this.fallingMeshes = new FallingBlockMeshes(ctx, atlas);
     this.renderScale = preset.renderScale;
     this.maxDpr = preset.maxDpr;
 
@@ -278,6 +294,11 @@ export class Renderer {
     // 2. terreno opaco, front-to-back (early-Z ajuda muito em GPU mobile)
     this.terrain.begin(this.camera.viewProj, this.skyParams, false);
     calls += this.chunks.draw('opaque', this.setOriginOpaque);
+    if (this.fallingBlocks !== null && this.fallingBlocks.active > 0) {
+      this.fallingCalls = 0;
+      this.fallingBlocks.forEach(this.drawFalling, alpha);
+      calls += this.fallingCalls;
+    }
     this.terrain.end();
 
     // 2b. cutout (folhas, vidro): mesmo passe, com alpha test
@@ -347,6 +368,16 @@ export class Renderer {
     this.vertices = this.chunks.vertices;
   }
 
+  /** Um bloco caindo: `x`/`z` no centro, `y` na base. Bound uma vez, como os de baixo. */
+  private readonly drawFalling = (x: number, y: number, z: number, state: number): void => {
+    const light = this.blockLightAt !== null
+      ? this.blockLightAt(Math.floor(x), Math.floor(y + 0.5), Math.floor(z)) : 0xf0;
+    const mesh = this.fallingMeshes.meshFor(state, light >> 4, light & 15);
+    this.terrain.setOrigin(x - 0.5, y, z - 0.5, false);
+    mesh.draw();
+    this.fallingCalls++;
+  };
+
   /** Bound uma vez: passar um closure novo por section alocaria por frame. */
   private readonly setOriginOpaque = (x: number, y: number, z: number): void => {
     this.terrain.setOrigin(x, y, z, false);
@@ -358,6 +389,7 @@ export class Renderer {
 
   dispose(): void {
     this.chunks.dispose();
+    this.fallingMeshes.dispose();
     this.clouds.dispose();
     this.sky.dispose();
     this.selection.dispose();

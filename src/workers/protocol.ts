@@ -67,7 +67,12 @@ export interface MeshRequest {
   light: Uint8Array;
 }
 
-export type WorkerRequest = InitRequest | GenRequest | MeshRequest;
+/** Onde nasce o jogador num mundo novo (`world/gen/spawnsearch.ts`). */
+export interface SpawnRequest {
+  type: 'spawn';
+}
+
+export type WorkerRequest = InitRequest | GenRequest | MeshRequest | SpawnRequest;
 
 export interface GenResponse {
   type: 'gen';
@@ -97,7 +102,13 @@ export interface MeshResponse {
   light: Uint8Array;
 }
 
-export type WorkerResponse = GenResponse | MeshResponse;
+export interface SpawnResponse {
+  type: 'spawn';
+  x: number;
+  z: number;
+}
+
+export type WorkerResponse = GenResponse | MeshResponse | SpawnResponse;
 
 /** Junta os `ArrayBuffer` de uma resposta para o `postMessage` transferir. */
 export function collectTransfers(response: WorkerResponse): Transferable[] {
@@ -109,7 +120,7 @@ export function collectTransfers(response: WorkerResponse): Transferable[] {
       out.push(section.skyLight.buffer, section.blockLight.buffer);
     }
     out.push(response.heightMap.buffer, response.biomeMap.buffer);
-  } else {
+  } else if (response.type === 'mesh') {
     for (const mesh of [response.opaque, response.cutout, response.translucent]) {
       if (mesh !== null) out.push(mesh.vertices, mesh.indices);
     }

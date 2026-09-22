@@ -220,6 +220,235 @@ O mapa não pode custar mais que 1 ms por segundo de jogo nem crescer o save de 
 
 ---
 
+## Avaliação de 2026-09-22 — M11 a M17
+
+> Acrescentado em 2026-09-22, a pedido do usuário: *"Faça uma avaliação completa no projeto, para
+> entender o que falta implementar, se possui melhorias claras de performance, funcionalidades
+> faltantes (…) e adicionar como novos marcos. Quero esse jogo o melhor possível"*.
+>
+> Tudo o que aparece abaixo como **falta** foi conferido no código (`grep`, leitura do módulo),
+> não suposto. O arquivo e a linha estão ao lado de cada item para quem for implementar conferir
+> de novo antes de começar — o código anda, e a linha pode ter mudado.
+
+**O achado que muda a leitura do projeto:** o doc 15 e o README diziam que *"nenhum documento
+normativo tem pendência de funcionalidade"*. **Não é verdade.** Os docs 03, 04, 05, 07 e 08 pedem
+coisas que não existem — algumas pequenas (a areia não cai), algumas estruturais (não há sistema de
+efeitos). Elas viraram o **M11**, que é o primeiro da fila por ser dívida, e não desejo.
+
+**O que a avaliação não achou:** problema de orçamento. O T0 real rodou a 60 FPS com 2,7 ms de
+render num orçamento de 33,3; o bundle está em 60% do teto; o save, a luz incremental e o meshing
+estão bem desenhados. A performance que falta é de **carregamento** (o mundo nasce mais devagar do
+que o jogador anda, doc 15 §3 M3) e de **alcance visual**, não de quadro — por isso o M12 é sobre
+o pipeline, e não sobre o shader.
+
+### Ordem recomendada
+
+```
+M11 dívida normativa ──► M13 casa em ordem ──► M12 carregamento ──► M9 gente ──► M10 localização
+                              │                                          │
+                              └── folga de atlas ──► M14 água ──► M15 oficina ──► M16 fim da jornada
+M17 alcance (idioma e primeira hora) pode andar em paralelo com qualquer um.
+```
+
+O M13 vem **antes** do conteúdo novo porque dois itens dele destravam os outros: o uso de item como
+dado (sem ele, o balde do M11 é o 12º `try*` em sequência na `Session`) e a folga de atlas (sem
+ela, o M14 e o M16 não cabem nas 44 camadas que sobram).
+
+---
+
+## M11 — O que os documentos já pediam ✅
+
+> Dívida normativa. Nada aqui é ideia nova: cada item está escrito num doc de 00 a 14 e não existia
+> no código. **Fechado em 2026-09-22**, no mesmo dia da avaliação — detalhe no doc 15 §3.
+
+- [x] **Areia, areia vermelha e cascalho caem** (doc 03 §9, doc 04 §2.1). `world/falling.ts`: a
+      flag `gravity` ganhou leitor. Entidade num pool, desenhada no próprio passe de terreno
+      (`render/fallingblocks.ts`); para no primeiro sólido, atravessa água, e a que cai numa tocha
+      vira item.
+- [x] **Lava corrente + água = pedregulho** (doc 03 §9). E o encontro dos dois fluidos passou a
+      existir dos dois lados: a água, que anda seis vezes mais rápido, **apagava** a lava por onde
+      passava. Os ids crus de `world/fluids.ts` saíram. O módulo não tinha teste nenhum; agora tem.
+- [x] **Balde que funciona**: água, lava e leite, pela tabela de uso de item (M13, abaixo). Lava
+      queima 20 000 ticks e devolve o balde; o bolo devolve os três baldes na grade.
+- [x] **Tesoura**: item, receita, tosquia (1–3 lãs da cor) e folha colhida inteira.
+- [x] **Ovelha colorida**: 85% branca, o resto nas outras sete cores; corante tinge; a lã volta
+      pastando. A cor é o `variant` da `MobStore`, que já dizia "cor da ovelha" e ninguém escrevia.
+- [x] **Muda por espécie** — e, achado no caminho, **nenhuma planta crescia**: a muda não virava
+      árvore, cana e cacto não subiam, a grama não se espalhava e flor boiava sem chão (doc 03 §9
+      inteiro). `data/plants.ts` + `world/growth.ts`; a forma da árvore saiu para `world/trees.ts`
+      para a geração e a muda usarem a mesma receita, **sem mudar um sorteio**.
+- [x] **Efeitos de status** como tabela (`data/effects.ts`, `game/effects.ts`): Fome,
+      Regeneração, Absorção e Veneno, com HUD (`ui/effectsbar.ts`) e save.
+- [x] **Comidas do doc 05 §4**: maçã dourada, ensopado (com os cogumelos, em caverna e pântano),
+      biscoito e bolo de 7 fatias comido no bloco.
+- [x] **Bloco de carvão e pedra lisa** — e, achado no caminho, **nenhum bloco queimava**: tábua,
+      tronco e muda, os três do doc 05 §5, ganharam `fuel`.
+- [x] **Galinha põe ovo**, ovo e bola de neve são arremessáveis, um ovo em oito choca.
+- [x] **Enderman pega e põe** terra, areia, planta e abóbora — nunca pedra nem construção.
+- [x] **Poço do deserto, cabana de bruxa e naufrágio**, no fim da tabela para não mudar o sal das
+      estruturas antigas.
+- [x] **Smoke test de navegador** (`npm run smoke`): carrega, cria mundo, anda 10 s, quebra,
+      salva, recarrega e confere. **7 passos verdes** em Chrome headless.
+
+**Achado pelo smoke test, corrigido no marco:** o jogador nascia **sempre** na coluna (0, 0), e
+metade das seeds põe mar ali. O worker agora procura terra firme em anéis
+(`world/gen/spawnsearch.ts`), e o ponto fica no meta do mundo.
+
+**Critério de aceite:** ✅ cumprido por teste — torre de areia desaba (`tests/falling.test.ts`),
+gerador de pedregulho funciona (`tests/fluids.test.ts`), bétula replantada dá bétula
+(`tests/plants.test.ts`), smoke test verde. **Falta o olho num aparelho** (doc 15 §6).
+
+---
+
+## M12 — O mundo chega antes do jogador
+
+> Performance de **carregamento e alcance**. O custo de quadro já está folgado em todos os tiers;
+> o que o jogador sente é o mundo aparecendo atrasado ao voar e a distância de render baixa no
+> celular fraco.
+
+- [ ] **Culling por conectividade de sections.** O PROMPT.md §4.2 o chama de *"fortemente
+      recomendado (corta 60–80% do trabalho em cavernas)"* e **não foi feito**: `buildDrawLists`
+      (`render/chunkrenderer.ts:150`) só faz frustum, e `grep -i occlusion src` só acha o AO do
+      mesher. O worker já varre a section inteira ao meshar; é ali que se calcula, por flood fill
+      do ar, quais das 6 faces se enxergam (15 bits por section). No render, BFS a partir da
+      section da câmera, atravessando só faces conectadas e só para longe dela.
+- [ ] **Culling por direção de face.** O mesh opaco de uma section sai misturado; agrupando os
+      índices em 6 faixas (uma por normal, o `face:3` já está no vértice), a section fora do plano
+      da câmera desenha só as faixas voltadas para ela. Em terreno aberto, metade das faces laterais
+      e todas as de baixo nunca são vistas — o ganho é em vértice, que é o que a GPU móvel paga.
+- [ ] **A cópia da vizinhança sai da thread principal.** Cada job de malha copia 18³ blocos e luz
+      no main thread, ~0,26 ms por section (`world/pipeline.ts:87`), e é esse orçamento que decide
+      quantas sections saem por quadro. Com um espelho das colunas **dentro** do worker (ele gerou a
+      coluna; só precisa receber os `setBlock` depois), o despacho vira uma mensagem de coordenada.
+      `SharedArrayBuffer` não é opção: o GitHub Pages não serve COOP/COEP.
+- [ ] **Luz que atravessa a borda do chunk na geração.** Hoje ela para na borda —
+      `world/gen/terrain.ts:514`, *"essa é a aproximação aceita"* —, o que deixa uma aresta reta de
+      sombra onde um barranco, uma boca de caverna ou um lago de lava cruzam a fronteira. Quando o
+      vizinho chega, semear o flood fill de `world/lighting.ts` com as bordas das duas colunas.
+- [ ] **Rever o preset de T0 com o que sobrar.** Render de 2,7 ms em 33,3 é folga para RD 5 ou 6;
+      o que segurou o RD 4 foi a geração. Precisa de um T0 na mão — o J7 Metal não está mais com o
+      usuário (doc 15 §5) — ou fica como está.
+
+**Critério de aceite:** `tests/dimensionrace.test.ts` (colunas em 40 ciclos, RD 8) **pelo menos
+1,5×** o valor atual de 86; numa caverna a Y=20 com RD 8, **metade ou menos** das sections do
+frustum vão para a lista de desenho; nenhuma aresta de luz visível na fronteira de chunk num teste
+com lava encostada na borda. Orçamentos do `tests/perf.test.ts` intocados.
+
+---
+
+## M13 — Casa em ordem ✅
+
+> Manutenção que **destrava** conteúdo. Nenhum item aqui aparece para o jogador; todos mudam quanto
+> custa o próximo item que aparece. **Fechado em 2026-09-22.**
+
+- [x] **Uso de item como dado.** `game/itemuse.ts` (as ações) e `game/itemuser.ts` (a espera entre
+      cliques e a contagem de segurar). Cada item tem uma lista de usos em ordem de tentativa
+      (`ItemDef.uses`), derivada da tabela: a cenoura é `['plant', 'eat']`. Os onze `try*` da
+      `Session` migraram; o que ficou nela é o que é do **bloco** (`game/blockuse.ts`) ou do veículo.
+- [x] **Dividir os módulos gigantes.** `session.ts` 2042 → **697** linhas, `main.ts` 1411 →
+      **682**. Saíram `vehicles`, `tiles`, `workbench`, `playercombat`, `blockuse`, `worldsystems`,
+      `sessionwiring`, `itemuser`, `entity/spawnerblocks`, `render/scenefeed`, `render/ambience`,
+      `input/playeractions`, `ui/hudfeed`, `ui/gameflow`, `ui/gamescreens`, `game/playfield`,
+      `audio/audiostart`, `core/lifecycle` e outros utilitários. `ui/containers/screen.ts` caiu de
+      1117 para 890 (CSS e clique de contêiner saíram).
+- [x] **Folga de atlas.** Tint de 2 para 6 bits no vértice (2 bits do `texLayer`, que tinha 10 para
+      256 camadas, e 2 livres da palavra 0), tabela de cores num uniform (`data/tints.ts`). Lã e cama
+      viraram um desenho cinza cada; na cama, madeira e travesseiro têm alfa 0,75 e o passe recortado
+      não os tinge. **Dezesseis cores** agora, e o atlas caiu de 222 para **194 camadas**.
+
+**Critério de aceite:** ✅ `session.ts` e `main.ts` abaixo de 700, suíte inteira sem mudar de
+expectativa de comportamento (só testes que liam o código-fonte ou o formato de bits mudaram);
+o balde, a tesoura e o ovo entraram sem tocar na cadeia da `Session`; 16 cores com 4 camadas, contra
+32 das 8 antigas. Smoke test verde.
+
+---
+
+## M14 — Água e paisagem
+
+> O mundo é bonito de cima e igual de dentro. Mergulhar não muda nada na tela, e não há rio.
+
+- [ ] **Ver de dentro da água e da lava.** Hoje a névoa e a cor não mudam ao mergulhar (`grep -i
+      underwater src` volta vazio). Névoa azul curta e escurecimento debaixo d'água, névoa laranja
+      quase opaca na lava — é um uniform a mais no passe de terreno, nada de passe novo.
+- [ ] **Rios.** Não há rio: a água do mundo é oceano, pântano e lago. Um ruído de canal que cava
+      abaixo do nível do mar nas faixas estreitas, com bioma de rio só por tint — zero camadas de
+      atlas.
+- [ ] **Pesca**: vara (linha + graveto), boia na água, bacalhau e bacalhau assado (doc 05 §4) e XP
+      de pesca (doc 06 §8). É a comida renovável que não depende de fazenda.
+- [ ] **Afogado** (doc 07 §1, *"pós-MVP"*): o zumbi que nasce na água e no rio.
+- [ ] **Lua com fases visível** (doc 03 §8: *"Lua com 8 fases"*). A fase já existe para o spawn
+      de slime (`game/weather.ts`); no céu, a lua é sempre cheia.
+- [ ] **Biomas de variação que só custam tint:** floresta de bétula, planície florida, pântano
+      mais escuro. E **selva**, que custa camadas (tronco, folha, tábua) e depende da folga do M13.
+
+**Critério de aceite:** mergulhar e emergir muda a tela em menos de um quadro; um rio atravessa
+pelo menos dois biomas numa seed de teste sem degrau de parede; pescar 10 peixes em 5 minutos de
+jogo. Geração de chunk continua abaixo de 25 ms (hoje 6,2).
+
+---
+
+## M15 — Oficina
+
+> Meio de jogo. Hoje a ferramenta encantada quebra e acabou, e o circuito não tem como mexer em
+> item.
+
+- [ ] **Bigorna**: reparar ferramenta com o material, juntar duas ferramentas e dois livros
+      encantados, dar nome. Custo em nível, como a mesa de encantamento.
+- [ ] **Reparo na grade**: duas ferramentas iguais e gastas viram uma com a soma, sem
+      encantamento. É uma receita especial do matcher, não uma tela.
+- [ ] **Funil, dispensador e liberador**: o circuito passa a mexer em item. É o que torna possível
+      fazenda automática e fornalha alimentada.
+- [ ] **Comparador e observador**: ler quanto tem num baú, e perceber que um bloco mudou.
+- [ ] **Livro encantado** como item guardável, saído da mesa de encantamento, que a bigorna
+      consome.
+
+**Critério de aceite:** uma picareta de diamante encantada volta de 10% para 100% de durabilidade
+sem perder o encantamento; uma fornalha alimentada por funil a partir de um baú funde 64 minérios
+sem o jogador tocar. Tick de circuito com 32 funis abaixo de 5 ms (o orçamento atual do fio de 64).
+
+---
+
+## M16 — Um fim para a jornada
+
+> O jogo não tem objetivo. Não há chefe, não há créditos, e o loop "minerar → descer → sobreviver"
+> não aponta para lugar nenhum. É o marco maior desta lista.
+
+- [ ] **Fortaleza do Nether** com **blaze**, e a vara de blaze que o doc 05 §5 já lista como
+      combustível.
+- [ ] **Poções**, com o suporte de preparo, a verruga do Nether e o sistema de efeitos do M11: cura,
+      força, velocidade, visão noturna, resistência ao fogo. A tabela de receitas de poção é dado.
+- [ ] **Olho do ender** (pérola, que já cai do enderman, + pó de blaze): arremessado, voa na
+      direção da fortaleza.
+- [ ] **Fortaleza** subterrânea com biblioteca e a sala do portal.
+- [ ] **O End**: terceira dimensão. O doc 15 §5 já registrou que `data/dimensions.ts` e o
+      protocolo do worker são genéricos — *"uma terceira dimensão é uma entrada na tabela e um
+      gerador"*. Ilhas de pedra do End, obsidiana em colunas, cristais.
+- [ ] **O dragão**: voo por caminho, cristais que curam, ovo, e **créditos** com o tempo de jogo e
+      as estatísticas do M10.
+
+**Critério de aceite:** um mundo novo pode ser **terminado** — do primeiro tronco ao dragão — sem
+comando nem modo criativo. O End em T0 a 30 FPS; o dragão no tick abaixo de 1 ms.
+
+---
+
+## M17 — Alcance
+
+> Quem ainda não joga. O jogo só fala português e não ensina nada.
+
+- [ ] **Idioma** (doc 08 §3.11: *"Menu raiz: Vídeo, Controles, Som, **Idioma**,
+      Acessibilidade"*). O menu não existe (`ui/screens/options.ts:292–296` tem quatro seções). Os
+      textos saem para `data/strings/pt.ts`, com um `t('chave')` barato, e entra `en` como segundo
+      idioma. O custo em bundle é para medir, não para supor.
+- [ ] **Primeira hora guiada**, por dica contextual e não por tutorial em pop-up: *"segure para
+      quebrar"* até o primeiro tronco, *"abra a mochila"* até a primeira bancada — cada dica some
+      quando a conquista correspondente de `data/achievements.ts` sai. Desligável.
+- [ ] **Compartilhar seed** na tela do mundo: copiar, colar e um código curto.
+
+**Critério de aceite:** o jogo inteiro em inglês sem um texto em português sobrando (teste que
+varre as chaves); um jogador novo chega à picareta de pedra sem ler nada fora do jogo.
+
+---
+
 ## Testes obrigatórios (a manter verde desde M1)
 
 | Tipo | O que cobrir |

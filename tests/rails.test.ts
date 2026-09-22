@@ -400,7 +400,7 @@ describe('carrinho pela sessão', () => {
     };
 
     expect(s.useHeld()).toBe(true);
-    expect(s.carts.active).toBe(1);
+    expect(s.vehicles.carts.active).toBe(1);
     expect(s.inventory.get(0)).toBeNull();
   });
 
@@ -414,37 +414,37 @@ describe('carrinho pela sessão', () => {
       px: 0.5, py: GROUND, pz: 0.5, state: world.getBlock(0, GROUND, 0), distance: 1,
     };
     s.useHeld();
-    expect(s.carts.active).toBe(0);
+    expect(s.vehicles.carts.active).toBe(0);
   });
 
   it('montar e descer do carrinho, e o jogador anda junto com ele', () => {
     const { world, player, session: s } = session();
     for (let x = 0; x < 8; x++) world.setBlock(x, RAIL_Y, 0, makeState(RAIL), 'player');
     s.tick();
-    s.carts.spawn(0.5, RAIL_Y, 0.5, 0);
+    s.vehicles.carts.spawn(0.5, RAIL_Y, 0.5, 0);
     player.setPosition(0.5, RAIL_Y, 0.5);
 
     expect(s.useHeld()).toBe(true);
-    expect(s.isRiding).toBe(true);
+    expect(s.vehicles.isRiding).toBe(true);
 
     for (let t = 0; t < 30; t++) {
-      s.driveVehicle(1);
+      s.vehicles.drive(1);
       s.tick();
     }
     expect(player.x).toBeGreaterThan(1);
-    expect(player.x).toBeCloseTo(s.carts.x[0], 5);
+    expect(player.x).toBeCloseTo(s.vehicles.carts.x[0], 5);
 
     // Clicar de novo desce.
     expect(s.useHeld()).toBe(true);
-    expect(s.isRiding).toBe(false);
+    expect(s.vehicles.isRiding).toBe(false);
   });
 
   it('trocar de dimensão leva os carrinhos junto', () => {
     const { world, session: s } = session();
     world.setBlock(0, RAIL_Y, 0, makeState(RAIL), 'player');
-    s.carts.spawn(0.5, RAIL_Y, 0.5);
-    expect(s.carts.active).toBe(1);
+    s.vehicles.carts.spawn(0.5, RAIL_Y, 0.5);
+    expect(s.vehicles.carts.active).toBe(1);
     s.enterDimension(1);
-    expect(s.carts.active).toBe(0);
+    expect(s.vehicles.carts.active).toBe(0);
   });
 });

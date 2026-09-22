@@ -278,7 +278,7 @@ export class GreedyMesher {
           out.addQuad(
             pos[0], pos[1], pos[2], face, w, h,
             key & 0x3ff, (key >>> 10) & 0xf, (key >>> 14) & 0xf,
-            ao, (key >>> 26) & 0x7,
+            ao, (key >>> 26) & 0x1f,
           );
           this.quads++;
         }
@@ -321,7 +321,8 @@ export class GreedyMesher {
       ((blockLight & 0xf) << 10) |
       ((skyLight & 0xf) << 14) |
       ((ao[0] & 3) << 18) | ((ao[1] & 3) << 20) | ((ao[2] & 3) << 22) | ((ao[3] & 3) << 24) |
-      ((t.tint[id] & 0x7) << 26) |
+      // Tint em 5 bits (26..30): até 32 cores, 20 em uso desde o M13.
+      ((t.tint[id] & 0x1f) << 26) |
       0x80000000
     ) >>> 0;
   }

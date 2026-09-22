@@ -194,11 +194,13 @@ describe('4. o botão de voar só existe no criativo', () => {
      * só. É esse lugar que o teste cobra: dois caminhos separados voltariam a
      * deixar o botão de voar visível no sobrevivência.
      */
-    const main = readFileSync('src/main.ts', 'utf8');
-    expect(main).toContain('function applyGameMode()');
-    expect(main).toContain('touchUi.setCreative(creative)');
-    expect(main).toContain('hud.setCreative(creative)');
-    expect(main, 'trocar de modo passa pelo mesmo lugar').toContain('applyGameMode();');
+    // Desde o M13 o lugar é `ui/gameflow.ts`, e o `main.ts` o chama ao entrar.
+    const flow = readFileSync('src/ui/gameflow.ts', 'utf8');
+    expect(flow).toContain('applyGameMode(): void');
+    expect(flow).toContain('touchUi().setCreative(creative)');
+    expect(flow).toContain('hud.setCreative(creative)');
+    expect(flow, 'trocar de modo passa pelo mesmo lugar').toContain('this.applyGameMode();');
+    expect(readFileSync('src/main.ts', 'utf8')).toContain('flow.applyGameMode();');
   });
 });
 
@@ -219,7 +221,7 @@ describe('5. o HUD não passa por baixo dos botões de toque', () => {
  * interface começa em automático e a próxima opção já é 1x"*.
  */
 describe('painel não vaza, e a escala responde', () => {
-  const screenSrc = readFileSync('src/ui/containers/screen.ts', 'utf8');
+  const screenSrc = (readFileSync('src/ui/containers/screen.ts', 'utf8') + readFileSync('src/ui/containers/screenstyle.ts', 'utf8'));
   const hudSrc = readFileSync('src/ui/hud.ts', 'utf8');
   const optionsSrc = readFileSync('src/ui/screens/options.ts', 'utf8');
 

@@ -17,7 +17,7 @@ export type BlockShape =
   | 'cube' | 'cross' | 'slab' | 'stairs' | 'fence' | 'fence_gate' | 'door' | 'trapdoor'
   | 'torch' | 'carpet' | 'flat' | 'liquid' | 'pane' | 'ladder' | 'sign' | 'painting'
   | 'lever' | 'button' | 'plate' | 'repeater' | 'piston' | 'piston_head' | 'rail' | 'bed'
-  | 'chest' | 'none';
+  | 'chest' | 'cake' | 'none';
 
 /**
  * De que o bloco precisa para continuar existindo (M7).
@@ -102,6 +102,25 @@ export interface BlockDef {
    */
   climbable: boolean;
   /**
+   * Apoia-se em si mesmo (2026-09-22): cana e cacto crescem em coluna, e o
+   * bloco de cima da coluna tem embaixo **outro igual**, que não é opaco. Sem
+   * este campo o apoio de `support: 'below'` (bloco opaco embaixo) derrubaria
+   * a coluna inteira menos a base.
+   */
+  stackable: boolean;
+  /**
+   * Ticks de queima do item deste bloco na fornalha (doc 05 §5); 0 = não
+   * queima. Mora no bloco porque o item de bloco é derivado desta tabela —
+   * até 2026-09-22 nenhum bloco queimava, e o doc lista tábua, tronco e muda.
+   */
+  fuel: number;
+  /**
+   * Cor de corante (`data/dyes.ts`) que tinge o desenho do bloco no shader, ou
+   * `null` (M13). Lã e cama das dezesseis cores são **um** desenho cinza cada,
+   * e é este campo que diz de que cor ele sai.
+   */
+  dye: string | null;
+  /**
    * Desenhado no passe translúcido, com mistura alfa (M7).
    *
    * Até o M6 só a água era translúcida, e `mesh/blockinfo.ts` a reconhecia pelo
@@ -136,6 +155,9 @@ const DEFAULTS: Omit<BlockDef, 'id' | 'name' | 'display'> = {
   support: 'none',
   multi: null,
   climbable: false,
+  stackable: false,
+  fuel: 0,
+  dye: null,
   translucent: false,
 };
 
@@ -153,9 +175,14 @@ const ore = (): Partial<BlockDef> =>
   ({ hardness: 3, tool: 'pickaxe', requiresTool: true, sound: 'stone' });
 const soil = (): Partial<BlockDef> => ({ tool: 'shovel', sound: 'gravel' });
 const wood = (): Partial<BlockDef> => ({ tool: 'axe', sound: 'wood', flammable: 5 });
+/*
+ * Planta precisa de chão (doc 03 §9, "Suporte: … flower, sapling, tall
+ * grass"). Até 2026-09-22 só os blocos de redstone e a tocha declaravam apoio,
+ * e uma flor ficava boiando sobre o buraco onde antes havia terra.
+ */
 const plant = (): Partial<BlockDef> => ({
   shape: 'cross', solid: false, opaque: false, lightAttenuation: 0,
-  hardness: 0, replaceable: true, sound: 'grass',
+  hardness: 0, replaceable: true, sound: 'grass', support: 'below',
 });
 
 /**
@@ -217,22 +244,22 @@ const SPECS: BlockSpec[] = [
   { id: 29, name: 'emerald_ore', display: 'Minério de Esmeralda', tex: 'block/emerald_ore', ...ore(), minTier: 3 },
 
   // --- 30..51 madeira e vegetação ----------------------------------------
-  { id: 30, name: 'oak_log', display: 'Tronco de Carvalho', hardness: 2, ...wood(),
+  { id: 30, name: 'oak_log', display: 'Tronco de Carvalho', hardness: 2, ...wood(), fuel: 300,
     tex: { top: 'block/oak_log_top', side: 'block/oak_log_side', bottom: 'block/oak_log_top' } },
-  { id: 31, name: 'birch_log', display: 'Tronco de Bétula', hardness: 2, ...wood(),
+  { id: 31, name: 'birch_log', display: 'Tronco de Bétula', hardness: 2, ...wood(), fuel: 300,
     tex: { top: 'block/birch_log_top', side: 'block/birch_log_side', bottom: 'block/birch_log_top' } },
-  { id: 32, name: 'spruce_log', display: 'Tronco de Pinheiro', hardness: 2, ...wood(),
+  { id: 32, name: 'spruce_log', display: 'Tronco de Pinheiro', hardness: 2, ...wood(), fuel: 300,
     tex: { top: 'block/spruce_log_top', side: 'block/spruce_log_side', bottom: 'block/spruce_log_top' } },
-  { id: 33, name: 'acacia_log', display: 'Tronco de Acácia', hardness: 2, ...wood(),
+  { id: 33, name: 'acacia_log', display: 'Tronco de Acácia', hardness: 2, ...wood(), fuel: 300,
     tex: {
       top: 'block/acacia_log_top', side: 'block/acacia_log_side',
       bottom: 'block/acacia_log_top',
     } },
-  { id: 34, name: 'oak_planks', display: 'Tábuas de Carvalho', tex: 'block/oak_planks', hardness: 2, ...wood() },
-  { id: 35, name: 'birch_planks', display: 'Tábuas de Bétula', tex: 'block/birch_planks', hardness: 2, ...wood() },
-  { id: 36, name: 'spruce_planks', display: 'Tábuas de Pinheiro', tex: 'block/spruce_planks', hardness: 2, ...wood() },
+  { id: 34, name: 'oak_planks', display: 'Tábuas de Carvalho', tex: 'block/oak_planks', hardness: 2, ...wood(), fuel: 300 },
+  { id: 35, name: 'birch_planks', display: 'Tábuas de Bétula', tex: 'block/birch_planks', hardness: 2, ...wood(), fuel: 300 },
+  { id: 36, name: 'spruce_planks', display: 'Tábuas de Pinheiro', tex: 'block/spruce_planks', hardness: 2, ...wood(), fuel: 300 },
   { id: 37, name: 'acacia_planks', display: 'Tábuas de Acácia', tex: 'block/acacia_planks',
-    hardness: 2, ...wood() },
+    hardness: 2, ...wood(), fuel: 300 },
   // Folhas: opaque=false para não esconder a face do vizinho, mas atenuam luz.
   { id: 38, name: 'oak_leaves', display: 'Folhas de Carvalho', tex: 'block/oak_leaves',
     hardness: 0.2, opaque: false, lightAttenuation: 1, tint: 'foliage', tool: 'shears',
@@ -251,16 +278,21 @@ const SPECS: BlockSpec[] = [
    * desenho com cor própria, e um tronco marrom de muda não pode ser pintado
    * de verde. Trocou-se variação por bioma por saber o que é cada planta.
    */
-  { id: 41, name: 'oak_sapling', display: 'Muda de Carvalho', tex: 'block/oak_sapling', ...plant() },
+  { id: 41, name: 'oak_sapling', display: 'Muda de Carvalho', tex: 'block/oak_sapling', ...plant(),
+    fuel: 100 },
   { id: 42, name: 'tall_grass', display: 'Grama Alta', tex: 'block/tall_grass', ...plant(), tint: 'grass' },
   { id: 43, name: 'fern', display: 'Samambaia', tex: 'block/fern', ...plant() },
   { id: 44, name: 'dandelion', display: 'Dente-de-leão', tex: 'block/dandelion', ...plant() },
   { id: 45, name: 'poppy', display: 'Papoula', tex: 'block/poppy', ...plant() },
   { id: 46, name: 'cactus', display: 'Cacto', hardness: 0.4, opaque: false, lightAttenuation: 0,
-    sound: 'cloth', tex: { top: 'block/cactus_top', side: 'block/cactus_side', bottom: 'block/cactus_top' } },
-  { id: 47, name: 'sugar_cane', display: 'Cana-de-açúcar', tex: 'block/sugar_cane', ...plant() },
+    sound: 'cloth', support: 'below', stackable: true,
+    tex: { top: 'block/cactus_top', side: 'block/cactus_side', bottom: 'block/cactus_top' } },
+  { id: 47, name: 'sugar_cane', display: 'Cana-de-açúcar', tex: 'block/sugar_cane', ...plant(),
+    stackable: true },
   { id: 48, name: 'dead_bush', display: 'Arbusto Morto', tex: 'block/dead_bush', ...plant() },
-  { id: 49, name: 'vine', display: 'Trepadeira', tex: 'block/vine', ...plant(), tint: 'foliage' },
+  // A trepadeira pendura na parede, não pisa no chão: sem apoio de baixo.
+  { id: 49, name: 'vine', display: 'Trepadeira', tex: 'block/vine', ...plant(), tint: 'foliage',
+    support: 'none' },
   // As duas apontavam `block/oak_planks` — eram caixotes de madeira com outro
   // nome no tooltip (corrigido no M8).
   { id: 50, name: 'pumpkin', display: 'Abóbora', hardness: 1, ...wood(),
@@ -299,10 +331,8 @@ const SPECS: BlockSpec[] = [
   // Cama: o **pé**. A cabeceira é `bed_head`, um bloco à frente (ver `MultiSpec`).
   // Sólida de propósito, com 9/16 de altura: subir na cama é parte do móvel.
   { id: 62, name: 'bed', display: 'Cama Vermelha', hardness: 0.2, shape: 'bed',
-    opaque: false, lightAttenuation: 0, sound: 'cloth',
-    tex: {
-      top: 'block/bed_red_foot_top', side: 'block/bed_red_side', bottom: 'block/bed_red_side',
-    },
+    opaque: false, lightAttenuation: 0, sound: 'cloth', dye: 'red',
+    tex: { top: 'block/bed_foot_top', side: 'block/bed_side', bottom: 'block/bed_side' },
     multi: { other: 'bed_head', at: 'facing', root: true } },
   { id: 63, name: 'tnt', display: 'TNT', hardness: 0, sound: 'grass',
     tex: { top: 'block/tnt_top', side: 'block/tnt_side', bottom: 'block/tnt_bottom' } },
@@ -311,7 +341,7 @@ const SPECS: BlockSpec[] = [
   { id: 65, name: 'cobblestone_slab', display: 'Laje de Pedregulho', tex: 'block/cobblestone',
     shape: 'slab', hardness: 2, opaque: false, lightAttenuation: 0, ...rock() },
   { id: 66, name: 'white_wool', display: 'Lã Branca', tex: 'block/wool_white', hardness: 0.8,
-    tool: 'shears', flammable: 30, sound: 'cloth' },
+    tool: 'shears', flammable: 30, sound: 'cloth', dye: 'white' },
   { id: 67, name: 'iron_block', display: 'Bloco de Ferro', tex: 'block/iron_block', hardness: 5,
     ...rock('pickaxe', 2), sound: 'metal' },
   { id: 68, name: 'gold_block', display: 'Bloco de Ouro', tex: 'block/gold_block', hardness: 5,
@@ -424,7 +454,10 @@ function buildingSpecs(): BlockSpec[] {
         opaque: false,
         lightAttenuation: 0,
         ...(material.wood
-          ? { tool: 'axe' as ToolKind, sound: 'wood' as SoundKind, flammable: 5 }
+          ? {
+            tool: 'axe' as ToolKind, sound: 'wood' as SoundKind, flammable: 5,
+            fuel: part.shape === 'slab' ? 150 : 300,
+          }
           : { tool: 'pickaxe' as ToolKind, minTier: 1 as const, requiresTool: true, sound: 'stone' as SoundKind }),
       });
     }
@@ -611,8 +644,8 @@ SPECS.push(
     shape: 'door', hardness: 3, opaque: false, lightAttenuation: 0, ...wood(), itemless: true,
     multi: { other: 'oak_door', at: 'below', root: false } },
   { id: 127, name: 'bed_head', display: 'Cama Vermelha', hardness: 0.2, shape: 'bed',
-    opaque: false, lightAttenuation: 0, sound: 'cloth', itemless: true,
-    tex: { top: 'block/bed_red_top', side: 'block/bed_red_side', bottom: 'block/bed_red_side' },
+    opaque: false, lightAttenuation: 0, sound: 'cloth', itemless: true, dye: 'red',
+    tex: { top: 'block/bed_top', side: 'block/bed_side', bottom: 'block/bed_side' },
     multi: { other: 'bed', at: 'facing', root: false } },
   /*
    * Fornalha acesa (M8): o **mesmo** truque da lâmpada de redstone, dois ids em
@@ -648,7 +681,7 @@ function doorSpecs(): BlockSpec[] {
     out.push({
       id: id++, name, display: `Porta de ${material.display}`, shape: 'door',
       tex: `block/${name}`, hardness: 3, opaque: false, lightAttenuation: 0,
-      tool: 'axe', sound: 'wood', flammable: 5,
+      tool: 'axe', sound: 'wood', flammable: 5, fuel: 200,
       multi: { other: `${name}_top`, at: 'above', root: true },
     });
     out.push({
@@ -662,6 +695,46 @@ function doorSpecs(): BlockSpec[] {
 }
 
 SPECS.push(...doorSpecs());
+
+/**
+ * Mudas das outras árvores (2026-09-22).
+ *
+ * Folha de bétula e de pinheiro davam **muda de carvalho**, e a acácia nascia
+ * com folha de carvalho: três das quatro madeiras não eram renováveis. A folha
+ * de acácia é um id novo com o **mesmo desenho** da de carvalho — as duas são
+ * cinza tingido pelo bioma — só para dar a muda certa; não custa camada de
+ * atlas.
+ */
+SPECS.push(
+  { id: 133, name: 'birch_sapling', display: 'Muda de Bétula', tex: 'block/birch_sapling',
+    ...plant(), fuel: 100 },
+  { id: 134, name: 'spruce_sapling', display: 'Muda de Pinheiro', tex: 'block/spruce_sapling',
+    ...plant(), fuel: 100 },
+  { id: 135, name: 'acacia_sapling', display: 'Muda de Acácia', tex: 'block/acacia_sapling',
+    ...plant(), fuel: 100 },
+  { id: 136, name: 'acacia_leaves', display: 'Folhas de Acácia', tex: 'block/oak_leaves',
+    hardness: 0.2, opaque: false, lightAttenuation: 1, tint: 'foliage', tool: 'shears',
+    flammable: 30, sound: 'grass' },
+  // Doc 05 §5 e §7: o bloco de carvão é o combustível denso (16 000 ticks, 80
+  // itens) e a pedra lisa é o que a fornalha faz com pedra.
+  { id: 137, name: 'coal_block', display: 'Bloco de Carvão', tex: 'block/coal_block',
+    hardness: 5, ...rock('pickaxe', 1), fuel: 16000, flammable: 5 },
+  { id: 138, name: 'smooth_stone', display: 'Pedra Lisa', tex: 'block/smooth_stone',
+    hardness: 2, ...rock() },
+  /*
+   * Bolo (doc 05 §4: "2/fatia, 7 fatias"). Come-se clicando no bloco, não
+   * segurando o item: é a comida que se põe na mesa. As fatias comidas vão nos
+   * bits 0..2 do estado, e a forma recua uma fatia por vez.
+   */
+  { id: 139, name: 'cake', display: 'Bolo', shape: 'cake', hardness: 0.5, opaque: false,
+    lightAttenuation: 0, sound: 'cloth', support: 'below',
+    tex: { top: 'block/cake_top', side: 'block/cake_side', bottom: 'block/cake_bottom' } },
+  // Cogumelos (doc 05 §4, ensopado): nascem no escuro da caverna e no pântano.
+  { id: 140, name: 'brown_mushroom', display: 'Cogumelo Marrom', tex: 'block/brown_mushroom',
+    ...plant(), emission: 1 },
+  { id: 141, name: 'red_mushroom', display: 'Cogumelo Vermelho', tex: 'block/red_mushroom',
+    ...plant() },
+);
 SPECS.push(...dyedSpecs());
 
 /**
@@ -683,7 +756,7 @@ function dyedSpecs(): BlockSpec[] {
     if (dye.name !== 'white') {
       out.push({
         id: id++, name: `${dye.name}_wool`, display: `Lã ${dye.feminine}`,
-        tex: `block/wool_${dye.name}`, hardness: 0.8,
+        tex: 'block/wool_white', dye: dye.name, hardness: 0.8,
         tool: 'shears', flammable: 30, sound: 'cloth',
       });
     }
@@ -691,16 +764,14 @@ function dyedSpecs(): BlockSpec[] {
     const bed = `bed_${dye.name}`;
     out.push({
       id: id++, name: bed, display: `Cama ${dye.feminine}`, hardness: 0.2, shape: 'bed',
-      opaque: false, lightAttenuation: 0, sound: 'cloth',
-      tex: {
-        top: `block/${bed}_foot_top`, side: `block/${bed}_side`, bottom: `block/${bed}_side`,
-      },
+      opaque: false, lightAttenuation: 0, sound: 'cloth', dye: dye.name,
+      tex: { top: 'block/bed_foot_top', side: 'block/bed_side', bottom: 'block/bed_side' },
       multi: { other: `${bed}_head`, at: 'facing', root: true },
     });
     out.push({
       id: id++, name: `${bed}_head`, display: `Cama ${dye.feminine}`, hardness: 0.2, shape: 'bed',
-      opaque: false, lightAttenuation: 0, sound: 'cloth', itemless: true,
-      tex: { top: `block/${bed}_top`, side: `block/${bed}_side`, bottom: `block/${bed}_side` },
+      opaque: false, lightAttenuation: 0, sound: 'cloth', itemless: true, dye: dye.name,
+      tex: { top: 'block/bed_top', side: 'block/bed_side', bottom: 'block/bed_side' },
       multi: { other: bed, at: 'facing', root: false },
     });
   }

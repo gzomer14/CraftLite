@@ -10,7 +10,9 @@
  * pode travar o frame.
  */
 
-import { AIR, LAVA, WATER, blockIdOf, defOf, makeState, stateBitsOf } from '../data/blocks';
+import {
+  AIR, BLOCK_BY_NAME, LAVA, STONE, WATER, blockIdOf, defOf, makeState, stateBitsOf,
+} from '../data/blocks';
 import { WORLD_HEIGHT } from './chunk';
 import type { World } from './world';
 
@@ -196,6 +198,7 @@ export class Fluids {
 
     // Descer tem prioridade absoluta; se desceu, não espalha lateralmente.
     const below = this.world.getBlock(x, y - 1, z);
+    if (y > 0 && this.meetOther(x, y - 1, z, id, below, true)) return;
     if (y > 0 && defOf(below).replaceable && blockIdOf(below) !== id) {
       this.setFluid(x, y - 1, z, makeFluid(id, 1));
       return;
@@ -212,6 +215,7 @@ export class Fluids {
       const nx = x + DIRS[d * 2];
       const nz = z + DIRS[d * 2 + 1];
       const target = this.world.getBlock(nx, y, nz);
+      if (this.meetOther(nx, y, nz, id, target, false)) continue;
       if (!defOf(target).replaceable) continue;
       if (blockIdOf(target) === id && fluidLevel(target) <= nextLevel) continue;
       this.setFluid(nx, y, nz, makeFluid(id, nextLevel));
@@ -259,7 +263,36 @@ export class Fluids {
   }
 
   /**
-   * Contato entre água e lava (doc 03 §9).
+   * Um fluido avançando sobre o **outro** (doc 03 §9).
+   *
+   * Sem isto, os dois se atropelavam: os dois são `replaceable`, e a água,
+   * que atualiza seis vezes mais rápido, simplesmente apagava a lava por onde
+   * passava — sem obsidiana, sem pedregulho, sem vapor.
+   *
+   * - água chegando numa fonte de lava: obsidiana;
+   * - água chegando em lava corrente: pedregulho;
+   * - lava **descendo** sobre água: pedra ("lava fluindo sobre água");
+   * - lava chegando de lado na água: pedregulho, na célula da água.
+   *
+   * Devolve true se houve encontro — quem chamou não espalha para lá.
+   */
+  private meetOther(
+    x: number, y: number, z: number, id: number, target: number, downward: boolean,
+  ): boolean {
+    const targetId = blockIdOf(target);
+    if (id === WATER && targetId === LAVA) {
+      this.setFluid(x, y, z, makeState(isSource(target) ? OBSIDIAN_ID : COBBLESTONE_ID));
+      return true;
+    }
+    if (id === LAVA && targetId === WATER) {
+      this.setFluid(x, y, z, makeState(downward ? STONE : COBBLESTONE_ID));
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Contato entre água e lava (doc 03 §9), visto da célula da lava.
    * Devolve true se o bloco virou outra coisa e não deve mais espalhar.
    */
   private handleContact(x: number, y: number, z: number, id: number, level: number): boolean {
@@ -267,22 +300,25 @@ export class Fluids {
     const other = WATER;
 
     let touchesWater = false;
-    let waterAbove = false;
     for (let d = 0; d < 4; d++) {
       if (blockIdOf(this.world.getBlock(x + DIRS[d * 2], y, z + DIRS[d * 2 + 1])) === other) {
         touchesWater = true;
       }
     }
-    if (blockIdOf(this.world.getBlock(x, y + 1, z)) === other) {
-      touchesWater = true;
-      waterAbove = true;
-    }
+    if (blockIdOf(this.world.getBlock(x, y + 1, z)) === other) touchesWater = true;
     if (!touchesWater) return false;
 
-    // Fonte de lava + água = obsidiana; lava fluindo = pedra;
-    // água caindo sobre lava fluindo = pedra também.
-    const result = level === 0 ? OBSIDIAN_ID : STONE_ID;
-    this.setFluid(x, y, z, makeState(waterAbove && level > 0 ? STONE_ID : result));
+    /*
+     * Fonte de lava + água = obsidiana; lava corrente + água = pedregulho.
+     *
+     * **Correção de 2026-09-22.** A lava corrente virava **pedra**, e o doc
+     * diz pedregulho ("fonte+fluxo = cobblestone"). Pedra é o caso da lava
+     * descendo sobre a água, que é outro encontro (`meetOther`). A diferença
+     * importa porque é ela que faz o gerador de pedregulho do gênero dar o
+     * bloco que se espera, e porque a pedra lisa quebrava em pedregulho de
+     * qualquer jeito — o jogador via um bloco e colhia outro.
+     */
+    this.setFluid(x, y, z, makeState(level === 0 ? OBSIDIAN_ID : COBBLESTONE_ID));
     return true;
   }
 
@@ -296,8 +332,9 @@ export class Fluids {
 /** Direções horizontais: +X, −X, +Z, −Z. */
 const DIRS = new Int8Array([1, 0, -1, 0, 0, 1, 0, -1]);
 
-const STONE_ID = 1;
-const OBSIDIAN_ID = 19;
+/** Resultados dos encontros, resolvidos pela tabela e não por número cru. */
+const OBSIDIAN_ID = BLOCK_BY_NAME.get('obsidian')?.id ?? STONE;
+const COBBLESTONE_ID = BLOCK_BY_NAME.get('cobblestone')?.id ?? STONE;
 
 function positionKey(x: number, y: number, z: number): number {
   // 26 bits por eixo horizontal e 8 para Y cabem folgado em um double.

@@ -68,6 +68,19 @@ export interface MobTraits {
   /** Item que doma o mob, com a chance de sucesso (lobo). */
   tameItem?: string;
   tameChance?: number;
+
+  // --- produtos (2026-09-22, ver `entity/husbandry.ts`) ----------------------
+  /**
+   * Tem lã de cor (ovelha, doc 07 §1): nasce com uma cor, dá lã dela ao morrer
+   * e à tesoura, se tinge com corante e volta a ter lã comendo grama.
+   */
+  woolly?: boolean;
+  /** Põe um item de tempos em tempos (galinha, doc 07 §1: ovo a cada 5–10 min). */
+  lays?: { item: string; minTicks: number; maxTicks: number };
+  /** Dá leite no balde (vaca). */
+  milkable?: boolean;
+  /** Pega e põe blocos do chão (enderman, doc 07 §1). */
+  carriesBlocks?: boolean;
 }
 
 export interface SpawnRule {
@@ -194,7 +207,7 @@ const SPECS: MobSpec[] = [
     followRange: 12, xp: [1, 3],
     drops: [{ item: 'leather', count: [0, 2] }, { item: 'beef', count: [1, 3] }],
     goals: PASSIVE_GOALS, model: 'quadruped', skin: 'cow', sound: 'cow',
-    despawnable: false, traits: { temptItem: 'wheat', breedItem: 'wheat' },
+    despawnable: false, traits: { temptItem: 'wheat', breedItem: 'wheat', milkable: true },
   },
   {
     id: 1, name: 'pig', display: 'Porco', category: 'passive',
@@ -208,9 +221,10 @@ const SPECS: MobSpec[] = [
     id: 2, name: 'sheep', display: 'Ovelha', category: 'passive',
     health: 8, width: 0.9, height: 1.3, speed: 1.25,
     followRange: 12, xp: [1, 3],
-    drops: [{ item: 'white_wool', count: 1 }, { item: 'mutton', count: [1, 2] }],
+    // A lã sai pela cor da ovelha (`woolly`), não pela tabela de drops.
+    drops: [{ item: 'mutton', count: [1, 2] }],
     goals: PASSIVE_GOALS, model: 'quadruped', skin: 'sheep', sound: 'sheep',
-    despawnable: false, traits: { temptItem: 'wheat', breedItem: 'wheat' },
+    despawnable: false, traits: { temptItem: 'wheat', breedItem: 'wheat', woolly: true },
   },
   {
     id: 3, name: 'chicken', display: 'Galinha', category: 'passive',
@@ -219,7 +233,10 @@ const SPECS: MobSpec[] = [
     drops: [{ item: 'feather', count: 1 }, { item: 'chicken', count: 1 }],
     goals: PASSIVE_GOALS, model: 'bird', skin: 'chicken', sound: 'chicken',
     despawnable: false,
-    traits: { glides: true, temptItem: 'wheat_seeds', breedItem: 'wheat_seeds' },
+    traits: {
+      glides: true, temptItem: 'wheat_seeds', breedItem: 'wheat_seeds',
+      lays: { item: 'egg', minTicks: 6000, maxTicks: 12000 },
+    },
   },
   {
     id: 4, name: 'squid', display: 'Lula', category: 'water',
@@ -256,7 +273,7 @@ const SPECS: MobSpec[] = [
     drops: [{ item: 'ender_pearl', count: [0, 1] }],
     goals: HOSTILE_GOALS, model: 'enderman', skin: 'enderman', sound: 'enderman',
     despawnable: true,
-    traits: { neutralUntilProvoked: true, teleportsOnDamage: true },
+    traits: { neutralUntilProvoked: true, teleportsOnDamage: true, carriesBlocks: true },
   },
   {
     id: 7, name: 'spider', display: 'Aranha', category: 'hostile',

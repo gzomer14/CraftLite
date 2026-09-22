@@ -33,10 +33,14 @@ export function trySpawn(world: World, player: Player, restored: boolean): boole
     const { cx, cz } = columnOf(player);
     return world.getChunk(cx, cz) !== undefined;
   }
-  const chunk = world.getChunk(0, 0);
+  // A coluna é a do ponto de nascimento, onde o jogador já foi posto antes do
+  // primeiro chunk chegar (`world/gen/spawnsearch.ts`); era sempre a (0, 0).
+  const x = Math.floor(player.x);
+  const z = Math.floor(player.z);
+  const chunk = world.getChunk(x >> 4, z >> 4);
   if (chunk === undefined) return false;
-  const height = chunk.heightMap[0];
+  const height = chunk.heightMap[((z & 15) << 4) | (x & 15)];
   if (height <= 0) return false;
-  player.setPosition(0.5, Math.max(height + 1, SEA_LEVEL + 1), 0.5);
+  player.setPosition(x + 0.5, Math.max(height + 1, SEA_LEVEL + 1), z + 0.5);
   return true;
 }

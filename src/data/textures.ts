@@ -11,7 +11,7 @@ import {
   oreBlobs, outline, pattern, plankLines, rect, rings, speckle, stripes, tintBy,
   type Rgb, type TexOp, type TexRecipe,
 } from '../render/texgen';
-import { DYES, type DyeDef } from './dyes';
+import type { DyeDef } from './dyes';
 
 const STONE_DARK: [number, number, number] = [86, 86, 86];
 const WOOD_DARK: [number, number, number] = [96, 78, 44];
@@ -977,6 +977,91 @@ export const TEXTURES: Record<string, TexRecipe> = {
     base: [98, 219, 214], noise: 'value', scale: 6, variance: 0.08,
     ops: [border([70, 178, 176], 1), speckle([190, 246, 244], 0.1, 1)],
   },
+  // Doc 05 §5 e §7 (2026-09-22): o bloco de carvão é um preto que brilha em
+  // pontos, para não se confundir com obsidiana; a pedra lisa é a pedra sem o
+  // ruído, com a moldura dupla que a separa da laje.
+  /*
+   * Bolo (2026-09-22): cobertura branca com pontos vermelhos em cima, e a
+   * lateral com a faixa de glacê escorrendo sobre a massa.
+   */
+  'block/cake_top': {
+    base: [240, 236, 228], noise: 'value', scale: 6, variance: 0.04,
+    ops: [speckle([214, 48, 48], 0.05, 1), border([218, 206, 190], 1)],
+  },
+  'block/cake_side': {
+    base: [196, 140, 88], noise: 'value', scale: 4, variance: 0.08,
+    ops: [pattern([
+      'wwwwwwwwwwwwwwww',
+      'wwwwwwwwwwwwwwww',
+      'wwwwwwwwwwwwwwww',
+      'wwwwwwwwwwwwwwww',
+      'wwwwwwwwwwwwwwww',
+      'wwwwwwwwwwwwwwww',
+      'wwwwwwwwwwwwwwww',
+      'wwwwwwwwwwwwwwww',
+      'wwwwwwwwwwwwwwww',
+      'ww w wwww ww ww ',
+      'w    w w   w    ',
+      '                ',
+      '                ',
+      'rr  r   r  rr  r',
+      '                ',
+      '                ',
+    ], { w: [240, 236, 228], r: [214, 48, 48] })],
+  },
+  'block/cake_bottom': {
+    base: [176, 122, 76], noise: 'value', scale: 4, variance: 0.08, ops: [dither(0.04)],
+  },
+  'block/brown_mushroom': {
+    base: [150, 108, 80], noise: 'flat', scale: 1, variance: 0,
+    ops: [pattern([
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '.....MMMMMM.....',
+      '....MMMMMMMM....',
+      '....dddddddd....',
+      '.......ss.......',
+      '.......ss.......',
+      '.......ss.......',
+      '......ssss......',
+      '................',
+      '................',
+    ], { d: [112, 80, 58], s: [220, 206, 180] })],
+  },
+  'block/red_mushroom': {
+    base: [198, 40, 38], noise: 'flat', scale: 1, variance: 0,
+    ops: [pattern([
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '......MMMM......',
+      '.....MwMMwM.....',
+      '....MMMMMwMM....',
+      '....MwMMMMMM....',
+      '.......ss.......',
+      '.......ss.......',
+      '.......ss.......',
+      '......ssss......',
+      '................',
+      '................',
+    ], { w: [244, 240, 232], s: [220, 206, 180] })],
+  },
+  'block/coal_block': {
+    base: [30, 30, 32], noise: 'value', scale: 6, variance: 0.18,
+    ops: [border([18, 18, 20], 1), speckle([70, 70, 76], 0.06, 1)],
+  },
+  'block/smooth_stone': {
+    base: [168, 168, 168], noise: 'value', scale: 8, variance: 0.03,
+    ops: [border([122, 122, 122], 1), dither(0.02)],
+  },
   'block/wool_white': {
     base: [233, 236, 236], noise: 'grain', scale: 12, variance: 0.06, ops: [dither(0.04)],
   },
@@ -1179,6 +1264,74 @@ export const TEXTURES: Record<string, TexRecipe> = {
       '................',
       '................',
     ], { t: [134, 100, 54], T: [108, 78, 42], d: [86, 62, 34] })],
+  },
+  /*
+   * As outras três mudas (2026-09-22). Cada uma lê como a árvore que vira: a
+   * bétula tem o caule branco com as manchas pretas, o pinheiro é um cone
+   * escuro, a acácia é uma copa chata sobre um caule torto.
+   */
+  'block/birch_sapling': {
+    base: [128, 170, 70], noise: 'flat', scale: 1, variance: 0,
+    ops: [pattern([
+      '................',
+      '................',
+      '.......ff.......',
+      '......fMMf......',
+      '.....fMMMMf.....',
+      '.....fMdMMf.....',
+      '.....fMMMdf.....',
+      '......fMMf......',
+      '.......tt.......',
+      '.......tk.......',
+      '.......tt.......',
+      '.......kt.......',
+      '.......tt.......',
+      '.......tt.......',
+      '......dtd.......',
+      '................',
+    ], { t: [216, 214, 204], k: [52, 52, 52], d: [86, 62, 34] })],
+  },
+  'block/spruce_sapling': {
+    base: [46, 88, 54], noise: 'flat', scale: 1, variance: 0,
+    ops: [pattern([
+      '................',
+      '.......M........',
+      '......MMM.......',
+      '.......M........',
+      '.....MMMMM......',
+      '......MMM.......',
+      '....MMMdMMM.....',
+      '.....MMMMM......',
+      '...MMMMdMMMM....',
+      '.......T........',
+      '.......T........',
+      '.......T........',
+      '.......T........',
+      '......dTd.......',
+      '................',
+      '................',
+    ], { T: [92, 64, 38], d: [70, 50, 30] })],
+  },
+  'block/acacia_sapling': {
+    base: [134, 150, 54], noise: 'flat', scale: 1, variance: 0,
+    ops: [pattern([
+      '................',
+      '................',
+      '................',
+      '..fMMMMMMMMf....',
+      '...fMMdMMMf.....',
+      '................',
+      '.........t......',
+      '........t.......',
+      '.......t........',
+      '.......t........',
+      '......tt........',
+      '......t.........',
+      '......t.........',
+      '.....dtd........',
+      '................',
+      '................',
+    ], { t: [150, 122, 98], d: [100, 72, 40] })],
   },
   'block/vine': {
     inherit: 'block/oak_leaves',
@@ -1454,23 +1607,32 @@ export const ANIMATED_OPS: Record<string, (frame: number, total: number) => TexO
 };
 
 /*
- * Lã e cama coloridas (M8), geradas a partir de `data/dyes.ts`.
+ * Cama (M8), desde o M13 **um desenho cinza** tingido pelo corante do bloco
+ * no shader (`data/tints.ts`). Eram três texturas por cor, 24 camadas para
+ * oito cores; agora são três para as dezesseis.
  *
- * Ficam **depois** da tabela escrita à mão porque a ordem dela define o índice
- * de camada: acrescentar no fim não move nenhuma textura existente de lugar.
- *
- * As três receitas de cama eram escritas à mão, em vermelho, e viraram estas —
- * uma cama vermelha continua saindo igual, só que agora pela mesma conta que
- * faz a azul. Era esse o desvio que impedia a cama de ter cor: o vermelho
- * estava no desenho, não no dado.
+ * O que **não** pode tingir — a madeira do estrado e o travesseiro — é marcado
+ * com alfa 0,75 (`untinted`): o passe recortado só aplica tint de corante em
+ * pixel de alfa cheio. Acima de 0,5 o pixel continua de pé no teste de alfa.
  */
 
-/** Lã: o tecido é o ruído `grain`, que é o que lê como fio. */
-function woolRecipe(dye: DyeDef): TexRecipe {
-  return { base: dye.wool, noise: 'grain', scale: 12, variance: 0.06, ops: [dither(0.04)] };
+/** O "corante" do desenho base: tons de cinza claro, que o tint colore. */
+const GREY: DyeDef = {
+  name: 'grey', display: 'Cinza', feminine: 'Cinza',
+  wool: [236, 236, 236], quilt: [226, 226, 226], shade: [150, 150, 150],
+  highlight: [252, 252, 252],
+};
+
+/** Marca um retângulo como "não tinge" (alfa 0,75, ver acima). */
+function untinted(x: number, y: number, w: number, h: number): TexOp {
+  return (c) => {
+    for (let py = y; py < y + h; py++) {
+      for (let px = x; px < x + w; px++) c.data[((py * 16 + px) << 2) + 3] = 191;
+    }
+  };
 }
 
-/** Cabeceira: travesseiro em cima, colcha embaixo. */
+/** Cabeceira: travesseiro em cima (não tinge), colcha embaixo. */
 function bedHeadRecipe(dye: DyeDef): TexRecipe {
   return {
     base: dye.wool, noise: 'grain', scale: 10, variance: 0.06,
@@ -1481,6 +1643,7 @@ function bedHeadRecipe(dye: DyeDef): TexRecipe {
       rect(1, 8, 14, 7, dye.quilt),
       rect(1, 8, 14, 1, dye.highlight, 0.6),
       dither(0.04),
+      untinted(2, 1, 12, 5),
     ],
   };
 }
@@ -1498,7 +1661,7 @@ function bedFootRecipe(dye: DyeDef): TexRecipe {
   };
 }
 
-/** Lateral: estrado de madeira com o colchão aparecendo. */
+/** Lateral: estrado de madeira (não tinge) com o colchão aparecendo. */
 function bedSideRecipe(dye: DyeDef): TexRecipe {
   return {
     base: [150, 124, 72], noise: 'stripes', scale: 1, variance: 0.08,
@@ -1509,17 +1672,17 @@ function bedSideRecipe(dye: DyeDef): TexRecipe {
       rect(0, 9, 16, 1, dye.shade),
       border([104, 84, 48], 1),
       dither(0.04),
+      untinted(0, 0, 16, 4),
+      untinted(0, 10, 16, 6),
+      untinted(0, 4, 1, 6),
+      untinted(15, 4, 1, 6),
     ],
   };
 }
 
-for (const dye of DYES) {
-  // A branca já existe escrita à mão desde o M4 e é a base do tingimento.
-  if (dye.name !== 'white') TEXTURES[`block/wool_${dye.name}`] = woolRecipe(dye);
-  TEXTURES[`block/bed_${dye.name}_top`] = bedHeadRecipe(dye);
-  TEXTURES[`block/bed_${dye.name}_foot_top`] = bedFootRecipe(dye);
-  TEXTURES[`block/bed_${dye.name}_side`] = bedSideRecipe(dye);
-}
+TEXTURES['block/bed_top'] = bedHeadRecipe(GREY);
+TEXTURES['block/bed_foot_top'] = bedFootRecipe(GREY);
+TEXTURES['block/bed_side'] = bedSideRecipe(GREY);
 
 /** Ordem estável de geração — o índice de camada é resolvido por nome. */
 export const TEXTURE_NAMES: readonly string[] = Object.keys(TEXTURES);

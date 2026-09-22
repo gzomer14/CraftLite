@@ -80,8 +80,15 @@ export class MobStore {
   readonly flags: Uint8Array;
   /** Escala do modelo (slime pequeno/médio/grande). */
   readonly scale: Float32Array;
-  /** Variante: tamanho do slime, cor da ovelha. */
+  /** Variante: tamanho do slime, cor da ovelha (ver `entity/husbandry.ts`). */
   readonly variant: Uint8Array;
+  /**
+   * Ticks até o próximo produto do bicho — o ovo da galinha (2026-09-22).
+   * 0 = ainda não sorteado.
+   */
+  readonly product: Int32Array;
+  /** Bloco que o enderman carrega (`blockState`), ou 0 (2026-09-22). */
+  readonly carried: Uint16Array;
 
   readonly onGround: Uint8Array;
   /** Ticks de piscada vermelha após dano. */
@@ -150,6 +157,8 @@ export class MobStore {
     this.flags = u8();
     this.scale = f32();
     this.variant = u8();
+    this.product = new Int32Array(capacity);
+    this.carried = new Uint16Array(capacity);
     this.onGround = u8();
     this.hurtTicks = i16();
     this.attackCooldown = i16();
@@ -193,6 +202,8 @@ export class MobStore {
     this.prevX[i] = x; this.prevY[i] = y; this.prevZ[i] = z;
     this.vx[i] = 0; this.vy[i] = 0; this.vz[i] = 0;
     this.variant[i] = variant;
+    this.product[i] = 0;
+    this.carried[i] = 0;
     this.scale[i] = def.traits.splitsOnDeath === true
       ? slimeScale(variant)
       : def.traits.modelScale ?? 1;
@@ -522,6 +533,8 @@ function copyEntry(s: MobStore, to: number, from: number): void {
   s.flags[to] = s.flags[from];
   s.scale[to] = s.scale[from];
   s.variant[to] = s.variant[from];
+  s.product[to] = s.product[from];
+  s.carried[to] = s.carried[from];
   s.onGround[to] = s.onGround[from];
   s.hurtTicks[to] = s.hurtTicks[from];
   s.attackCooldown[to] = s.attackCooldown[from];

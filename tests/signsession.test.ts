@@ -121,10 +121,10 @@ describe('tampa do baú', () => {
 
     aimAt(session, 8, 64, 8);
     session.useHeld();
-    expect(session.openScreen).toBe('chest');
+    expect(session.workbench.openScreen).toBe('chest');
     expect(stateBitsOf(world.getBlock(8, 64, 8)) & 1).toBe(1);
 
-    session.closeScreen();
+    session.workbench.closeScreen();
     expect(stateBitsOf(world.getBlock(8, 64, 8)) & 1).toBe(0);
   });
 
@@ -146,7 +146,7 @@ describe('tampa do baú', () => {
     expect(stateBitsOf(world.getBlock(8, 64, 8)) & 1).toBe(1);
     expect(stateBitsOf(world.getBlock(9, 64, 8)) & 1).toBe(1);
 
-    session.closeScreen();
+    session.workbench.closeScreen();
     expect(stateBitsOf(world.getBlock(8, 64, 8)) & 1).toBe(0);
     expect(stateBitsOf(world.getBlock(9, 64, 8)) & 1).toBe(0);
   });
@@ -158,7 +158,7 @@ describe('tampa do baú', () => {
 
     aimAt(session, 8, 64, 8);
     session.useHeld();
-    session.closeScreen();
+    session.workbench.closeScreen();
     aimAt(session, 8, 64, 4);
     session.useHeld();
 
@@ -174,7 +174,7 @@ describe('tampa do baú', () => {
     breakAimed(session);
     expect(world.getBlock(8, 64, 8)).toBe(AIR);
     // Fechar depois não pode ressuscitar o baú.
-    session.closeScreen();
+    session.workbench.closeScreen();
     expect(world.getBlock(8, 64, 8)).toBe(AIR);
   });
 });

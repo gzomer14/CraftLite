@@ -6,6 +6,7 @@
  * despachado sem os 8 vizinhos, buffer não reciclado, chunk descarregado sem
  * liberar o VBO.
  */
+import { findSpawnColumn } from '../src/world/gen/spawnsearch';
 import { describe, expect, it } from 'vitest';
 import { ChunkPipeline, type WorkerLike } from '../src/world/pipeline';
 import { World } from '../src/world/world';
@@ -36,6 +37,10 @@ class FakeWorker implements WorkerLike {
       this.seed = request.seed;
       this.noise = new TerrainNoise(this.seed);
       this.mesher = new GreedyMesher(tables, request.packed);
+      return;
+    }
+    if (request.type === 'spawn') {
+      this.outbox.push({ type: 'spawn', ...spawnOf(this.noise!) });
       return;
     }
     if (request.type === 'gen') {
@@ -338,3 +343,8 @@ describe('ChunkPipeline', () => {
     for (const c of counts) expect(c).toBeGreaterThan(0);
   });
 });
+
+function spawnOf(noise: TerrainNoise): { x: number; z: number } {
+  const [x, z] = findSpawnColumn(noise.field);
+  return { x, z };
+}

@@ -20,22 +20,31 @@
  */
 
 import { BIOMES } from '../../data/biomes';
-import { AIR, makeState } from '../../data/blocks';
+import { AIR, BLOCK_BY_NAME, defOf, makeState } from '../../data/blocks';
 import { Rng, hash2 } from '../../core/rng';
 import { SEA_LEVEL, SECTION_SIZE, WORLD_HEIGHT, type ChunkColumn } from '../chunk';
 import type { HeightField } from './heightfield';
+import { growTree, type TreeKind, type TreeWriter } from '../trees';
+
+export type { TreeKind } from '../trees';
 
 /** Sal do RNG de decoração — separado dos usados pelo terreno e pelos minérios. */
 const SALT_DECOR = 20;
+/**
+ * Sal próprio dos cogumelos (2026-09-22). Eles chegaram depois de tudo, e usar
+ * o sorteio da decoração mudaria a posição de toda árvore e flor ainda não
+ * gerada — com costura contra o mundo salvo.
+ */
+const SALT_MUSHROOM = 21;
+const BROWN_MUSHROOM = makeState(BLOCK_BY_NAME.get('brown_mushroom')?.id ?? 0);
+const RED_MUSHROOM = makeState(BLOCK_BY_NAME.get('red_mushroom')?.id ?? 0);
+/** Tentativas de cogumelo por chunk no chão de caverna, e o teto delas. */
+const CAVE_MUSHROOM_TRIES = 4;
+const CAVE_MUSHROOM_MAX_Y = 50;
+/** Cogumelos de superfície por bioma: o escuro da mata fechada e do pântano. */
+const SURFACE_MUSHROOMS: Record<string, number> = { swamp: 2, taiga: 0.6, forest: 0.4 };
 
-/** Blocos usados aqui, resolvidos uma vez. */
-const OAK_LOG = makeState(30);
-const BIRCH_LOG = makeState(31);
-const SPRUCE_LOG = makeState(32);
-const ACACIA_LOG = makeState(33);
-const OAK_LEAVES = makeState(38);
-const BIRCH_LEAVES = makeState(39);
-const SPRUCE_LEAVES = makeState(40);
+/** Blocos usados aqui, resolvidos uma vez. Tronco e folha vêm de `trees.ts`. */
 const TALL_GRASS = makeState(42);
 const FERN = makeState(43);
 const DANDELION = makeState(44);
@@ -43,8 +52,6 @@ const POPPY = makeState(45);
 const CACTUS = makeState(46);
 const SUGAR_CANE = makeState(47);
 const DEAD_BUSH = makeState(48);
-
-export type TreeKind = 'oak' | 'birch' | 'spruce' | 'acacia';
 
 /** Quanto cada bioma recebe. Contagens fracionárias viram probabilidade. */
 export interface DecorSpec {
@@ -87,6 +94,40 @@ export function decorate(chunk: ChunkColumn, seed: number, field: HeightField): 
     for (let dx = -1; dx <= 1; dx++) {
       decorateFrom(chunk, seed, field, chunk.cx + dx, chunk.cz + dz);
     }
+  }
+  placeMushrooms(chunk, seed, field);
+}
+
+/**
+ * Cogumelos (doc 05 §4: o ensopado precisa deles). Só dentro do próprio
+ * chunk — cogumelo não transborda, então não precisa do sorteio dos vizinhos —
+ * e com sorteio próprio (`SALT_MUSHROOM`).
+ *
+ * Na caverna, o chão é o primeiro ar sobre bloco opaco descendo de
+ * `CAVE_MUSHROOM_MAX_Y`; na superfície, a mesma regra de chão das flores.
+ */
+function placeMushrooms(chunk: ChunkColumn, seed: number, field: HeightField): void {
+  const rng = new Rng(hash2(seed, chunk.cx, chunk.cz, SALT_MUSHROOM), SALT_MUSHROOM);
+  for (let i = 0; i < CAVE_MUSHROOM_TRIES; i++) {
+    const lx = rng.nextInt(SECTION_SIZE);
+    const lz = rng.nextInt(SECTION_SIZE);
+    const kind = rng.nextFloat() < 0.65 ? BROWN_MUSHROOM : RED_MUSHROOM;
+    for (let y = CAVE_MUSHROOM_MAX_Y; y > 8; y--) {
+      if (chunk.getBlock(lx, y, lz) !== AIR) continue;
+      const floor = chunk.getBlock(lx, y - 1, lz);
+      if (floor === AIR || !defOf(floor).opaque) continue;
+      chunk.setBlock(lx, y, lz, kind);
+      break;
+    }
+  }
+
+  const center = field.sample(chunk.cx * SECTION_SIZE + 8, chunk.cz * SECTION_SIZE + 8);
+  const biome = BIOMES[center.biome];
+  const perChunk = biome === undefined ? 0 : SURFACE_MUSHROOMS[biome.name] ?? 0;
+  const count = countOf(rng, perChunk);
+  for (let i = 0; i < count; i++) {
+    const kind = rng.nextFloat() < 0.65 ? BROWN_MUSHROOM : RED_MUSHROOM;
+    placePlant(chunk, field, rng, chunk.cx, chunk.cz, kind);
   }
 }
 
@@ -179,82 +220,19 @@ function placeTree(
   const ground = groundHeight(chunk, field, wx, wz, false);
   if (ground < 0) return;
 
-  const base = ground + 1;
-  if (kind === 'spruce') {
-    growSpruce(chunk, rng, wx, base, wz);
-  } else if (kind === 'acacia') {
-    growAcacia(chunk, rng, wx, base, wz);
-  } else {
-    growRound(chunk, rng, wx, base, wz, kind);
-  }
+  CHUNK_WRITER.chunk = chunk;
+  growTree(CHUNK_WRITER, rng, kind, wx, ground + 1, wz);
 }
 
-/** Carvalho e bétula: tronco reto com uma copa arredondada. */
-function growRound(
-  chunk: ChunkColumn, rng: Rng, wx: number, base: number, wz: number, kind: TreeKind,
-): void {
-  const log = kind === 'birch' ? BIRCH_LOG : OAK_LOG;
-  const leaves = kind === 'birch' ? BIRCH_LEAVES : OAK_LEAVES;
-  const height = (kind === 'birch' ? 5 : 4) + rng.nextInt(3);
-
-  for (let y = 0; y < height; y++) setSolid(chunk, wx, base + y, wz, log);
-
-  const top = base + height;
-  for (let dy = -2; dy <= 1; dy++) {
-    const radius = dy >= 1 ? 1 : 2;
-    for (let dz = -radius; dz <= radius; dz++) {
-      for (let dx = -radius; dx <= radius; dx++) {
-        // Corta os cantos do anel largo, senão a copa fica um cubo.
-        if (radius === 2 && Math.abs(dx) === 2 && Math.abs(dz) === 2) {
-          if (rng.nextFloat() < 0.75) continue;
-        }
-        if (dx === 0 && dz === 0 && dy < 1) continue;
-        setLeaf(chunk, wx + dx, top + dy, wz + dz, leaves);
-      }
-    }
-  }
-}
-
-/** Pinheiro: cônico, mais alto e mais estreito no topo. */
-function growSpruce(
-  chunk: ChunkColumn, rng: Rng, wx: number, base: number, wz: number,
-): void {
-  const height = 7 + rng.nextInt(4);
-  for (let y = 0; y < height; y++) setSolid(chunk, wx, base + y, wz, SPRUCE_LOG);
-
-  let radius = 0;
-  for (let y = height; y >= 2; y--) {
-    // O raio cresce descendo e reinicia a cada dois níveis: é o que dá o
-    // recorte de galhos em degraus do pinheiro.
-    for (let dz = -radius; dz <= radius; dz++) {
-      for (let dx = -radius; dx <= radius; dx++) {
-        if (Math.abs(dx) === radius && Math.abs(dz) === radius && radius > 1) continue;
-        if (dx === 0 && dz === 0 && y < height) continue;
-        setLeaf(chunk, wx + dx, base + y, wz + dz, SPRUCE_LEAVES);
-      }
-    }
-    radius = radius >= 2 ? 0 : radius + 1;
-  }
-}
-
-/** Acácia: tronco curto e uma copa chata e larga. */
-function growAcacia(
-  chunk: ChunkColumn, rng: Rng, wx: number, base: number, wz: number,
-): void {
-  const height = 4 + rng.nextInt(2);
-  for (let y = 0; y < height; y++) setSolid(chunk, wx, base + y, wz, ACACIA_LOG);
-
-  const top = base + height;
-  for (let dz = -3; dz <= 3; dz++) {
-    for (let dx = -3; dx <= 3; dx++) {
-      if (dx * dx + dz * dz > 9) continue;
-      setLeaf(chunk, wx + dx, top, wz + dz, OAK_LEAVES);
-      if (Math.abs(dx) <= 1 && Math.abs(dz) <= 1) {
-        setLeaf(chunk, wx + dx, top + 1, wz + dz, OAK_LEAVES);
-      }
-    }
-  }
-}
+/**
+ * Escritor de árvore que recorta no chunk sendo gerado (ver `trees.ts`).
+ * Um só, reusado: a geração de uma coluna escreve dezenas de árvores.
+ */
+const CHUNK_WRITER: TreeWriter & { chunk: ChunkColumn | null } = {
+  chunk: null,
+  trunk(x, y, z, state) { if (this.chunk !== null) setSolid(this.chunk, x, y, z, state); },
+  leaf(x, y, z, state) { if (this.chunk !== null) setLeaf(this.chunk, x, y, z, state); },
+};
 
 function placePlant(
   chunk: ChunkColumn, field: HeightField, rng: Rng,

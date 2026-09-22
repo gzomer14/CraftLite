@@ -7,6 +7,7 @@
  */
 
 import { createProgram, uniformLocations, type GlContext } from './gl';
+import { TINT_COLORS } from '../data/tints';
 import {
   TERRAIN_FS_100, TERRAIN_FS_300, TERRAIN_VS_100, TERRAIN_VS_300, withDefines,
 } from './shaders/terrain.glsl';
@@ -15,7 +16,7 @@ import type { Mat4 } from '../core/math';
 
 const UNIFORMS = [
   'uViewProj', 'uChunkOrigin', 'uDayFactor', 'uMinSkyLight',
-  'uAtlas', 'uAtlasTiles', 'uFogColor', 'uFogDensity',
+  'uAtlas', 'uAtlasTiles', 'uFogColor', 'uFogDensity', 'uTints',
 ] as const;
 
 export interface SkyParams {
@@ -70,6 +71,9 @@ export class TerrainPass {
     gl.uniform1f(u.uMinSkyLight, sky.minSkyLight);
     gl.uniform3fv(u.uFogColor, sky.fogColor);
     gl.uniform1f(u.uFogDensity, sky.fogDensity);
+    // A tabela de tints é fixa; subir a cada `begin` custa 60 floats, três vezes
+    // por quadro — mais barato que guardar estado por programa.
+    gl.uniform3fv(u.uTints, TINT_COLORS);
   }
 
   /** Define a origem da section atual (posições no vértice são locais). */

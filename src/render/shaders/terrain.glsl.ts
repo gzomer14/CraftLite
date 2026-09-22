@@ -7,14 +7,15 @@
  * fragment — as variantes saem por `#define` na compilação (doc 01 §5.5).
  */
 
-/** Tabela de tints indexada pelo campo `tint` do vértice. */
+import { TINT_COUNT, TINT_DYE_BASE } from '../../data/tints';
+
+/**
+ * Tabela de tints indexada pelo campo `tint` do vértice (M13: uniform, montada
+ * de `data/tints.ts`). Era uma constante de quatro cores; um uniform serve os
+ * dois GLSL — o 1.00 não tem array constante — e cresce com os corantes.
+ */
 const TINT_TABLE = `
-const vec3 TINTS[4] = vec3[4](
-  vec3(1.0, 1.0, 1.0),
-  vec3(0.475, 0.753, 0.353),
-  vec3(0.349, 0.682, 0.188),
-  vec3(0.247, 0.463, 0.894)
-);`;
+uniform vec3 uTints[${TINT_COUNT}];`;
 
 /** Curva de luz do original: pow(0.8, 15 - light), com piso ambiente. */
 const LIGHT_FN = `
@@ -35,6 +36,7 @@ uniform float uMinSkyLight;    // luz ambiente mínima (não deixa a noite ficar
 out vec3 vUv;                  // xy = uv em tiles, z = camada do array
 out float vLight;
 out vec3 vTint;
+out float vDye;
 out float vFogDepth;
 
 ${TINT_TABLE}
@@ -57,11 +59,11 @@ void main() {
 
   uint face  = (w0 >> 27) & 7u;
 
-  float layer = float(w1 & 1023u);
-  float bl    = float((w1 >> 10) & 15u);
-  float sl    = float((w1 >> 14) & 15u);
-  uint ao     = (w1 >> 18) & 3u;
-  uint tint   = (w1 >> 20) & 3u;
+  float layer = float(w1 & 255u);
+  float bl    = float((w1 >> 8) & 15u);
+  float sl    = float((w1 >> 12) & 15u);
+  uint ao     = (w1 >> 16) & 3u;
+  uint tint   = ((w1 >> 18) & 15u) | (((w0 >> 30) & 3u) << 4);
   float u    = float((w1 >> 22) & 31u);
   float v    = float((w1 >> 27) & 31u);
 
@@ -72,7 +74,8 @@ void main() {
 
   float light = max(bl, sl * uDayFactor);
   vLight = max(lightCurve(light), uMinSkyLight) * AO_LEVELS[ao] * FACE_SHADE[face];
-  vTint = TINTS[tint];
+  vTint = uTints[tint];
+  vDye = tint >= ${TINT_DYE_BASE}u ? 1.0 : 0.0;
   vFogDepth = gl_Position.w;
 }
 `;
@@ -84,6 +87,7 @@ precision mediump sampler2DArray;
 in vec3 vUv;
 in float vLight;
 in vec3 vTint;
+in float vDye;
 in float vFogDepth;
 
 uniform sampler2DArray uAtlas;
@@ -96,8 +100,13 @@ void main() {
   vec4 texel = texture(uAtlas, vec3(fract(vUv.xy), vUv.z));
 #ifdef ALPHA_TEST
   if (texel.a < 0.5) discard;
+  // Corante só tinge pixel de alfa cheio: madeira e travesseiro da cama são
+  // marcados com 0,75 no desenho (\`data/textures.ts\`, M13).
+  vec3 tint = mix(vTint, vec3(1.0), vDye * step(texel.a, 0.9));
+#else
+  vec3 tint = vTint;
 #endif
-  vec3 color = texel.rgb * vLight * vTint;
+  vec3 color = texel.rgb * vLight * tint;
 
   float f = vFogDepth * uFogDensity;
   float fog = 1.0 - exp(-f * f);
@@ -130,8 +139,10 @@ varying highp vec2 vUv;
 varying highp vec2 vTileOrigin;
 varying mediump float vLight;
 varying mediump vec3 vTint;
+varying mediump float vDye;
 varying highp float vFogDepth;
 
+${TINT_TABLE}
 ${LIGHT_FN}
 
 void main() {
@@ -143,12 +154,9 @@ void main() {
   float bl = mod(bits, 16.0);
   float sl = mod(floor(bits / 16.0), 16.0);
   float ao = mod(floor(bits / 256.0), 4.0);
-  float tint = mod(floor(bits / 1024.0), 16.0);
-
-  vec3 tintColor = vec3(1.0);
-  if (tint > 2.5)      tintColor = vec3(0.247, 0.463, 0.894);
-  else if (tint > 1.5) tintColor = vec3(0.349, 0.682, 0.188);
-  else if (tint > 0.5) tintColor = vec3(0.475, 0.753, 0.353);
+  float tint = mod(floor(bits / 1024.0), 64.0);
+  vec3 tintColor = uTints[int(tint)];
+  vDye = tint > ${TINT_DYE_BASE}.0 - 0.5 ? 1.0 : 0.0;
 
   float aoMul = 0.55 + ao * 0.15;
   float face = aPosFace.w;
@@ -176,6 +184,7 @@ varying highp vec2 vUv;
 varying highp vec2 vTileOrigin;
 varying mediump float vLight;
 varying mediump vec3 vTint;
+varying mediump float vDye;
 varying highp float vFogDepth;
 
 uniform sampler2D uAtlas;
@@ -190,8 +199,13 @@ void main() {
   vec4 texel = texture2D(uAtlas, uv);
 #ifdef ALPHA_TEST
   if (texel.a < 0.5) discard;
+  // Corante só tinge pixel de alfa cheio: madeira e travesseiro da cama são
+  // marcados com 0,75 no desenho (\`data/textures.ts\`, M13).
+  vec3 tint = mix(vTint, vec3(1.0), vDye * step(texel.a, 0.9));
+#else
+  vec3 tint = vTint;
 #endif
-  vec3 color = texel.rgb * vLight * vTint;
+  vec3 color = texel.rgb * vLight * tint;
 
   float f = vFogDepth * uFogDensity;
   float fog = 1.0 - exp(-f * f);

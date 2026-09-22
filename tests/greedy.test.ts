@@ -203,7 +203,7 @@ describe('GreedyMesher', () => {
     const out = mesher().mesh(blocks, light);
     const words = new Uint32Array(out.opaque!.vertices);
     for (let i = 0; i < out.opaque!.vertexCount; i++) {
-      expect((words[i * 2 + 1] >>> 18) & 3).toBe(3);
+      expect((words[i * 2 + 1] >>> 16) & 3).toBe(3);
     }
   });
 
@@ -216,7 +216,7 @@ describe('GreedyMesher', () => {
     const words = new Uint32Array(out.opaque!.vertices);
     let litVerts = 0;
     for (let i = 0; i < out.opaque!.vertexCount; i++) {
-      if (((words[i * 2 + 1] >>> 14) & 0xf) === 15) litVerts++;
+      if (((words[i * 2 + 1] >>> 12) & 0xf) === 15) litVerts++;
     }
     expect(litVerts).toBe(4); // exatamente os 4 vértices da face de topo
   });

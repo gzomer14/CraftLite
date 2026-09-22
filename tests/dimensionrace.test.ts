@@ -180,6 +180,7 @@ describe('geração não morre de fome', () => {
         this.mesher = new GreedyMesher(tables, request.packed);
         return;
       }
+      if (request.type === 'spawn') return;
       if (request.type === 'mesh') {
         const out = (this.mesher as GreedyMesher).mesh(request.blocks, request.light);
         this.outbox.push({
@@ -454,11 +455,9 @@ describe('o save respondendo durante a troca de dimensão', () => {
 
   /** `SaveGame` precisa de pouco da sessão: baús, placas e veículos. */
   const stubSession = (): Session => ({
-    tileEntities: [],
+    tiles: { saved: [], restore: () => { /* nada */ } },
     signs: { records: () => [], restore: () => { /* nada */ } },
-    vehicleSnapshot: () => [],
-    restoreContainer: () => { /* nada */ },
-    restoreVehicles: () => { /* nada */ },
+    vehicles: { snapshot: () => [], restore: () => { /* nada */ } },
   }) as unknown as Session;
 
   it('a leitura espera a troca terminar, e sai na chave nova', async () => {

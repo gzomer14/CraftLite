@@ -79,18 +79,18 @@ function openTable(h: Harness): void {
 describe('contagem de estantes', () => {
   it('conta só o anel de 2 blocos, com o caminho livre', () => {
     const h = harness();
-    expect(h.session.countBookshelves(8, GROUND_Y + 1, 8)).toBe(0);
+    expect(h.session.workbench.countBookshelves(8, GROUND_Y + 1, 8)).toBe(0);
 
     // Colada na mesa não conta: é o anel externo que vale.
     h.world.setBlock(9, GROUND_Y + 1, 8, block('bookshelf'), 'player');
-    expect(h.session.countBookshelves(8, GROUND_Y + 1, 8)).toBe(0);
+    expect(h.session.workbench.countBookshelves(8, GROUND_Y + 1, 8)).toBe(0);
 
     h.world.setBlock(10, GROUND_Y + 1, 8, block('bookshelf'), 'player');
     // O caminho passa por (9, y, 8), que agora tem uma estante opaca no meio.
-    expect(h.session.countBookshelves(8, GROUND_Y + 1, 8)).toBe(0);
+    expect(h.session.workbench.countBookshelves(8, GROUND_Y + 1, 8)).toBe(0);
 
     h.world.setBlock(9, GROUND_Y + 1, 8, 0, 'player');
-    expect(h.session.countBookshelves(8, GROUND_Y + 1, 8)).toBe(1);
+    expect(h.session.workbench.countBookshelves(8, GROUND_Y + 1, 8)).toBe(1);
   });
 
   it('não passa do teto de 15', () => {
@@ -111,7 +111,7 @@ describe('contagem de estantes', () => {
         h.world.setBlock(8 + dx, GROUND_Y + 2, 8 + dz, 0, 'player');
       }
     }
-    expect(h.session.countBookshelves(8, GROUND_Y + 1, 8)).toBe(MAX_BOOKSHELVES);
+    expect(h.session.workbench.countBookshelves(8, GROUND_Y + 1, 8)).toBe(MAX_BOOKSHELVES);
   });
 });
 
@@ -119,24 +119,24 @@ describe('encantar pela sessão', () => {
   it('abre a mesa ao usar nela', () => {
     const h = harness();
     openTable(h);
-    expect(h.session.openScreen).toBe('enchanting');
-    expect(h.session.openContainer?.kind).toBe('enchanting');
+    expect(h.session.workbench.openScreen).toBe('enchanting');
+    expect(h.session.workbench.openContainer?.kind).toBe('enchanting');
   });
 
   it('cobra níveis e lápis, e grava o encantamento no item', () => {
     const h = harness();
     h.player.mode = 'survival';
     openTable(h);
-    const table = h.session.openContainer!;
+    const table = h.session.workbench.openContainer!;
     table.set(ENCHANT_ITEM, makeStack(itemId('diamond_pickaxe')));
     table.set(ENCHANT_LAPIS, makeStack(itemId('lapis_lazuli'), 5));
-    h.session.refreshEnchantOffers();
+    h.session.workbench.refreshEnchantOffers();
 
     h.session.xp.setTotal(totalForLevel(30));
-    const offer = h.session.enchantOffers[0];
+    const offer = h.session.workbench.enchantOffers[0];
     expect(offer.enchant).toBeGreaterThanOrEqual(0);
 
-    expect(h.session.buyEnchant(0)).toBe('ok');
+    expect(h.session.workbench.buyEnchant(0)).toBe('ok');
     expect(h.session.xp.level).toBe(30 - offer.cost);
     expect(table.get(ENCHANT_LAPIS)?.count).toBe(5 - offer.lapis);
     expect(enchantCount(table.get(ENCHANT_ITEM)?.ench ?? 0)).toBe(1);
@@ -146,15 +146,15 @@ describe('encantar pela sessão', () => {
     const h = harness();
     h.player.mode = 'survival';
     openTable(h);
-    const table = h.session.openContainer!;
+    const table = h.session.workbench.openContainer!;
     table.set(ENCHANT_ITEM, makeStack(itemId('diamond_pickaxe')));
-    h.session.refreshEnchantOffers();
+    h.session.workbench.refreshEnchantOffers();
 
-    expect(h.session.buyEnchant(0)).toBe('no-lapis');
+    expect(h.session.workbench.buyEnchant(0)).toBe('no-lapis');
 
     table.set(ENCHANT_LAPIS, makeStack(itemId('lapis_lazuli'), 3));
     h.session.xp.setTotal(0);
-    expect(h.session.buyEnchant(2)).toBe('no-level');
+    expect(h.session.workbench.buyEnchant(2)).toBe('no-level');
     expect(table.get(ENCHANT_LAPIS)?.count).toBe(3);
     expect(table.get(ENCHANT_ITEM)?.ench ?? 0).toBe(0);
   });
@@ -162,24 +162,24 @@ describe('encantar pela sessão', () => {
   it('slot vazio não tem oferta', () => {
     const h = harness();
     openTable(h);
-    h.session.refreshEnchantOffers();
-    expect(h.session.enchantOffers.every((o) => o.enchant < 0)).toBe(true);
-    expect(h.session.buyEnchant(0)).toBe('no-offer');
+    h.session.workbench.refreshEnchantOffers();
+    expect(h.session.workbench.enchantOffers.every((o) => o.enchant < 0)).toBe(true);
+    expect(h.session.workbench.buyEnchant(0)).toBe('no-offer');
   });
 
   it('fechar a tela devolve o item encantado ao inventário', () => {
     const h = harness();
     h.player.mode = 'survival';
     openTable(h);
-    const table = h.session.openContainer!;
+    const table = h.session.workbench.openContainer!;
     const pick = makeStack(itemId('diamond_pickaxe'));
     table.set(ENCHANT_ITEM, pick);
     table.set(ENCHANT_LAPIS, makeStack(itemId('lapis_lazuli'), 3));
-    h.session.refreshEnchantOffers();
+    h.session.workbench.refreshEnchantOffers();
     h.session.xp.setTotal(totalForLevel(30));
-    h.session.buyEnchant(0);
+    h.session.workbench.buyEnchant(0);
 
-    h.session.closeScreen();
+    h.session.workbench.closeScreen();
     expect(table.get(ENCHANT_ITEM)).toBeNull();
     expect(table.get(ENCHANT_LAPIS)).toBeNull();
 
@@ -197,16 +197,16 @@ describe('encantar pela sessão', () => {
     const h = harness();
     h.player.mode = 'survival';
     openTable(h);
-    const table = h.session.openContainer!;
+    const table = h.session.workbench.openContainer!;
     table.set(ENCHANT_ITEM, makeStack(itemId('diamond_sword')));
     table.set(ENCHANT_LAPIS, makeStack(itemId('lapis_lazuli'), 9));
-    h.session.refreshEnchantOffers();
+    h.session.workbench.refreshEnchantOffers();
     h.session.xp.setTotal(totalForLevel(60));
 
-    const before = h.session.enchantOffers.map((o) => `${o.enchant}:${o.level}`);
-    expect(h.session.buyEnchant(0)).toBe('ok');
-    h.session.refreshEnchantOffers();
-    const after = h.session.enchantOffers.map((o) => `${o.enchant}:${o.level}`);
+    const before = h.session.workbench.enchantOffers.map((o) => `${o.enchant}:${o.level}`);
+    expect(h.session.workbench.buyEnchant(0)).toBe('ok');
+    h.session.workbench.refreshEnchantOffers();
+    const after = h.session.workbench.enchantOffers.map((o) => `${o.enchant}:${o.level}`);
     expect(after).not.toEqual(before);
   });
 });

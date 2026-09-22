@@ -10,36 +10,36 @@
  */
 
 import { AudioEngine } from './audio/engine';
-import { BUSES, BUS_SETTING } from './data/soundbuses';
-import { Music } from './audio/music';
+import { AudioStart } from './audio/audiostart';
+import { dyeRgbOf } from './data/tints';
 import { blockSound } from './audio/synth';
+import { EffectsBar } from './ui/effectsbar';
+import { startUiNavLoop } from './input/uinavloop';
+import { showHint } from './ui/controlhint';
+import { fail, hideBootScreen, progress } from './ui/bootscreen';
 import { GameLoop } from './core/loop';
 import { registerServiceWorker, showUpdateToast } from './core/pwa';
 import { detectTier, presetFor, readDeviceInfo } from './core/tier';
-import { DEG2RAD, createVec3, forwardFrom } from './core/math';
-import { BIOMES } from './data/biomes';
-import { BLOCK_BY_NAME, defOf, stateBitsOf, texOf } from './data/blocks';
-import { ITEM_BY_NAME, itemDef, makeStack } from './data/items';
-import { MOB_BY_NAME, mobDef } from './data/mobs';
+import { DEG2RAD } from './core/math';
+import { BLOCK_BY_NAME, defOf, texOf } from './data/blocks';
+import { ITEM_BY_NAME, makeStack } from './data/items';
+import { MOB_BY_NAME } from './data/mobs';
 import { nextObjective, objectiveFor } from './data/achievements';
 
 /** Nome legível do alvo de uma conquista, item ou mob. */
 const displayOfTarget = (target: string): string =>
   ITEM_BY_NAME.get(target)?.display ?? MOB_BY_NAME.get(target)?.display ?? target;
-import { modelOf } from './data/mobmodels';
-import { Player, type GameMode } from './entity/player';
+import { Player } from './entity/player';
 import { SaveGame } from './game/savegame';
 import { SettingsStore } from './game/settings';
 import { Session } from './game/session';
-import { MAX_AIR } from './game/survival';
 import { Controls } from './input/controls';
 import { Keybinds } from './input/keybinds';
 import { Gamepads } from './input/gamepad';
-import { profileById } from './data/gamepads';
-import { NAV_STEP_MS, UiNavigator } from './input/uinav';
+import { UiNavigator } from './input/uinav';
 import { Atlas } from './render/atlas';
 import { DynamicScale } from './render/dynamicscale';
-import { EntityAtlas, ARROW_LAYER, BOAT_LAYER, MINECART_LAYER } from './render/entityatlas';
+import { EntityAtlas } from './render/entityatlas';
 import { createContext } from './render/gl';
 import { ItemRenderer } from './render/itemrender';
 import { HandRenderer } from './render/hand';
@@ -50,23 +50,27 @@ import { MobRenderer } from './render/mobrender';
 import { Renderer } from './render/renderer';
 import { SaveDatabase, isAvailable as saveAvailable, type WorldMeta } from './save/db';
 import { SaveManager } from './save/savemanager';
-import { ContainerScreen } from './ui/containers/screen';
-import { CreativeScreen } from './ui/containers/creative';
 import { MenuFlow, newWorldMeta } from './ui/menuflow';
 import { DeathScreen } from './ui/screens/death';
-import { PauseMenu } from './ui/screens/pause';
 import { SignEditor } from './ui/screens/signeditor';
-import { SIGN_TEXT_DISTANCE, SignTextPass } from './render/signtext';
+import { SignTextPass } from './render/signtext';
+import { SceneFeed } from './render/scenefeed';
+import { Ambience } from './render/ambience';
+import { PlayerActions } from './input/playeractions';
+import { HudFeed } from './ui/hudfeed';
+import { Thumbnail } from './save/thumbnail';
+import { Playfield } from './game/playfield';
+import { createGameScreens } from './ui/gamescreens';
+import { attachLifecycle } from './core/lifecycle';
+import { GameFlow } from './ui/gameflow';
 import { Hud } from './ui/hud';
 import { ScreenMode } from './ui/screenmode';
 import { TouchUi } from './ui/touchui';
-import { DebugOverlay, type DebugSource } from './ui/debug';
+import { DebugOverlay } from './ui/debug';
 import { SEA_LEVEL, type ChunkColumn } from './world/chunk';
 import { trySpawn } from './game/spawnplacement';
-import { ChunkPipeline } from './world/pipeline';
+import { ChunkPipeline, type MeshResult } from './world/pipeline';
 import { World } from './world/world';
-import { emitTorchSparks } from './game/ambient';
-import { SHAPE_BY_NAME, boundsFor } from './world/mesh/shapes';
 
 /** Blocos que aparecem na hotbar inicial, até o inventário existir (M4). */
 /** Acima disto de cota usada, o doc 11 §4 manda avisar o jogador. */
@@ -169,7 +173,7 @@ async function boot(): Promise<void> {
     soundOverrides: soundOverridesFor(pack),
   });
   audio.subtitlesEnabled = settings.get('subtitles');
-  let music: Music | null = null;
+  const sound = new AudioStart(audio, settings);
   const dynamicScale = new DynamicScale(preset.targetFps);
   dynamicScale.enabled = settings.get('dynamicResolution');
   const debug = new DebugOverlay(tier, preset, ctx.caps, device, atlas.layerCount, atlas.buildMs);
@@ -226,6 +230,8 @@ async function boot(): Promise<void> {
   player.pitch = 15 * DEG2RAD;
 
   const hud = new Hud(settings);
+  const effectsBar = new EffectsBar();
+  hud.mount(effectsBar.el);
   /*
    * Avisos de armazenamento (doc 11 §4), agora que há HUD para mostrá-los.
    *
@@ -246,45 +252,14 @@ async function boot(): Promise<void> {
   const screenMode = new ScreenMode();
   const isTouchDevice = matchMedia('(pointer: coarse)').matches;
 
-  const slotColor = new Float32Array(3);
-  const containerScreen = new ContainerScreen({
-    onClose: () => { session.closeScreen(); },
-    colorOf: (item) => {
-      const def = itemDef(item);
-      atlas.averageColor(atlas.layerOf(def?.tex ?? 'block/missing'), slotColor);
-      return `rgb(${Math.round(slotColor[0] * 255)},${Math.round(slotColor[1] * 255)},`
-        + `${Math.round(slotColor[2] * 255)})`;
-    },
-    spriteOf: (item) => itemSprites.position(item),
-    recipes: () => session.recipes.entries(),
-    onPickRecipe: (entry) => session.autoFillRecipe(entry),
-    enchantOffers: () => session.enchantOffers,
-    onEnchantRefresh: () => session.refreshEnchantOffers(),
-    onBuyEnchant: (slot) => session.buyEnchant(slot),
-    xpLevel: () => session.xp.level,
-    onFurnaceOutput: (furnace, item) => session.collectFurnaceXp(furnace, item),
-    longPressMs: () => settings.get('longPressMs'),
-    // O toque longo do slot não tem retorno visual próprio; a vibração é o que
-    // diz ao jogador que o gesto pegou.
-    vibrate: () => { if (settings.get('vibration')) navigator.vibrate?.(12); },
-  });
-  const creativeScreen = new CreativeScreen({
-    onClose: () => { controls.reset(); },
-    // A paleta escolhe o item; a mochila é quem veste. Sem esta ponte, no
-    // criativo não havia como chegar aos slots de armadura.
-    onOpenInventory: () => { session.toggleInventory(); },
-    longPressMs: () => settings.get('longPressMs'),
-    spriteOf: (item) => itemSprites.position(item),
-    colorOf: (item) => {
-      const def = itemDef(item);
-      atlas.averageColor(atlas.layerOf(def?.tex ?? 'block/missing'), slotColor);
-      return `rgb(${Math.round(slotColor[0] * 255)},${Math.round(slotColor[1] * 255)},`
-        + `${Math.round(slotColor[2] * 255)})`;
-    },
+  const { containerScreen, creativeScreen } = createGameScreens({
+    atlas, itemSprites, settings,
+    session: () => session,
+    onCreativeClose: () => { controls.reset(); },
   });
   const deathScreen = new DeathScreen({
-    onRespawn: () => { deathScreen.hide(); session.respawn(0, 0); },
-    onQuit: () => { deathScreen.hide(); session.respawn(0, 0); },
+    onRespawn: () => { deathScreen.hide(); session.respawn(meta.spawn[0], meta.spawn[2]); },
+    onQuit: () => { deathScreen.hide(); session.respawn(meta.spawn[0], meta.spawn[2]); },
   });
 
   const session = new Session(world, player, {
@@ -332,7 +307,7 @@ async function boot(): Promise<void> {
       hud.flashDamage();
       if (settings.get('vibration')) navigator.vibrate?.(20);
       // Combate corta a música (doc 10 §3).
-      music?.stop();
+      sound.music?.stop();
     },
   }, {
     maxMobs: preset.maxMobs,
@@ -350,6 +325,17 @@ async function boot(): Promise<void> {
   const itemRenderer = new ItemRenderer(ctx, itemSprites.raw);
   const signTextPass = new SignTextPass(ctx);
   renderer.signTextPass = signTextPass;
+  renderer.fallingBlocks = session.falling;
+  /*
+   * Gancho do smoke test (`scripts/smoke.mjs`, doc 14 "Testes obrigatórios").
+   * Só existe com `?smoke` na URL: o teste precisa ler o mundo por dentro para
+   * conferir que o bloco quebrado continua quebrado depois de recarregar, e o
+   * jogo de todo dia não expõe nada.
+   */
+  if (/[?&]smoke\b/.test(location.search)) {
+    (window as unknown as { __craftlite?: unknown }).__craftlite = { world, player, session };
+  }
+  renderer.blockLightAt = (x, y, z) => (world.getSkyLight(x, y, z) << 4) | world.getBlockLight(x, y, z);
   // Item na mão (doc 01 §191). O passe é uma draw call e limpa a profundidade,
   // então não disputa com nada — mas continua desligável em Opções.
   const handRenderer = new HandRenderer(ctx, atlas, itemSprites.raw);
@@ -357,40 +343,13 @@ async function boot(): Promise<void> {
   renderer.handRenderer = handRenderer;
 
   // --- persistência (doc 11) ------------------------------------------------
-  /*
-   * Miniatura do mundo (doc 08 §3.2).
-   *
-   * O contexto nasce com `preserveDrawingBuffer: false` — ligá-lo custaria uma
-   * cópia do backbuffer **todo frame** —, então o canvas só pode ser lido
-   * dentro do mesmo quadro em que foi desenhado. Daí o desenho em duas partes:
-   * o render copia para um canvas pequeno logo depois de desenhar, e o save
-   * pega os bytes quando precisar deles.
-   */
-  const thumbCanvas = document.createElement('canvas');
-  thumbCanvas.width = 160;
-  thumbCanvas.height = 90;
-  const thumbCtx = thumbCanvas.getContext('2d');
-  let thumbPending = true;
-  let thumbData = '';
-
-  /** Copia o quadro recém-desenhado para o canvas pequeno. */
-  function grabThumbnail(): void {
-    if (!thumbPending || thumbCtx === null) return;
-    thumbPending = false;
-    try {
-      thumbCtx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
-      thumbData = thumbCanvas.toDataURL('image/png');
-    } catch {
-      // Canvas "sujo" ou contexto perdido: o mundo fica sem miniatura.
-      thumbData = '';
-    }
-  }
+  const thumbnail = new Thumbnail();
 
   const save = db === null
     ? null
     : new SaveGame(new SaveManager(db, meta.id), session, player, meta, {
       onError: (message) => hud.showMessage(`Falha ao salvar: ${message}`, 120),
-      captureThumbnail: () => decodeDataUrl(thumbData),
+      captureThumbnail: () => thumbnail.bytes(),
     });
 
   let restored = false;
@@ -404,6 +363,21 @@ async function boot(): Promise<void> {
       // travar na tela preta.
       restored = false;
     }
+  }
+
+  /*
+   * Ponto de nascimento em terra firme (2026-09-22). Era sempre a coluna
+   * (0, 0), e metade das seeds põe mar ali. O worker procura — é ele que tem o
+   * ruído do terreno — e o resultado fica no meta do mundo, para o
+   * renascimento e para a próxima vez.
+   */
+  if (!restored) {
+    if (meta.spawnFound !== true) {
+      const [sx, sz] = await pipeline.findSpawn();
+      meta.spawn = [sx, 0, sz];
+      meta.spawnFound = true;
+    }
+    player.setPosition(meta.spawn[0] + 0.5, SEA_LEVEL + 30, meta.spawn[2] + 0.5);
   }
 
   if (!restored) {
@@ -423,13 +397,14 @@ async function boot(): Promise<void> {
   // Partículas com a cor média do bloco quebrado (doc 06 §4) + haptics.
   // A `Session` já registrou o próprio handler; aqui só encadeamos o efeito.
   const particleColor = new Float32Array(3);
-  /** Reusado por frame para medir o brilho do bloco mirado. */
-  const crackColor = new Float32Array(3);
   const sessionBroken = interaction.onBlockBroken;
   interaction.onBlockBroken = (x, y, z, state) => {
     sessionBroken?.(x, y, z, state);
     const layer = atlas.layerOf(texOf(defOf(state), 'side'));
     atlas.averageColor(layer, particleColor);
+    // Lã e cama tingidas: o desenho é cinza, a partícula sai da cor (M13).
+    const dye = dyeRgbOf(defOf(state));
+    if (dye !== null) for (let c = 0; c < 3; c++) particleColor[c] *= dye[c] / 255;
     renderer.particles.emitBlockBreak(
       x, y, z, 8, particleColor[0], particleColor[1], particleColor[2],
     );
@@ -456,57 +431,25 @@ async function boot(): Promise<void> {
       if (target !== null) inventory.pickBlock(defOf(target.state).id, player.mode === 'creative');
     },
     onToggleDebug: () => debug.toggle(),
-    onToggleFly: () => {
-      if (player.mode !== 'creative') return;
-      player.flying = !player.flying;
-      if (player.flying) player.vy = 0;
-    },
-    // Esc fecha uma camada por vez (doc 08 §4.1).
-    onPause: () => {
-      if (creativeScreen.isOpen) creativeScreen.close();
-      else if (containerScreen.isOpen) session.closeScreen();
-      else togglePause();
-    },
-    onInventory: () => toggleInventory(),
+    onToggleFly: () => flow.toggleFly(),
+    onPause: () => flow.escape(),
+    onInventory: () => flow.toggleInventory(),
     // Largar o item da mão no chão (doc 08 §3.5). O `onDrop` do inventário já
     // vai parar na `Session`, que cria a entidade com o arremesso.
     onDropItem: (whole) => { inventory.dropSelected(whole); },
   }, keybinds, gamepads);
 
-  /** No criativo, `E` abre a paleta de itens; no sobrevivência, a mochila. */
-  function toggleInventory(): void {
-    if (player.mode !== 'creative') { session.toggleInventory(); return; }
-    if (creativeScreen.isOpen) { creativeScreen.close(); return; }
-    // Mochila aberta pelo atalho da paleta: `E` fecha ela em vez de abrir a
-    // paleta por cima — uma camada por vez, como o `Esc` (doc 08 §4.1).
-    if (containerScreen.isOpen) { session.closeScreen(); return; }
-    controls.mouse.exitLock();
-    creativeScreen.open(inventory);
-  }
-
   hud.onSlotSelected = (index) => inventory.select(index);
   hud.spriteOf = (item) => itemSprites.position(item);
   inventory.onChange = () => containerScreen.refresh();
 
-  const pauseMenu = new PauseMenu({
-    onResume: () => { paused = false; pauseMenu.hide(); },
-    onOptions: () => {
-      pauseMenu.hide();
-      menu.openOptions(() => pauseMenu.show());
-    },
-    achievements: () => session.achievements.mask,
-    gameMode: () => player.mode,
-    onToggleMode: () => setGameMode(player.mode === 'creative' ? 'survival' : 'creative'),
-    onSaveAndQuit: () => {
-      pauseMenu.setStatus('salvando…');
-      void (async () => {
-        await save?.saveAll();
-        // Recarregar é a saída honesta para voltar ao título: garante que nada
-        // do mundo antigo (workers, VBOs, listeners) sobreviva ao próximo.
-        location.reload();
-      })();
-    },
+  const flow = new GameFlow({
+    player, session, controls, hud, containerScreen, creativeScreen,
+    touchUi: () => touchUi,
+    openOptions: (back) => menu.openOptions(back),
+    saveAll: async () => { await save?.saveAll(); },
   });
+  const pauseMenu = flow.pauseMenu;
 
   const signEditor = new SignEditor({
     onDone: (x, y, z, lines) => {
@@ -517,80 +460,14 @@ async function boot(): Promise<void> {
   });
 
   const touchUi = new TouchUi(settings, controls.touch.buttons, {
-    onPause: () => togglePause(),
-    onInventory: () => toggleInventory(),
-    onFlyToggle: () => {
-      if (player.mode !== 'creative') return;
-      player.flying = !player.flying;
-      if (player.flying) player.vy = 0;
-    },
-    onBreakDown: (down) => { modeBBreaking = down; },
-    onPlace: () => { modeBPlace = true; },
+    onPause: () => flow.togglePause(),
+    onInventory: () => flow.toggleInventory(),
+    onFlyToggle: () => flow.toggleFly(),
+    onBreakDown: (down) => { actions.modeBBreaking = down; },
+    onPlace: () => { actions.modeBPlace = true; },
   });
   touchUi.setVisible(isTouchDevice);
-  applyGameMode();
-
-  /**
-   * Troca o modo **no mesmo mundo** (pedido de campo 2026-09-14).
-   *
-   * O save já guardava o modo junto da meta desde o M4 — `saveAll` grava
-   * `meta.gameMode = player.mode` —, então persistir é só salvar depois de
-   * trocar. O que não existia era como trocar.
-   *
-   * Três cuidados que o modo novo exige:
-   *
-   * - **para de voar**. Entrar no sobrevivência voando deixaria o jogador
-   *   parado no ar; sair dele com o voo ligado daria voo de graça. Cair é a
-   *   resposta certa nos dois casos, e o duplo toque no pulo religa quando
-   *   valer.
-   * - **fecha a tela aberta**. A paleta do criativo e a mochila do
-   *   sobrevivência são telas diferentes para o mesmo botão: deixar a antiga
-   *   aberta mostraria itens que o modo novo não dá.
-   * - **salva na hora**. Trocar de modo é raro e deliberado; esperar o
-   *   autosave arriscaria perder justamente a coisa que o jogador acabou de
-   *   pedir.
-   */
-  function setGameMode(next: GameMode): void {
-    if (player.mode === next) return;
-    player.mode = next;
-    player.flying = false;
-    if (creativeScreen.isOpen) creativeScreen.close();
-    if (containerScreen.isOpen) session.closeScreen();
-    applyGameMode();
-    hud.showMessage(next === 'creative' ? 'Modo Criativo' : 'Modo Sobrevivência', 60);
-    void save?.saveAll();
-  }
-
-  /** Põe a interface de acordo com o modo atual. */
-  function applyGameMode(): void {
-    const creative = player.mode === 'creative';
-    touchUi.setCreative(creative);
-    hud.setCreative(creative);
-  }
-
-  // Estado dos botões dedicados do Modo B.
-  let modeBBreaking = false;
-  let modeBPlace = false;
-
-  /**
-   * O `AudioContext` só pode nascer dentro de um gesto (doc 10 §1). Qualquer
-   * um serve — tocar a tela, clicar ou apertar uma tecla.
-   */
-  let audioStarted = false;
-  function startAudio(): void {
-    if (audioStarted) return;
-    audioStarted = true;
-    void audio.start().then(() => {
-      applyVolumes();
-      music = new Music(audio.context, audio.busNode('music'));
-      music.enabled = settings.get('musicVolume') > 0;
-    });
-  }
-  /** Os nove sliders de volume do doc 08 §3.11, em uma passada. */
-  function applyVolumes(): void {
-    audio.setVolume('master', settings.get('masterVolume'));
-    for (const bus of BUSES) audio.setVolume(bus, settings.get(BUS_SETTING[bus]));
-  }
+  flow.applyGameMode();
 
   /*
    * Controle ligado: diz qual foi reconhecido, porque é a única forma de o
@@ -607,158 +484,42 @@ async function boot(): Promise<void> {
      * controle não conta como gesto em navegador nenhum. Quem só tem o controle
      * na mão jogaria mudo sem entender por quê, então o jogo avisa o que fazer.
      */
-    if (!audioStarted) {
+    if (!sound.started) {
       hud.showMessage('Toque na tela ou aperte uma tecla uma vez para ligar o som.', 120);
     }
   });
   audio.onSubtitle = (text, direction) => hud.showSubtitle(text, direction);
-  for (const event of ['pointerdown', 'keydown'] as const) {
-    window.addEventListener(event, startAudio, { once: false, passive: true });
-  }
-
   // Primeiro toque: tela cheia + trava de orientação (precisa de gesto).
   controls.touch.onFirstTouch = () => screenMode.enter();
 
-  let paused = false;
-  function togglePause(): void {
-    paused = !paused;
-    controls.reset();
-    if (paused) {
-      controls.mouse.exitLock();
-      pauseMenu.show();
-    } else {
-      pauseMenu.hide();
-    }
-  }
-
   showHint(controls, isTouchDevice, gamepads);
 
-  const debugSource: DebugSource = {
-    stats: undefined as never,
-    camera: renderer.camera,
-    drawCalls: 0,
-    vertices: 0,
-    renderScale: 1,
-    chunks: {
-      loaded: 0, total: 0, queued: 0, generating: 0, meshing: 0, visibleSections: 0,
-    },
-    maxFps: 0,
-    biome: '—',
-    blockLight: 0,
-    skyLight: 15,
-    entities: { mobs: 0, items: 0, arrows: 0, paths: 0 },
-    redstone: 0,
-    fire: 0,
-    clock: '00:00',
-    sounds: 0,
-  };
+  const hudFeed = new HudFeed({
+    hud, effectsBar, touchUi: isTouchDevice ? touchUi : null, debug, session, controls, settings,
+    renderer, pipeline, audio,
+  });
 
-  /** Direção do olhar reusada — `forwardFrom` escreve nela, sem alocar. */
-  const aimDirection = createVec3();
-
-  /**
-   * Som de passo a cada ~2,2 blocos andados no chão, com a superfície pisada.
-   * Um som por tick andando seria uma metralhadora.
-   */
-  let stepDistance = 0;
-  function tickFootsteps(): void {
-    if (!player.onGround) return;
-    const moved = Math.hypot(player.x - player.prevX, player.z - player.prevZ);
-    stepDistance += moved;
-    if (stepDistance < 2.2) return;
-    stepDistance = 0;
-    const below = defOf(world.getBlock(
-      Math.floor(player.x), Math.floor(player.y - 0.2), Math.floor(player.z),
-    ));
-    if (below.shape === 'none') return;
-    audio.play(blockSound(below.sound, 'step'), player.x, player.y, player.z, 0.5);
-  }
-
-  /**
-   * Monta o batch de mobs e flechas do frame (doc 07 §5).
-   *
-   * A luz é **uma amostra por entidade** — por vértice não mudaria nada na tela
-   * e multiplicaria por 24 o número de consultas ao mundo.
-   */
-  const shadowsEnabled = preset.entityShadows;
-  function drawEntities(alpha: number): void {
-    mobRenderer.begin();
-    const store = session.mobs.store;
-    const dayFactor = dayNight.dayFactor;
-
-    for (let i = 0; i < store.active; i++) {
-      const def = mobDef(store.type[i]);
-      const x = store.renderX(i, alpha);
-      const y = store.renderY(i, alpha);
-      const z = store.renderZ(i, alpha);
-      const bx = Math.floor(x);
-      const by = Math.floor(y + store.height(i) * 0.5);
-      const bz = Math.floor(z);
-      const light = Math.max(
-        world.getBlockLight(bx, by, bz), world.getSkyLight(bx, by, bz) * dayFactor,
-      );
-      // Creeper com o pavio aceso pisca branco: é o aviso de que dá tempo de correr.
-      const flash = store.hurtTicks[i] > 0
-        ? 1
-        : store.fuse[i] > 0 ? (store.fuse[i] % 8 < 4 ? 0.8 : 0) : 0;
-
-      mobRenderer.addModel(
-        modelOf(def.model), entityAtlas.layerOf(def.skin),
-        x, y, z,
-        store.renderYaw(i, alpha), 0,
-        store.headYaw[i], store.pitch[i],
-        store.limbSwing[i], store.limbAmount[i], store.age[i],
-        light, flash, store.scale[i], store.squash[i],
-      );
-    }
-
-    // Barco e carrinho: mesmo batcher dos mobs, como a flecha (doc 07 §6).
-    const cartModel = modelOf(MINECART_LAYER);
-    const cartLayer = entityAtlas.layerOf(MINECART_LAYER);
-    session.carts.forEach((x, y, z, yaw) => {
-      const light = world.getSkyLight(Math.floor(x), Math.floor(y), Math.floor(z)) * dayFactor;
-      mobRenderer.addModel(
-        cartModel, cartLayer, x, y, z, yaw, 0, yaw, 0, 0, 0, 0,
-        Math.max(4, light), 0, 1, 0,
-      );
-    }, alpha);
-
-    const boatModel = modelOf(BOAT_LAYER);
-    const boatLayer = entityAtlas.layerOf(BOAT_LAYER);
-    session.boats.forEach((x, y, z, yaw) => {
-      const light = world.getSkyLight(Math.floor(x), Math.floor(y), Math.floor(z)) * dayFactor;
-      mobRenderer.addModel(
-        boatModel, boatLayer, x, y, z, yaw, 0, yaw, 0, 0, 0, 0,
-        Math.max(4, light), 0, 1, 0,
-      );
-    }, alpha);
-
-    const arrowModel = modelOf(ARROW_LAYER);
-    const arrowLayer = entityAtlas.layerOf(ARROW_LAYER);
-    session.projectiles.forEach((x, y, z, vx, vy, vz) => {
-      const yaw = Math.atan2(vx, vz);
-      const pitch = -Math.atan2(vy, Math.hypot(vx, vz) || 0.001);
-      mobRenderer.addModel(
-        arrowModel, arrowLayer, x, y, z, yaw, pitch, yaw, 0, 0, 0, 0, 12, 0, 1, 0,
-      );
-    }, alpha);
-
-    // Sombras por último: elas fecham o buffer para poderem ser desenhadas com
-    // blending numa segunda chamada.
-    if (!shadowsEnabled || !settings.get('entityShadows')) return;
-    for (let i = 0; i < store.active; i++) {
-      const x = store.renderX(i, alpha);
-      const z = store.renderZ(i, alpha);
-      const groundY = Math.floor(store.y[i]);
-      const light = world.getSkyLight(Math.floor(x), groundY, Math.floor(z)) * dayFactor;
-      mobRenderer.addShadow(x, groundY, z, store.width(i) * 0.8, Math.max(4, light));
-    }
-  }
+  const actions = new PlayerActions(controls, session, renderer.camera, handRenderer);
+  const ambience = new Ambience(renderer, session, audio, settings, preset.rainDrops);
+  const sceneFeed = new SceneFeed({
+    renderer, mobRenderer, itemRenderer, signTextPass, entityAtlas, atlas, world, session, player,
+    shadows: () => preset.entityShadows && settings.get('entityShadows'),
+  });
 
   /** Espera o terreno existir antes de soltar o jogador na gravidade. */
   let spawned = false;
   /** Três dedos abrem o debug (doc 02 §6) — dispara uma vez por gesto. */
   let threeFingerArmed = true;
+
+  // Callbacks do laço criados uma vez: uma closure nova por quadro é lixo
+  // para o coletor no caminho quente (PROMPT.md §6).
+  const applyMesh = (result: MeshResult): void => { renderer.chunks.apply(result); };
+  const applyLook = (yawDelta: number, pitchDelta: number): void => {
+    // Pausado, o movimento é **consumido e jogado fora**: guardá-lo faria a
+    // câmera saltar tudo de uma vez ao voltar ao jogo.
+    if (flow.paused) return;
+    Controls.applyLookTo(player, yawDelta, pitchDelta);
+  };
 
   const loop = new GameLoop({
     tick() {
@@ -770,7 +531,7 @@ async function boot(): Promise<void> {
         threeFingerArmed = true;
       }
 
-      if (paused) return;
+      if (flow.paused) return;
 
       if (!spawned) {
         spawned = trySpawn(world, player, restored);
@@ -782,9 +543,9 @@ async function boot(): Promise<void> {
          * continua ticando — é ela que espera o chunk chegar e o reposiciona.
          */
         player.prevX = player.x; player.prevY = player.y; player.prevZ = player.z;
-      } else if (session.isRiding) {
+      } else if (session.vehicles.isRiding) {
         // Pilotando: o veículo é que anda, e o jogador vai junto (M6/M7).
-        session.driveVehicle(controls.state.forward);
+        session.vehicles.drive(controls.state.forward);
       } else if (!session.survival.isDead) {
         const fallBefore = player.fallDistance;
         const wasAirborne = !player.onGround;
@@ -798,129 +559,16 @@ async function boot(): Promise<void> {
       // Com uma tela de contêiner aberta o mundo continua rodando, mas o
       // jogador não interage com ele (doc 08 §4.2).
       if (containerScreen.isOpen || creativeScreen.isOpen || deathScreen.isOpen) {
-        interaction.tickBreaking(false, null);
-        session.cancelEating();
-        /*
-         * A mão continua animando, parada.
-         *
-         * Sair do tick antes de `handRenderer.tick()` congela o golpe no meio:
-         * `previous` e `current` ficam em valores diferentes para sempre e o
-         * render interpola entre os dois a cada frame. Abrir a bancada com a
-         * mão vazia — um clique de usar, que dispara o golpe e abre a tela no
-         * mesmo tick — deixava a mão vibrando para frente e para trás até
-         * fechar (relato de campo 2026-09-12).
-         */
-        const heldNow = inventory.held;
-        handRenderer.setHeld(heldNow === null ? -1 : heldNow.item);
-        handRenderer.tick(0);
+        actions.idle();
         return;
       }
-
-      // Mira: no Modo A vem do dedo; senão, do centro da tela.
-      if (controls.hasAim) {
-        const ray = renderer.camera.rayFromNdc(controls.aimNdcX, controls.aimNdcY);
-        interaction.updateTargetAlong(ray[0], ray[1], ray[2]);
-      } else {
-        interaction.updateTarget();
-      }
-
-      const breaking = controls.state.breaking || modeBBreaking;
-      // Mob na frente do bloco: o golpe vai nele, não na parede atrás.
-      //
-      // Vale **nos dois modos**. Com o golpe restrito ao sobrevivência, bater
-      // em qualquer bicho no criativo não fazia nada visível: o clique caía
-      // direto no `tickBreaking`, que no criativo quebra o bloco atrás do mob.
-      let attacked = false;
-      if (breaking) {
-        if (controls.hasAim) {
-          const ray = renderer.camera.rayFromNdc(controls.aimNdcX, controls.aimNdcY);
-          attacked = session.attackAlong(ray[0], ray[1], ray[2]);
-        } else {
-          forwardFrom(aimDirection, player.yaw, player.pitch);
-          attacked = session.attackAlong(aimDirection[0], aimDirection[1], aimDirection[2]);
-        }
-      }
-      interaction.tickBreaking(breaking && !attacked, inventory.held);
-
-      // Mão: o item vem do slot selecionado, o balanço de bater ou usar, e o
-      // passo do quanto o jogador andou neste tick.
-      const heldStack = inventory.held;
-      handRenderer.setHeld(heldStack === null ? -1 : heldStack.item);
-      if (attacked || interaction.state.stage >= 0) handRenderer.swing();
-      handRenderer.tick(Math.hypot(player.x - player.prevX, player.z - player.prevZ));
-
-      // Soltar o botão de usar é o que **encerra** comer, carregar o arco e
-      // baixar o escudo. Antes a condição olhava o botão de quebrar, e comer
-      // era zerado no mesmo tick em que começava — nunca completava.
-      const placing = controls.consumePlace() || modeBPlace;
-      if (!placing) session.cancelEating();
-
-      if (placing) {
-        // Clicar num mob (domar) vence colocar bloco: o jogador está mirando
-        // no bicho, não na parede atrás dele.
-        let used = false;
-        if (controls.hasAim) {
-          const ray = renderer.camera.rayFromNdc(controls.aimNdcX, controls.aimNdcY);
-          used = session.useOnMob(ray[0], ray[1], ray[2]);
-        } else {
-          forwardFrom(aimDirection, player.yaw, player.pitch);
-          used = session.useOnMob(aimDirection[0], aimDirection[1], aimDirection[2]);
-        }
-        if (!used) session.useHeld();
-        handRenderer.swing();
-      }
-      modeBPlace = false;
-
-      /*
-       * Balanço da câmera: a fase avança com a distância andada no chão.
-       *
-       * Ligar pelo tempo em vez da distância faria a câmera balançar parada de
-       * costas para a parede, empurrando contra ela.
-       */
-      const camera = renderer.camera;
-      if (settings.get('cameraBob') && player.onGround) {
-        const walked = Math.hypot(player.x - player.prevX, player.z - player.prevZ);
-        camera.bobPhase += walked * 2.4;
-        // A intensidade acompanha a velocidade: passo lento balança pouco.
-        camera.bobStrength = Math.min(1, walked * 5);
-      } else {
-        camera.bobStrength = 0;
-      }
-
-      renderer.particles.tick();
-      /*
-       * Fagulha de tocha (M8): duas sondas por tick num cubo de 17 blocos.
-       *
-       * Duas é pouco de propósito. Um punhado por segundo basta para uma sala
-       * com meia dúzia de tochas piscar o tempo todo, e o custo — duas
-       * consultas ao mundo — não aparece nem em T0. Quem baixa "Partículas" nas
-       * opções baixa isto junto: o teto do pool é o mesmo, e o emissor desiste
-       * sozinho quando ele enche.
-       */
-      emitTorchSparks(world, player.x, player.y, player.z, 2, (fx, fy, fz) => {
-        renderer.particles.emitFlame(fx, fy, fz);
-      });
-      // Chuva: um punhado de gotas por tick em volta do jogador, no mesmo pool
-      // das outras partículas (doc 03 §8).
-      if (session.weather.isRaining) {
-        const drops = Math.round(session.weather.intensity * preset.rainDrops);
-        if (drops > 0) {
-          renderer.particles.emitRain(player.x, player.y, player.z, 10, drops);
-        }
-      }
-      /*
-       * Chuva no ouvido: um loop só, com o ganho seguindo a intensidade.
-       *
-       * Fica embaixo de telhado? Continua chovendo — o som atravessa, e medir
-       * cobertura por raycast a cada tick custaria mais do que o realismo vale.
-       */
-      audio.setLoop('weather/rain', session.weather.intensity * 0.9);
+      actions.tick();
+      ambience.tick();
       save?.tick();
       // Uma foto nova a cada 30 s, para a tela de seleção mostrar o mundo como
       // ele está e não como estava na primeira vez que foi salvo.
-      if (loop.stats.tick % 600 === 0) thumbPending = true;
-      tickFootsteps();
-      music?.tick();
+      if (loop.stats.tick % 600 === 0) thumbnail.pending = true;
+      sound.music?.tick();
       hud.tick();
 
       pipeline.setCenter(player.x, player.z);
@@ -928,7 +576,7 @@ async function boot(): Promise<void> {
       pipeline.pump();
     },
     pump(budgetMs) {
-      pipeline.drainReady(budgetMs, (result) => renderer.chunks.apply(result));
+      pipeline.drainReady(budgetMs, applyMesh);
     },
     render(alpha) {
       /*
@@ -938,12 +586,7 @@ async function boot(): Promise<void> {
        * 20 Hz num display de 60 Hz repetiria o mesmo ângulo por três quadros e
        * depois pularia. Ver o comentário de `Controls.updateLook`.
        */
-      controls.updateLook(loop.stats.frameMs, (yawDelta, pitchDelta) => {
-        // Pausado, o movimento é **consumido e jogado fora**: guardá-lo faria
-        // a câmera saltar tudo de uma vez ao voltar ao jogo.
-        if (paused) return;
-        Controls.applyLookTo(player, yawDelta, pitchDelta);
-      });
+      controls.updateLook(loop.stats.frameMs, applyLook);
 
       const camera = renderer.camera;
       camera.prevX = player.prevX;
@@ -955,62 +598,7 @@ async function boot(): Promise<void> {
       camera.prevYaw = player.yaw; camera.yaw = player.yaw;
       camera.prevPitch = player.pitch; camera.pitch = player.pitch;
 
-      const target = interaction.state.target;
-      const h = renderer.highlight;
-      h.visible = target !== null && !paused;
-      if (target !== null) {
-        h.x = target.x; h.y = target.y; h.z = target.z;
-        h.stage = interaction.state.stage;
-        // Brilho do bloco mirado: é ele que decide se a fissura sai clara ou
-        // escura. `averages` do atlas já está pronto desde o boot, então é
-        // leitura de array, não cálculo por frame.
-        atlas.averageColor(atlas.layerOf(texOf(defOf(target.state), 'side')), crackColor);
-        h.brightness = crackColor[0] * 0.299 + crackColor[1] * 0.587 + crackColor[2] * 0.114;
-        // Contorno do tamanho da forma: uma consulta de tabela por frame.
-        boundsFor(
-          SHAPE_BY_NAME[defOf(target.state).shape] ?? 0, stateBitsOf(target.state), h.bounds,
-        );
-      }
-
-      drawEntities(alpha);
-
-      /*
-       * Texto das placas (M8): só o que está perto o bastante para ser lido.
-       * O corte por distância é o que limita o passe — sem ele, um mural de
-       * placas a 200 blocos custaria preenchimento por letra ilegível.
-       */
-      signTextPass.begin();
-      if (session.signs.size > 0) {
-        session.signs.forEach((sx, sy, sz, lines) => {
-          const dx = sx + 0.5 - player.x;
-          const dz = sz + 0.5 - player.z;
-          if (dx * dx + dz * dz > SIGN_TEXT_DISTANCE * SIGN_TEXT_DISTANCE) return;
-          signTextPass.add(sx, sy, sz, stateBitsOf(world.getBlock(sx, sy, sz)) & 3, lines);
-        });
-      }
-
-      // Itens no chão: um billboard por entidade, tudo numa draw call.
-      itemRenderer.begin();
-      session.items.forEach((x, y, z, item, _count, age) => {
-        itemRenderer.add(x, y, z, item, age);
-      }, alpha);
-      renderer.itemRenderer = itemRenderer;
-
-      // Orbes de XP: um brilho verde por orbe no pool de partículas, em vez de
-      // um passe de render novo. Custa zero draw call a mais e some sozinho.
-      session.orbs.forEach((x, y, z) => {
-        renderer.particles.emitGlow(x, y + 0.15, z, 0.48, 0.84, 0.23);
-      }, alpha);
-
-      // A mão acompanha a luz de onde o jogador está: sem isto ela fica acesa
-      // dentro da caverna, como se tivesse luz própria.
-      const eyeX = Math.floor(player.x);
-      const eyeY = Math.floor(player.y + player.eyeHeight);
-      const eyeZ = Math.floor(player.z);
-      renderer.handLight = Math.max(
-        world.getBlockLight(eyeX, eyeY, eyeZ),
-        world.getSkyLight(eyeX, eyeY, eyeZ) * dayNight.dayFactor,
-      ) / 15;
+      sceneFeed.frame(alpha, flow.paused, dayNight.dayFactor);
 
       /*
        * Campo de visão: o valor das opções mais o "puxão" de correr, escalado
@@ -1026,12 +614,12 @@ async function boot(): Promise<void> {
       renderer.skyFlash = session.weather.flash;
       renderer.setDayTime(dayNight.time, dayNight.dayFactor, session.weather.intensity);
       audio.setListener(camera.x, camera.y, camera.z, player.yaw);
-      if (music !== null) {
-        music.mood = player.y < SEA_LEVEL - 6 ? 'underground' : 'surface';
+      if (sound.music !== null) {
+        sound.music.mood = player.y < SEA_LEVEL - 6 ? 'underground' : 'surface';
       }
       renderer.render(alpha);
       // Ainda no mesmo quadro: depois disto o navegador descarta o backbuffer.
-      grabThumbnail();
+      thumbnail.grab(canvas);
 
       if (settings.get('dynamicResolution')) {
         // Enquanto há chunk na fila, o frame time mede carregamento, não o
@@ -1041,42 +629,9 @@ async function boot(): Promise<void> {
         if (nextScale !== renderer.renderScale) renderer.setRenderScale(nextScale);
       }
 
-      hud.setSelected(inventory.selected);
-      hud.render(inventory.slots);
-      hud.setStats(
-        session.survival.health, session.survival.hunger, session.survival.air, MAX_AIR,
-        session.armorPoints,
-      );
-      hud.setExperience(session.xp.level, session.xp.progress);
-      hud.setFps(loop.stats.fps, settings.get('showFps'));
-      if (isTouchDevice) {
-        const stick = controls.touch.joystick;
-        const aimX = ((controls.aimNdcX + 1) / 2) * window.innerWidth;
-        const aimY = ((1 - controls.aimNdcY) / 2) * window.innerHeight;
-        touchUi.draw(stick, controls.holdProgress, aimX, aimY);
-      }
-
-      const now = performance.now();
-      // A taxa do display se mede sempre: precisa estar pronta ao abrir o F3.
-      debug.sampleDisplayRate(now);
-      // O resto só com o overlay aberto — em T0 nem a varredura do anel nem as
-      // leituras de estado precisam acontecer 60 vezes por segundo à toa.
-      if (debug.isVisible) {
-        debugSource.maxFps = loop.maxFps;
-        debugSource.entities.mobs = session.mobs.count;
-        debugSource.entities.items = session.items.active;
-        debugSource.entities.arrows = session.projectiles.active;
-        debugSource.entities.paths = session.mobs.pathsComputed;
-        debugSource.redstone = session.redstone.lastUpdates;
-        debugSource.fire = session.fire.burning;
-        debugSource.clock = dayNight.clock;
-        debugSource.sounds = audio.loadedSounds;
-        updateDebugSource(debugSource, renderer, pipeline, world, player);
-        debug.update(now, debugSource);
-      }
+      hudFeed.frame(loop);
     },
   });
-  debugSource.stats = loop.stats;
   loop.maxFps = settings.get('maxFps');
   /**
    * A linha de objetivo do HUD: o próximo passo da árvore de conquistas.
@@ -1090,110 +645,25 @@ async function boot(): Promise<void> {
     hud.setObjective(next === undefined ? null : objectiveFor(next, displayOfTarget));
   }
 
-  /** Opções que só se aplicam em algum lugar do render ou da física. */
-  /**
-   * Distância de render efetiva: o override das opções vence, 0 = seguir o
-   * preset do tier.
-   *
-   * Ela era lida **uma vez, no boot** (ver o `rdOverride` lá em cima): mexer no
-   * controle durante a partida não fazia absolutamente nada, e de dentro do
-   * jogo isso é indistinguível de a opção estar quebrada (relato de campo
-   * 2026-09-12). Agora o pipeline, o plano distante e a névoa acompanham.
-   */
-  function applyRenderDistance(): void {
-    const override = settings.get('renderDistance');
-    const distance = override > 0 ? override : preset.renderDistance;
-    if (distance === pipeline.renderDistance) return;
-    pipeline.setRenderDistance(distance);
-    renderer.setRenderDistance(distance);
-    // Senão o overlay segue anunciando o valor do boot, e quem está medindo o
-    // mundo mede errado (relato de campo 2026-09-13).
-    debug.setRenderDistance(distance);
-  }
-
-  function applyPlayfieldSettings(): void {
-    applyRenderDistance();
-    player.autoJump = settings.get('autoJump');
-    // Brilho 0–100 → piso de luz ambiente do shader. 50 mantém o 0.06 de antes,
-    // e o topo clareia a caverna sem apagar a diferença entre dia e noite.
-    renderer.minSkyLight = 0.02 + (settings.get('brightness') / 100) * 0.16;
-    hud.applyAccessibility(
-      settings.get('highContrast'), settings.get('textScale'), settings.get('damageFlash'),
-      settings.get('colorBlind'),
-    );
-
-    /*
-     * O resto da tabela de Vídeo do doc 08 §3.11.
-     *
-     * Tudo que é `auto` cai no preset do tier (`core/tier.ts`), que continua
-     * sendo o padrão do aparelho; o jogador só sobrescreve o que quiser.
-     */
-    const clouds = settings.get('clouds');
-    renderer.clouds.mode = clouds === 'auto' ? preset.clouds : clouds;
-    const particles = settings.get('particles');
-    renderer.particles.setMode(particles === 'auto' ? preset.particles : particles);
-    renderer.fogMode = settings.get('fog');
-    renderer.applyFog();
-    renderer.highContrastOutline = settings.get('highContrastOutline');
-
-    // Distância de simulação: é o raio em que mob nasce e some (doc 07 §4).
-    const simulation = settings.get('simulationDistance');
-    session.spawner.simulationDistance = simulation > 0 ? simulation : preset.simulationDistance;
-
-    session.weather.showFlashes = !settings.get('hideSkyFlashes');
-
-    // Modo A mira no dedo: a mira central apontaria para outro lugar.
-    hud.setCrosshairVisible(!(isTouchDevice && settings.get('touchMode') === 'A'));
-
-    // Layout de controle forçado (`auto` deixa a detecção decidir).
-    const forced = settings.get('padProfile');
-    gamepads.forcedProfile = forced === 'auto' ? null : profileById(forced);
-
-    renderer.resize();
-  }
-  applyPlayfieldSettings();
+  const playfield = new Playfield({
+    settings, preset, pipeline, renderer, debug, player, hud, session, gamepads,
+    touchAimMode: isTouchDevice,
+  });
+  playfield.apply();
   refreshObjective();
   settings.onChange((next) => {
     loop.maxFps = next.maxFps;
-    applyVolumes();
+    sound.applyVolumes();
     audio.subtitlesEnabled = next.subtitles;
     session.survival.difficulty = next.difficulty as 0 | 1 | 2 | 3;
-    if (music !== null) music.enabled = next.musicVolume > 0;
+    if (sound.music !== null) sound.music.enabled = next.musicVolume > 0;
     handRenderer.enabled = next.handItem;
-    applyPlayfieldSettings();
+    playfield.apply();
   });
 
-  canvas.addEventListener('webglcontextlost', (e) => {
-    e.preventDefault();
-    loop.stop();
+  attachLifecycle({
+    canvas, loop, resize: () => renderer.resize(), resetInput: () => controls.reset(), audio, save,
   });
-  canvas.addEventListener('webglcontextrestored', () => location.reload());
-
-  window.addEventListener('resize', () => renderer.resize(), { passive: true });
-  window.addEventListener('blur', () => controls.reset());
-  document.addEventListener('visibilitychange', () => {
-    // Suspender o áudio ao perder o foco é regra do doc 10 §5.
-    if (document.hidden) {
-      controls.reset(); loop.stop(); audio.suspend();
-      /*
-       * Esconder a aba é o **único** aviso confiável no celular.
-       *
-       * `beforeunload` não dispara ao trocar de app ou fechar o navegador no
-       * Android: quem dispara é isto. Sem gravar aqui, sair do jogo pelo botão
-       * de início do aparelho perdia tudo desde o último autosave — e, antes
-       * de hoje, o conteúdo dos baús perdia desde sempre.
-       *
-       * A rede de segurança síncrona vai primeiro, porque ela **sempre**
-       * termina; o save completo é assíncrono e pode ser interrompido.
-       */
-      save?.writeEmergency();
-      void save?.saveAll();
-    } else { loop.start(); audio.resume(); }
-  });
-
-  // Rede de segurança do doc 11 §3: `beforeunload` não espera o IndexedDB, mas
-  // o `localStorage` grava na hora.
-  window.addEventListener('beforeunload', () => save?.writeEmergency());
 
   loop.start();
 
@@ -1207,170 +677,6 @@ async function boot(): Promise<void> {
     },
   });
   }
-}
-
-/**
- * `data:image/png;base64,…` → bytes. Sem `fetch`, que é assíncrono e teria que
- * esperar por um dado que já está na mão.
- */
-function decodeDataUrl(url: string): Uint8Array | null {
-  const comma = url.indexOf(',');
-  if (comma < 0 || !url.startsWith('data:image/png;base64,')) return null;
-  try {
-    const binary = atob(url.slice(comma + 1));
-    const out = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
-    return out;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Laço da navegação de interface por controle.
- *
- * Roda em `requestAnimationFrame` próprio, e **não** no tick do jogo, porque a
- * tela de título existe muito antes de haver um `GameLoop`: sem isto, quem só
- * tem controle na mão não conseguiria nem entrar num mundo.
- *
- * Dentro do jogo ele continua rodando de graça — `tick` devolve `false` na
- * hora quando não há tela aberta, e o polling do controle é o mesmo que o
- * `Controls` já faria.
- */
-function startUiNavLoop(gamepads: Gamepads, uiNav: UiNavigator, settings: SettingsStore): void {
-  /*
-   * A navegação anda a ~20 Hz, não a 120: a repetição de `UiNavigator` é
-   * contada em ticks, e num painel rápido a lista passaria seis vezes mais
-   * depressa do que no lento. Amarrar ao relógio deixa o menu igual em
-   * qualquer aparelho.
-   */
-  const stepMs = NAV_STEP_MS;
-  let last = 0;
-  const frame = (now: number): void => {
-    requestAnimationFrame(frame);
-    if (now - last < stepMs) return;
-    last = now;
-    gamepads.deadZone = settings.get('padDeadZone');
-    gamepads.vibration = settings.get('vibration');
-    // `pollNav` e não `poll`: a borda de subida é consumida no tick do jogo, e
-    // lê-la aqui roubaria o aperto de lá.
-    gamepads.pollNav();
-    // Quem decide se o mundo recebe o analógico é esta linha: com uma tela
-    // aberta, o controle é da tela.
-    gamepads.uiCapture = uiNav.tick(gamepads.nav);
-  };
-  requestAnimationFrame(frame);
-}
-
-function updateDebugSource(
-  source: DebugSource, renderer: Renderer, pipeline: ChunkPipeline, world: World, player: Player,
-): void {
-  source.drawCalls = renderer.drawCalls;
-  source.vertices = renderer.vertices;
-  source.renderScale = renderer.renderScale;
-  source.chunks.visibleSections = renderer.chunks.visibleSections;
-  source.chunks.queued = pipeline.stats.queued;
-  source.chunks.generating = pipeline.stats.generating;
-  source.chunks.meshing = pipeline.stats.meshing;
-  pipeline.ringProgress(source.chunks);
-
-  const x = Math.floor(player.x);
-  const y = Math.floor(player.y + player.eyeHeight);
-  const z = Math.floor(player.z);
-  source.blockLight = world.getBlockLight(x, y, z);
-  source.skyLight = world.getSkyLight(x, y, z);
-
-  const chunk = world.getChunk(x >> 4, z >> 4);
-  if (chunk !== undefined) {
-    const biome = BIOMES[chunk.biomeMap[((z & 15) << 4) | (x & 15)]];
-    source.biome = biome !== undefined ? biome.display : '—';
-  } else {
-    source.biome = 'carregando…';
-  }
-}
-
-
-function showHint(controls: Controls, isTouch: boolean, gamepads: Gamepads): void {
-  const hint = document.createElement('div');
-  hint.id = 'hint';
-  const base = isTouch
-    ? 'Esquerda: joystick · Direita: arrastar para olhar, toque curto coloca, toque longo quebra'
-    : 'Clique para jogar · WASD mover · Espaço pular · Shift agachar · Ctrl correr · '
-      + 'botões do mouse quebrar/colocar · 1-9 e roda trocam de item · F3 debug';
-  hint.textContent = base;
-
-  /*
-   * A dica de controle só aparece quando há um ligado, e com os rótulos **do
-   * controle na mão**: dizer "aperte A" para quem segura um DualSense manda o
-   * jogador procurar um botão que não existe no aparelho dele.
-   */
-  const showPadHint = (): void => {
-    if (!gamepads.connected) return;
-    const l = gamepads.labels;
-    hint.textContent = `${base}\n`
-      + `Controle: analógicos mover/olhar · ${l.faceDown} pular · ${l.faceRight} agachar · `
-      + `${l.l2} colocar · ${l.r2} quebrar · ${l.faceUp} largar · `
-      + `${l.l1}/${l.r1} ou direcional ←→ trocar item · ${l.start} pausa · `
-      + `${l.faceLeft} mochila`;
-  };
-  gamepads.onConnect(showPadHint);
-  showPadHint();
-
-  document.body.appendChild(hint);
-  const style = document.createElement('style');
-  // `pre-line` porque a linha do controle entra como um segundo parágrafo.
-  style.textContent = `#hint{position:fixed;left:50%;bottom:calc(30 * var(--px, 3px));
-    transform:translateX(-50%);padding:6px 12px;background:#00000080;color:#fff;
-    font:12px/1.4 ui-monospace,monospace;pointer-events:none;transition:opacity .3s;
-    text-align:center;max-width:90vw;z-index:5;white-space:pre-line}`;
-  document.head.appendChild(style);
-
-  if (isTouch) {
-    // No toque a dica some sozinha; não há pointer lock para servir de sinal.
-    setTimeout(() => { hint.style.opacity = '0'; }, 6000);
-  } else {
-    controls.mouse.onLockChange = (locked) => { hint.style.opacity = locked ? '0' : '1'; };
-    /*
-     * Quem joga **só de controle** no computador nunca trava o ponteiro, e a
-     * dica ficaria na tela para sempre. Com um controle ligado ela some pelo
-     * relógio, como no toque — e um pouco mais devagar, porque ela tem uma
-     * linha a mais para ler.
-     */
-    gamepads.onConnect(() => {
-      setTimeout(() => {
-        if (!controls.mouse.locked) hint.style.opacity = '0';
-      }, 9000);
-    });
-  }
-}
-
-function progress(value: number, message: string): void {
-  const bar = document.getElementById('boot-bar');
-  const msg = document.getElementById('boot-msg');
-  if (bar !== null) bar.style.width = `${Math.round(value * 100)}%`;
-  if (msg !== null) msg.textContent = message;
-}
-
-function hideBootScreen(): void {
-  const boot = document.getElementById('boot');
-  if (boot === null) return;
-  boot.classList.add('hidden');
-  setTimeout(() => boot.remove(), 300);
-}
-
-function fail(error: unknown): void {
-  const msg = error instanceof Error ? error.message : String(error);
-  const boot = document.getElementById('boot');
-  if (boot !== null) {
-    boot.classList.remove('hidden');
-    boot.innerHTML = '';
-    const h = document.createElement('h1');
-    h.textContent = 'Não foi possível iniciar';
-    const p = document.createElement('p');
-    p.textContent = msg;
-    boot.append(h, p);
-  }
-  console.error(error);
 }
 
 boot().catch(fail);

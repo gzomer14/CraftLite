@@ -88,7 +88,7 @@ describe('atacar mobs', () => {
     for (let t = 0; t < 200 && session.mobs.count > 0; t++) {
       const store = session.mobs.store;
       player.setPosition(store.x[0] - 1.2, GROUND_Y + 1, store.z[0]);
-      if (session.attackAlong(0.894, -0.447, 0)) swings++;
+      if (session.combat.attackAlong(0.894, -0.447, 0)) swings++;
       session.tick();
     }
 
@@ -102,14 +102,14 @@ describe('atacar mobs', () => {
     session.mobs.spawn(ZOMBIE, 10.0, GROUND_Y + 1, 8.5);
     const before = session.mobs.store.x[0];
 
-    session.attackAlong(1, 0, 0);
+    session.combat.attackAlong(1, 0, 0);
     session.tick();
     expect(session.mobs.store.x[0]).toBeGreaterThan(before);
   });
 
   it('sem mob na frente, o ataque não acontece', () => {
     const { session } = harness();
-    expect(session.attackAlong(1, 0, 0)).toBe(false);
+    expect(session.combat.attackAlong(1, 0, 0)).toBe(false);
   });
 
   it('a espada perde durabilidade ao acertar', () => {
@@ -118,7 +118,7 @@ describe('atacar mobs', () => {
     session.inventory.set(0, makeStack(sword.id, 1));
     session.mobs.spawn(ZOMBIE, 10.0, GROUND_Y + 1, 8.5);
 
-    session.attackAlong(1, 0, 0);
+    session.combat.attackAlong(1, 0, 0);
     expect(session.inventory.get(0)?.damage).toBe(1);
   });
 });
@@ -236,7 +236,7 @@ describe('explosão de creeper', () => {
     }
     player.setPosition(8.5, GROUND_Y + 4, 8.5);
 
-    session.explodeAt(8.5, GROUND_Y + 2, 8.5, 3);
+    session.combat.explodeAt(8.5, GROUND_Y + 2, 8.5, 3);
 
     expect(world.getBlock(8, GROUND_Y + 2, 8)).toBe(AIR);
     expect(session.survival.health).toBeLessThan(20);
@@ -248,7 +248,7 @@ describe('explosão de creeper', () => {
     const door = makeState(BLOCK_BY_NAME.get('oak_door')!.id);
     world.setBlock(9, GROUND_Y + 1, 8, door, 'gen');
 
-    session.breakBlockByMob(9, GROUND_Y + 1, 8);
+    session.combat.breakBlockByMob(9, GROUND_Y + 1, 8);
 
     expect(world.getBlock(9, GROUND_Y + 1, 8)).toBe(AIR);
     expect(session.items.active).toBe(0);
@@ -263,7 +263,7 @@ describe('explosão de creeper', () => {
     const shielded = makeState(BLOCK_BY_NAME.get('bookshelf')!.id);
     world.setBlock(11, GROUND_Y + 2, 8, shielded, 'gen');
 
-    session.explodeAt(7.5, GROUND_Y + 2, 8.5, 3);
+    session.combat.explodeAt(7.5, GROUND_Y + 2, 8.5, 3);
     expect(world.getBlock(11, GROUND_Y + 2, 8)).toBe(shielded);
   });
 
@@ -271,7 +271,7 @@ describe('explosão de creeper', () => {
     const { world, session } = harness();
     const bedrock = makeState(BLOCK_BY_NAME.get('bedrock')!.id);
     world.setBlock(9, GROUND_Y, 8, bedrock, 'gen');
-    session.explodeAt(9.5, GROUND_Y + 1, 8.5, 3);
+    session.combat.explodeAt(9.5, GROUND_Y + 1, 8.5, 3);
     expect(world.getBlock(9, GROUND_Y, 8)).toBe(bedrock);
   });
 });

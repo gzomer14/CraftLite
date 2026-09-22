@@ -121,6 +121,23 @@ export const RECIPES: readonly Recipe[] = [
   { type: 'shapeless', ingredients: ['iron_block'], result: { item: 'iron_ingot', count: 9 } },
   { type: 'shapeless', ingredients: ['gold_block'], result: { item: 'gold_ingot', count: 9 } },
   { type: 'shapeless', ingredients: ['diamond_block'], result: { item: 'diamond', count: 9 } },
+  // --- 2026-09-22 (M11): comidas do doc 05 §4 e a tesoura do §6.3 ---------
+  { type: 'shaped', pattern: ['GGG', 'GAG', 'GGG'], key: { G: 'gold_ingot', A: 'apple' }, result: { item: 'golden_apple', count: 1 } },
+  { type: 'shapeless', ingredients: ['brown_mushroom', 'red_mushroom', 'bowl'], result: { item: 'mushroom_stew', count: 1 } },
+  { type: 'shapeless', ingredients: ['sugar_cane'], result: { item: 'sugar', count: 1 } },
+  // Desvio consciente: o biscoito do gênero leva cacau, e não há selva nem
+  // cacau no jogo. O açúcar faz o papel — é o que a cana ganha de utilidade.
+  { type: 'shaped', pattern: ['WSW'], key: { W: 'wheat', S: 'sugar' }, result: { item: 'cookie', count: 8 } },
+  // O bolo devolve os três baldes vazios na grade (`consumeGrid`).
+  {
+    type: 'shaped', pattern: ['MMM', 'SES', 'WWW'],
+    key: { M: 'milk_bucket', S: 'sugar', E: 'egg', W: 'wheat' },
+    result: { item: 'cake', count: 1 },
+  },
+  { type: 'shaped', pattern: ['.I', 'I.'], key: { I: 'iron_ingot' }, result: { item: 'shears', count: 1 } },
+  // Bloco de carvão (doc 05 §5): nove carvões num bloco que queima dez vezes.
+  { type: 'shaped', pattern: ['CCC', 'CCC', 'CCC'], key: { C: 'coal' }, result: { item: 'coal_block', count: 1 } },
+  { type: 'shapeless', ingredients: ['coal_block'], result: { item: 'coal', count: 9 } },
   { type: 'shaped', pattern: ['GSG', 'SGS', 'GSG'], key: { G: 'gunpowder', S: 'sand' }, result: { item: 'tnt', count: 1 } },
 
   // --- armadura (M5) ------------------------------------------------------

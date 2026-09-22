@@ -16,7 +16,7 @@
  */
 
 import { RECIPES, resolveIngredient, type Recipe } from '../data/recipes';
-import { ITEM_BY_NAME, type ItemStack } from '../data/items';
+import { ITEM_BY_NAME, itemDef, type ItemStack } from '../data/items';
 
 /** Receita já resolvida para ids. */
 interface CompiledShaped {
@@ -147,8 +147,22 @@ export function consumeGrid(grid: CraftGrid): void {
     const stack = grid.slots[i];
     if (stack === null) continue;
     stack.count--;
-    if (stack.count <= 0) grid.slots[i] = null;
+    if (stack.count > 0) continue;
+    /*
+     * O que sobra fica na célula (2026-09-22): o balde do balde de leite volta
+     * vazio para a grade, como no gênero. Todo item com resto empilha em 1, então
+     * a célula está sempre livre quando o resto chega.
+     */
+    const remainder = remainderOf(stack.item);
+    grid.slots[i] = remainder < 0 ? null : { item: remainder, count: 1, damage: 0 };
   }
+}
+
+/** Id do item que sobra ao gastar `item` (tigela, balde), ou −1. */
+export function remainderOf(item: number): number {
+  const name = itemDef(item)?.remainder;
+  if (name === undefined) return -1;
+  return ITEM_BY_NAME.get(name)?.id ?? -1;
 }
 
 /** Quantas vezes a receita atual pode ser feita com o que está na grade. */

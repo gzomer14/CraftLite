@@ -335,3 +335,34 @@ export function buildPortalAt(world: World, x: number, y: number, z: number): Po
 function isSolid(world: World, x: number, y: number, z: number): boolean {
   return defOf(world.getBlock(x, y, z)).solid;
 }
+
+/** Os seis vizinhos, para a varredura de portal quebrado. */
+const PORTAL_NEIGHBORS: readonly (readonly [number, number, number])[] = [
+  [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1],
+];
+/** Posição devolvida por `breakPortalNear`, reusada. */
+const BROKEN: [number, number, number] = [0, 0, 0];
+
+/**
+ * Quebrar um pedaço da moldura apaga o portal inteiro (M7). Vale para a
+ * obsidiana **e** para o próprio bloco de portal: nos dois casos o que sobraria
+ * seria um retângulo roxo furado, que continuaria teleportando.
+ *
+ * Devolve onde o portal foi apagado (para a luz e o som), ou `null`. O array
+ * é reusado: copie antes de chamar de novo.
+ */
+export function breakPortalNear(
+  world: World, x: number, y: number, z: number,
+): [number, number, number] | null {
+  for (let d = 0; d < 6; d++) {
+    const step = PORTAL_NEIGHBORS[d];
+    const nx = x + step[0];
+    const ny = y + step[1];
+    const nz = z + step[2];
+    if (!isPortalBlock(world.getBlock(nx, ny, nz))) continue;
+    extinguishPortal(world, nx, ny, nz);
+    BROKEN[0] = nx; BROKEN[1] = ny; BROKEN[2] = nz;
+    return BROKEN;
+  }
+  return null;
+}

@@ -14,6 +14,7 @@ import { lootingBonus } from '../game/enchanting';
 import { MOBS, mobDef, type MobDef } from '../data/mobs';
 import { raycast } from '../world/raycast';
 import { GOALS, type AiContext } from './ai/goals';
+import { babyVariant, deathDrops, tickHusbandry } from './husbandry';
 import { Pathfinder, REQUESTS_PER_TICK, standHeight } from './ai/pathfinder';
 import {
   FLAG_ANGRY, FLAG_PERSISTENT, FLAG_TAMED, MobStore, PATH_MAX, slimeHealth, slimeScale,
@@ -68,6 +69,11 @@ export interface MobEvents {
   onExplode(x: number, y: number, z: number, power: number): void;
   /** Um mob derrubou o bloco — hoje só o zumbi arrombando porta (doc 06 §10). */
   onBreakBlock(x: number, y: number, z: number): void;
+  /**
+   * Um bicho mudou um bloco sem quebrá-lo: ovelha pastando, enderman pegando
+   * e pondo (`entity/husbandry.ts`). Quem ouve atualiza a luz.
+   */
+  onBlockChanged?(x: number, y: number, z: number, previous: number, state: number): void;
   /** `fireball` = bola de fogo do ghast: voa reto e explode onde parar. */
   onArrow(
     x: number, y: number, z: number,
@@ -233,6 +239,7 @@ export class Mobs {
       if (this.pendingRemove === i) { s.removeAt(i); i--; continue; }
 
       s.tickPhysics(this.world, i);
+      tickHusbandry(s, i, mobDef(s.type[i]), this.world, this.rng, this.events);
       this.ambientSound(i);
 
       if (this.tickDespawn(i)) { i--; continue; }
@@ -514,6 +521,7 @@ export class Mobs {
         this.rollDrop(def.drops[d], x, y, z);
       }
     }
+    deathDrops(s, i, def, this.events, x, y, z);
     const xpSpread = def.xp[1] - def.xp[0];
     const xp = def.xp[0] + (xpSpread > 0 ? Math.floor(this.rng() * (xpSpread + 1)) : 0);
     if (xp > 0 && !baby) this.events.onXp(xp, x, y, z);
@@ -657,7 +665,9 @@ export class Mobs {
     const x = (s.x[i] + s.x[partner]) * 0.5;
     const y = Math.max(s.y[i], s.y[partner]);
     const z = (s.z[i] + s.z[partner]) * 0.5;
-    const baby = this.store.spawn(s.type[i], x, y, z, s.variant[i]);
+    const baby = this.store.spawn(
+      s.type[i], x, y, z, babyVariant(mobDef(s.type[i]), s.variant[i]),
+    );
     if (baby >= 0) {
       this.store.makeBaby(baby, GROW_TICKS);
       this.store.setFlag(baby, FLAG_PERSISTENT, true);

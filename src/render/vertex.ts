@@ -7,8 +7,13 @@
  * greedy meshing pode ter 16 tiles de comprimento, e 4 bits só chegam a 15; e a
  * posição usa 9 bits por eixo, pelo motivo abaixo.
  *
- * palavra 0:  x:9 | y:9 | z:9 | face:3                                  (30 bits)
- * palavra 1:  texLayer:10 | blockLight:4 | skyLight:4 | ao:2 | tint:2 | u:5 | v:5
+ * palavra 0:  x:9 | y:9 | z:9 | face:3 | tintAlto:2
+ * palavra 1:  texLayer:8 | blockLight:4 | skyLight:4 | ao:2 | tintBaixo:4 | u:5 | v:5
+ *
+ * **M13 (2026-09-22):** o tint passou de 2 para 6 bits (64 cores: grama, folha,
+ * água e os dezesseis corantes de `data/tints.ts`). Os 4 bits saíram do
+ * `texLayer`, que tinha 10 bits para um teto de 256 camadas (8 bastam), e dos
+ * 2 bits que sobravam na palavra 0.
  *
  * Posições são em **dezesseis avos de bloco** dentro da section (0..256).
  *
@@ -56,13 +61,14 @@ export const TINT_WATER = 3;
 export const POSITION_SCALE = 16;
 
 export function packWord0(
-  x16: number, y16: number, z16: number, face: number,
+  x16: number, y16: number, z16: number, face: number, tint = 0,
 ): number {
   return (
     (x16 & 0x1ff) |
     ((y16 & 0x1ff) << 9) |
     ((z16 & 0x1ff) << 18) |
-    ((face & 0x7) << 27)
+    ((face & 0x7) << 27) |
+    (((tint >> 4) & 0x3) << 30)
   ) >>> 0;
 }
 
@@ -71,11 +77,11 @@ export function packWord1(
   u: number, v: number,
 ): number {
   return (
-    (texLayer & 0x3ff) |
-    ((blockLight & 0xf) << 10) |
-    ((skyLight & 0xf) << 14) |
-    ((ao & 0x3) << 18) |
-    ((tint & 0x3) << 20) |
+    (texLayer & 0xff) |
+    ((blockLight & 0xf) << 8) |
+    ((skyLight & 0xf) << 12) |
+    ((ao & 0x3) << 16) |
+    ((tint & 0xf) << 18) |
     ((u & 0x1f) << 22) |
     ((v & 0x1f) << 27)
   ) >>> 0;

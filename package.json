@@ -15,7 +15,8 @@
     "size": "node scripts/size-report.mjs",
     "icons": "node scripts/make-icons.mjs",
     "soak": "node scripts/soak.mjs",
-    "slow-network": "node scripts/slow-network.mjs"
+    "slow-network": "node scripts/slow-network.mjs",
+    "smoke": "node scripts/smoke.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.4.1",

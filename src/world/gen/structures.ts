@@ -26,7 +26,7 @@ import {
   structureByName, type Piece, type StructureDef,
 } from '../../data/structures';
 import { hash2, hash3 } from '../../core/rng';
-import { SECTION_SIZE, WORLD_HEIGHT, type ChunkColumn } from '../chunk';
+import { SEA_LEVEL, SECTION_SIZE, WORLD_HEIGHT, type ChunkColumn } from '../chunk';
 import type { HeightField } from './heightfield';
 
 /** Sal do RNG de estrutura — separado do terreno, dos minérios e da decoração. */
@@ -104,7 +104,7 @@ function tryPlace(
 }
 
 /** Altura da estrutura: sorteada na faixa, ou assentada na superfície. */
-function pickY(
+export function pickY(
   def: StructureDef, ox: number, oz: number, spot: number, field: HeightField,
 ): number {
   if (!def.placement.surface) {
@@ -112,6 +112,8 @@ function pickY(
     return def.placement.minY + ((spot >>> 8) % Math.max(1, span + 1));
   }
   const height = field.heightAt(ox, oz);
+  // No fundo do mar: só com água de verdade em cima (naufrágio).
+  if (def.placement.underwater === true) return height <= SEA_LEVEL - 4 ? height + 1 : -1;
   // Assenta com o piso um bloco acima do chão; abaixo do mar não se constrói.
   if (height < 62) return -1;
   return height + 1;
@@ -176,7 +178,7 @@ function placeVillage(
  * Escreve a estrutura no chunk, ignorando tudo que cai fora dele.
  * `ox/oy/oz` são coordenadas de mundo da origem da estrutura.
  */
-function stamp(
+export function stamp(
   chunk: ChunkColumn, seed: number, def: StructureDef, ox: number, oy: number, oz: number,
 ): void {
   for (const piece of def.pieces) stampPiece(chunk, seed, piece, ox, oy, oz);

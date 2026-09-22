@@ -127,7 +127,7 @@ export class SaveGame {
    */
   switchDimension(dimension: number): void {
     const tiles = this.tileRecords();
-    const vehicles = this.session.vehicleSnapshot();
+    const vehicles = this.session.vehicles.snapshot();
     this.switching = this.finishSwitch(dimension, tiles, vehicles)
       .finally(() => { this.switching = null; });
   }
@@ -148,7 +148,7 @@ export class SaveGame {
 
   /** Contêineres e placas da dimensão atual, na mesma lista. */
   private tileRecords(): TileRecord[] {
-    const out: TileRecord[] = this.session.tileEntities.map(tileFrom);
+    const out: TileRecord[] = this.session.tiles.saved.map(tileFrom);
     for (const sign of this.session.signs.records()) out.push(sign);
     return out;
   }
@@ -156,14 +156,14 @@ export class SaveGame {
   /** Um registro lido do save volta a ser placa ou contêiner. */
   private restoreTile(record: TileRecord): void {
     if (record.kind === 'sign') this.session.signs.restore(record);
-    else this.session.restoreContainer(containerFrom(record));
+    else this.session.tiles.restore(containerFrom(record));
   }
 
   /** Traz baús, placas e veículos da dimensão que acabou de entrar. */
   private async loadDimensionState(): Promise<void> {
     const tiles = await this.manager.loadTiles<TileRecord>();
     for (const record of tiles) this.restoreTile(record);
-    this.session.restoreVehicles(await this.manager.loadVehicles<VehicleRecord>());
+    this.session.vehicles.restore(await this.manager.loadVehicles<VehicleRecord>());
   }
 
   /**
@@ -247,6 +247,8 @@ export class SaveGame {
       enchants,
       xp: this.session.xp.total,
       achievements: this.session.achievements.mask,
+      effects: this.session.survival.effects.snapshot(),
+      absorption: this.session.survival.absorption,
       bedSpawn: this.session.spawnY >= 0
         ? [this.session.spawnX, this.session.spawnY, this.session.spawnZ]
         : undefined,
@@ -271,6 +273,8 @@ export class SaveGame {
     this.session.survival.health = saved.health;
     this.session.survival.hunger = saved.hunger;
     this.session.survival.saturation = saved.saturation;
+    this.session.survival.effects.restore(saved.effects, this.session.survival);
+    if (saved.absorption !== undefined) this.session.survival.absorption = saved.absorption;
     this.session.inventory.select(saved.selected);
     this.session.xp.setTotal(saved.xp ?? 0);
     this.session.achievements.setMask(saved.achievements ?? 0);
@@ -323,7 +327,7 @@ export class SaveGame {
       await this.manager.flush();
       await this.manager.savePlayer(this.snapshot());
       await this.manager.saveTiles(this.tileRecords());
-      await this.manager.saveVehicles(this.session.vehicleSnapshot());
+      await this.manager.saveVehicles(this.session.vehicles.snapshot());
       // Mede **depois** de gravar os chunks: senão o número seria o do mundo
       // de antes deste save.
       await this.manager.measureWorld(this.meta);

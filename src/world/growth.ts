@@ -12,9 +12,15 @@
  * nunca derruba o frame. É o trade-off certo para o aparelho-alvo.
  */
 
-import { AIR, DIRT, FARMLAND, WATER, blockIdOf, makeState, stateBitsOf } from '../data/blocks';
+import {
+  AIR, BLOCK_BY_NAME, DIRT, FARMLAND, GRASS_BLOCK, PODZOL, WATER,
+  blockIdOf, defOf, makeState, stateBitsOf,
+} from '../data/blocks';
 import { cropOfState, type CropDef } from '../data/crops';
-import type { World } from './world';
+import { plantOfState, type PlantDef } from '../data/plants';
+import { TREE_MAX_HEIGHT, growTree, type TreeRng, type TreeWriter } from './trees';
+import { WORLD_HEIGHT } from './chunk';
+import type { BlockSource, World } from './world';
 
 /** Ticks de uma varredura completa do registro (2 s). */
 export const SWEEP_TICKS = 40;
@@ -28,6 +34,14 @@ const WATER_RANGE = 4;
 const MIN_LIGHT = 9;
 /** Fração da chance de crescer quando a terra está seca. */
 const DRY_PENALTY = 0.5;
+/** Luz mínima acima da terra para a grama pegar nela (doc 03 §9: "luz ≥ 4"). */
+const GRASS_MIN_LIGHT = 4;
+/** Chance de a grama pegar numa terra vizinha, por visita. */
+const GRASS_SPREAD_CHANCE = 0.1;
+/** Chão em que muda vira árvore. */
+const TREE_SOIL = new Set<number>([
+  GRASS_BLOCK, DIRT, PODZOL, BLOCK_BY_NAME.get('coarse_dirt')?.id ?? DIRT,
+]);
 
 /** Limite de coordenada horizontal que a chave de posição comporta. */
 const XZ_MASK = 0xfffff;
@@ -38,6 +52,11 @@ export interface GrowthEvents {
   onCropBroken?(x: number, y: number, z: number, state: number): void;
   /** A plantação avançou de idade — usado para o som e para o save. */
   onGrown?(x: number, y: number, z: number, state: number): void;
+  /**
+   * Um bloco mudou por crescimento que não é idade de roça: árvore nascendo,
+   * cana subindo, grama pegando. A luz precisa saber — uma copa faz sombra.
+   */
+  onChanged?(x: number, y: number, z: number, previous: number, state: number): void;
 }
 
 export class Growth {
@@ -66,7 +85,9 @@ export class Growth {
   /** Liga o registro ao mundo: toda mudança de bloco entra ou sai daqui. */
   attach(): () => void {
     return this.world.onBlockChange((change) => {
-      this.onBlockChanged(change.x, change.y, change.z, change.previous, change.state);
+      this.onBlockChanged(
+        change.x, change.y, change.z, change.previous, change.state, change.source,
+      );
     });
   }
 
@@ -147,6 +168,13 @@ export class Growth {
       this.tickFarmland(x, y, z, state);
       return true;
     }
+    if (id === DIRT) return this.tickDirt(x, y, z);
+    const plant = plantOfState(state);
+    if (plant !== undefined) {
+      if (plant.kind === 'tree') this.tickSapling(x, y, z, plant);
+      else this.tickColumn(x, y, z, state, plant);
+      return true;
+    }
     const crop = cropOfState(state);
     if (crop === undefined) {
       this.remove(key(x, y, z));
@@ -199,6 +227,158 @@ export class Growth {
     this.events.onGrown?.(x, y, z, next);
   }
 
+  /**
+   * Muda que vira árvore (doc 03 §9). Precisa de luz, de chão de terra e de
+   * **espaço**: o tronco inteiro tem que caber, senão ela espera — é o que
+   * impede a árvore de atravessar o teto da casa de quem plantou dentro.
+   */
+  private tickSapling(x: number, y: number, z: number, plant: PlantDef): void {
+    const kind = plant.tree;
+    if (kind === undefined) return;
+    if (!TREE_SOIL.has(blockIdOf(this.world.getBlock(x, y - 1, z)))) return;
+    if (this.lightAt(x, y, z) < MIN_LIGHT) return;
+    if (this.random() >= plant.chance) return;
+
+    const height = TREE_MAX_HEIGHT[kind];
+    if (y + height >= WORLD_HEIGHT) return;
+    for (let dy = 1; dy < height; dy++) {
+      const cell = this.world.getBlock(x, y + dy, z);
+      if (blockIdOf(cell) !== AIR && !defOf(cell).replaceable) return;
+    }
+    growTree(this.treeWriter, this.treeRng, kind, x, y, z);
+  }
+
+  /**
+   * Cana e cacto: só o **topo** da coluna cresce, até a altura da tabela. A
+   * cana pede água encostada no chão em que foi plantada; o cacto pede os
+   * lados livres, como no gênero.
+   */
+  private tickColumn(x: number, y: number, z: number, state: number, plant: PlantDef): void {
+    if (blockIdOf(this.world.getBlock(x, y + 1, z)) !== AIR) return;
+    const id = blockIdOf(state);
+    let height = 1;
+    while (blockIdOf(this.world.getBlock(x, y - height, z)) === id) height++;
+    if (height >= (plant.maxHeight ?? 3)) return;
+    if (plant.needsWater) {
+      const soilY = y - height;
+      let wet = false;
+      for (let d = 0; d < 4 && !wet; d++) {
+        const nx = x + SIDES[d * 2];
+        const nz = z + SIDES[d * 2 + 1];
+        if (blockIdOf(this.world.getBlock(nx, soilY, nz)) === WATER) wet = true;
+      }
+      if (!wet) return;
+    }
+    if (plant.needsClearSides) {
+      for (let d = 0; d < 4; d++) {
+        if (defOf(this.world.getBlock(x + SIDES[d * 2], y + 1, z + SIDES[d * 2 + 1])).solid) return;
+      }
+    }
+    if (this.random() >= plant.chance) return;
+    const next = makeState(id);
+    if (this.world.setBlock(x, y + 1, z, next, 'physics')) {
+      this.events.onChanged?.(x, y + 1, z, AIR, next);
+    }
+  }
+
+  /**
+   * Terra que vira grama (doc 03 §9, "Espalhamento: grass block → dirt
+   * adjacente com luz ≥ 4").
+   *
+   * **Não varre o mundo.** A terra entra no registro por evento — quando o
+   * jogador a expõe, a coloca, ou quando uma grama vizinha acabou de pegar —, e
+   * sai quando não há grama perto ou quando algo opaco a cobre. É por isso que
+   * um caminho pisado volta a ficar verde e que a terra gerada no fundo de uma
+   * caverna não custa nada.
+   *
+   * Devolve false quando a posição saiu do registro.
+   */
+  private tickDirt(x: number, y: number, z: number): boolean {
+    const above = defOf(this.world.getBlock(x, y + 1, z));
+    if (above.opaque || !this.hasGrassNear(x, y, z)) {
+      this.remove(key(x, y, z));
+      return false;
+    }
+    if (this.lightAt(x, y + 1, z) < GRASS_MIN_LIGHT) return true;
+    if (this.random() >= GRASS_SPREAD_CHANCE) return true;
+    const next = makeState(GRASS_BLOCK);
+    if (this.world.setBlock(x, y, z, next, 'physics')) {
+      this.events.onChanged?.(x, y, z, makeState(DIRT), next);
+    }
+    // Virou grama: sai do registro, e `onTerrainChanged` já chamou as vizinhas.
+    this.remove(key(x, y, z));
+    return false;
+  }
+
+  /** Grama num cubo 3×3×3 em volta (a regra do gênero, de um degrau acima a um abaixo). */
+  private hasGrassNear(x: number, y: number, z: number): boolean {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0 && dz === 0) continue;
+          if (blockIdOf(this.world.getBlock(x + dx, y + dy, z + dz)) === GRASS_BLOCK) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /** Registra as terras em volta que podem pegar grama. */
+  private trackDirtAround(x: number, y: number, z: number): void {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          const nz = z + dz;
+          if (blockIdOf(this.world.getBlock(nx, ny, nz)) !== DIRT) continue;
+          if (defOf(this.world.getBlock(nx, ny + 1, nz)).opaque) continue;
+          this.add(key(nx, ny, nz));
+        }
+      }
+    }
+  }
+
+  /**
+   * Registra uma terra descoberta **só se houver grama por perto**: cavar um
+   * poço em terra expõe um bloco por golpe, e nenhum deles vai pegar grama.
+   */
+  private trackDirt(x: number, y: number, z: number): void {
+    if (defOf(this.world.getBlock(x, y + 1, z)).opaque) return;
+    if (!this.hasGrassNear(x, y, z)) return;
+    this.add(key(x, y, z));
+  }
+
+  private lightAt(x: number, y: number, z: number): number {
+    return Math.max(this.world.getBlockLight(x, y, z), this.world.getSkyLight(x, y, z));
+  }
+
+  /**
+   * Escritor de árvore pelo `world.setBlock` (ver `trees.ts`). O tronco passa
+   * por cima da muda e do que for substituível; a folha só entra no ar.
+   */
+  private readonly treeWriter: TreeWriter = {
+    trunk: (x, y, z, state) => {
+      const previous = this.world.getBlock(x, y, z);
+      if (blockIdOf(previous) !== AIR && !defOf(previous).replaceable) return;
+      if (this.world.setBlock(x, y, z, state, 'physics')) {
+        this.events.onChanged?.(x, y, z, previous, state);
+      }
+    },
+    leaf: (x, y, z, state) => {
+      if (blockIdOf(this.world.getBlock(x, y, z)) !== AIR) return;
+      if (this.world.setBlock(x, y, z, state, 'physics')) {
+        this.events.onChanged?.(x, y, z, makeState(AIR), state);
+      }
+    },
+  };
+
+  /** Sorteio da forma da árvore, sobre o aleatório do jogo (injetável nos testes). */
+  private readonly treeRng: TreeRng = {
+    nextInt: (n) => Math.floor(this.random() * n),
+    nextFloat: () => this.random(),
+  };
+
   /** Arranca a plantação sem suporte. */
   private breakCrop(x: number, y: number, z: number, state: number): void {
     this.world.setBlock(x, y, z, AIR, 'physics');
@@ -216,15 +396,47 @@ export class Growth {
   }
 
   private onBlockChanged(
-    x: number, y: number, z: number, previous: number, state: number,
+    x: number, y: number, z: number, previous: number, state: number, source: BlockSource,
   ): void {
     if (isGrowing(state)) this.add(key(x, y, z));
     else if (isGrowing(previous)) this.remove(key(x, y, z));
+
+    if (source !== 'gen') this.onTerrainChanged(x, y, z, state);
 
     // Tirou o chão da plantação: ela cai na hora, não na próxima varredura.
     const above = this.world.getBlock(x, y + 1, z);
     if (cropOfState(above) !== undefined && blockIdOf(state) !== FARMLAND) {
       this.breakCrop(x, y + 1, z, above);
+    }
+  }
+
+  /**
+   * O lado da grama numa mudança feita em jogo.
+   *
+   * - bloco opaco em cima da grama: ela vira terra na hora (sem luz, não há
+   *   grama — e esperar a varredura deixaria o chão verde debaixo da casa);
+   * - grama nova (colocada ou que acabou de pegar): as terras em volta entram
+   *   no registro;
+   * - terra nova, ou terra que ficou descoberta: entra no registro.
+   */
+  private onTerrainChanged(x: number, y: number, z: number, state: number): void {
+    const id = blockIdOf(state);
+    const def = defOf(state);
+    const below = this.world.getBlock(x, y - 1, z);
+    const belowId = blockIdOf(below);
+
+    if (def.opaque && belowId === GRASS_BLOCK) {
+      const dirt = makeState(DIRT);
+      if (this.world.setBlock(x, y - 1, z, dirt, 'physics')) {
+        this.events.onChanged?.(x, y - 1, z, below, dirt);
+      }
+    }
+    if (id === GRASS_BLOCK) {
+      this.trackDirtAround(x, y, z);
+    } else if (id === DIRT) {
+      this.trackDirt(x, y, z);
+    } else if (!def.opaque && belowId === DIRT) {
+      this.trackDirt(x, y - 1, z);
     }
   }
 
@@ -247,9 +459,13 @@ export class Growth {
   }
 }
 
+/** Direções horizontais: +X, −X, +Z, −Z. */
+const SIDES = new Int8Array([1, 0, -1, 0, 0, 1, 0, -1]);
+
 /** true se o bloco entra no registro de crescimento. */
 export function isGrowing(state: number): boolean {
-  return blockIdOf(state) === FARMLAND || cropOfState(state) !== undefined;
+  return blockIdOf(state) === FARMLAND || cropOfState(state) !== undefined
+    || plantOfState(state) !== undefined;
 }
 
 export function key(x: number, y: number, z: number): number {

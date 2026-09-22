@@ -9,6 +9,7 @@
 
 import { reduceByArmor } from './combat';
 import { reduceByProtection, reduceFallDamage } from './enchanting';
+import { StatusEffects, type EffectTarget } from './effects';
 
 export const MAX_HEALTH = 20;
 export const MAX_HUNGER = 20;
@@ -44,7 +45,7 @@ export type Difficulty = 0 | 1 | 2 | 3;
 /** Causa da morte, para a tela de morte (doc 08 §3.12). */
 export type DamageCause =
   | 'fall' | 'drown' | 'suffocate' | 'fire' | 'lava' | 'cactus' | 'void' | 'starve' | 'mob'
-  | 'arrow' | 'explosion';
+  | 'arrow' | 'explosion' | 'poison';
 
 const CAUSE_MESSAGES: Record<DamageCause, string> = {
   fall: 'Você caiu de um lugar alto',
@@ -58,13 +59,16 @@ const CAUSE_MESSAGES: Record<DamageCause, string> = {
   mob: 'Você foi morto',
   arrow: 'Você foi flechado',
   explosion: 'Você explodiu',
+  // O veneno para em meio coração e nunca é a causa da morte; a mensagem
+  // existe porque o tipo pede uma para cada causa.
+  poison: 'Você foi envenenado',
 };
 
 /**
  * Causas que **ignoram a armadura** (doc 05 §3 e doc 06 §6): fome, void e o que
  * é falta de ar. Peitoral de diamante não ajuda a respirar.
  */
-const ARMOR_BYPASS: readonly DamageCause[] = ['starve', 'void', 'drown', 'suffocate'];
+const ARMOR_BYPASS: readonly DamageCause[] = ['starve', 'void', 'drown', 'suffocate', 'poison'];
 
 /**
  * O que o ambiente faz ao jogador neste tick.
@@ -83,8 +87,15 @@ export interface SurvivalContext {
   y: number;
 }
 
-export class Survival {
+export class Survival implements EffectTarget {
   health = MAX_HEALTH;
+  /**
+   * Vida extra da Absorção (doc 05 §4, maçã dourada). Gasta **antes** da
+   * vida e não se regenera: quando acaba, o efeito acaba junto.
+   */
+  absorption = 0;
+  /** Efeitos ativos (2026-09-22). */
+  readonly effects = new StatusEffects();
   hunger = MAX_HUNGER;
   saturation = 5;
   exhaustion = 0;
@@ -144,6 +155,7 @@ export class Survival {
     if (this.invulnerable > 0) this.invulnerable--;
     if (this.isDead) return;
 
+    this.effects.tick(this);
     this.consumeExhaustion();
     this.tickRegeneration();
     this.tickStarvation();
@@ -257,7 +269,15 @@ export class Survival {
     }
     if (scaled <= 0) return false;
 
-    this.health = Math.max(0, this.health - scaled);
+    // A vida extra paga primeiro. O golpe continua sendo golpe — piscada,
+    // som e desgaste de armadura saem com o valor inteiro.
+    let taken = scaled;
+    if (this.absorption > 0) {
+      const used = Math.min(this.absorption, taken);
+      this.absorption -= used;
+      taken -= used;
+    }
+    this.health = Math.max(0, this.health - taken);
     this.lastCause = cause;
     if (!ignoreInvulnerability) this.invulnerable = INVULNERABLE_TICKS;
     this.onDamage?.(scaled, cause);
@@ -272,6 +292,19 @@ export class Survival {
     if (raw <= 0) return;
     const damage = reduceFallDamage(raw, this.featherFalling);
     if (damage > 0) this.damage(damage, 'fall');
+  }
+
+  /** Cura sem passar do máximo (Regeneração). */
+  heal(amount: number): void {
+    if (this.isDead) return;
+    this.health = Math.min(MAX_HEALTH, this.health + amount);
+  }
+
+  /** Dano de efeito que para em meio coração (Veneno). */
+  hurtNonLethal(amount: number): void {
+    const room = this.health - 1;
+    if (room <= 0) return;
+    this.damage(Math.min(amount, room), 'poison', true);
   }
 
   /** Comer restaura fome e saturação; a saturação nunca passa da fome. */
@@ -297,6 +330,8 @@ export class Survival {
     this.drownTimer = 0;
     this.suffocateTimer = 0;
     this.lastCause = null;
+    this.effects.clear(this);
+    this.absorption = 0;
   }
 }
 

@@ -10,11 +10,11 @@ import { BLOCKS, AIR, WATER, LAVA, texOf } from '../../data/blocks';
 import {
   SHAPE_BUTTON, SHAPE_CARPET, SHAPE_CROSS, SHAPE_DOOR, SHAPE_FENCE, SHAPE_FENCE_GATE, SHAPE_FLAT,
   SHAPE_LADDER, SHAPE_LEVER, SHAPE_NONE, SHAPE_PAINTING, SHAPE_PANE, SHAPE_PISTON,
-  SHAPE_BED, SHAPE_CHEST, SHAPE_PISTON_HEAD, SHAPE_PLATE, SHAPE_RAIL, SHAPE_REPEATER, SHAPE_SIGN, SHAPE_SLAB,
+  SHAPE_BED, SHAPE_CAKE, SHAPE_CHEST, SHAPE_PISTON_HEAD, SHAPE_PLATE, SHAPE_RAIL, SHAPE_REPEATER, SHAPE_SIGN, SHAPE_SLAB,
   SHAPE_STAIRS, SHAPE_TORCH, SHAPE_TRAPDOOR,
 } from './shapes';
 import { layerOf, type LayerIndex } from '../../render/layers';
-import { TINT_FOLIAGE, TINT_GRASS, TINT_NONE, TINT_WATER } from '../../render/vertex';
+import { tintIndexOf } from '../../data/tints';
 
 export const LAYER_NONE = 0;
 export const LAYER_OPAQUE = 1;
@@ -76,6 +76,7 @@ const COMPLEX_BY_SHAPE: Record<string, number> = {
   torch: CPLX_TORCH,
   bed: CPLX_BOXES,
   chest: CPLX_CHEST,
+  cake: CPLX_BOXES,
   slab: CPLX_BOXES,
   carpet: CPLX_BOXES,
   flat: CPLX_BOXES,
@@ -103,6 +104,7 @@ const SHAPE_ID_BY_NAME: Record<string, number> = {
   torch: SHAPE_TORCH,
   bed: SHAPE_BED,
   chest: SHAPE_CHEST,
+  cake: SHAPE_CAKE,
   slab: SHAPE_SLAB,
   carpet: SHAPE_CARPET,
   flat: SHAPE_FLAT,
@@ -150,10 +152,6 @@ export interface BlockTables {
   hasStages: Uint8Array;
 }
 
-const TINT_INDEX: Record<string, number> = {
-  none: TINT_NONE, grass: TINT_GRASS, foliage: TINT_FOLIAGE, water: TINT_WATER,
-};
-
 /** Constrói as tabelas a partir de um índice de camadas. Roda uma vez, no boot. */
 export function buildBlockTables(index: LayerIndex): BlockTables {
   const n = BLOCKS.length;
@@ -185,7 +183,7 @@ export function buildBlockTables(index: LayerIndex): BlockTables {
     tables.occludes[id] = def.opaque ? 1 : 0;
     tables.emission[id] = def.emission;
     tables.attenuation[id] = def.lightAttenuation;
-    tables.tint[id] = TINT_INDEX[def.tint] ?? TINT_NONE;
+    tables.tint[id] = tintIndexOf(def);
     tables.texTop[id] = layerOf(index, texOf(def, 'top'));
     tables.texSide[id] = layerOf(index, texOf(def, 'side'));
     tables.texBottom[id] = layerOf(index, texOf(def, 'bottom'));

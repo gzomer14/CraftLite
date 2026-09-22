@@ -435,7 +435,10 @@ export class Redstone {
       const dir = mountDir(stateBitsOf(state) & 7);
       sx = x + dir[0]; sy = y + dir[1]; sz = z + dir[2];
     }
-    if (ROLES.conductive[blockIdOf(this.world.getBlock(sx, sy, sz))] === 1) return false;
+    const supportId = blockIdOf(this.world.getBlock(sx, sy, sz));
+    if (ROLES.conductive[supportId] === 1) return false;
+    // Cana e cacto em coluna: o de cima pisa num igual, que não é opaco.
+    if (def.stackable && supportId === id) return false;
 
     if (!this.world.setBlock(x, y, z, AIR, 'physics')) return false;
     this.events.onChanged?.(x, y, z, state, AIR);

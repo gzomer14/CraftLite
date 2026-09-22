@@ -12,6 +12,141 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-22 · 18:33 → 19:28 · O M13 fechou: a sessão perdeu dois terços, e a lã ganhou cores
+
+**Pedido:** a mesma sessão (*"seguindo sua ordem recomendada"*); no meio, *"Somente o M11 está sendo
+implementado? Por que essa demora absurda para finalizar?"* — respondido: o M11 já tinha fechado, e
+o M13 era o que estava em curso.
+
+**Resultado:** M13 fechado. `session.ts` 2042 → 697 linhas, `main.ts` 1411 → 682, `screen.ts`
+1117 → 890; uso de item como dado com usos de segurar; tint de 6 bits no vértice e lã e cama em
+**16 cores** com o atlas caindo de 222 para **194 camadas**. Um defeito achado no caminho: as ações
+de item miravam o centro da câmera mesmo no Modo A de toque.
+
+Portões: **1975 testes** em 97 arquivos, lint limpo, build ok, **226,1 KB** de 350, smoke verde.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| **Sessão dividida** | | |
+| `+` | `src/game/vehicles.ts`, `tiles.ts`, `workbench.ts`, `playercombat.ts`, `blockuse.ts`, `worldsystems.ts`, `sessionwiring.ts`, `itemuser.ts` | o que saiu da `Session`, um assunto por módulo |
+| `+` | `src/entity/spawnerblocks.ts` | geradores de monstros da dungeon |
+| `~` | `src/game/session.ts` | orquestra os módulos acima; 697 linhas |
+| `~` | `src/game/itemuse.ts` | usos antigos migrados (comer, arco/escudo, barco, carrinho, isqueiro, enxada, semente); mira pela `Interaction` |
+| `~` | `src/game/portal.ts`, `src/game/interaction.ts` | `breakPortalNear`; direção da mira guardada |
+| `~` | `src/data/items.ts` | `ItemDef.uses` derivado; corantes novos no fim da fila |
+| **main dividido** | | |
+| `+` | `src/render/scenefeed.ts`, `render/ambience.ts`, `input/playeractions.ts`, `ui/hudfeed.ts`, `ui/gameflow.ts`, `ui/gamescreens.ts`, `game/playfield.ts`, `audio/audiostart.ts`, `core/lifecycle.ts`, `save/thumbnail.ts` | o que saiu do `main.ts`, com callbacks criados uma vez |
+| `+` | `src/ui/bootscreen.ts`, `ui/controlhint.ts`, `ui/debugsource.ts`, `input/uinavloop.ts`, `core/dataurl.ts` | as funções soltas do fim do `main.ts` |
+| `~` | `src/main.ts` | 682 linhas |
+| `+` | `src/ui/containers/screenstyle.ts`, `containerclick.ts` | CSS e clique de contêiner saídos de `screen.ts` |
+| **Tint de corante** | | |
+| `+` | `src/data/tints.ts` | tabela de cores de tint e índice por bloco |
+| `~` | `src/render/vertex.ts`, `render/mesh.ts`, `render/shaders/terrain.glsl.ts`, `render/terrain.ts`, `world/mesh/greedy.ts`, `world/mesh/blockinfo.ts` | tint de 6 bits, tabela em uniform, máscara de alfa no passe recortado |
+| `~` | `src/data/dyes.ts`, `data/blocks.ts`, `data/textures.ts` | 16 cores; campo `dye`; lã e cama em desenho cinza |
+| `~` | `src/render/itemsprites.ts`, `render/hand.ts`, `render/fallingblocks.ts` | sprite, mão e bloco caindo tingidos |
+| **Testes e docs** | | |
+| `+` | `tests/tints.test.ts` | tint, contagem de camadas, máscara da cama |
+| `~` | `tests/vertex.test.ts`, `greedy.test.ts`, `texgen.test.ts`, `m8finish.test.ts`, `uxpolish.test.ts`, `creativeui.test.ts`, `rails.test.ts`, `dimensionrace.test.ts`, `itemuse.test.ts` e os que chamavam delegadores | formato de bits e caminhos novos |
+| `~` | `docs/14-roadmap.md`, `docs/15-status.md`, `README.md` | M13 fechado, métricas, próximo passo |
+
+---
+
+## 2026-09-22 · 17:15 → 18:33 · O M11 fechou, e a madeira voltou a crescer
+
+**Pedido:** *"Pode começar as implementações então, seguindo sua ordem recomendada"*.
+
+**Resultado:** o **M11 fechou** — os 13 itens de dívida normativa, cada um com teste — e quatro
+achados no caminho, que a avaliação não tinha visto: nenhuma planta crescia fora da roça (madeira
+não era renovável), nenhum bloco queimava na fornalha, a água apagava a lava, e o jogador nascia no
+mar em metade das seeds. O último foi achado pelo **smoke test de navegador**, que não existia e
+passou a existir: 7 passos verdes em Chrome headless. O primeiro item do M13 (uso de item como
+dado) nasceu aqui, porque o balde precisava dele.
+
+Portões: **1930 testes** em 96 arquivos (eram 1823 em 89), lint limpo, build ok, **221,3 KB** de
+350, smoke verde. Atlas em 222 camadas de 256; áudio em 3,33 MB de 3,5; geração de chunk em 6,2 ms.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| **Mundo** | | |
+| `+` | `src/world/falling.ts` | areia e cascalho que caem: fila por evento com orçamento, entidade num pool, pouso e quebra na tocha |
+| `+` | `src/world/trees.ts` | forma das quatro árvores com escritor por caminho (chunk ou `setBlock`), sorteios intactos |
+| `+` | `src/world/gen/spawnsearch.ts` | ponto de nascimento em terra firme, em anéis a partir da origem |
+| `~` | `src/world/growth.ts` | muda vira árvore, cana e cacto crescem, grama se espalha por registro de eventos e morre sob bloco opaco |
+| `~` | `src/world/fluids.ts` | encontro água/lava dos dois lados, lava corrente vira pedregulho, ids pela tabela |
+| `~` | `src/world/gen/decorate.ts` | usa `trees.ts`; cogumelos em caverna e mata fechada com sal próprio |
+| `~` | `src/world/gen/structures.ts` | `underwater` no assentamento; `stamp` e `pickY` exportados para teste |
+| `~` | `src/world/redstone.ts` | apoio aceita coluna de bloco `stackable` |
+| `~` | `src/world/pipeline.ts` | `findSpawn()` pede o nascimento ao worker |
+| `~` | `src/world/mesh/shapes.ts`, `src/world/mesh/blockinfo.ts` | forma de bolo com as fatias nos bits de estado |
+| **Dados** | | |
+| `+` | `src/data/effects.ts` | Fome, Regeneração, Absorção e Veneno como números por nível |
+| `+` | `src/data/plants.ts` | tabela de crescimento: quatro mudas, cana e cacto |
+| `~` | `src/data/blocks.ts` | campos `stackable` e `fuel`; planta com apoio; três mudas, folha de acácia, bloco de carvão, pedra lisa, bolo, dois cogumelos |
+| `~` | `src/data/items.ts` | `use`, `remainder`, efeitos na comida; maçã dourada, ensopado, biscoito, açúcar, ovo, três baldes cheios, tesoura |
+| `~` | `src/data/recipes.ts`, `src/data/smelting.ts` | receitas das comidas, tesoura, bolo e bloco de carvão; pedra → pedra lisa |
+| `~` | `src/data/loot.ts` | cada folha dá a própria muda |
+| `~` | `src/data/mobs.ts` | traços `woolly`, `lays`, `milkable`, `carriesBlocks`; a lã sai da cor |
+| `~` | `src/data/structures.ts` | poço do deserto, cabana de bruxa, naufrágio e o loot dele |
+| `~` | `src/data/textures.ts`, `src/data/itemart.ts` | mudas, bolo, cogumelos, bloco de carvão, pedra lisa; baldes, ensopado, ovo, tesoura, maçã dourada |
+| **Jogo e entidades** | | |
+| `+` | `src/game/effects.ts` | motor de efeitos sobre a tabela, com acúmulo e save |
+| `+` | `src/game/food.ts` | efeitos ao comer |
+| `+` | `src/game/itemuse.ts` | registro de uso de item: balde, leite, tesoura, corante, ovo, bola de neve |
+| `+` | `src/entity/husbandry.ts` | cor e tosquia da ovelha, ovo da galinha, bloco do enderman |
+| `~` | `src/game/session.ts` | liga queda, efeitos, bolo, registro de uso e ovo que choca; resto de item ao comer |
+| `~` | `src/game/survival.ts` | vida extra, cura, veneno que não mata, efeitos no tick e no renascimento |
+| `~` | `src/game/crafting.ts`, `src/game/container.ts` | resto de receita e de combustível (o balde volta) |
+| `~` | `src/game/drops.ts` | tesoura colhe folha inteira |
+| `~` | `src/game/interaction.ts`, `src/game/spawnplacement.ts`, `src/game/savegame.ts` | apoio em coluna; nascimento na coluna achada; efeitos no save |
+| `~` | `src/entity/mobs.ts`, `src/entity/mobstore.ts`, `src/entity/spawn.ts`, `src/entity/projectile.ts` | produtos no tick e na morte; campos `product` e `carried`; cor ao nascer; projétil com item e ovo |
+| **Render, UI e boot** | | |
+| `+` | `src/render/fallingblocks.ts` | cubo do bloco que cai, no passe de terreno, com cache por luz |
+| `+` | `src/ui/effectsbar.ts` | selos de efeito e corações dourados |
+| `~` | `src/render/renderer.ts`, `src/render/entityatlas.ts` | bloco caindo no passe opaco; peles de ovelha por cor e tosquiada |
+| `~` | `src/main.ts`, `src/ui/hud.ts` | faixa de efeitos, projétil com sprite, nascimento procurado, gancho `?smoke` |
+| `~` | `src/workers/chunk.worker.ts`, `src/workers/protocol.ts`, `src/save/db.ts`, `src/audio/synth.ts` | mensagem `spawn`; `spawnFound` e efeitos no save; três sons curtos |
+| **Testes e scripts** | | |
+| `+` | `tests/falling.test.ts`, `tests/fluids.test.ts`, `tests/plants.test.ts`, `tests/fuel.test.ts`, `tests/effects.test.ts`, `tests/itemuse.test.ts`, `tests/spawnsearch.test.ts` | 107 testes novos |
+| `~` | `tests/structures.test.ts`, `tests/savegame.test.ts`, `tests/pipeline.test.ts`, `tests/dimensionrace.test.ts` | estruturas novas; contrato novo do nascimento; duplos de worker conhecem `spawn` |
+| `+` | `scripts/smoke.mjs` | smoke test de navegador sem dependência nova |
+| `~` | `package.json` | `npm run smoke` |
+| **Docs** | | |
+| `~` | `docs/14-roadmap.md`, `docs/15-status.md`, `README.md` | M11 fechado, achados no §3 e §4, métricas, próximo passo |
+
+---
+
+## 2026-09-22 · 16:55 → 17:12 · A lista que se dizia fechada não estava
+
+**Pedido:** *"Faça uma avaliação completa no projeto, para entender o que falta implementar, se
+possui melhorias claras de performance, funcionalidades faltantes que podem ser implementadas,
+entre outros pontos que quiser avaliar e adicionar como novos marcos. Quero esse jogo o melhor
+possível"*.
+
+**Resultado:** avaliação sem mudança de código, e sete marcos novos no roteiro (M11–M17). O achado
+principal é que o doc 15 e o README afirmavam *"nenhum documento normativo tem pendência de
+funcionalidade"*, e **13 itens dos docs 03, 04, 05, 07, 08 e 14 não existem no código** — a flag
+`gravity` da areia nunca é lida, o balde é craftável e inútil, não há sistema de efeitos de status,
+a tesoura não existe como item, bétula e pinheiro não são renováveis, entre outros. Cada um foi
+conferido com `grep` e leitura do módulo, e está com arquivo e linha no doc 15 §5.
+
+Na performance, o orçamento de quadro está folgado em todos os tiers; o que falta é de
+carregamento e alcance: o culling por conectividade de sections pedido no PROMPT.md §4.2 não
+existe, a cópia de vizinhança custa ~0,26 ms por section na thread principal, e a luz gerada para
+na borda do chunk. Na manutenção, `session.ts` (1911 linhas), `main.ts` (1376) e
+`ui/containers/screen.ts` (1117) passam muito do teto de ~400, e `Session.useHeld` é uma cadeia de
+onze `try*` que o balde, a tesoura e o ovo aumentariam.
+
+Portões rodados antes de escrever: 1823 testes verdes em 89 arquivos, lint limpo, build ok,
+208,8 KB gzip de 350.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `docs/14-roadmap.md` | seção "Avaliação de 2026-09-22" com ordem recomendada e os marcos M11 (dívida normativa), M12 (carregamento e culling), M13 (casa em ordem), M14 (água e paisagem), M15 (oficina), M16 (um fim para a jornada) e M17 (alcance), cada um com evidência e critério de aceite |
+| `~` | `docs/15-status.md` | data; M9–M17 no §1; §2 reconfirmado; §3 com a avaliação; §5 desmente a "lista fechada" com a tabela dos 13 itens e o roteiro em ordem; §6 ganha o item 0 (começar o M11) |
+| `~` | `README.md` | estado atual sem a afirmação de zero pendência normativa; M9–M17 propostos na lista de docs |
+
+---
+
 ## 2026-09-17 · 12:10 → 12:21 · A placa escondia o que a placa escrevia
 
 **Pedido:** *"Todos os 5 testes passaram perfeitamente. Só a placa que por conta de sua textura mal

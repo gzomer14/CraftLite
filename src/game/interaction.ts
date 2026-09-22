@@ -113,6 +113,12 @@ export class Interaction {
   };
 
   private placeCooldown = 0;
+  /**
+   * Direção da última mira (2026-09-22): a do olhar, ou a do dedo no Modo A.
+   * O balde e o arremesso a reusam para mirar onde o jogador está mirando, e
+   * não sempre o centro da câmera.
+   */
+  readonly aim = createVec3();
   /** Ticks restantes até a próxima quebra poder acontecer. */
   private breakCooldown = 0;
   private breakingActive = false;
@@ -144,6 +150,7 @@ export class Interaction {
    */
   updateTargetAlong(dx: number, dy: number, dz: number): void {
     const player = this.player;
+    this.aim[0] = dx; this.aim[1] = dy; this.aim[2] = dz;
     const hit = raycast(
       this.world,
       player.x, player.y + player.eyeHeight, player.z,
@@ -387,6 +394,8 @@ export class Interaction {
     let step: readonly [number, number, number] = PISTON_STEP[5];
     if (def.support === 'mount') step = PISTON_STEP[mountIndexOf(bits & 7)];
     const support = defOf(this.world.getBlock(x + step[0], y + step[1], z + step[2]));
+    // Cana sobre cana, cacto sobre cacto: a coluna é o próprio apoio.
+    if (def.stackable && support.id === blockId) return true;
     return support.opaque && support.solid;
   }
 

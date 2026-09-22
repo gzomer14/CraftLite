@@ -25,6 +25,8 @@ export const SMELTING: readonly SmeltingRecipe[] = [
   { input: 'sand', output: 'glass', xp: 0.1 },
   { input: 'red_sand', output: 'glass', xp: 0.1 },
   { input: 'cobblestone', output: 'stone', xp: 0.1 },
+  // Pedra lisa (doc 05 §7): a segunda passada na fornalha.
+  { input: 'stone', output: 'smooth_stone', xp: 0.1 },
   { input: 'clay_ball', output: 'brick', xp: 0.3 },
   { input: '#logs', output: 'charcoal', xp: 0.15 },
   { input: 'beef', output: 'cooked_beef', xp: 0.35 },

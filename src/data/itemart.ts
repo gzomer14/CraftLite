@@ -615,6 +615,83 @@ export const SHAPES: Record<string, readonly string[]> = {
     '................',
   ],
   /*
+   * Itens de 2026-09-22. O balde cheio é o balde com a boca preenchida no
+   * acento — água, lava e leite são a mesma máscara em três cores —, e o
+   * ensopado é a tigela com o caldo no acento.
+   */
+  filled_bucket: [
+    '................',
+    '................',
+    '................',
+    '...M......M.....',
+    '...M......M.....',
+    '..MMMMMMMMMM....',
+    '..MaAaaAaaaM....',
+    '..MmmmmmmmmM....',
+    '..dmmmmmmmmd....',
+    '...dmmmmmmd.....',
+    '...dmmmmmmd.....',
+    '....dddddd......',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+  stew: [
+    '................',
+    '................',
+    '................',
+    '................',
+    '....aAa.Aa......',
+    '..MaaAaaaaaM....',
+    '..MmmmmmmmmM....',
+    '...dmmmmmmd.....',
+    '...dmmmmmmd.....',
+    '....dmmmmd......',
+    '.....dddd.......',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+  egg: [
+    '................',
+    '................',
+    '................',
+    '.......MM.......',
+    '......MmmM......',
+    '.....MmmmmM.....',
+    '.....MmmmmM.....',
+    '....MmmmmmmM....',
+    '....Mmmmmmmd....',
+    '....mmmmmmmd....',
+    '....dmmmmmmd....',
+    '.....dmmmmd.....',
+    '......dddd......',
+    '................',
+    '................',
+    '................',
+  ],
+  shears: [
+    '................',
+    '................',
+    '..........M.....',
+    '.........Mm.....',
+    '........Mmd.....',
+    '.......Mmd..M...',
+    '......Mmd..Mm...',
+    '.....aMd..Mmd...',
+    '....aAa..Mmd....',
+    '...aA.Aa.md.....',
+    '...a...aa.......',
+    '...aA.Aa........',
+    '....aAa.........',
+    '................',
+    '................',
+    '................',
+  ],
+  /*
    * Tocha, porta e cama (M8).
    *
    * Os três colocam bloco, então caíam no cubo isométrico de
@@ -820,6 +897,12 @@ const SIMPLE: Record<string, [string, Rgb]> = {
   rotten_flesh: ['meat', [124, 100, 68]],
 
   boat: ['boat', WOOD],
+
+  // 2026-09-22 (M11).
+  golden_apple: ['apple', GOLD],
+  cookie: ['round', [196, 140, 80]],
+  sugar: ['dust', [244, 244, 240]],
+  egg: ['egg', [236, 220, 184]],
 };
 
 /** Arte por nome de item, montada uma vez no boot. */
@@ -857,6 +940,13 @@ function buildArt(): Record<string, ItemArt> {
   out.oak_door = { shape: 'door', color: [150, 118, 68], accent: [214, 214, 220] };
   out.bed = { shape: 'bed', color: [196, 52, 52], accent: [238, 238, 232] };
   out.ladder = { shape: 'ladder', color: [146, 116, 68] };
+  // Baldes cheios e ensopado (2026-09-22): a cor do conteúdo vai no acento.
+  const bucket: Rgb = [188, 188, 196];
+  out.water_bucket = { shape: 'filled_bucket', color: bucket, accent: [52, 96, 214] };
+  out.lava_bucket = { shape: 'filled_bucket', color: bucket, accent: [230, 110, 30] };
+  out.milk_bucket = { shape: 'filled_bucket', color: bucket, accent: [244, 244, 240] };
+  out.mushroom_stew = { shape: 'stew', color: WOOD, accent: [168, 112, 70] };
+  out.shears = { shape: 'shears', color: [214, 214, 220], accent: [160, 60, 50] };
   /*
    * Corante e cama coloridos (M8). São a mesma silhueta em oito cores — o
    * caso que este módulo existe para resolver: o desenho é o papel, a cor é o

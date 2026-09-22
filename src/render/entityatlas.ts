@@ -9,8 +9,11 @@
  * modelos, e a sombra é um disco radial desenhado aqui mesmo.
  */
 
-import { MOBS } from '../data/mobs';
+import { MOBS, type MobDef } from '../data/mobs';
 import { MOB_SKINS } from '../data/mobskins';
+import { DYES } from '../data/dyes';
+import { COLOR_MASK, SHEARED } from '../entity/husbandry';
+import type { SkinRecipe } from './skingen';
 import { ENTITY_FINISH, type TextureStyleId } from '../data/texturestyle';
 import { applyFinish } from './texfinish';
 import { modelOf } from '../data/mobmodels';
@@ -41,6 +44,11 @@ export class EntityAtlas {
 
   private readonly gl: AnyGL;
   private readonly layers = new Map<string, number>();
+  /**
+   * Camada por variante dos bichos de lã (2026-09-22): 16 cores e a tosquiada,
+   * por id de mob. Tabela plana para o render não montar string por quadro.
+   */
+  private readonly woolLayers = new Map<number, Int16Array>();
 
   /**
    * `overrides` é a arte do jogador (`render/pack.ts`), por nome de skin. Ela
@@ -79,6 +87,26 @@ export class EntityAtlas {
     }
 
     // Camadas que não são mob mas usam o mesmo batcher: flecha e barco.
+    // Ovelha de cada cor e tosquiada: a receita da ovelha com a lã trocada.
+    for (const mob of MOBS) {
+      if (mob.traits.woolly !== true) continue;
+      const recipe = MOB_SKINS[mob.skin];
+      if (recipe === undefined) continue;
+      const model = modelOf(mob.model);
+      const table = new Int16Array(COLOR_MASK + 2).fill(this.layers.get(mob.skin) ?? 0);
+      for (let color = 1; color < DYES.length; color++) {
+        const name = `${mob.skin}_${DYES[color].name}`;
+        table[color] = pixels.length;
+        this.layers.set(name, pixels.length);
+        pixels.push(custom(name, () => generateSkin(model, woolRecipe(recipe, DYES[color].wool), seedOf(name))));
+      }
+      const sheared = `${mob.skin}_sheared`;
+      table[COLOR_MASK + 1] = pixels.length;
+      this.layers.set(sheared, pixels.length);
+      pixels.push(custom(sheared, () => generateSkin(model, shearedRecipe(recipe), seedOf(sheared))));
+      this.woolLayers.set(mob.id, table);
+    }
+
     for (const name of EXTRA_LAYERS) {
       const recipe = MOB_SKINS[name];
       this.layers.set(name, pixels.length);
@@ -108,6 +136,13 @@ export class EntityAtlas {
 
   layerOf(name: string): number {
     return this.layers.get(name) ?? 0;
+  }
+
+  /** Camada de um mob com a variante dele: a cor e a tosquia da ovelha. */
+  layerForMob(def: MobDef, variant: number): number {
+    const table = this.woolLayers.get(def.id);
+    if (table === undefined) return this.layerOf(def.skin);
+    return (variant & SHEARED) !== 0 ? table[COLOR_MASK + 1] : table[variant & COLOR_MASK];
   }
 
   bind(unit: number): void {
@@ -223,4 +258,26 @@ function upload2D(gl: AnyGL, pixels: Uint8ClampedArray[], tilesPerRow: number): 
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   return tex;
+}
+
+/** A receita da ovelha com a lã (fundo e tufos) na cor pedida. */
+function woolRecipe(recipe: SkinRecipe, wool: readonly [number, number, number]): SkinRecipe {
+  const light: [number, number, number] = [
+    Math.min(255, wool[0] + 14), Math.min(255, wool[1] + 14), Math.min(255, wool[2] + 14),
+  ];
+  return {
+    ...recipe,
+    base: [wool[0], wool[1], wool[2]],
+    details: (recipe.details ?? []).map((d) => (d.kind === 'patch' ? { ...d, color: light } : d)),
+  };
+}
+
+/** Tosquiada: o corpo vira a pele da cabeça, sem os tufos. */
+function shearedRecipe(recipe: SkinRecipe): SkinRecipe {
+  const skin = recipe.parts?.head ?? [214, 196, 176];
+  return {
+    ...recipe,
+    base: [skin[0], skin[1], skin[2]],
+    details: (recipe.details ?? []).filter((d) => d.kind !== 'patch'),
+  };
 }

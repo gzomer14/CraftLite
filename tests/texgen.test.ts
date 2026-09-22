@@ -228,14 +228,8 @@ describe('legibilidade das texturas', () => {
     ['block/oak_planks', 'block/tnt_side'],
     ['block/chest_side', 'block/crafting_table_side'],
     ['block/cobblestone', 'block/furnace_side'],
-    // A cama passou a ser colorida (M8): a vermelha é a que existia.
-    ['block/wool_white', 'block/bed_red_top'],
-    // Duas cores de lã que ficam lado a lado no inventário.
-    ['block/wool_white', 'block/wool_black'],
-    ['block/wool_red', 'block/wool_orange'],
-    ['block/wool_blue', 'block/wool_purple'],
-    // Cabeceira e pé da mesma cama: o travesseiro é a diferença.
-    ['block/bed_red_top', 'block/bed_red_foot_top'],
+    // Desde o M13 a cor da lã e da cama é tint (`data/tints.ts`, testado lá,
+    // inclusive a cabeceira: em cinza ela só se distingue depois de tingida).
     // Os quatro quadros (M8): eram **um** desenho só, repetido em toda parede.
     ['block/painting', 'block/painting_sunflower'],
     ['block/painting', 'block/painting_skull'],

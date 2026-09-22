@@ -388,6 +388,11 @@ const BASE_SOUNDS: Record<string, Recipe> = {
   'player/pickup': { kind: 'tones', duration: 0.09, freqs: [900, 1350], type: 'sine', gain: 0.25, decay: 0.07 },
   'player/eat': { kind: 'clicks', count: 3, spacing: 0.07, length: 0.05, color: 'pink', gain: 0.25, filter: 'bandpass', freq: 700 },
   'player/arrow': { kind: 'noise', duration: 0.12, color: 'white', gain: 0.3, attack: 0.002, decay: 0.1, filter: 'highpass', freq: 2600 },
+  // 2026-09-22: balde e arremesso. Água e lava dividem o mesmo par — a
+  // diferença entre as duas se vê, e o orçamento de memória de áudio é curto.
+  'block/bucket_fill': { kind: 'noise', duration: 0.18, color: 'pink', gain: 0.28, attack: 0.01, decay: 0.16, filter: 'bandpass', freq: 500, freqTo: 1300, q: 1.2 },
+  'block/bucket_empty': { kind: 'noise', duration: 0.2, color: 'pink', gain: 0.28, attack: 0.01, decay: 0.18, filter: 'bandpass', freq: 1300, freqTo: 420, q: 1.2 },
+  'player/throw': { kind: 'noise', duration: 0.1, color: 'white', gain: 0.22, attack: 0.004, decay: 0.09, filter: 'bandpass', freq: 1800, freqTo: 900, q: 1 },
   'player/hit': { kind: 'noise', duration: 0.1, color: 'brown', gain: 0.45, attack: 0.002, decay: 0.08, filter: 'lowpass', freq: 1400 },
 
   'block/chest': { kind: 'noise', duration: 0.25, color: 'white', gain: 0.3, attack: 0.002, decay: 0.22, filter: 'bandpass', freq: 1200, q: 1.1 },

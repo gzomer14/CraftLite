@@ -315,6 +315,11 @@ export class Hud {
    * a faixa mais disputada da tela — logo acima da hotbar — e ainda sugerem
    * uma mecânica que não existe ali.
    */
+  /** Acrescenta um painel próprio à raiz do HUD (a faixa de efeitos). */
+  mount(child: HTMLElement): void {
+    this.root.appendChild(child);
+  }
+
   setCreative(on: boolean): void {
     this.bars.hidden = on;
     this.creative = on;

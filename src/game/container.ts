@@ -209,7 +209,12 @@ export class Furnace extends Container {
         this.burnTicks = burn;
         this.burnTotal = burn;
         fuel.count--;
-        if (fuel.count <= 0) this.slots[FURNACE_FUEL] = null;
+        if (fuel.count <= 0) {
+          // Balde de lava queima e devolve o balde (doc 05 §5).
+          const rest = itemDef(fuel.item)?.remainder;
+          const restId = rest === undefined ? -1 : ITEM_BY_NAME.get(rest)?.id ?? -1;
+          this.slots[FURNACE_FUEL] = restId < 0 ? null : { item: restId, count: 1, damage: 0 };
+        }
       }
     }
 

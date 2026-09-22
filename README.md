@@ -4,9 +4,14 @@ Este repositório contém **a especificação completa** de um jogo de mundo abe
 navegador — um jogo de minerar-e-construir que roda em praticamente qualquer máquina, incluindo
 celulares antigos — e a **implementação em andamento**.
 
-**Estado atual: os oito marcos, de M0 a M7, estão concluídos, e o M8 — acabamento visual — fechou
-em 2026-09-17 e foi validado em aparelho no mesmo dia. Nenhum documento normativo tem pendência de
-funcionalidade. Falta jogar em aparelho o que foi entregue no acabamento pós-M7 (2026-09-14).**
+**Estado atual: os oito marcos, de M0 a M7, estão concluídos; o M8 — acabamento visual — fechou
+em 2026-09-17 e foi validado em aparelho no mesmo dia; e o M11 e o M13 fecharam em 2026-09-22.** A avaliação
+completa daquele dia achou 13 itens que os documentos normativos pediam e o código não tinha, e o
+M11 os entregou com mais quatro achados no caminho: plantas que não cresciam (a madeira não era
+renovável), blocos que não queimavam, água que apagava lava e o jogador nascendo no mar. Há agora um
+smoke test de navegador (`npm run smoke`), e o M13 reorganizou o código (a `Session` e o `main.ts` perderam
+dois terços) e deu 16 cores à lã e à cama. Seguem M12, M9, M10 e M14 a M17 no roteiro. Falta jogar em aparelho o
+que foi entregue no acabamento pós-M7 (2026-09-14) e no M11.
 
 - **M0 — esqueleto:** Vite + TypeScript strict, renderer WebGL2 próprio com fallback WebGL1,
   detecção de tier, loop de 20 Hz com interpolação, gerador procedural de texturas alimentando um
@@ -140,9 +145,10 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 1823 testes (vitest)
+npm test           # 1975 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
+npm run smoke      # abre o jogo num Chrome headless e joga o roteiro do doc 14 (precisa do build)
 npm run icons      # regenera os ícones do PWA
 ```
 
@@ -218,7 +224,7 @@ src/
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      1823 testes, incluindo orçamento de performance e de luz
+tests/                      1975 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios
@@ -235,7 +241,7 @@ docs/
   11-persistencia-e-saves.md IndexedDB, formato de save, PWA
   12-multiplayer.md         ganchos de arquitetura, protocolo P2P
   13-assets-e-arte.md       texturas procedurais, sprites, fonte, licença
-  14-roadmap.md             marcos com checklist e critérios de aceite (M0–M8 feitos, M9–M10 propostos)
+  14-roadmap.md             marcos com checklist e critérios de aceite (M0–M8 feitos, M9–M17 propostos)
   15-status.md              estado real: status por marco, pendências, próximo passo
   16-auditoria.md           histórico por sessão, com grid de arquivos
   mockups/                  14 wireframes SVG + generate.py

@@ -275,12 +275,12 @@ describe('tile entities', () => {
     const first = harness(db);
     const chest = new Container('chest', 27, 3, 64, 5);
     chest.set(2, makeStack(ITEM_BY_NAME.get('diamond')!.id, 3));
-    first.session.restoreContainer(chest);
+    first.session.tiles.restore(chest);
     await first.save.saveAll();
 
     const second = harness(db, first.meta);
     await second.save.load();
-    const loaded = second.session.containerAt(3, 64, 5);
+    const loaded = second.session.tiles.at(3, 64, 5);
     expect(loaded?.get(2)?.count).toBe(3);
   });
 
@@ -291,12 +291,12 @@ describe('tile entities', () => {
     const sword = makeStack(ITEM_BY_NAME.get('diamond_sword')!.id, 1);
     applyEnchant(sword, SHARPNESS, 3);
     chest.set(0, sword);
-    first.session.restoreContainer(chest);
+    first.session.tiles.restore(chest);
     await first.save.saveAll();
 
     const second = harness(db, first.meta);
     await second.save.load();
-    expect(levelOf(second.session.containerAt(4, 64, 6)?.get(0) ?? null, SHARPNESS)).toBe(3);
+    expect(levelOf(second.session.tiles.at(4, 64, 6)?.get(0) ?? null, SHARPNESS)).toBe(3);
   });
 
   it('fornalha volta com o combustível e o progresso', () => {
@@ -394,6 +394,7 @@ describe('viajar longe e voltar', () => {
         });
         return;
       }
+      if (request.type === 'spawn') return;
       this.generated++;
       const column = new ChunkColumn(request.cx, request.cz);
       for (let y = 0; y <= GROUND_Y; y++) {
@@ -532,7 +533,7 @@ describe('autosave grava o mundo inteiro', () => {
     h.session.dayNight.totalTicks = 9000;
     const chest = new Container('chest', 27, 4, 64, 4);
     chest.set(0, makeStack(ITEM_BY_NAME.get('oak_planks')!.id, 12));
-    h.session.restoreContainer(chest);
+    h.session.tiles.restore(chest);
     h.world.setBlock(8, GROUND_Y, 8, AIR, 'player');
 
     // Um tick a menos que o intervalo: ainda não gravou nada.
@@ -632,13 +633,20 @@ describe('voltar ao mundo não teletransporta', () => {
     expect(player.z).toBeCloseTo(-10.5, 3);
   });
 
-  it('mundo novo continua ganhando posição de spawn', () => {
+  /*
+   * Mudou em 2026-09-22: o mundo novo nascia sempre na coluna (0, 0), e metade
+   * das seeds põe mar ali. Agora o `main.ts` põe o jogador na coluna achada
+   * pela busca (`world/gen/spawnsearch.ts`) antes do primeiro chunk chegar, e
+   * `trySpawn` só o assenta no chão **daquela** coluna.
+   */
+  it('mundo novo assenta o jogador no chão da coluna em que foi posto', () => {
     const world = flatWorld();
     const player = new Player(20.5, 200, -10.5);
 
     expect(trySpawn(world, player, false)).toBe(true);
-    expect(player.x).toBeCloseTo(0.5, 3);
-    expect(player.z).toBeCloseTo(0.5, 3);
+    expect(player.x).toBeCloseTo(20.5, 3);
+    expect(player.z).toBeCloseTo(-10.5, 3);
+    expect(player.y).toBeCloseTo(GROUND_Y + 1, 3);
   });
 
   it('espera o chão antes de simular, nos dois casos', () => {
@@ -664,18 +672,18 @@ describe('veículos e dimensão no save (M7)', () => {
   it('barco e carrinho vão para o save e voltam dele', async () => {
     const db = fakeDb();
     const first = harness(db);
-    first.session.boats.spawn(1.5, GROUND_Y + 1, 2.5, 0.75);
-    first.session.carts.spawn(4.5, GROUND_Y + 1, 4.5, 2);
+    first.session.vehicles.boats.spawn(1.5, GROUND_Y + 1, 2.5, 0.75);
+    first.session.vehicles.carts.spawn(4.5, GROUND_Y + 1, 4.5, 2);
     await first.save.saveAll();
     await settleSaves();
 
     const second = harness(db, first.meta);
     await second.save.load();
-    expect(second.session.boats.active).toBe(1);
-    expect(second.session.carts.active).toBe(1);
-    expect(second.session.boats.x[0]).toBeCloseTo(1.5);
-    expect(second.session.carts.z[0]).toBeCloseTo(4.5);
-    expect(second.session.carts.dir[0]).toBe(2);
+    expect(second.session.vehicles.boats.active).toBe(1);
+    expect(second.session.vehicles.carts.active).toBe(1);
+    expect(second.session.vehicles.boats.x[0]).toBeCloseTo(1.5);
+    expect(second.session.vehicles.carts.z[0]).toBeCloseTo(4.5);
+    expect(second.session.vehicles.carts.dir[0]).toBe(2);
   });
 
   it('mundo sem veículo nenhum volta sem veículo, e não quebra', async () => {
@@ -686,8 +694,8 @@ describe('veículos e dimensão no save (M7)', () => {
 
     const second = harness(db, first.meta);
     await second.save.load();
-    expect(second.session.boats.active).toBe(0);
-    expect(second.session.carts.active).toBe(0);
+    expect(second.session.vehicles.boats.active).toBe(0);
+    expect(second.session.vehicles.carts.active).toBe(0);
   });
 
   it('cada dimensão tem a sua lista de baús e de veículos', async () => {
@@ -695,7 +703,7 @@ describe('veículos e dimensão no save (M7)', () => {
     const { session, save } = harness(db);
 
     // Um barco na superfície, gravado pelo caminho normal.
-    session.boats.spawn(1.5, GROUND_Y + 1, 1.5, 0);
+    session.vehicles.boats.spawn(1.5, GROUND_Y + 1, 1.5, 0);
     await save.saveAll();
     await settleSaves();
 
@@ -703,17 +711,17 @@ describe('veículos e dimensão no save (M7)', () => {
     save.switchDimension(1);
     session.enterDimension(1);
     await settleSaves();
-    expect(session.boats.active).toBe(0);
+    expect(session.vehicles.boats.active).toBe(0);
 
     // Um carrinho do lado de lá, e de volta para casa.
-    session.carts.spawn(9.5, GROUND_Y + 1, 9.5, 0);
+    session.vehicles.carts.spawn(9.5, GROUND_Y + 1, 9.5, 0);
     save.switchDimension(0);
     session.enterDimension(0);
     await settleSaves();
 
     // O barco da superfície voltou; o carrinho do Nether não veio junto.
-    expect(session.boats.active).toBe(1);
-    expect(session.carts.active).toBe(0);
+    expect(session.vehicles.boats.active).toBe(1);
+    expect(session.vehicles.carts.active).toBe(0);
   });
 
   it('a dimensão do jogador entra no instantâneo', () => {

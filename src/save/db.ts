@@ -39,6 +39,11 @@ export interface WorldMeta {
   time: number;
   totalTicks: number;
   spawn: [number, number, number];
+  /**
+   * `spawn` já foi procurado em terra firme (2026-09-22). Mundo antigo não tem
+   * o campo e continua nascendo na coluna (0, 0), onde sempre nasceu.
+   */
+  spawnFound?: boolean;
   createdAt: number;
   lastPlayed: number;
   sizeBytes: number;
@@ -75,6 +80,13 @@ export interface PlayerSave {
   xp?: number;
   /** Conquistas como máscara de bits (doc 08 §3.4). Ausente = nenhuma. */
   achievements?: number;
+  /**
+   * Efeitos ativos como triplas `[id, nível, ticks]`, e a vida extra da
+   * Absorção (2026-09-22). Ausentes = nenhum, que é o que todo save anterior
+   * significa.
+   */
+  effects?: number[];
+  absorption?: number;
   /** Ponto de renascimento definido pela cama, se houver. */
   bedSpawn?: [number, number, number];
   /**

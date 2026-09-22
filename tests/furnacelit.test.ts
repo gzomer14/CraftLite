@@ -61,7 +61,7 @@ function openFurnace(session: Session, x: number, y: number, z: number): Furnace
   session.player.pitch = 0.6;
   session.interaction.updateTarget();
   session.useHeld();
-  const container = session.openContainer;
+  const container = session.workbench.openContainer;
   expect(container, 'a fornalha tem que abrir').toBeInstanceOf(Furnace);
   return container as Furnace;
 }
@@ -125,7 +125,7 @@ describe('fornalha acesa', () => {
     for (let i = 0; i < 5; i++) session.tick();
     expect(blockIdOf(world.getBlock(8, 64, 8))).toBe(FURNACE_LIT);
 
-    session.closeScreen();
+    session.workbench.closeScreen();
     const again = openFurnace(session, 8, 64, 8);
     expect(again).toBe(furnace);
     // O carvão já foi consumido ao acender; o que fica é a fundição em curso.

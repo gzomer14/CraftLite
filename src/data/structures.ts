@@ -70,6 +70,12 @@ export interface Placement {
   surface: boolean;
   /** Biomas em que pode nascer; vazio = qualquer um. */
   biomes?: readonly string[];
+  /**
+   * Assenta no **fundo do mar** em vez da superfície (naufrágio, 2026-09-22).
+   * Só vale com `surface`; a coluna tem que estar a pelo menos 4 blocos de
+   * água, senão o barco nasce encalhado na praia.
+   */
+  underwater?: boolean;
 }
 
 export interface StructureDef {
@@ -120,6 +126,18 @@ export const CHEST_LOOT: Record<string, readonly LootRoll[]> = {
     { item: 'iron_ingot', count: [1, 2], chance: 0.25 },
     { item: 'emerald', count: [1, 2], chance: 0.2 },
     { item: 'oak_sapling', count: [1, 3], chance: 0.3 },
+  ],
+  // Naufrágio (2026-09-22): mantimento de bordo e um pouco de metal.
+  shipwreck: [
+    { item: 'paper', count: [1, 6], chance: 0.6 },
+    { item: 'coal', count: [2, 6], chance: 0.5 },
+    { item: 'iron_ingot', count: [1, 4], chance: 0.45 },
+    { item: 'gold_ingot', count: [1, 3], chance: 0.2 },
+    { item: 'emerald', count: [1, 3], chance: 0.25 },
+    { item: 'carrot', count: [2, 6], chance: 0.35 },
+    { item: 'potato', count: [2, 6], chance: 0.35 },
+    { item: 'wheat', count: [4, 10], chance: 0.3 },
+    { item: 'diamond', count: [1, 1], chance: 0.05 },
   ],
 };
 
@@ -255,8 +273,90 @@ const VILLAGE_WELL: StructureDef = {
   },
 };
 
+/*
+ * As três estruturas do doc 03 §7 que faltavam (2026-09-22). Entram **no fim**
+ * da lista: o sal do sorteio de cada estrutura é a posição dela aqui, e
+ * encaixá-las no meio mudaria onde nascem as dungeons e as minas de todo mundo
+ * ainda não gerado.
+ */
+
+/**
+ * Poço do deserto (doc 03 §7: "1/1000 chunks, Desert — estrutura de sandstone
+ * com água"): base de arenito, bordo de laje, quatro pilares e o telhado.
+ */
+const DESERT_WELL: StructureDef = {
+  name: 'desert_well',
+  size: [5, 5, 5],
+  pieces: [
+    { kind: 'fill', block: 'sandstone', box: [0, -3, 0, 4, 0, 4], replace: 'any' },
+    { kind: 'fill', block: 'water', box: [2, -2, 2, 2, 0, 2], replace: 'any' },
+    { kind: 'fill', block: 'sandstone_slab', box: [0, 1, 0, 4, 1, 4], replace: 'air' },
+    { kind: 'walls', block: 'sandstone', box: [1, 1, 1, 3, 1, 3], replace: 'any' },
+    { kind: 'point', block: 'water', box: [2, 1, 2, 2, 1, 2], replace: 'any' },
+    { kind: 'fill', block: 'sandstone', box: [1, 2, 1, 1, 3, 1], replace: 'any' },
+    { kind: 'fill', block: 'sandstone', box: [3, 2, 1, 3, 3, 1], replace: 'any' },
+    { kind: 'fill', block: 'sandstone', box: [1, 2, 3, 1, 3, 3], replace: 'any' },
+    { kind: 'fill', block: 'sandstone', box: [3, 2, 3, 3, 3, 3], replace: 'any' },
+    { kind: 'fill', block: 'sandstone_slab', box: [1, 4, 1, 3, 4, 3], replace: 'any' },
+    { kind: 'point', block: 'sandstone', box: [2, 4, 2, 2, 4, 2], replace: 'any' },
+  ],
+  placement: { attempts: 0.001, minY: 0, maxY: 0, surface: true, biomes: ['desert'] },
+};
+
+/**
+ * Cabana de bruxa (doc 03 §7: "Swamp, raro — sobre estacas"). A bruxa não
+ * existe ainda (M14); a cabana já dá o marco no pântano e os dois cogumelos
+ * do ensopado para quem a achar.
+ */
+const WITCH_HUT: StructureDef = {
+  name: 'witch_hut',
+  size: [5, 8, 5],
+  pieces: [
+    // Estacas de tronco até o chão (ou o fundo do pântano).
+    { kind: 'fill', block: 'oak_log', box: [0, -3, 0, 0, 1, 0], replace: 'any' },
+    { kind: 'fill', block: 'oak_log', box: [4, -3, 0, 4, 1, 0], replace: 'any' },
+    { kind: 'fill', block: 'oak_log', box: [0, -3, 4, 0, 1, 4], replace: 'any' },
+    { kind: 'fill', block: 'oak_log', box: [4, -3, 4, 4, 1, 4], replace: 'any' },
+    // Casca de pinheiro, miolo vazio, telhado de laje por cima.
+    { kind: 'hollow', block: 'spruce_planks', box: [0, 2, 0, 4, 6, 4], replace: 'any' },
+    { kind: 'fill', block: 'air', box: [1, 3, 1, 3, 5, 3], replace: 'any' },
+    { kind: 'fill', block: 'spruce_slab', box: [-1, 7, -1, 5, 7, 5], replace: 'air' },
+    // Porta aberta e janelas.
+    { kind: 'fill', block: 'air', box: [2, 3, 0, 2, 4, 0], replace: 'any' },
+    { kind: 'point', block: 'glass', box: [0, 4, 2, 0, 4, 2], replace: 'any' },
+    { kind: 'point', block: 'glass', box: [4, 4, 2, 4, 4, 2], replace: 'any' },
+    // Mobília: bancada e os dois cogumelos no chão.
+    { kind: 'point', block: 'crafting_table', box: [1, 3, 3, 1, 3, 3], replace: 'any' },
+    { kind: 'point', block: 'brown_mushroom', box: [3, 3, 3, 3, 3, 3], replace: 'any' },
+    { kind: 'point', block: 'red_mushroom', box: [3, 3, 1, 3, 3, 1], replace: 'any' },
+  ],
+  placement: { attempts: 0.004, minY: 0, maxY: 0, surface: true, biomes: ['swamp'] },
+};
+
+/**
+ * Naufrágio (doc 03 §7: "Ocean, raro — barco quebrado com baú de loot"):
+ * casco de tábua no fundo, mastro caído de pé pela metade e o baú na popa.
+ * Só as paredes são escritas; o miolo continua água.
+ */
+const SHIPWRECK: StructureDef = {
+  name: 'shipwreck',
+  size: [9, 5, 3],
+  pieces: [
+    { kind: 'fill', block: 'oak_planks', box: [0, 0, 0, 8, 0, 2], replace: 'any' },
+    { kind: 'walls', block: 'oak_planks', box: [0, 1, 0, 8, 1, 2], replace: 'any' },
+    // Borda quebrada: só parte da segunda fiada ficou.
+    { kind: 'fill', block: 'oak_planks', box: [0, 2, 0, 3, 2, 0], replace: 'any' },
+    { kind: 'fill', block: 'oak_planks', box: [5, 2, 2, 8, 2, 2], replace: 'any' },
+    { kind: 'fill', block: 'oak_log', box: [4, 1, 1, 4, 4, 1], replace: 'any' },
+  ],
+  chests: [{ at: [7, 1, 1], loot: 'shipwreck' }],
+  placement: {
+    attempts: 0.01, minY: 0, maxY: 0, surface: true, underwater: true, biomes: ['ocean'],
+  },
+};
+
 export const STRUCTURES: readonly StructureDef[] = [
-  DUNGEON, MINESHAFT, VILLAGE_HOUSE, VILLAGE_WELL,
+  DUNGEON, MINESHAFT, VILLAGE_HOUSE, VILLAGE_WELL, DESERT_WELL, WITCH_HUT, SHIPWRECK,
 ];
 
 export function structureByName(name: string): StructureDef | undefined {

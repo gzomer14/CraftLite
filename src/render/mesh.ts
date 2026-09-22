@@ -170,7 +170,7 @@ export class MeshBuilder {
     const z16 = Math.round(z * POSITION_SCALE);
     if (this.packed) {
       const o = n * 2;
-      this.words[o] = packWord0(x16, y16, z16, face);
+      this.words[o] = packWord0(x16, y16, z16, face, tint);
       this.words[o + 1] = packWord1(texLayer, bl, sl, ao, tint, u, v);
     } else {
       writeFloatVertex(

@@ -113,7 +113,7 @@ describe('roteiro de sobrevivência do doc 14', () => {
 
     // 2. Tronco → 4 tábuas, na grade 2×2 do inventário.
     inv.set(CRAFT_START, makeStack(itemId('oak_log'), 4));
-    h.session.refreshCraftResult();
+    h.session.workbench.refreshCraftResult();
     expect(inv.get(CRAFT_RESULT)?.item).toBe(itemId('oak_planks'));
 
     // Retira 4 vezes: 16 tábuas.
@@ -128,23 +128,23 @@ describe('roteiro de sobrevivência do doc 14', () => {
     clearCraft(inv);
     inv.set(CRAFT_START, makeStack(itemId('oak_planks'), 2));
     inv.set(CRAFT_START + 2, makeStack(itemId('oak_planks'), 2));
-    h.session.refreshCraftResult();
+    h.session.workbench.refreshCraftResult();
     expect(inv.get(CRAFT_RESULT)?.item).toBe(itemId('stick'));
 
     // 4. Tábuas → bancada.
     clearCraft(inv);
     for (let i = 0; i < 4; i++) inv.set(CRAFT_START + i, makeStack(itemId('oak_planks'), 1));
-    h.session.refreshCraftResult();
+    h.session.workbench.refreshCraftResult();
     expect(inv.get(CRAFT_RESULT)?.item).toBe(itemId('crafting_table'));
     clearCraft(inv);
 
     // 5. Na bancada 3×3: picareta de pedra.
-    h.session.setScreen('crafting', h.session.bench);
-    const bench = h.session.bench;
+    h.session.workbench.setScreen('crafting', h.session.workbench.bench);
+    const bench = h.session.workbench.bench;
     for (let i = 0; i < 3; i++) bench.set(i, makeStack(itemId('cobblestone'), 1));
     bench.set(4, makeStack(itemId('stick'), 1));
     bench.set(7, makeStack(itemId('stick'), 1));
-    h.session.refreshCraftResult();
+    h.session.workbench.refreshCraftResult();
     expect(inv.get(CRAFT_RESULT)?.item).toBe(itemId('stone_pickaxe'));
   });
 
@@ -164,7 +164,7 @@ describe('roteiro de sobrevivência do doc 14', () => {
     const furnace = new Furnace(4, 64, 4);
     furnace.set(FURNACE_INPUT, makeStack(itemId('raw_iron'), 3));
     furnace.set(FURNACE_FUEL, makeStack(itemId('coal'), 2));
-    h.session.restoreContainer(furnace);
+    h.session.tiles.restore(furnace);
 
     // Nenhuma tela aberta; só o tick do mundo.
     for (let i = 0; i < SMELT_TICKS * 2 + 10; i++) h.session.tick();
@@ -242,7 +242,7 @@ describe('contêineres no mundo', () => {
     h.session.interaction.updateTarget();
     expect(h.session.interaction.state.target).not.toBeNull();
     h.session.useHeld();
-    expect(h.session.openScreen).toBe('crafting');
+    expect(h.session.workbench.openScreen).toBe('crafting');
   });
 
   it('quebrar o baú devolve o conteúdo', () => {
@@ -251,7 +251,7 @@ describe('contêineres no mundo', () => {
     h.world.setBlock(8, 64, 8, block('chest'), 'player');
     h.session.interaction.onBlockPlaced?.(8, 64, 8, block('chest'));
 
-    const chest = h.session.containerAt(8, 64, 8);
+    const chest = h.session.tiles.at(8, 64, 8);
     expect(chest).toBeDefined();
     chest!.set(0, makeStack(itemId('diamond'), 3));
 
@@ -323,7 +323,7 @@ describe('experiência no mundo (M6)', () => {
     const h = harness();
     const furnace = new Furnace(2, 64, 2);
     furnace.storedXp = 3.4;
-    h.session.collectFurnaceXp(furnace);
+    h.session.workbench.collectFurnaceXp(furnace);
     expect(h.session.orbs.active).toBe(1);
     // Só a parte inteira sai; a fração fica para a próxima fornada.
     expect(furnace.storedXp).toBeCloseTo(0.4, 5);
@@ -334,9 +334,9 @@ describe('fechar a tela devolve os itens', () => {
   it('a grade de craft não engole itens', () => {
     const h = harness();
     const inv = h.session.inventory;
-    h.session.setScreen('inventory', null);
+    h.session.workbench.setScreen('inventory', null);
     inv.set(CRAFT_START, makeStack(itemId('diamond'), 4));
-    h.session.closeScreen();
+    h.session.workbench.closeScreen();
     expect(inv.countOf(itemId('diamond'))).toBe(4);
     expect(inv.get(CRAFT_START)).toBeNull();
   });
@@ -370,7 +370,7 @@ describe('ataque no criativo', () => {
     const cow = h.session.mobs.spawn(0, 8.5, 64, 8.5 + MOB_AHEAD);
     expect(cow).toBeGreaterThanOrEqual(0);
     const before = h.session.mobs.count;
-    expect(h.session.attackAlong(0, -0.3, 1)).toBe(true);
+    expect(h.session.combat.attackAlong(0, -0.3, 1)).toBe(true);
     expect(h.session.mobs.count).toBe(before - 1);
   });
 
@@ -378,7 +378,7 @@ describe('ataque no criativo', () => {
     const h = setup('survival');
     h.session.mobs.spawn(0, 8.5, 64, 8.5 + MOB_AHEAD);
     const before = h.session.mobs.count;
-    expect(h.session.attackAlong(0, -0.3, 1)).toBe(true);
+    expect(h.session.combat.attackAlong(0, -0.3, 1)).toBe(true);
     expect(h.session.mobs.count).toBe(before);
   });
 });

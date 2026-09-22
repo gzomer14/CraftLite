@@ -122,14 +122,14 @@ describe('escudo', () => {
 
     const before = h.session.survival.health;
     // Empurrão para −Z = o atacante está em +Z, de frente para o jogador.
-    h.session.explodeAt(h.player.x, h.player.y, h.player.z + 2, 2);
+    h.session.combat.explodeAt(h.player.x, h.player.y, h.player.z + 2, 2);
     const blocked = before - h.session.survival.health;
 
     // Mesmo golpe sem escudo machuca mais.
     const bare = harness();
     bare.player.yaw = 0;
     const beforeBare = bare.session.survival.health;
-    bare.session.explodeAt(bare.player.x, bare.player.y, bare.player.z + 2, 2);
+    bare.session.combat.explodeAt(bare.player.x, bare.player.y, bare.player.z + 2, 2);
     const raw = beforeBare - bare.session.survival.health;
 
     expect(blocked).toBeLessThan(raw);
@@ -183,25 +183,25 @@ describe('barco', () => {
 
   it('montar cola o jogador no barco e desmontar o solta', () => {
     const h = harness();
-    h.session.boats.spawn(8.5, GROUND_Y + 1, 8.5);
+    h.session.vehicles.boats.spawn(8.5, GROUND_Y + 1, 8.5);
     h.player.setPosition(8.5, GROUND_Y + 1, 9.0);
 
     expect(h.session.useHeld()).toBe(true);
-    expect(h.session.isRiding).toBe(true);
+    expect(h.session.vehicles.isRiding).toBe(true);
 
     h.session.tick();
-    expect(h.player.x).toBeCloseTo(h.session.boats.x[0], 3);
+    expect(h.player.x).toBeCloseTo(h.session.vehicles.boats.x[0], 3);
 
     expect(h.session.useHeld()).toBe(true);
-    expect(h.session.isRiding).toBe(false);
+    expect(h.session.vehicles.isRiding).toBe(false);
   });
 
   it('não monta num barco distante', () => {
     const h = harness();
-    h.session.boats.spawn(8.5, GROUND_Y + 1, 8.5);
+    h.session.vehicles.boats.spawn(8.5, GROUND_Y + 1, 8.5);
     h.player.setPosition(2.5, GROUND_Y + 1, 2.5);
     h.session.useHeld();
-    expect(h.session.isRiding).toBe(false);
+    expect(h.session.vehicles.isRiding).toBe(false);
   });
 
   it('remover um barco não embaralha os outros', () => {

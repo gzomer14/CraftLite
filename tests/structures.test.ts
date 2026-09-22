@@ -198,3 +198,63 @@ describe('loot de baú', () => {
     expect(rolled).toBe(0);
   });
 });
+
+describe('as estruturas que faltavam no doc 03 §7 (2026-09-22)', () => {
+  // Importadas aqui para não misturar com a varredura de cima.
+  const WATER = BLOCK_BY_NAME.get('water')!.id;
+  const SANDSTONE = BLOCK_BY_NAME.get('sandstone')!.id;
+
+  it('entram no fim da tabela: as antigas não mudam de sal', () => {
+    const names = STRUCTURES.map((s) => s.name);
+    expect(names.slice(0, 4)).toEqual(['dungeon', 'mineshaft', 'village_house', 'village_well']);
+    expect(names).toContain('desert_well');
+    expect(names).toContain('witch_hut');
+    expect(names).toContain('shipwreck');
+  });
+
+  it('cada uma no bioma do doc', () => {
+    expect(structureByName('desert_well')?.placement.biomes).toEqual(['desert']);
+    expect(structureByName('witch_hut')?.placement.biomes).toEqual(['swamp']);
+    expect(structureByName('shipwreck')?.placement.biomes).toEqual(['ocean']);
+  });
+
+  it('o poço do deserto tem água no meio e arenito em volta', async () => {
+    const { stamp } = await import('../src/world/gen/structures');
+    const { ChunkColumn } = await import('../src/world/chunk');
+    const chunk = new ChunkColumn(0, 0);
+    stamp(chunk, 1, structureByName('desert_well')!, 4, 70, 4);
+    expect(blockIdOf(chunk.getBlock(6, 71, 6))).toBe(WATER);
+    expect(blockIdOf(chunk.getBlock(5, 71, 6))).toBe(SANDSTONE);
+    expect(blockIdOf(chunk.getBlock(5, 72, 5))).toBe(SANDSTONE);
+  });
+
+  it('o naufrágio vem com baú marcado para loot', async () => {
+    const { stamp } = await import('../src/world/gen/structures');
+    const { ChunkColumn } = await import('../src/world/chunk');
+    const chunk = new ChunkColumn(0, 0);
+    stamp(chunk, 1, structureByName('shipwreck')!, 2, 40, 2);
+    expect(blockIdOf(chunk.getBlock(9, 41, 3))).toBe(CHEST);
+    expect(chunk.structures.some((m) => m.kind === 'chest' && m.data === 'shipwreck')).toBe(true);
+    expect(CHEST_LOOT.shipwreck.length).toBeGreaterThan(0);
+  });
+
+  it('o naufrágio só assenta com água de verdade em cima', async () => {
+    const { pickY } = await import('../src/world/gen/structures');
+    const def = structureByName('shipwreck')!;
+    const deep = { heightAt: () => 45 } as unknown as Parameters<typeof pickY>[4];
+    const shallow = { heightAt: () => 61 } as unknown as Parameters<typeof pickY>[4];
+    expect(pickY(def, 0, 0, 0, deep)).toBe(46);
+    expect(pickY(def, 0, 0, 0, shallow)).toBe(-1);
+  });
+
+  it('a cabana de bruxa fica sobre estacas', async () => {
+    const { stamp } = await import('../src/world/gen/structures');
+    const { ChunkColumn } = await import('../src/world/chunk');
+    const chunk = new ChunkColumn(0, 0);
+    stamp(chunk, 1, structureByName('witch_hut')!, 4, 64, 4);
+    const log = BLOCK_BY_NAME.get('oak_log')!.id;
+    expect(blockIdOf(chunk.getBlock(4, 62, 4))).toBe(log);
+    expect(blockIdOf(chunk.getBlock(5, 66, 5)), 'piso de tábua acima das estacas')
+      .toBe(BLOCK_BY_NAME.get('spruce_planks')!.id);
+  });
+});

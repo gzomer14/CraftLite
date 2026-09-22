@@ -96,8 +96,8 @@ describe('baú duplo (P6)', () => {
     h.world.setBlock(9, GROUND_Y, 8, chestState, 'player');
 
     expect(useBlockAt(h, 8, GROUND_Y, 8)).toBe(true);
-    expect(h.session.openScreen).toBe('chest');
-    expect(h.session.openContainer?.size).toBe(54);
+    expect(h.session.workbench.openScreen).toBe('chest');
+    expect(h.session.workbench.openContainer?.size).toBe(54);
   });
 
   it('abrir pela direita ou pela esquerda mostra a mesma ordem', () => {
@@ -106,18 +106,18 @@ describe('baú duplo (P6)', () => {
     h.world.setBlock(9, GROUND_Y, 8, chestState, 'player');
 
     useBlockAt(h, 8, GROUND_Y, 8);
-    h.session.openContainer?.set(0, makeStack(ITEM_BY_NAME.get('coal')!.id, 1));
-    h.session.closeScreen();
+    h.session.workbench.openContainer?.set(0, makeStack(ITEM_BY_NAME.get('coal')!.id, 1));
+    h.session.workbench.closeScreen();
 
     useBlockAt(h, 9, GROUND_Y, 8);
-    expect(h.session.openContainer?.get(0)?.item).toBe(ITEM_BY_NAME.get('coal')!.id);
+    expect(h.session.workbench.openContainer?.get(0)?.item).toBe(ITEM_BY_NAME.get('coal')!.id);
   });
 
   it('baú sozinho continua com 27', () => {
     const h = harness();
     h.world.setBlock(8, GROUND_Y, 8, chestState, 'player');
     expect(useBlockAt(h, 8, GROUND_Y, 8)).toBe(true);
-    expect(h.session.openContainer?.size).toBe(27);
+    expect(h.session.workbench.openContainer?.size).toBe(27);
   });
 
   it('quebrar uma metade fecha a tela e dropa só o conteúdo dela', () => {
@@ -127,18 +127,18 @@ describe('baú duplo (P6)', () => {
     useBlockAt(h, 8, GROUND_Y, 8);
 
     const coal = ITEM_BY_NAME.get('coal')!.id;
-    h.session.openContainer?.set(0, makeStack(coal, 4));   // baú da esquerda
-    h.session.openContainer?.set(27, makeStack(coal, 7));  // baú da direita
+    h.session.workbench.openContainer?.set(0, makeStack(coal, 4));   // baú da esquerda
+    h.session.workbench.openContainer?.set(27, makeStack(coal, 7));  // baú da direita
 
     const before = h.session.items.active;
     h.world.setBlock(8, GROUND_Y, 8, AIR, 'player');
     // A sessão só reage pelo `Interaction`; aqui simula-se a quebra direta.
     h.session.interaction.onBlockBroken?.(8, GROUND_Y, 8, chestState);
 
-    expect(h.session.openScreen).toBe('none');
+    expect(h.session.workbench.openScreen).toBe('none');
     expect(h.session.items.active).toBeGreaterThan(before);
     // O outro baú continua existindo com o que era dele.
-    expect(h.session.containerAt(9, GROUND_Y, 8)?.get(0)?.count).toBe(7);
+    expect(h.session.tiles.at(9, GROUND_Y, 8)?.get(0)?.count).toBe(7);
   });
 });
 
@@ -190,7 +190,7 @@ describe('livro de receitas (P5)', () => {
     expect(entry).toBeDefined();
     if (entry === undefined) return;
 
-    expect(h.session.autoFillRecipe(entry)).toBe(true);
+    expect(h.session.workbench.autoFillRecipe(entry)).toBe(true);
     // 4 tábuas saíram da pilha e foram para as 4 células da grade 2×2.
     expect(h.session.inventory.get(0)?.count).toBe(4);
     for (let i = 0; i < 4; i++) {
@@ -206,7 +206,7 @@ describe('livro de receitas (P5)', () => {
       .find((e) => e.resultItem === ITEM_BY_NAME.get('crafting_table')!.id);
     if (entry === undefined) return;
 
-    expect(h.session.autoFillRecipe(entry)).toBe(false);
+    expect(h.session.workbench.autoFillRecipe(entry)).toBe(false);
     for (let i = 0; i < 4; i++) expect(h.session.inventory.get(CRAFT_START + i)).toBeNull();
   });
 
@@ -219,7 +219,7 @@ describe('livro de receitas (P5)', () => {
       .find((e) => e.resultItem === ITEM_BY_NAME.get('iron_block')!.id);
     expect(entry?.width).toBe(3);
     if (entry === undefined) return;
-    expect(h.session.autoFillRecipe(entry)).toBe(false);
+    expect(h.session.workbench.autoFillRecipe(entry)).toBe(false);
     expect(h.session.inventory.get(0)?.count).toBe(9);
   });
 
@@ -229,15 +229,15 @@ describe('livro de receitas (P5)', () => {
     h.session.inventory.set(0, makeStack(iron.id, 9));
     h.world.setBlock(8, GROUND_Y, 8, benchState, 'player');
     useBlockAt(h, 8, GROUND_Y, 8);
-    expect(h.session.openScreen).toBe('crafting');
+    expect(h.session.workbench.openScreen).toBe('crafting');
 
     const entry = h.session.recipes.entries()
       .find((e) => e.resultItem === ITEM_BY_NAME.get('iron_block')!.id);
     if (entry === undefined) return;
 
-    expect(h.session.autoFillRecipe(entry)).toBe(true);
+    expect(h.session.workbench.autoFillRecipe(entry)).toBe(true);
     expect(h.session.inventory.get(0)).toBeNull();
-    expect(h.session.bench.get(4)?.item).toBe(iron.id);
+    expect(h.session.workbench.bench.get(4)?.item).toBe(iron.id);
   });
 });
 

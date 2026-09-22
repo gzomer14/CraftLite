@@ -60,8 +60,11 @@ export const BLOCK_LOOT: Record<string, LootEntry> = {
       { item: 'apple', count: 1, chance: 0.02 },
     ],
   },
-  birch_leaves: { drops: [{ item: 'oak_sapling', count: 1, chance: 0.05 }] },
-  spruce_leaves: { drops: [{ item: 'oak_sapling', count: 1, chance: 0.05 }] },
+  // Cada folha dá a própria muda (2026-09-22). Davam todas muda de carvalho,
+  // e bétula, pinheiro e acácia não se replantavam.
+  birch_leaves: { drops: [{ item: 'birch_sapling', count: 1, chance: 0.05 }] },
+  spruce_leaves: { drops: [{ item: 'spruce_sapling', count: 1, chance: 0.05 }] },
+  acacia_leaves: { drops: [{ item: 'acacia_sapling', count: 1, chance: 0.05 }] },
   tall_grass: { drops: [{ item: 'wheat_seeds', count: 1, chance: 0.125 }] },
   fern: { drops: [{ item: 'wheat_seeds', count: 1, chance: 0.125 }] },
   dead_bush: { drops: [{ item: 'stick', count: [0, 2] }] },

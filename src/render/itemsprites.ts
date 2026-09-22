@@ -14,6 +14,7 @@
  * boot é o que evita 46 canvas vivos por tela.
  */
 
+import { dyeRgbOf } from '../data/tints';
 import { BIOMES } from '../data/biomes';
 import { defOf, makeState, texOf } from '../data/blocks';
 import {
@@ -210,8 +211,10 @@ export function drawBlockIsometric(
   const side = source.texturePixels(texOf(def, 'side'));
   if (top === null && side === null) return;
 
-  const topTint = def.tint === 'grass' ? GRASS_TINT : def.tint === 'foliage' ? FOLIAGE_TINT : null;
-  const sideTint = def.tint === 'foliage' ? FOLIAGE_TINT : null;
+  // Lã das dezesseis cores é um desenho cinza tingido (M13): o sprite pinta igual.
+  const dye = dyeRgbOf(def);
+  const topTint = dye ?? (def.tint === 'grass' ? GRASS_TINT : def.tint === 'foliage' ? FOLIAGE_TINT : null);
+  const sideTint = dye ?? (def.tint === 'foliage' ? FOLIAGE_TINT : null);
   const topPixels = top ?? side;
   const sidePixels = side ?? top;
   if (topPixels === null || sidePixels === null) return;

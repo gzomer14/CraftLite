@@ -25,6 +25,7 @@
  * mão muda — trocar de slot é raro, e o caminho de render não aloca nada.
  */
 
+import { dyeRgbOf } from '../data/tints';
 import {
   createMat4, identity, multiply, perspective, rotateX, rotateY, scaleMat, translate, type Mat4,
 } from '../core/math';
@@ -267,6 +268,8 @@ export class HandRenderer {
   /** Item desenhado agora; `-1` é mão vazia. */
   private held = -2;
   private mode = 2;
+  /** Tint do bloco na mão (lã colorida); branco para o resto. */
+  private readonly tint = new Float32Array([1, 1, 1]);
   private vertexCount = 0;
   private lastAspect = 0;
 
@@ -351,6 +354,11 @@ export class HandRenderer {
       if (blockId !== undefined) {
         this.mode = 0;
         this.vertexCount = buildBlockCube(this.data, this.atlas, blockId);
+        // Lã colorida é o desenho cinza tingido (M13): a mão tinge igual.
+        const dye = dyeRgbOf(defOf(makeState(blockId)));
+        this.tint[0] = dye === null ? 1 : dye[0] / 255;
+        this.tint[1] = dye === null ? 1 : dye[1] / 255;
+        this.tint[2] = dye === null ? 1 : dye[2] / 255;
       } else {
         this.mode = 1;
         const tile = this.sheet.index.get(item);
@@ -442,7 +450,8 @@ export class HandRenderer {
     if (this.mode === 2) {
       gl.uniform4f(this.uniforms.uColor, SKIN[0] * shade, SKIN[1] * shade, SKIN[2] * shade, 1);
     } else {
-      gl.uniform4f(this.uniforms.uColor, shade, shade, shade, 1);
+      const t = this.mode === 0 ? this.tint : NO_TINT;
+      gl.uniform4f(this.uniforms.uColor, shade * t[0], shade * t[1], shade * t[2], 1);
     }
 
     gl.enable(gl.DEPTH_TEST);
@@ -570,3 +579,5 @@ const SPRITE_HALF = 0.75;
  * "objeto fino, mas objeto".
  */
 const SPRITE_THICKNESS = (SPRITE_HALF * 2) * (2 / 16);
+
+const NO_TINT = new Float32Array([1, 1, 1]);

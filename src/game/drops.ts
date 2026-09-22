@@ -61,6 +61,16 @@ export function rollDrops(
     }
   }
 
+  // A tesoura colhe inteiro o que pede tesoura (2026-09-22): folha e
+  // trepadeira saem como bloco, e não como a muda e a maçã do sorteio.
+  if (tool?.kind === 'shears' && def.tool === 'shears') {
+    const self = ITEM_BY_NAME.get(def.name);
+    if (self !== undefined) {
+      OUT.push({ item: self.id, count: 1, damage: 0 });
+      return OUT;
+    }
+  }
+
   const entry = BLOCK_LOOT[def.name];
   if (entry === undefined) {
     // Regra padrão: o bloco vira o item de mesmo id.

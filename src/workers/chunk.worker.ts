@@ -11,6 +11,7 @@ import { buildBlockTables } from '../world/mesh/blockinfo';
 import { GreedyMesher } from '../world/mesh/greedy';
 import { TerrainNoise, generateChunk } from '../world/gen/terrain';
 import { NetherNoise, generateNetherChunk } from '../world/gen/nether';
+import { findSpawnColumn } from '../world/gen/spawnsearch';
 import { DIM_NETHER } from '../data/dimensions';
 import type { ChunkSection } from '../world/chunk';
 import {
@@ -47,6 +48,12 @@ self.onmessage = (event: MessageEvent<WorkerRequest>): void => {
     case 'mesh':
       reply(handleMesh(message.cx, message.cz, message.sy, message.blocks, message.light));
       break;
+    case 'spawn': {
+      if (noise === null) noise = new TerrainNoise(seed);
+      const [x, z] = findSpawnColumn(noise.field);
+      reply({ type: 'spawn', x, z });
+      break;
+    }
   }
 };
 

@@ -17,11 +17,11 @@ function unpack0(w: number) {
 }
 function unpack1(w: number) {
   return {
-    layer: w & 1023,
-    blockLight: (w >>> 10) & 15,
-    skyLight: (w >>> 14) & 15,
-    ao: (w >>> 18) & 3,
-    tint: (w >>> 20) & 3,
+    layer: w & 255,
+    blockLight: (w >>> 8) & 15,
+    skyLight: (w >>> 12) & 15,
+    ao: (w >>> 16) & 3,
+    tint: (w >>> 18) & 15,
     u: (w >>> 22) & 31,
     v: (w >>> 27) & 31,
   };
@@ -62,10 +62,24 @@ describe('formato de vértice', () => {
   });
 
   it('ida e volta da palavra 1 com todos os campos no máximo', () => {
-    const u = unpack1(packWord1(1023, 15, 15, 3, 3, 31, 31));
+    const u = unpack1(packWord1(255, 15, 15, 3, 15, 31, 31));
     expect(u).toEqual({
-      layer: 1023, blockLight: 15, skyLight: 15, ao: 3, tint: 3, u: 31, v: 31,
+      layer: 255, blockLight: 15, skyLight: 15, ao: 3, tint: 15, u: 31, v: 31,
     });
+  });
+
+  /*
+   * M13 (2026-09-22): o tint tem 6 bits — 4 na palavra 1, 2 no topo da
+   * palavra 0 —, para caber grama, folha, água e os dezesseis corantes.
+   */
+  it('o tint de 6 bits se divide entre as duas palavras e volta inteiro', () => {
+    for (const tint of [0, 3, 4, 19, 63]) {
+      const w0 = packWord0(1, 2, 3, 4, tint);
+      const w1 = packWord1(7, 1, 2, 3, tint, 4, 5);
+      const back = ((w1 >>> 18) & 15) | (((w0 >>> 30) & 3) << 4);
+      expect(back).toBe(tint);
+      expect(unpack0(w0)).toEqual(unpack0(packWord0(1, 2, 3, 4)));
+    }
   });
 
   it('campos não vazam um no outro', () => {

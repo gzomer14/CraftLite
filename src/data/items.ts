@@ -8,7 +8,8 @@
  */
 
 import { BLOCK_BY_NAME, BLOCKS, type ToolKind } from './blocks';
-import { DYES } from './dyes';
+import { DYES, LEGACY_DYE_COUNT } from './dyes';
+import type { FoodEffect } from './effects';
 
 /** Id de bloco por nome, para os itens que colocam um bloco de outro nome. */
 function blockIdByName(name: string): number {
@@ -36,6 +37,10 @@ export interface FoodSpec {
   saturation: number;
   /** Ticks segurando o botão para comer. 32 = 1,6 s. */
   eatTicks: number;
+  /** Efeitos ao terminar de comer (doc 05 §4: carne podre, maçã dourada). */
+  effects?: readonly FoodEffect[];
+  /** Come mesmo de barriga cheia — a maçã dourada é remédio, não comida. */
+  alwaysEdible?: boolean;
 }
 
 /** Item que se usa segurando o botão (doc 05 §1). */
@@ -73,7 +78,32 @@ export interface ItemDef {
   placesMinecart?: boolean;
   /** Acende portal de obsidiana ao ser usado (isqueiro, M7). */
   lights?: boolean;
+  /**
+   * O que sobra na mão depois de gastar o item: a tigela do ensopado, o balde
+   * do balde de leite (2026-09-22). Vale para comer, para queimar na fornalha
+   * e para a receita que o consome.
+   */
+  remainder?: string;
+  /**
+   * O que o item faz ao ser usado, quando não se deduz dos outros campos
+   * (2026-09-22). O comportamento mora em `game/itemuse.ts`, indexado por este
+   * nome; a tabela só diz qual.
+   */
+  use?: ItemUse;
+  /**
+   * Todos os usos do item, **em ordem de tentativa**: o declarado em `use` e os
+   * que saem dos outros campos (`food` come, `charge` segura, `placesBoat`
+   * põe barco…). Derivado no fim desta tabela — é o que `game/itemuse.ts` lê.
+   * A cenoura, que planta **e** se come, é `['plant', 'eat']`.
+   */
+  uses: readonly ItemUse[];
 }
+
+/** Ações de uso de item que `game/itemuse.ts` sabe executar. */
+export type ItemUse =
+  | 'fill_bucket' | 'pour_water' | 'pour_lava' | 'drink_milk' | 'shears' | 'throw_egg'
+  | 'throw_snowball' | 'dye_sheep' | 'eat' | 'charge' | 'place_boat' | 'place_minecart'
+  | 'ignite' | 'till' | 'plant';
 
 /**
  * Materiais de ferramenta (doc 05 §2).
@@ -110,7 +140,8 @@ export const ITEM_ID_BASE = 1024;
 
 const items: ItemDef[] = [];
 
-function register(def: ItemDef): void {
+function register(input: Omit<ItemDef, 'uses'>): void {
+  const def: ItemDef = { ...input, uses: [] };
   if (items[def.id] !== undefined) {
     throw new Error(`Id de item duplicado: ${def.id} (${def.name})`);
   }
@@ -131,6 +162,7 @@ for (const block of BLOCKS) {
     tex,
     maxStack: 64,
     placesBlock: block.id,
+    ...(block.fuel > 0 ? { fuel: block.fuel } : {}),
   });
 }
 
@@ -170,6 +202,8 @@ interface SimpleItem {
   fuel?: number;
   /** Nome do bloco que o item coloca, quando não é o bloco de mesmo nome. */
   places?: string;
+  /** Ação de uso (`game/itemuse.ts`). */
+  use?: ItemUse;
 }
 
 const SIMPLE_ITEMS: SimpleItem[] = [
@@ -192,15 +226,15 @@ const SIMPLE_ITEMS: SimpleItem[] = [
   { name: 'clay_ball', display: 'Bola de Argila' },
   { name: 'brick', display: 'Tijolo' },
   { name: 'glowstone_dust', display: 'Pó de Pedra Luminosa' },
-  { name: 'snowball', display: 'Bola de Neve', maxStack: 16 },
+  { name: 'snowball', display: 'Bola de Neve', maxStack: 16, use: 'throw_snowball' },
   // vegetais e derivados
   { name: 'stick', display: 'Graveto', fuel: 100 },
   { name: 'bowl', display: 'Tigela' },
-  { name: 'bucket', display: 'Balde', maxStack: 1 },
+  { name: 'bucket', display: 'Balde', maxStack: 1, use: 'fill_bucket' },
   { name: 'paper', display: 'Papel' },
   { name: 'book', display: 'Livro' },
   { name: 'wheat', display: 'Trigo' },
-  { name: 'wheat_seeds', display: 'Sementes de Trigo' },
+  { name: 'wheat_seeds', display: 'Sementes de Trigo', use: 'plant' },
   { name: 'string', display: 'Linha' },
   { name: 'feather', display: 'Pena' },
   { name: 'leather', display: 'Couro' },
@@ -212,12 +246,26 @@ const SIMPLE_ITEMS: SimpleItem[] = [
   { name: 'cooked_beef', display: 'Bife', food: { hunger: 8, saturation: 12.8, eatTicks: 32 } },
   { name: 'porkchop', display: 'Porco Cru', food: { hunger: 3, saturation: 1.8, eatTicks: 32 } },
   { name: 'cooked_porkchop', display: 'Porco Assado', food: { hunger: 8, saturation: 12.8, eatTicks: 32 } },
-  { name: 'chicken', display: 'Frango Cru', food: { hunger: 2, saturation: 1.2, eatTicks: 32 } },
+  {
+    name: 'chicken', display: 'Frango Cru',
+    food: {
+      hunger: 2, saturation: 1.2, eatTicks: 32,
+      effects: [{ effect: 'hunger', level: 1, seconds: 30, chance: 0.3 }],
+    },
+  },
   { name: 'cooked_chicken', display: 'Frango Assado', food: { hunger: 6, saturation: 7.2, eatTicks: 32 } },
   { name: 'mutton', display: 'Carneiro Cru', food: { hunger: 2, saturation: 1.2, eatTicks: 32 } },
   { name: 'cooked_mutton', display: 'Carneiro Assado', food: { hunger: 6, saturation: 9.6, eatTicks: 32 } },
   { name: 'melon_slice', display: 'Fatia de Melancia', food: { hunger: 2, saturation: 1.2, eatTicks: 32 } },
-  { name: 'rotten_flesh', display: 'Carne Podre', food: { hunger: 4, saturation: 0.8, eatTicks: 32 } },
+  // Doc 05 §4: carne podre dá Fome em 80% das vezes, frango cru em 30% (os
+  // efeitos só passaram a existir em 2026-09-22).
+  {
+    name: 'rotten_flesh', display: 'Carne Podre',
+    food: {
+      hunger: 4, saturation: 0.8, eatTicks: 32,
+      effects: [{ effect: 'hunger', level: 1, seconds: 30, chance: 0.8 }],
+    },
+  },
   // --- drops de mob (M5). Apêndice: os ids acima não podem se mover. ------
   { name: 'bone', display: 'Osso' },
   { name: 'arrow', display: 'Flecha' },
@@ -226,7 +274,11 @@ const SIMPLE_ITEMS: SimpleItem[] = [
   { name: 'spider_eye', display: 'Olho de Aranha', food: { hunger: 2, saturation: 3.2, eatTicks: 32 } },
   { name: 'ender_pearl', display: 'Pérola do Fim', maxStack: 16 },
   // --- corantes (M8). Gerados da tabela de cores, no fim para não mover id. -
-  ...DYES.map((dye) => ({ name: `${dye.name}_dye`, display: `Corante ${dye.display}` })),
+  // Só as oito do M8 aqui: as do M13 entram no fim da tabela, senão o id de
+  // todo item registrado depois desta lista mudaria.
+  ...DYES.slice(0, LEGACY_DYE_COUNT).map((dye) => ({
+    name: `${dye.name}_dye`, display: `Corante ${dye.display}`, use: 'dye_sheep' as const,
+  })),
 ];
 
 for (const item of SIMPLE_ITEMS) {
@@ -239,6 +291,7 @@ for (const item of SIMPLE_ITEMS) {
     ...(item.food !== undefined ? { food: item.food } : {}),
     ...(item.fuel !== undefined ? { fuel: item.fuel } : {}),
     ...(item.places !== undefined ? { placesBlock: blockIdByName(item.places) } : {}),
+    ...(item.use !== undefined ? { use: item.use } : {}),
   });
 }
 
@@ -307,8 +360,8 @@ for (const material of TOOL_MATERIALS) {
 }
 
 const FARM_ITEMS: SimpleItem[] = [
-  { name: 'carrot', display: 'Cenoura', food: { hunger: 3, saturation: 3.6, eatTicks: 32 } },
-  { name: 'potato', display: 'Batata', food: { hunger: 1, saturation: 0.6, eatTicks: 32 } },
+  { name: 'carrot', display: 'Cenoura', food: { hunger: 3, saturation: 3.6, eatTicks: 32 }, use: 'plant' },
+  { name: 'potato', display: 'Batata', food: { hunger: 1, saturation: 0.6, eatTicks: 32 }, use: 'plant' },
   { name: 'baked_potato', display: 'Batata Assada', food: { hunger: 5, saturation: 6.0, eatTicks: 32 } },
 ];
 
@@ -359,6 +412,7 @@ for (const item of FARM_ITEMS) {
     tex: `item/${item.name}`,
     maxStack: 64,
     ...(item.food !== undefined ? { food: item.food } : {}),
+    ...(item.use !== undefined ? { use: item.use } : {}),
   });
 }
 
@@ -401,6 +455,95 @@ register({
   durability: 64,
   lights: true,
 });
+
+// --- apêndice de 2026-09-22: o que os docs 05 e 07 pediam e não existia -----
+// No fim, como todo apêndice. `use` aponta para `game/itemuse.ts`.
+
+interface AppendixItem {
+  name: string; display: string; maxStack?: number; food?: FoodSpec; remainder?: string;
+  use?: ItemUse; fuel?: number;
+}
+
+for (const item of [
+  {
+    name: 'golden_apple', display: 'Maçã Dourada',
+    food: {
+      hunger: 4, saturation: 9.6, eatTicks: 32, alwaysEdible: true,
+      effects: [
+        { effect: 'regeneration', level: 2, seconds: 5 },
+        { effect: 'absorption', level: 1, seconds: 120 },
+      ],
+    },
+  },
+  {
+    name: 'mushroom_stew', display: 'Ensopado de Cogumelo', maxStack: 1, remainder: 'bowl',
+    food: { hunger: 6, saturation: 7.2, eatTicks: 32 },
+  },
+  { name: 'cookie', display: 'Biscoito', food: { hunger: 2, saturation: 0.4, eatTicks: 16 } },
+  { name: 'sugar', display: 'Açúcar' },
+  { name: 'egg', display: 'Ovo', maxStack: 16, use: 'throw_egg' },
+  { name: 'water_bucket', display: 'Balde de Água', maxStack: 1, remainder: 'bucket', use: 'pour_water' },
+  {
+    name: 'lava_bucket', display: 'Balde de Lava', maxStack: 1, remainder: 'bucket',
+    use: 'pour_lava', fuel: 20000,
+  },
+  { name: 'milk_bucket', display: 'Balde de Leite', maxStack: 1, remainder: 'bucket', use: 'drink_milk' },
+] satisfies AppendixItem[]) {
+  register({
+    id: nextId++,
+    name: item.name,
+    display: item.display,
+    tex: `item/${item.name}`,
+    maxStack: item.maxStack ?? 64,
+    ...(item.food !== undefined ? { food: item.food } : {}),
+    ...(item.remainder !== undefined ? { remainder: item.remainder } : {}),
+    ...(item.use !== undefined ? { use: item.use } : {}),
+    ...(item.fuel !== undefined ? { fuel: item.fuel } : {}),
+  });
+}
+
+/**
+ * Tesoura (doc 05 §6.3). O tipo de ferramenta `shears` existia desde o M1 —
+ * folha e lã o pedem — e o item não: a folha só saía na mão, lenta, e a lã
+ * só saía matando a ovelha.
+ */
+register({
+  id: nextId++,
+  name: 'shears',
+  display: 'Tesoura',
+  tex: 'item/shears',
+  maxStack: 1,
+  durability: 238,
+  tool: { kind: 'shears', tier: 1, speed: 5 },
+  use: 'shears',
+});
+
+// --- apêndice do M13: os oito corantes novos, no fim da fila de ids --------
+for (const dye of DYES.slice(LEGACY_DYE_COUNT)) {
+  register({
+    id: nextId++, name: `${dye.name}_dye`, display: `Corante ${dye.display}`,
+    tex: `item/${dye.name}_dye`, maxStack: 64, use: 'dye_sheep',
+  });
+}
+
+/**
+ * Usos de cada item, em ordem de tentativa (ver `ItemDef.uses`).
+ *
+ * O declarado vem primeiro: a cenoura tenta plantar antes de comer, porque
+ * mirando terra arada é plantar que se quer. Depois, o que os campos dizem.
+ */
+for (const def of items) {
+  if (def === undefined) continue;
+  const uses: ItemUse[] = [];
+  if (def.use !== undefined) uses.push(def.use);
+  if (def.tool?.kind === 'hoe') uses.push('till');
+  if (def.placesMinecart === true) uses.push('place_minecart');
+  if (def.placesBoat === true) uses.push('place_boat');
+  if (def.charge !== undefined) uses.push('charge');
+  if (def.lights === true) uses.push('ignite');
+  if (def.food !== undefined) uses.push('eat');
+  def.uses = uses;
+}
 
 export const ITEMS: readonly (ItemDef | undefined)[] = items;
 

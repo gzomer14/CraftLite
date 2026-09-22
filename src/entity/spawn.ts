@@ -15,6 +15,7 @@
  * um lugar para sair de sincronia com `core/tier.ts`.
  */
 
+import { spawnVariant } from './husbandry';
 import { BIOMES } from '../data/biomes';
 import { DIM_OVERWORLD } from '../data/dimensions';
 import { defOf } from '../data/blocks';
@@ -290,7 +291,9 @@ export class MobSpawner {
         const z = baseZ + this.randomInt(-5, 5);
         const y = baseY + (attempt === 0 ? 0 : this.randomInt(-2, 2));
         if (!this.isValidSpot(rule, def.height, x, y, z, playerX, playerZ)) continue;
-        const variant = def.traits.splitsOnDeath === true ? this.randomInt(1, 3) : 0;
+        const variant = def.traits.splitsOnDeath === true
+          ? this.randomInt(1, 3)
+          : spawnVariant(def, this.random);
         if (this.mobs.spawn(typeId, x + 0.5, y, z + 0.5, variant) < 0) return spawned;
         spawned++;
         break;

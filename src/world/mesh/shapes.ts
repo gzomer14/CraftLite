@@ -50,6 +50,10 @@ export const SHAPE_TORCH = 21;
 export const SHAPE_BED = 22;
 /** Caixa com tampa e tranca: o baú (doc 04 §3). */
 export const SHAPE_CHEST = 23;
+/** Bolo (2026-09-22): as fatias comidas, 0..6, nos bits 0..2 do estado. */
+export const SHAPE_CAKE = 24;
+/** Fatias que o bolo tem; comer a última some com ele. */
+export const CAKE_SLICES = 7;
 
 /**
  * Formas de trilho nos bits 0..3 do estado (M7), na codificação do gênero.
@@ -127,6 +131,7 @@ export const SHAPE_BY_NAME: Readonly<Record<string, number>> = {
   torch: SHAPE_TORCH,
   bed: SHAPE_BED,
   chest: SHAPE_CHEST,
+  cake: SHAPE_CAKE,
   slab: SHAPE_SLAB,
   carpet: SHAPE_CARPET,
   flat: SHAPE_FLAT,
@@ -262,6 +267,9 @@ export function boxesFor(
       return bed(state, out);
     case SHAPE_CHEST:
       return chest(out);
+    case SHAPE_CAKE:
+      // Cada fatia comida recua a face −X em 2/16, como no gênero.
+      return one(out, 0, (1 + 2 * Math.min(state & 7, CAKE_SLICES - 1)) / 16, 0, 1 / 16, 15 / 16, 8 / 16, 15 / 16);
     case SHAPE_RAIL:
       // O desenho é um quad só (ver `mesh/complex.ts`); a caixa existe para
       // quem pergunta pela forma — hoje ninguém, porque trilho não colide.

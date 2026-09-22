@@ -30,6 +30,12 @@ export const FLAG_NO_GRAVITY = 1;
 export const FLAG_EXPLOSIVE = 2;
 /** A bola de fogo do ghast: voa reto e explode onde parar. */
 export const FIREBALL_FLAGS = FLAG_NO_GRAVITY | FLAG_EXPLOSIVE;
+/**
+ * Ovo (2026-09-22): quebra ao parar, e quem ouve `onEgg` sorteia o pintinho.
+ * Ovo e bola de neve são projéteis **com item** — desenhados com o sprite do
+ * item, não com o modelo da flecha.
+ */
+export const FLAG_EGG = 4;
 
 export class Projectiles {
   private readonly x: Float64Array;
@@ -46,6 +52,8 @@ export class Projectiles {
   private readonly fromPlayer: Uint8Array;
   /** Bandeiras: bit 0 = sem gravidade, bit 1 = explode ao parar. */
   private readonly flags: Uint8Array;
+  /** Item arremessado (ovo, bola de neve); 0 = flecha ou bola de fogo. */
+  private readonly item: Uint16Array;
   private readonly capacity: number;
   private count = 0;
 
@@ -54,6 +62,8 @@ export class Projectiles {
   onImpactSound: ((x: number, y: number, z: number) => void) | null = null;
   /** Um projétil explosivo parou: quem ouve detona (bola de fogo do ghast). */
   onExplode: ((x: number, y: number, z: number) => void) | null = null;
+  /** Um ovo quebrou: quem ouve sorteia o pintinho. */
+  onEgg: ((x: number, y: number, z: number) => void) | null = null;
 
   constructor(capacity = 64) {
     this.capacity = capacity;
@@ -70,6 +80,7 @@ export class Projectiles {
     this.age = new Int32Array(capacity);
     this.fromPlayer = new Uint8Array(capacity);
     this.flags = new Uint8Array(capacity);
+    this.item = new Uint16Array(capacity);
   }
 
   get active(): number {
@@ -80,7 +91,7 @@ export class Projectiles {
   spawn(
     x: number, y: number, z: number,
     dx: number, dy: number, dz: number,
-    damage: number, fromPlayer = false, speed = 1.2, flags = 0,
+    damage: number, fromPlayer = false, speed = 1.2, flags = 0, item = 0,
   ): boolean {
     if (this.count >= this.capacity) return false;
     const i = this.count++;
@@ -93,6 +104,7 @@ export class Projectiles {
     this.age[i] = 0;
     this.fromPlayer[i] = fromPlayer ? 1 : 0;
     this.flags[i] = flags;
+    this.item[i] = item;
     return true;
   }
 
@@ -155,17 +167,19 @@ export class Projectiles {
     this.age[i] = this.age[last];
     this.fromPlayer[i] = this.fromPlayer[last];
     this.flags[i] = this.flags[last];
+    this.item[i] = this.item[last];
   }
 
   /** Explode, se for explosivo. Chamado em todo fim de trajetória. */
   private detonate(i: number): void {
+    if ((this.flags[i] & FLAG_EGG) !== 0) this.onEgg?.(this.x[i], this.y[i], this.z[i]);
     if ((this.flags[i] & FLAG_EXPLOSIVE) === 0) return;
     this.onExplode?.(this.x[i], this.y[i], this.z[i]);
   }
 
   /** Percorre as flechas ativas para o render, sem alocar. */
   forEach(
-    fn: (x: number, y: number, z: number, vx: number, vy: number, vz: number) => void,
+    fn: (x: number, y: number, z: number, vx: number, vy: number, vz: number, item: number) => void,
     alpha = 1,
   ): void {
     for (let i = 0; i < this.count; i++) {
@@ -173,7 +187,7 @@ export class Projectiles {
         this.prevX[i] + (this.x[i] - this.prevX[i]) * alpha,
         this.prevY[i] + (this.y[i] - this.prevY[i]) * alpha,
         this.prevZ[i] + (this.z[i] - this.prevZ[i]) * alpha,
-        this.vx[i], this.vy[i], this.vz[i],
+        this.vx[i], this.vy[i], this.vz[i], this.item[i],
       );
     }
   }

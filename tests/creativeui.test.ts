@@ -198,7 +198,7 @@ describe('toda tela de container fecha sem teclado', () => {
   });
 
   it('o botão é alvo de toque de 44 px, como manda o doc 09', () => {
-    const source = readFileSync('src/ui/containers/screen.ts', 'utf8').replace(/\s+/g, '');
+    const source = (readFileSync('src/ui/containers/screen.ts', 'utf8') + readFileSync('src/ui/containers/screenstyle.ts', 'utf8')).replace(/\s+/g, '');
     expect(source).toContain('#container-screen.close{flex:1;min-height:44px');
   });
 });
@@ -289,7 +289,7 @@ describe('a mochila mostra armadura e mão secundária', () => {
  * inalcançável.
  */
 describe('CSS de rolagem das janelas', () => {
-  const screenSrc = readFileSync('src/ui/containers/screen.ts', 'utf8');
+  const screenSrc = (readFileSync('src/ui/containers/screen.ts', 'utf8') + readFileSync('src/ui/containers/screenstyle.ts', 'utf8'));
   const creativeSrc = readFileSync('src/ui/containers/creative.ts', 'utf8');
 
   /** Só o bloco de regra do seletor raiz, sem os filhos. */

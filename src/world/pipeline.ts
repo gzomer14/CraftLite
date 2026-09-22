@@ -439,7 +439,26 @@ export class ChunkPipeline {
     if (this.inFlight[best] > 0) this.inFlight[best]--;
 
     if (response.type === 'gen') this.onGenerated(response);
-    else this.onMeshed(response);
+    else if (response.type === 'mesh') this.onMeshed(response);
+    else this.onSpawnFound(response.x, response.z);
+  }
+
+  /** Pedidos de ponto de nascimento esperando resposta do worker. */
+  private readonly spawnWaiters: ((column: [number, number]) => void)[] = [];
+
+  /**
+   * Coluna em terra firme para o jogador nascer num mundo novo
+   * (`world/gen/spawnsearch.ts`). Quem sabe o terreno é o worker.
+   */
+  findSpawn(): Promise<[number, number]> {
+    return new Promise((resolve) => {
+      this.spawnWaiters.push(resolve);
+      this.send({ type: 'spawn' });
+    });
+  }
+
+  private onSpawnFound(x: number, z: number): void {
+    this.spawnWaiters.shift()?.([x, z]);
   }
 
   private onGenerated(response: GenResponse): void {

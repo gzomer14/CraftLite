@@ -63,9 +63,12 @@ describe('lã, corante e cama coloridas', () => {
       expect(BLOCK_BY_NAME.get(bed), bed).toBeDefined();
       expect(BLOCK_BY_NAME.get(`${bed}_head`), `${bed}_head`).toBeDefined();
       expect(ITEM_BY_NAME.get(`${dye.name}_dye`), `${dye.name}_dye`).toBeDefined();
-      expect(TEXTURES[`block/wool_${dye.name}`] ?? TEXTURES['block/wool_white']).toBeDefined();
+      // M13: a cor é tint sobre um desenho só (`data/tints.ts`).
+      expect(BLOCK_BY_NAME.get(wool)?.dye, wool).toBe(dye.name);
+      expect(BLOCK_BY_NAME.get(bed)?.dye, bed).toBe(dye.name);
+      expect(TEXTURES['block/wool_white']).toBeDefined();
       for (const part of ['top', 'foot_top', 'side']) {
-        expect(TEXTURES[`block/bed_${dye.name}_${part}`], `bed_${dye.name}_${part}`).toBeDefined();
+        expect(TEXTURES[`block/bed_${part}`], `bed_${part}`).toBeDefined();
       }
     }
   });

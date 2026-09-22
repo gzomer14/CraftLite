@@ -9,8 +9,9 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-17 12:21 — **M8 fechado e validado em aparelho; a placa ganhou uma
-tábua que se lê e um campo de texto só**
+**Última atualização:** 2026-09-22 19:28 — **M13 fechado: `session.ts` 2042 → 697 e `main.ts`
+1411 → 682 linhas, uso de item como dado, e lã e cama em 16 cores por tint (atlas de 222 para 194
+camadas)**
 
 ---
 
@@ -38,6 +39,15 @@ tábua que se lê e um campo de texto só**
 | **M8** Presença dos objetos | vértice em 1/16 de bloco, tocha de verdade, porta e cama de duas células, item na mão com volume, contorno do tamanho da forma, vidro visível, escada que escala, baú e fornalha acesa, placa com texto, quadro com arte, oito cores de lã e cama, tampa de baú que abre | ✅ **validado em campo em 2026-09-17** | — |
 | **Terreno** pós-M8 | blend 5×5 do `heightOffset` de bioma e teto macio: a parede de 29 blocos entre montanha e planície virou encosta, e o platô chapado em Y=124 virou cordilheira | ✅ **validado em campo** | muda o terreno gerado: **mundo antigo ganha costura** (ver §4) |
 | **Placa, 2ª passada** | tábua lisa e clara no lugar da tábua de carvalho com rabisco, e um campo de texto só com quebra de linha interpretada | ✅ concluído | — |
+| **M9** Gente no mundo | aldeão com rotina e troca, aldeia de verdade, golem, reputação | ⬜ proposto (2026-09-16) | — |
+| **M10** Saber onde se está | bússola, relógio, mapa, marcador, estatísticas, espectador | ⬜ proposto (2026-09-16) | — |
+| **M11** O que os documentos já pediam | areia que cai, pedregulho de lava, balde, tesoura, ovelha colorida, planta que cresce, efeitos de status, comidas e estruturas que faltavam, nascimento em terra firme, smoke test | ✅ concluído em 2026-09-22 | **nada visto em aparelho ainda** (§6) |
+| **M12** O mundo chega antes do jogador | culling por conectividade e por direção de face, cópia de vizinhança fora da thread principal, luz na borda do chunk | ⬜ proposto (2026-09-22) | — |
+| **M13** Casa em ordem | uso de item como dado, `session.ts` e `main.ts` abaixo de 700 linhas, lã e cama em 16 cores por tint | ✅ concluído em 2026-09-22 | **cores novas não vistas em aparelho** (§6) |
+| **M14** Água e paisagem | visão submersa, rios, pesca, afogado, lua com fases, biomas por tint, selva | ⬜ proposto (2026-09-22) | — |
+| **M15** Oficina | bigorna, reparo na grade, funil, dispensador, comparador, observador | ⬜ proposto (2026-09-22) | — |
+| **M16** Um fim para a jornada | fortaleza do Nether, blaze, poções, olho do ender, End, dragão, créditos | ⬜ proposto (2026-09-22) | depende de M11 (efeitos) e M13 (atlas) |
+| **M17** Alcance | menu Idioma (doc 08 §3.11) com `en`, primeira hora guiada, seed compartilhável | ⬜ proposto (2026-09-22) | — |
 
 **O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
 ele irá pesar muito o jogo e trazer muita complexidade por enquanto desnecessária"*. O
@@ -50,16 +60,17 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-17 12:21, com `npm test`, `npm run build` e
-`SIZE_BUDGET_KB=350 npm run size`.
+Medidas em 2026-09-22 19:28, ao fechar o M13, com `npm test`, `npm run build`,
+`SIZE_BUDGET_KB=350 npm run size` e `npm run smoke`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **208,8 KB** (eram 200,9 antes da fonte, dos quadros e das oito cores) | < 350 KB | `npm run size` |
-| Testes | **1823**, 89 arquivos | manter verde | `npm test` |
-| Camadas de atlas | **212** (eram 181; +28 de lã e cama coloridas, +3 de quadro) | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
-| Memória de áudio | **3,26 MB** (era 3,95 com três sons a menos) | < 3,5 MB | `tests/audio.test.ts` |
-| Geração de chunk | **6,2 ms** (mediana; o blend de bioma custou ~0,2 ms) | < 25 ms | `tests/perf.test.ts` |
+| Bundle (gzip, tudo) | **226,1 KB** (221,3 no M11; 208,8 antes dele) | < 350 KB | `npm run size` |
+| Testes | **1975**, 97 arquivos (1930 no M11; 1823 antes dele) | manter verde | `npm test` |
+| Smoke test de navegador | **7 passos verdes**: carregar, criar, andar 10 s, quebrar, salvar, recarregar, conferir | verde | `npm run smoke` |
+| Camadas de atlas | **194** com 16 cores de lã e cama (222 no M11 com 8 cores; lã e cama viraram tint no M13) | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
+| Memória de áudio | **3,33 MB** (era 3,26; +3 sons curtos de balde e arremesso) | < 3,5 MB | `tests/audio.test.ts` |
+| Geração de chunk | **6,2 ms** (mediana; os cogumelos não mexeram no número) | < 25 ms | `tests/perf.test.ts` |
 | Geração de chunk do Nether | 5,1 ms (mediana; 3,8 antes de a luz entrar) | < 25 ms | `tests/perf.test.ts` |
 | Meshing de section | 0,64 ms (mediana) | < 8 ms | `tests/perf.test.ts` |
 | Meshing de um piso de 256 tochas | **1,10 ms** (o pior caso construível da forma nova) | < 2 ms | `tests/perf.test.ts` |
@@ -1378,6 +1389,85 @@ costura. Não há migração possível — o terreno é função da seed, e a fu
 
 ---
 
+### Avaliação completa e M11–M17 ⬜ — 2026-09-22
+
+Leitura do código inteiro contra os docs normativos, sem mexer em código. Três resultados:
+
+1. **Dívida normativa que o documento negava** — 13 itens, com arquivo e linha, na tabela do §5.
+   Viraram o **M11**.
+2. **Performance de carregamento, não de quadro.** Frustum é o único culling de terreno
+   (`render/chunkrenderer.ts:150`); o culling por conectividade de sections do PROMPT.md §4.2 não
+   existe; a cópia 18³ da vizinhança custa ~0,26 ms por section na thread principal
+   (`world/pipeline.ts:87`); a luz gerada para na borda do chunk (`world/gen/terrain.ts:514`).
+   Viraram o **M12**.
+3. **O que encarece o próximo conteúdo**: `Session.useHeld` com onze `try*`, três módulos acima
+   de 1100 linhas contra o teto de ~400 do CLAUDE.md, e 44 camadas de atlas livres. O vértice tem
+   2 bits livres na palavra 0, o que abre um tint de corante e devolve camadas. Viraram o **M13**.
+
+M14 a M17 são conteúdo e alcance novos: água e paisagem, oficina, um fim para a jornada (End e
+dragão) e idioma. Nenhum foi iniciado. Portões reconfirmados verdes: 1823 testes, lint limpo,
+build, 208,8 KB de 350.
+
+### M11 — O que os documentos já pediam ✅ — 2026-09-22
+
+Os 13 itens da tabela do §5, todos com teste. O que vale registrar além do checklist do doc 14:
+
+**Quatro achados que a avaliação não tinha visto**, todos corrigidos no marco (§4):
+
+1. **Nenhuma planta crescia fora da roça.** A muda nunca virava árvore — a única receita de árvore
+   do jogo escrevia direto no chunk durante a geração —, cana e cacto ficavam do tamanho em que
+   nasceram, a grama não voltava a um caminho pisado e uma flor boiava sobre o buraco onde antes
+   havia terra. Somado, **madeira não era renovável**. A forma das árvores saiu para
+   `world/trees.ts`, com um escritor por caminho (chunk na geração, `world.setBlock` no
+   crescimento), e o código foi movido **sem mudar um sorteio**: o terreno gerado continua o
+   mesmo. A grama se espalha por **registro de eventos**, não por varredura: só entra no registro
+   a terra que o jogador expôs perto de grama.
+2. **Nenhum bloco queimava.** O item de bloco é derivado da tabela de blocos, que não tinha coluna
+   de combustível; tábua, tronco e muda — os primeiros combustíveis que o jogador tem — não
+   entravam na fornalha.
+3. **A água apagava a lava.** Os dois fluidos são `replaceable`, e a água, que atualiza a cada
+   5 ticks contra 30 da lava, sobrescrevia a lava por onde passava — sem obsidiana, sem
+   pedregulho. `world/fluids.ts` não tinha teste nenhum.
+4. **O jogador nascia no mar.** Achado pelo smoke test no primeiro mundo que ele criou: o
+   nascimento era sempre a coluna (0, 0). O worker agora procura terra firme em anéis de 16 blocos
+   até 512 (`world/gen/spawnsearch.ts`); o resultado fica no meta do mundo (`spawnFound`), e o
+   renascimento usa o mesmo ponto. Mundo antigo não muda.
+
+**Desvios conscientes, escritos no comentário do módulo:**
+
+- **biscoito** leva açúcar no lugar do cacau (não há selva nem cacau; `data/recipes.ts`);
+- **leite** se bebe no clique, sem os 1,6 s do gênero (`game/itemuse.ts`);
+- **folha de acácia** é um id novo com o desenho da de carvalho: as duas são cinza tingido pelo
+  bioma, e o id só existe para dar a muda certa — zero camada de atlas;
+- **cabana de bruxa** sem bruxa (a bruxa é do M14).
+
+**O que o M11 adiantou do M13:** o registro de uso de item (`game/itemuse.ts`) nasceu aqui, porque
+balde, tesoura, ovo, leite e corante precisavam dele. Os onze `try*` antigos da `Session` ainda não
+migraram.
+
+**O que ninguém viu ainda, em ordem de quanto pode estar errado** (§6, item 0).
+
+### M13 — Casa em ordem ✅ — 2026-09-22
+
+Refatoração sem mudança de jogo, exceto as cores. O que vale registrar:
+
+- **A `Session` virou orquestradora.** Veículos, contêineres, a tela aberta, combate, clique em
+  bloco, geradores de dungeon, os sistemas do mundo e a costura de eventos saíram para módulos
+  próprios (lista no doc 14). A API pública foi mantida onde era usada; quem falava com
+  delegadores de uma linha passou a falar com o subobjeto (`session.workbench.closeScreen()`,
+  `session.vehicles.boats`).
+- **Uso de item é tabela.** `ItemDef.uses` sai dos campos (`food` come, `charge` segura,
+  `placesBoat`…) e do `use` declarado. O uso de segurar (comer, arco, escudo) tem `hold` e
+  `release`; o de clique, uma espera de 4 ticks. **Correção achada no caminho:** as ações mirando
+  pelo centro da câmera ignoravam o Modo A de toque; agora usam a mira da `Interaction` (o dedo).
+- **`main.ts` sem closure por quadro.** O `SceneFeed` e o laço criam os callbacks uma vez — o
+  `main.ts` criava oito por quadro, contra a regra de zero alocação no caminho quente.
+- **Formato de vértice:** `texLayer` 8 bits, tint 6 bits (4 na palavra 1, 2 no topo da palavra 0).
+  O teto de 256 camadas do doc 02 §3 continua, agora como limite do formato.
+- **16 cores**: cinza-claro, cinza, marrom, rosa, verde-limão, ciano, azul-claro e magenta, por
+  mistura de corante (o marrom é vermelho + verde: não há cacau). Os ids de item das cores novas
+  entraram no fim da fila; os de bloco, depois dos 200–220 das antigas.
+
 ## 4. Correções fora de marco
 
 Bugs anteriores encontrados durante o M5 e já corrigidos — ficam registrados porque explicam
@@ -1385,6 +1475,13 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-22 | `game/itemuse.ts` | **Balde, ovo e arco miravam o centro da câmera** mesmo no Modo A de toque, em que a mira é o dedo. Achado ao migrar os usos de item (M13): passaram a usar a mira da `Interaction`. |
+| 2026-09-22 | `world/growth.ts`, `world/gen/decorate.ts` → `world/trees.ts` | **Nenhuma planta crescia fora da roça** (M5/M6). A muda era decoração: a única receita de árvore do jogo escrevia direto no chunk durante a geração. Cana e cacto não subiam, a grama não se espalhava, e três das quatro folhas davam muda de carvalho. Madeira não era renovável. |
+| 2026-09-22 | `data/blocks.ts`, `world/redstone.ts`, `game/interaction.ts` | **Flor, muda e grama alta boiavam sem chão** (doc 03 §9, "Suporte"). Só redstone e tocha declaravam apoio. Planta ganhou `support: 'below'`, e cana e cacto o campo `stackable`, para a coluna se segurar em si mesma. |
+| 2026-09-22 | `data/blocks.ts`, `data/items.ts` | **Nenhum bloco queimava na fornalha** (doc 05 §5). Tábua, tronco e muda não tinham `fuel`: a tabela de blocos não tinha a coluna. |
+| 2026-09-22 | `world/fluids.ts` | **A água apagava a lava**, e lava corrente com água dava pedra em vez de pedregulho (doc 03 §9). Os dois fluidos são substituíveis e a água, seis vezes mais rápida, passava por cima. |
+| 2026-09-22 | `data/blocks.ts` → `world/falling.ts` | **A flag `gravity` nunca foi lida** (M1). Areia e cascalho ficavam de pé sem base. |
+| 2026-09-22 | `game/spawnplacement.ts`, `main.ts` | **O jogador nascia no mar** em metade das seeds: o nascimento era sempre a coluna (0, 0). Achado pelo smoke test. |
 | 2026-09-17 | `data/textures.ts` | **A textura da placa escondia o texto da placa.** Ela era tábua de carvalho com três linhas de rabisco desenhadas por cima — a "escrita" ilegível que fazia o olho reconhecer uma placa **quando não havia texto de verdade**. Quando passou a haver, o rabisco virou o ruído que o cobria, e o sulco da tábua cortava a letra na horizontal. Não era só tom: a área de escrita tinha desvio de luminância de 25,9 contra uma tinta de 24,8, ou seja, o fundo variava mais que o contraste da letra. Virou textura própria, de média 172 e desvio 4,7 — a única superfície do jogo desenhada para servir de fundo de leitura. Relato: *"por conta de sua textura mal dá para visualizar o texto escrito"*. |
 | 2026-09-17 | `world/gen/heightfield.ts` (era `gen/terrain.ts`) | **O `heightOffset` do bioma entrava em degrau.** Entre montanha (offset 26) e planície (offset 2) o terreno subia **29 blocos em um bloco** de distância, e onde a fronteira se esfarela a parede virava fileira de pilares. O doc 03 §4.3 pede média ponderada 5×5 a cada 4 blocos e diz, com estas palavras, que *"sem isso, aparecem paredes retas entre biomas"* — o código nunca fez isso, e o comentário de `terrain.ts` **afirmava que fazia**: chamava a grade esparsa de ruído de "o blend 5×5 do doc 03 §4.3". Ela suaviza a entrada, não a saída. Relato do usuário: *"as montanhas eram literalmente verticais (…) simplesmente pilares enormes verticais, e vários um do lado do outro"*. |
 | 2026-09-17 | `world/gen/heightfield.ts` | **O teto do mundo achatava as montanhas.** A altura terminava num `clamp` duro em 124 e **54,3% das colunas de montanha** batiam nele: a cordilheira virava um platô liso, com topo chapado e lado vertical, e a faixa de altura de montanha inteira era 118..124. Virou teto macio — uma hipérbole que se aproxima de 124 sem encostar —, e a faixa passou a 90..117, que é o que o doc 03 §4.3 pede. |
@@ -1610,9 +1707,71 @@ não vale inventar uma: a saída é mundo novo.
 um teto de 256 (doc 02 §3). Restam **44 camadas** para o que vier — o que dá para M9 e M10 como
 estão propostos, mas não dá para uma segunda paleta de 16 cores.
 
+**2026-09-22: a avaliação completa desmentiu este documento.** O parágrafo de 2026-09-14 acima
+(*"Não sobrou pendência de funcionalidade em nenhum documento normativo"*) e o README diziam o
+mesmo, e **não é verdade**. Conferido no código, item por item:
+
+| Doc | O que pede | O que o código tem | Onde |
+|---|---|---|---|
+| 03 §9, 04 §2.1 | areia, areia vermelha e cascalho caem | a flag `gravity: true` está na tabela e **nenhum módulo a lê** | `data/blocks.ts:186–191`; `grep -rn "\.gravity" src` vazio |
+| 03 §9 | lava fluindo + água = pedregulho | sai **pedra**; e os ids `1` e `19` estão literais | `world/fluids.ts:284`, `:299–300` |
+| 05 §5, §6.3 | balde; lava como combustível | balde craftável que **não faz nada**; não há balde d'água nem de lava | `data/items.ts:199`, `data/recipes.ts:101` |
+| 05 §6.3 | tesoura | o tipo `shears` existe e folha e lã o pedem; **o item não** | `data/blocks.ts:56` |
+| 07 §1 | ovelha de cor, 15% rara | sempre branca | `data/mobs.ts:211` |
+| — (renovabilidade) | cada árvore dá a sua muda | folha de bétula e pinheiro dão **muda de carvalho**; acácia nasce com folha de carvalho | `data/loot.ts:63–64`, `world/gen/decorate.ts` |
+| 05 §4 | Fome por carne podre/frango cru; maçã dourada com Regeneração e Absorção | **não há sistema de efeitos** | `data/items.ts:220` |
+| 05 §4 | maçã dourada, ensopado de cogumelo, biscoito, bolo | nenhum existe, nem o cogumelo | `grep -rli "cake\|cookie\|mushroom" src` vazio |
+| 05 §5, §7 | bloco de carvão, pedra lisa | nenhum dos dois | — |
+| 07 §1 | galinha põe ovo; enderman pega bloco | nem ovo como item, nem o carregar | — |
+| 03 §7 | poço do deserto, cabana de bruxa, naufrágio | só dungeon, mina, casa e poço de aldeia | `data/structures.ts` |
+| 08 §3.11 | menu raiz com **Idioma** | quatro seções, sem Idioma | `ui/screens/options.ts:292–296` |
+| 14 (testes) | smoke test de navegador | não existe; só o `soak` | `scripts/` |
+
+Nada disso é bug de regressão — são coisas que **nunca foram feitas** e que a revisão de
+2026-09-14 não cruzou com as tabelas dos docs. Viraram o **M11** do doc 14 (o Idioma, por tamanho,
+foi para o M17). A lição fica para quem declarar a próxima lista fechada: **cruzar tabela de doc
+com `grep`**, não com memória da sessão.
+
+**O que a avaliação confirmou que está bom:** orçamento de quadro (60 FPS em T0 com 2,7 ms de
+render), bundle em 60% do teto, save com compressão e escrita ociosa, luz incremental com filas
+pré-alocadas, lista de desenho sem alocação. A performance que falta é **de carregamento**, não de
+quadro — e o PROMPT.md §4.2 pedia o culling por conectividade de sections como *"fortemente
+recomendado"*, e ele não existe. Isso é o **M12**.
+
+**2026-09-22, fim do dia: o M11 fechou** — os 13 itens e mais quatro achados no caminho (§3). A
+lista de dívida normativa da tabela acima está vazia, com uma exceção declarada: o menu **Idioma**,
+que foi para o M17 por tamanho. O que o M11 deixou pronto para os próximos: o registro de uso de
+item (primeiro item do M13), o sistema de efeitos (as poções do M16) e o smoke test (que roda em
+qualquer marco daqui em diante).
+
+**O roteiro inteiro, em ordem recomendada** (detalhe e critérios no doc 14):
+
+```
+M11 dívida normativa ──► M13 casa em ordem ──► M12 carregamento ──► M9 gente ──► M10 localização
+                              └── folga de atlas ──► M14 água ──► M15 oficina ──► M16 fim da jornada
+M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
+```
+
 ---
 
 ## 6. Próximo passo recomendado
+
+0. **Continuar o roteiro: M12** (o mundo chega antes do jogador) — culling por conectividade de
+   sections, culling por direção de face, cópia de vizinhança fora da thread principal e luz na borda
+   do chunk. M11 e M13 fecharam em 2026-09-22.
+
+   **E olhar M11 e M13 num aparelho**, que nada disso viu. Em ordem de quanto pode estar errado:
+   - **lã e cama coloridas**: o tint é novo no shader. Colocar as 16 lãs lado a lado e uma cama de
+     cada cor; na cama, a madeira e o travesseiro **não** podem sair coloridos. Se a cor sair
+     lavada ou escura demais, o número é o `DYE_BASE` de `data/tints.ts`;
+   - **mundo novo**: nascer em terra, com árvore à vista;
+   - **areia caindo**: cavar debaixo de uma coluna na praia;
+   - **plantar uma muda** e esperar ~2 min; cana na beira d'água; caminho pisado voltando a verde
+     (`chance` em `data/plants.ts`, `GRASS_SPREAD_CHANCE` em `world/growth.ts`);
+   - **balde**: fonte infinita e gerador de pedregulho; **no Modo A de toque**, conferir que o balde
+     pega a água onde o dedo aponta;
+   - **ovelha**: tosquiar e tingir; **maçã dourada**: os corações dourados e o selo de efeito
+     (`ui/effectsbar.ts`) sem cobrir o HUD de toque; **bolo**: comer fatia por fatia.
 
 1. ~~**Criar um mundo novo e voar.**~~ ~~**Olhar as quatro peças novas do M8 num aparelho.**~~
    **Feitos em 2026-09-17**: *"todos os 5 testes passaram perfeitamente"*. Terreno, placa, baú,

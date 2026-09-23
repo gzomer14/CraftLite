@@ -46,6 +46,9 @@ import { WorldSystems } from './worldsystems';
 import { Travel } from './travel';
 import { breakPortalNear } from './portal';
 import { BlockUse } from './blockuse';
+import { TRADE_REACH, Villages } from './village';
+import { FLAG_TRADING } from '../entity/mobstore';
+import { Trading } from './trading';
 import { SpawnerBlocks } from '../entity/spawnerblocks';
 import { DIM_OVERWORLD, dimensionOf } from '../data/dimensions';
 import { Lighting } from '../world/lighting';
@@ -141,6 +144,10 @@ export class Session {
   spawnZ = 0;
   /** Golpe, escudo, armadura e explosão (`game/playercombat.ts`). */
   readonly combat: PlayerCombat;
+  /** Moradores, reputação, sino e portas da aldeia (M9, `game/village.ts`). */
+  readonly villages: Villages;
+  /** A troca com o aldeão (M9, `game/trading.ts`). */
+  readonly trading: Trading;
 
   constructor(
     world: World, player: Player, events: SessionEvents, options: SessionOptions = {},
@@ -197,7 +204,11 @@ export class Session {
     this.workbench = new Workbench({
       world, player, inventory: this.inventory, recipes: this.recipes, tiles: this.tiles,
       xp: this.xp, achievements: this.achievements,
-      onOpenScreen: (screen, container) => { this.events.onOpenScreen(screen, container); },
+      onOpenScreen: (screen, container) => {
+        // Qualquer tela que não seja a de troca solta o aldeão que negociava.
+        if (screen !== 'trading') this.villages.stopTrading();
+        this.events.onOpenScreen(screen, container);
+      },
       sound: (name, x, y, z) => { this.events.onSound?.(name, x, y, z); },
       dropItem: (stack) => { this.dropItem(stack); },
       noteObtained: (item) => { this.noteObtained(item); },
@@ -218,6 +229,21 @@ export class Session {
       sound: (name, x, y, z) => { this.events.onSound?.(name, x, y, z); },
       message: (text) => { this.events.onMessage?.(text); },
       setSpawn: (x, y, z) => { this.spawnX = x; this.spawnY = y; this.spawnZ = z; },
+    });
+    this.villages = new Villages({
+      world, mobs: this.mobs.store, seed: world.seed,
+      totalTicks: () => this.dayNight.totalTicks,
+      sound: (name, x, y, z) => { this.events.onSound?.(name, x, y, z); },
+      message: (text) => { this.events.onMessage?.(text); },
+      toggleDoor: (x, y, z) => { this.blockUse.toggle(x, y, z); },
+    });
+    this.trading = new Trading({
+      mobs: this.mobs.store, inventory: this.inventory,
+      day: () => this.dayNight.day,
+      creative: () => this.player.mode === 'creative',
+      dropItem: (stack) => { this.dropItem(stack); },
+      sound: (name, x, y, z) => { this.events.onSound?.(name, x, y, z); },
+      noteObtained: (item) => { this.noteObtained(item); },
     });
     this.combat = new PlayerCombat({
       world, player, inventory: this.inventory, survival: this.survival, mobs: this.mobs,
@@ -358,6 +384,7 @@ export class Session {
     const day = this.dayNight.dayFactor > 0.25 && !this.weather.isThundering;
     this.mobs.difficulty = this.survival.difficulty;
     this.mobs.isDay = day;
+    this.mobs.dayTime = this.dayNight.time;
     this.spawner.difficulty = this.survival.difficulty;
     this.spawner.isDay = day;
     this.spawner.isNight = !day;
@@ -372,8 +399,32 @@ export class Session {
     PLAYER_VIEW.alive = !this.survival.isDead && this.player.mode === 'survival';
 
     this.mobs.tick(PLAYER_VIEW);
+    this.checkTrade();
     this.spawner.tick(this.player.x, this.player.y, this.player.z);
     this.projectiles.tick(this.world);
+  }
+
+  /**
+   * A troca aberta continua valendo? O aldeão pode ter morrido, saído do mundo
+   * com o chunk, ou o jogador se afastou: a tela fecha sozinha.
+   */
+  private checkTrade(): void {
+    if (this.workbench.openScreen !== 'trading') return;
+    const i = this.villages.trader();
+    const store = this.mobs.store;
+    if (i >= 0 && Math.hypot(store.x[i] - this.player.x, store.z[i] - this.player.z) <= TRADE_REACH) return;
+    this.workbench.closeScreen();
+  }
+
+  /** As ofertas do aldeão com quem o jogador negocia (a tela desenha isto). */
+  get tradeOffers(): ReturnType<Trading['offers']> {
+    const i = this.villages.trader();
+    return i < 0 ? [] : this.trading.offers(i);
+  }
+
+  /** Faz a troca `slot` com o aldeão da tela aberta. */
+  buyTrade(slot: number): ReturnType<Trading['buy']> {
+    return this.trading.buy(this.villages.trader(), slot);
   }
 
   /** Pontos de armadura equipada, para a barra do HUD (doc 08 §3.4). */
@@ -413,16 +464,18 @@ export class Session {
    * Devolve true se o mob consumiu o clique.
    */
   useOnMob(dx: number, dy: number, dz: number): boolean {
-    const held = this.inventory.held;
-    if (held === null) return false;
-    const name = itemDef(held.item)?.name;
-    if (name === undefined) return false;
-
     const eyeY = this.player.y + this.player.eyeHeight;
     const index = this.mobs.pickTarget(
       this.player.x, eyeY, this.player.z, dx, dy, dz, this.player.reach,
     );
     if (index < 0) return false;
+    // Aldeão: clique direito é conversa, com ou sem item na mão (M9).
+    if (this.villages.isVillager(index)) return this.talkTo(index);
+
+    const held = this.inventory.held;
+    if (held === null) return false;
+    const name = itemDef(held.item)?.name;
+    if (name === undefined) return false;
 
     // Ações de item em bicho (tesoura, balde na vaca, corante na ovelha).
     if (this.itemUser.onMob(held, index)) return true;
@@ -440,6 +493,20 @@ export class Session {
     if (feed === 'wait') return true;
     if (this.player.mode === 'survival') this.inventory.consumeHeld();
     this.achievements.event('breed');
+    return true;
+  }
+
+  /** Abre a troca com o aldeão, se a aldeia dele ainda aceita o jogador. */
+  private talkTo(index: number): boolean {
+    const store = this.mobs.store;
+    if (this.villages.isBanned(index)) {
+      this.events.onMessage?.('O aldeão não quer negociar com você');
+      this.events.onSound?.('mob/villager_hurt', store.x[index], store.centerY(index), store.z[index]);
+      return true;
+    }
+    this.villages.stopTrading();
+    store.setFlag(index, FLAG_TRADING, true);
+    this.workbench.setScreen('trading', null);
     return true;
   }
 
@@ -480,6 +547,7 @@ export class Session {
     if (this.vehicles.tryRide()) return true;
     const target = this.interaction.state.target;
     if (target !== null && this.blockUse.bed(target.x, target.y, target.z)) return true;
+    if (target !== null && this.villages.ringBell(target.x, target.y, target.z)) return true;
     // Alavanca, botão e repetidor respondem antes da porta: os três são
     // mecanismos de clique, e a porta é a única que também abre na mão.
     if (target !== null && this.redstone.use(target.x, target.y, target.z)) return true;
@@ -673,6 +741,7 @@ export class Session {
     this.spawner.populateChunk(chunk);
     this.systems.scanChunk(chunk);
     applyStructures(this, chunk);
+    this.villages.onChunkLoaded(chunk);
     // Por último: a costura tem que ver o que as estruturas acabaram de pôr.
     this.lighting.stitchColumn(chunk.cx, chunk.cz);
   }
@@ -681,6 +750,7 @@ export class Session {
   onChunkUnloaded(chunk: ChunkColumn): void {
     this.systems.forgetChunk(chunk.cx, chunk.cz);
     this.spawners.forgetChunk(chunk.cx, chunk.cz);
+    this.villages.onChunkUnloaded(chunk);
   }
 
   /** Pede ao dono da UI que abra o editor da placa nesta posição. */

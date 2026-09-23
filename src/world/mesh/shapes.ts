@@ -54,6 +54,8 @@ export const SHAPE_CHEST = 23;
 export const SHAPE_CAKE = 24;
 /** Fatias que o bolo tem; comer a última some com ele. */
 export const CAKE_SLICES = 7;
+/** Sino pendurado (M9): coroa presa no teto, corpo e boca. */
+export const SHAPE_BELL = 25;
 
 /**
  * Formas de trilho nos bits 0..3 do estado (M7), na codificação do gênero.
@@ -132,6 +134,7 @@ export const SHAPE_BY_NAME: Readonly<Record<string, number>> = {
   bed: SHAPE_BED,
   chest: SHAPE_CHEST,
   cake: SHAPE_CAKE,
+  bell: SHAPE_BELL,
   slab: SHAPE_SLAB,
   carpet: SHAPE_CARPET,
   flat: SHAPE_FLAT,
@@ -270,6 +273,11 @@ export function boxesFor(
     case SHAPE_CAKE:
       // Cada fatia comida recua a face −X em 2/16, como no gênero.
       return one(out, 0, (1 + 2 * Math.min(state & 7, CAKE_SLICES - 1)) / 16, 0, 1 / 16, 15 / 16, 8 / 16, 15 / 16);
+    case SHAPE_BELL:
+      // Coroa presa no teto, corpo, e a boca um pouco mais larga embaixo.
+      one(out, 0, 6 / 16, 13 / 16, 6 / 16, 10 / 16, 1, 10 / 16);
+      one(out, 1, 5 / 16, 5 / 16, 5 / 16, 11 / 16, 13 / 16, 11 / 16);
+      return one(out, 2, 4 / 16, 3 / 16, 4 / 16, 12 / 16, 5 / 16, 12 / 16);
     case SHAPE_RAIL:
       // O desenho é um quad só (ver `mesh/complex.ts`); a caixa existe para
       // quem pergunta pela forma — hoje ninguém, porque trilho não colide.

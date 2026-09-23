@@ -15,6 +15,7 @@ import { mobDef } from '../data/mobs';
 import { WORLD_HEIGHT } from '../world/chunk';
 import { createAabb, moveWithCollision, setAabbFromBase, type Aabb } from '../world/physics';
 import type { World } from '../world/world';
+import { VillageState } from './villagestate';
 
 /** Nós guardados por caminho. Acima disso o A* já estourou o orçamento. */
 export const PATH_MAX = 24;
@@ -26,6 +27,10 @@ export const FLAG_TAMED = 2;
 export const FLAG_PERSISTENT = 4;
 export const FLAG_IN_WATER = 8;
 export const FLAG_CLIMBING = 16;
+/** Aldeão deitado na cama (M9): parado, e o render o desenha deitado. */
+export const FLAG_SLEEPING = 32;
+/** Aldeão com a tela de troca aberta: fica de frente para o jogador. */
+export const FLAG_TRADING = 64;
 
 const GRAVITY = -0.08;
 const VERTICAL_DRAG = 0.98;
@@ -137,6 +142,9 @@ export class MobStore {
   /** Achatamento vertical (slime pulando). */
   readonly squash: Float32Array;
 
+  /** Casa, trabalho, aldeia e trocas de quem mora numa aldeia (M9). */
+  readonly village: VillageState;
+
   private readonly aabb: Aabb = createAabb();
   private count = 0;
 
@@ -185,6 +193,7 @@ export class MobStore {
     this.limbSwing = f32();
     this.limbAmount = f32();
     this.squash = f32();
+    this.village = new VillageState(capacity);
   }
 
   get active(): number {
@@ -238,6 +247,7 @@ export class MobStore {
     this.limbSwing[i] = 0;
     this.limbAmount[i] = 0;
     this.squash[i] = 0;
+    this.village.reset(i);
     return i;
   }
 
@@ -246,6 +256,7 @@ export class MobStore {
     const last = --this.count;
     if (i !== last) {
       copyEntry(this, i, last);
+      this.village.copy(i, last);
       for (let n = 0; n < PATH_MAX; n++) {
         this.pathX[i * PATH_MAX + n] = this.pathX[last * PATH_MAX + n];
         this.pathY[i * PATH_MAX + n] = this.pathY[last * PATH_MAX + n];
@@ -391,7 +402,16 @@ export class MobStore {
       if (def.traits.climbsWalls === true) {
         this.setFlag(i, FLAG_CLIMBING, true);
       } else if (this.onGround[i] === 1 && this.jumpCooldown[i] <= 0) {
-        this.vy[i] = JUMP_IMPULSE;
+        /*
+         * O pulo é decidido **depois** de mover, e o tick seguinte aplica
+         * gravidade e arrasto **antes** de mover. Com `vy = JUMP_IMPULSE` o
+         * primeiro passo subia 0,33 e o pico ficava em 0,83 bloco — nenhum mob
+         * subia um degrau de bloco inteiro, desde o M5: o caminho do A* que
+         * sobe um bloco travava o bicho pulando no pé da parede (achado no M9,
+         * com o aldeão voltando para casa). Descontar o que o próximo tick
+         * tira faz o primeiro passo ser o impulso inteiro, como o do jogador.
+         */
+        this.vy[i] = JUMP_IMPULSE / VERTICAL_DRAG - GRAVITY;
         this.jumpCooldown[i] = 10;
       }
     } else {

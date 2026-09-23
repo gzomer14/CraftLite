@@ -10,7 +10,7 @@ import { Rng } from '../src/core/rng';
 import { ChunkColumn } from '../src/world/chunk';
 import { World } from '../src/world/world';
 import { Mobs, rayBoxDistance } from '../src/entity/mobs';
-import { FLAG_ANGRY, FLAG_PERSISTENT } from '../src/entity/mobstore';
+import { FLAG_ANGRY, FLAG_PERSISTENT, MobStore } from '../src/entity/mobstore';
 import { MOBS_BY_CATEGORY, MOB_BY_NAME, mobDef, spawnRuleOf } from '../src/data/mobs';
 import { BLOCK_BY_NAME, makeState } from '../src/data/blocks';
 import { ITEM_BY_NAME } from '../src/data/items';
@@ -130,9 +130,9 @@ describe('morcego (categoria ambient)', () => {
 });
 
 describe('tabela de mobs', () => {
-  it('tem os 12 mobs do MVP, o aldeão, os dois do Nether e o morcego', () => {
-    // 12 do MVP + aldeão (M6) + porco zumbi e ghast (M7) + morcego.
-    expect(MOB_BY_NAME.size).toBe(16);
+  it('tem os 12 mobs do MVP, o aldeão, os dois do Nether, o morcego e o golem', () => {
+    // 12 do MVP + aldeão (M6) + porco zumbi e ghast (M7) + morcego + golem (M9).
+    expect(MOB_BY_NAME.size).toBe(17);
     for (const name of MOB_BY_NAME.keys()) {
       const def = MOB_BY_NAME.get(name)!;
       expect(def.model.length).toBeGreaterThan(0);
@@ -548,5 +548,44 @@ describe('perseguição', () => {
       expect(speed, `${name} não pode ultrapassar quem corre`).toBeLessThan(5.612);
       expect(speed, `${name} precisa ser ameaça de verdade`).toBeGreaterThan(4.317 * 0.7);
     }
+  });
+});
+
+/*
+ * Regressão de 2026-09-23: `mobDef(id)` lia `MOBS[id]`, e a lista estava na
+ * ordem de declaração. O morcego (15) declarado antes do porco zumbi (13) e do
+ * ghast (14) fazia os três trocarem de corpo e de IA.
+ */
+describe('tabela de mobs', () => {
+  it('mobDef(id) devolve o próprio mob, para todo mob da tabela', () => {
+    for (const [name, def] of MOB_BY_NAME) {
+      expect(mobDef(def.id).name, name).toBe(name);
+    }
+  });
+});
+
+/*
+ * Regressão de 2026-09-23 (achado no M9): o pulo do mob chegava a 0,83 bloco,
+ * e nenhum mob subia um degrau de bloco inteiro.
+ */
+describe('degrau', () => {
+  it('mob travado num degrau de um bloco pula e sobe', () => {
+    const world = new World(5);
+    const chunk = new ChunkColumn(0, 0);
+    for (let z = 0; z < 16; z++) {
+      for (let x = 0; x < 16; x++) {
+        for (let y = 0; y <= 60; y++) chunk.setBlock(x, y, z, makeState(BLOCK_BY_NAME.get('stone')!.id));
+        if (x >= 8) chunk.setBlock(x, 61, z, makeState(BLOCK_BY_NAME.get('stone')!.id)); // o degrau
+      }
+    }
+    world.addChunk(chunk);
+    const store = new MobStore(4);
+    const i = store.spawn(MOB_BY_NAME.get('zombie')!.id, 5.5, 61, 8.5);
+    for (let t = 0; t < 80; t++) {
+      store.setMoveTarget(i, 12.5, 62, 8.5, 1);
+      store.tickPhysics(world, i);
+    }
+    expect(store.y[i]).toBeCloseTo(62, 1);
+    expect(store.x[i]).toBeGreaterThan(9);
   });
 });

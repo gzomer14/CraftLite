@@ -1066,6 +1066,26 @@ export const TEXTURES: Record<string, TexRecipe> = {
     base: [233, 236, 236], noise: 'grain', scale: 12, variance: 0.06, ops: [dither(0.04)],
   },
   /*
+   * Aldeia (M9). O sino é dourado com o brilho de cima e a sombra da boca
+   * embaixo — as caixas do sino mostram o ladrilho inteiro em cada face, então
+   * o desenho é em faixas, como a tocha. O caminho é terra batida mais clara
+   * que a terra, com pedrinhas: tem que se ler como "gente passa por aqui".
+   */
+  'block/bell': {
+    base: [214, 172, 52], noise: 'value', scale: 4, variance: 0.1,
+    ops: [
+      rect(0, 0, 16, 3, [250, 214, 96]),
+      rect(0, 3, 16, 1, [168, 128, 30]),
+      rect(0, 12, 16, 2, [150, 112, 26]),
+      rect(0, 14, 16, 2, [104, 76, 18]),
+      dither(0.04),
+    ],
+  },
+  'block/dirt_path_top': {
+    base: [150, 122, 74], noise: 'grain', scale: 6, variance: 0.09,
+    ops: [speckle([122, 98, 58], 0.2, 1), speckle([172, 150, 104], 0.08, 1), dither(0.04)],
+  },
+  /*
    * Tocha (M8): faixas horizontais, não uma cruz.
    *
    * A tocha deixou de ser dois quads cruzados e virou um poste de 2/16 de

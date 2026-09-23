@@ -9,10 +9,10 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-23 09:58 — **M12 fechado: culling por conectividade (29% das
-sections do frustum numa caverna), faces viradas para a câmera, vizinhança montada no worker com um
-pedido de malha por coluna (RD 16 pronto em 2,2× menos quadros), e luz que atravessa a borda do
-chunk. M11, M13 e a correção das texturas de pé validados em campo.**
+**Última atualização:** 2026-09-23 11:03 — **M9 fechado: aldeões com ofício, rotina de dia e
+noite, porta e cama; troca por esmeralda; aldeia com caminhos, hortas cercadas e sino; golem de
+ferro e reputação. M12 validado em campo. No caminho, três defeitos antigos de mob: a tabela
+trocava morcego, porco zumbi e ghast; nenhum mob subia um degrau; e mob longe caía no vazio.**
 
 ---
 
@@ -40,10 +40,10 @@ chunk. M11, M13 e a correção das texturas de pé validados em campo.**
 | **M8** Presença dos objetos | vértice em 1/16 de bloco, tocha de verdade, porta e cama de duas células, item na mão com volume, contorno do tamanho da forma, vidro visível, escada que escala, baú e fornalha acesa, placa com texto, quadro com arte, oito cores de lã e cama, tampa de baú que abre | ✅ **validado em campo em 2026-09-17** | — |
 | **Terreno** pós-M8 | blend 5×5 do `heightOffset` de bioma e teto macio: a parede de 29 blocos entre montanha e planície virou encosta, e o platô chapado em Y=124 virou cordilheira | ✅ **validado em campo** | muda o terreno gerado: **mundo antigo ganha costura** (ver §4) |
 | **Placa, 2ª passada** | tábua lisa e clara no lugar da tábua de carvalho com rabisco, e um campo de texto só com quebra de linha interpretada | ✅ concluído | — |
-| **M9** Gente no mundo | aldeão com rotina e troca, aldeia de verdade, golem, reputação | ⬜ proposto (2026-09-16) | — |
+| **M9** Gente no mundo | aldeão com rotina e troca, aldeia de verdade, golem, reputação | ✅ concluído em 2026-09-23 | **não visto em aparelho** (§6) |
 | **M10** Saber onde se está | bússola, relógio, mapa, marcador, estatísticas, espectador | ⬜ proposto (2026-09-16) | — |
 | **M11** O que os documentos já pediam | areia que cai, pedregulho de lava, balde, tesoura, ovelha colorida, planta que cresce, efeitos de status, comidas e estruturas que faltavam, nascimento em terra firme, smoke test | ✅ **validado em campo em 2026-09-23** | — |
-| **M12** O mundo chega antes do jogador | culling por conectividade e por direção de face, cópia de vizinhança fora da thread principal, luz na borda do chunk | ✅ concluído em 2026-09-23 | **não visto em aparelho**; preset do T0 não revisto (sem T0 na mão) — §3 |
+| **M12** O mundo chega antes do jogador | culling por conectividade e por direção de face, cópia de vizinhança fora da thread principal, luz na borda do chunk | ✅ **validado em campo em 2026-09-23** | preset do T0 não revisto (sem T0 na mão) — §3 |
 | **M13** Casa em ordem | uso de item como dado, `session.ts` e `main.ts` abaixo de 700 linhas, lã e cama em 16 cores por tint | ✅ **validado em campo em 2026-09-23** | — |
 | **M14** Água e paisagem | visão submersa, rios, pesca, afogado, lua com fases, biomas por tint, selva | ⬜ proposto (2026-09-22) | — |
 | **M15** Oficina | bigorna, reparo na grade, funil, dispensador, comparador, observador | ⬜ proposto (2026-09-22) | — |
@@ -61,13 +61,13 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-23 09:58, ao fechar o M12, com `npm test`, `npm run build`,
+Medidas em 2026-09-23 11:03, ao fechar o M9, com `npm test`, `npm run build`,
 `SIZE_BUDGET_KB=350 npm run size` e `npm run smoke`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **229,0 KB** (226,3 antes do M12; 226,1 no M13) | < 350 KB | `npm run size` |
-| Testes | **2003**, 100 arquivos (1981 antes do M12; 1975 no M13) | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **239,4 KB** (229,0 no M12; 226,3 antes dele) | < 350 KB | `npm run size` |
+| Testes | **2023**, 101 arquivos (2003 no M12; 1981 antes dele) | manter verde | `npm test` |
 | Smoke test de navegador | **7 passos verdes**: carregar, criar, andar 10 s, quebrar, salvar, recarregar, conferir | verde | `npm run smoke` |
 | Camadas de atlas | **194** com 16 cores de lã e cama (222 no M11 com 8 cores; lã e cama viraram tint no M13) | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Memória de áudio | **3,33 MB** (era 3,26; +3 sons curtos de balde e arremesso) | < 3,5 MB | `tests/audio.test.ts` |
@@ -76,6 +76,8 @@ Medidas em 2026-09-23 09:58, ao fechar o M12, com `npm test`, `npm run build`,
 | Meshing de section | 0,64 ms (mediana) | < 8 ms | `tests/perf.test.ts` |
 | Meshing de um piso de 256 tochas | **1,10 ms** (o pior caso construível da forma nova) | < 2 ms | `tests/perf.test.ts` |
 | Tick de 20 mobs | 0,20 ms | << 50 ms | `tests/mobs.test.ts` |
+| Tick de 20 aldeões com rotina (indo para casa) | **0,08 ms** | < 1 ms (aceite do M9) | `tests/village.test.ts` |
+| Aldeões que entram em casa ao entardecer | **47 de 47**, em 11 aldeias de seeds diferentes, 2 min de jogo | ≥ 80% no teste | `tests/village.test.ts` (1 aldeia) e medido à mão (11) |
 | Tick de circuito (fio de 64) | 0,83 ms | < 5 ms | `tests/perf.test.ts` |
 | Tick de fogo (256 chamas, o teto) | **0,03 ms** | < 2 ms | `tests/perf.test.ts` |
 | Acabamento do estilo Nítido (atlas inteiro) | **3,0 ms**, uma vez no boot (eram 2,1 com 31 texturas a menos) | < 60 ms | `tests/perf.test.ts` |
@@ -1519,6 +1521,57 @@ Pedido: *"Pode seguir com o M12"*. Os cinco itens do doc 14, com o que cada um v
 Achados no caminho, fora do escopo mas corrigidos porque o M12 os expôs (§4): o crédito de pedido
 em voo voltava para o worker errado, e o BFS de luz explodia na borda do mundo carregado.
 
+### M9 — Gente no mundo ✅ — 2026-09-23
+
+Pedido: *"Pode implementar o M9"*. O que cada item virou, e as leituras que o doc deixava abertas:
+
+- **Aldeão com ofício** (`data/villagers.ts`): fazendeiro, açougueiro, ferreiro e bibliotecário,
+  cada um com quatro ofertas por esmeralda e limite de usos por dia (reabastece ao virar o dia). O
+  ofício é a `variant` do mob e escolhe a pele (`traits.variantSkins`, uma camada de atlas de
+  entidade por ofício). Os postos são blocos que o jogo já tinha — bancada, fornalha, estante; o
+  fazendeiro trabalha na horta. A bigorna e o defumador do M15 podem trocá-los numa linha.
+- **Rotina** (`entity/ai/villagegoals.ts`): de manhã vai ao posto, de tarde junta-se perto do
+  poço, às 11500 do dia (meio tick-dia antes do pôr do sol) volta para casa, **atravessa a porta de
+  verdade** (frente → abre → passa → fecha) e deita na cama; o render o desenha deitado. Foge de
+  monstro a menos de 8 blocos. Viagens longas pedem ao A* uma meta a 20 blocos (ele recusa destino
+  a mais de 32); quem passa 5 s sem chegar mais perto dá uns passos para um lado e tenta de novo.
+  **Medido:** todos no poço meia hora antes do pôr do sol, dois minutos de jogo depois **47 de 47
+  aldeões deitados na própria cama, com a porta fechada, em 11 aldeias** de seeds diferentes.
+- **Aldeia de verdade** (`world/gen/village.ts`, `data/structures.ts`): cada casa ganhou uma
+  frente pelo ofício — terreiro com o posto, ou a **horta cercada** do fazendeiro (trigo, cenoura,
+  batata, água tampada por laje) — e um degrau largo na borda, para a frente não virar plataforma
+  numa encosta. **Caminhos de terra batida** (bloco novo) saem de cada casa até um anel em volta do
+  poço. O **sino** (bloco novo, com forma própria) fica pendurado no telhado do poço; tocá-lo manda
+  quem mora por perto para casa por 30 s. As aldeias continuam onde estavam nos mundos criados:
+  os sais do sorteio de poço e casa não mudaram.
+- **Moradores nascem com o chunk da casa, não com a geração** (`game/village.ts`). Mob não vai
+  para o save (desvio antigo, doc 11 §2 — ver `game/savegame.ts`); os marcos de geração se perdiam
+  no chunk que o jogador modificava. Agora, quando qualquer chunk entra no mundo, o plano da seed
+  diz se há casa com morador e a cama é procurada na coluna. O chunk da casa saindo leva o morador;
+  voltando, traz. **3 a 8 aldeões por aldeia** (doc 03 §7) são sorteados e vão para as casas de
+  menor sorteio; casa sorteada que não nasceu (bioma, relevo) deixa a aldeia com um a menos.
+- **Golem de ferro**: um por aldeia, nasce junto do poço. Caça o hostil a menos de 16 blocos e
+  mata o zumbi (teste). Não caça o jogador, a menos que ele bata num aldeão da aldeia ou nele.
+  **Não há** construção de golem com blocos nem golem novo com o tempo — não estava no doc 14.
+- **Reputação**: bater num aldeão fecha as trocas **da aldeia inteira** por um dia de jogo e vira os
+  golems dela. O prazo vai para a meta do mundo (`villageBans`) — recarregar não limpa a má fama.
+- **Troca — leitura do critério.** O doc 14 pede *"trocar dois itens sem abrir nenhum menu que não
+  exista hoje"*. Lido como: a troca é uma tela **do sistema de contêineres que já existe** — mesmo
+  painel, mesmos slots do inventário, mesmo toque, controle e botão Fechar —, com a lista de ofertas
+  no lugar da grade, no padrão das três ofertas da mesa de encantamento (`ui/containers/tradepanel.ts`).
+  Não há slot de troca: o pagamento sai do inventário e o item entra nele. Clique direito no
+  aldeão abre, com ou sem item na mão; afastar-se mais de 8 blocos fecha. Vista no Chrome:
+  "Aldeão — Fazendeiro", quatro ofertas com o desenho dos itens.
+- **Sons**: sino (parciais fora da série harmônica), bigorna curta do ferreiro no posto, porta pelo
+  som de porta de sempre, voz do golem.
+
+**Orçamento:** 20 aldeões voltando para casa (a rotina que mais pede caminho e porta) em **0,08 ms
+por tick** — o aceite pede menos de 1 ms.
+
+Achados no caminho, corrigidos (§4): a tabela de mobs trocava três criaturas entre si, nenhum mob
+subia um degrau de um bloco, e mob em coluna não carregada caía no vazio. E o A* passou a tratar
+porta como passagem (o zumbi para diante dela, onde o Difícil a arromba).
+
 ## 4. Correções fora de marco
 
 Bugs anteriores encontrados durante o M5 e já corrigidos — ficam registrados porque explicam
@@ -1526,6 +1579,10 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-23 | `data/mobs.ts` | **Morcego, porco zumbi e ghast trocavam de corpo e de IA** (desde 2026-09-14). `mobDef(id)` lê `MOBS[id]`, e a lista estava na ordem de declaração: o morcego (id 15) entrou antes do porco zumbi (13) e do ghast (14). O morcego das cavernas era um ghast, o porco zumbi do Nether um morcego, e o ghast um porco zumbi. A lista passou a ser ordenada pelo id, e buraco na numeração vira erro no boot. Regressão em `tests/mobs.test.ts`. |
+| 2026-09-23 | `entity/mobstore.ts` | **Nenhum mob subia um degrau de bloco inteiro** (M5). O pulo é decidido depois de mover, e o tick seguinte aplica gravidade antes de mover: o pico ficava em 0,83 bloco. Todo caminho do A* que subia um bloco deixava o bicho pulando no pé da parede — parte, talvez, do "os monstros não me seguem" de 2026-09-12. O impulso passou a descontar o que o próximo tick tira. Achado com o aldeão voltando para casa. |
+| 2026-09-23 | `entity/mobs.ts` | **Mob em coluna não carregada caía no vazio.** O mundo fora do anel responde ar; todo bicho que ficava para trás despencava e morria de "void". Agora fica parado até a coluna voltar. |
+| 2026-09-23 | `entity/ai/pathfinder.ts` | **Porta era parede para o A*.** Porta passou a contar como passagem, aberta ou fechada: o aldeão abre a de casa, e o zumbi para diante dela. |
 | 2026-09-23 | `world/lighting.ts` | **O BFS de luz explodia na borda do mundo carregado** (M2). Coluna não carregada responde "luz de bloco 0" e ignora a escrita, então todo voxel lá fora parecia sempre mais escuro e voltava para a fila com seus 6 vizinhos — até 6¹⁴ caminhos. Uma tocha ou lava rente à borda já travava a aba; a costura de luz do M12, que roda justamente na fronteira, passou a acioná-lo em toda coluna nova, e o smoke test pegou (a página congelava ao criar o mundo). Vizinho em coluna não carregada agora é pulado nos dois BFS. Regressão em `tests/lightstitch.test.ts`. |
 | 2026-09-23 | `world/pipeline.ts` | **O crédito de pedido em voo voltava para o worker errado** (M1). Sem saber de quem era a resposta, o pipeline descontava do worker mais ocupado: a soma batia, mas o balanceamento derivava. Com os pedidos de coluna do M12, um worker de três ficava sem receber nada. Cada worker agora tem o próprio `onmessage` com o índice. |
 | 2026-09-23 | `tests/pipeline.test.ts` | **O duplo de worker trabalhava dentro do `postMessage`** e cobrava a geração no orçamento de despacho da thread principal. Dois testes passavam por isso e não pelo que diziam medir: "respeita o limite de requisições em voo" afirmava um teto de 2 × 2 que é 16 × 2 desde 2026-09-13. O duplo passou a trabalhar no `flush`, como o navegador. |
@@ -1811,9 +1868,24 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
 
 ## 6. Próximo passo recomendado
 
-0. **Olhar o M12 num aparelho** e depois seguir o roteiro: **M9** (gente no mundo). O M12 mexeu no
-   caminho de todo triângulo e de todo chunk, e só foi visto em testes e no Chrome sem janela. Em
-   ordem de quanto pode estar errado:
+0. **Olhar o M9 num aparelho** e depois seguir o roteiro: **M10** (saber onde se está — bússola,
+   relógio, mapa). O M9 só foi visto em testes e no Chrome sem janela. Em ordem de quanto pode
+   estar errado:
+   - **entardecer**: achar uma aldeia (a semente `2` tem uma com o poço em x 282, z 340), esperar o
+     fim da tarde e ver os aldeões entrarem, fecharem a porta e deitarem. Se algum travar num canto,
+     o número é `STUCK_TICKS` em `entity/ai/villagegoals.ts`;
+   - **troca**: clique direito num aldeão (com e sem item na mão), duas trocas, e a tela com o
+     desenho dos itens legível no celular. **No Modo A de toque**, conferir que o toque no aldeão
+     abre a troca;
+   - **golem e reputação**: bater num aldeão perto do golem — ele tem que vir atrás do jogador —,
+     e as trocas fechadas até o dia seguinte;
+   - **sino**: tocar e ver todo mundo correr para casa;
+   - **morcego nas cavernas e porco zumbi no Nether**: voltaram a ser eles mesmos (§4) — o morcego
+     não pode mais atirar bola de fogo;
+   - **mob subindo degrau**: um zumbi perseguindo morro acima tem que subir, não empacar.
+
+   ~~**Olhar o M12 num aparelho**~~ — **feito em 2026-09-23**: *"M12 testado com sucesso"*. O
+   roteiro que foi seguido, para referência:
    - **buraco no mundo**: voar por cima de montanha, entrar numa caverna, sair dela, cavar uma
      parede de uma caverna para outra. Nenhuma section pode sumir e reaparecer. Se sumir perto,
      o número é `NEAR_COLUMNS` em `render/sectioncull.ts`; se o anel distante demorar a aparecer,

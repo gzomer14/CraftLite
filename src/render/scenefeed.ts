@@ -14,6 +14,7 @@ import { defOf, stateBitsOf, texOf } from '../data/blocks';
 import { mobDef } from '../data/mobs';
 import { modelOf } from '../data/mobmodels';
 import { SHAPE_BY_NAME, boundsFor } from '../world/mesh/shapes';
+import { FLAG_SLEEPING } from '../entity/mobstore';
 import { ARROW_LAYER, BOAT_LAYER, MINECART_LAYER, type EntityAtlas } from './entityatlas';
 import { SIGN_TEXT_DISTANCE, type SignTextPass } from './signtext';
 import type { Atlas } from './atlas';
@@ -130,10 +131,12 @@ export class SceneFeed {
       const flash = store.hurtTicks[i] > 0
         ? 1
         : store.fuse[i] > 0 ? (store.fuse[i] % 8 < 4 ? 0.8 : 0) : 0;
+      // Aldeão dormindo (M9): o corpo inteiro deita, com a cabeça no travesseiro.
+      const sleeping = store.hasFlag(i, FLAG_SLEEPING);
       mobRenderer.addModel(
         modelOf(def.model), entityAtlas.layerForMob(def, store.variant[i]),
-        x, y, z,
-        store.renderYaw(i, alpha), 0,
+        x, sleeping ? y + 0.15 : y, z,
+        store.renderYaw(i, alpha), sleeping ? -Math.PI / 2 : 0,
         store.headYaw[i], store.pitch[i],
         store.limbSwing[i], store.limbAmount[i], store.age[i],
         light, flash, store.scale[i], store.squash[i],

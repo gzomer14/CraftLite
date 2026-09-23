@@ -44,6 +44,11 @@ export interface WorldMeta {
    * o campo e continua nascendo na coluna (0, 0), onde sempre nasceu.
    */
   spawnFound?: boolean;
+  /**
+   * Aldeias que não negociam com o jogador (M9): `[x, z, até, …]`, com o poço
+   * como chave e o tick total do fim da má fama. Mundo antigo não tem o campo.
+   */
+  villageBans?: number[];
   createdAt: number;
   lastPlayed: number;
   sizeBytes: number;

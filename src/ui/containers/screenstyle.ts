@@ -122,6 +122,12 @@ export function injectStyle(): void {
 #container-screen .offer.affordable{background:#5b2a8a;color:#fff}
 #container-screen .offer:disabled{cursor:not-allowed;opacity:.6}
 #container-screen .offer:focus-visible{outline:2px solid #fff}
+/* Troca com aldeão (M9): o item que ele quer, a seta e o que ele dá. */
+#container-screen .offer.trade{display:flex;align-items:center;gap:calc(2 * var(--px,3px))}
+#container-screen .trade-icon{width:calc(14 * var(--px,3px));height:calc(14 * var(--px,3px));
+  pointer-events:none;flex:none}
+#container-screen .trade-arrow{font-size:calc(5 * var(--px,3px))}
+#container-screen .trade-left{margin-left:auto;font-size:calc(3.5 * var(--px,3px))}
 #container-screen .offer-hint{margin-bottom:calc(2 * var(--px,3px));color:#3f3f3f;
   font-size:calc(4 * var(--px,3px))}
 /* Sprite: a folha inteira é o fundo e o background-position escolhe o tile. */

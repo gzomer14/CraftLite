@@ -5,6 +5,7 @@
  * Saiu do `main.ts` em 2026-09-22 (M13).
  */
 
+import { professionOf } from '../data/villagers';
 import { itemDef } from '../data/items';
 import { ContainerScreen } from './containers/screen';
 import { CreativeScreen } from './containers/creative';
@@ -47,6 +48,13 @@ export function createGameScreens(deps: GameScreensDeps): {
     onEnchantRefresh: () => session().workbench.refreshEnchantOffers(),
     onBuyEnchant: (slot) => session().workbench.buyEnchant(slot),
     xpLevel: () => session().xp.level,
+    tradeOffers: () => session().tradeOffers,
+    onBuyTrade: (slot) => session().buyTrade(slot),
+    tradeTitle: () => {
+      const s = session();
+      const i = s.villages.trader();
+      return i < 0 ? 'Aldeão' : `Aldeão — ${professionOf(s.mobs.store.variant[i]).display}`;
+    },
     onFurnaceOutput: (furnace, item) => session().workbench.collectFurnaceXp(furnace, item),
     longPressMs,
     // O toque longo do slot não tem retorno visual próprio; a vibração é o que

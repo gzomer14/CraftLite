@@ -80,6 +80,11 @@ export interface Placement {
 
 export interface StructureDef {
   name: string;
+  /**
+   * Parte de aldeia (M9): não é sorteada chunk a chunk como as outras — quem a
+   * coloca é o plano da aldeia (`world/gen/village.ts`).
+   */
+  village?: boolean;
   /** Tamanho em blocos, para o alcance de busca dos chunks vizinhos. */
   size: readonly [number, number, number];
   pieces: readonly Piece[];
@@ -209,46 +214,166 @@ const MINESHAFT: StructureDef = {
  * Casa de aldeia: 7×5×7 com paredes de tábua, telhado de laje, porta, janela e
  * um baú dentro. É o template do "pool" do doc — a aldeia é um punhado destas.
  */
+/** A casa em si, igual para todo ofício: o que muda é a frente dela. */
+const HOUSE_PIECES: readonly Piece[] = [
+  // Fundação enterrada, para a casa não ficar com pé no ar na encosta.
+  { kind: 'fill', block: 'cobblestone', box: [0, -3, 0, 6, 0, 6], replace: 'any' },
+  // Casca de tábuas e miolo vazio.
+  { kind: 'hollow', block: 'oak_planks', box: [0, 0, 0, 6, 4, 6], replace: 'any' },
+  { kind: 'fill', block: 'air', box: [1, 1, 1, 5, 3, 5], replace: 'any' },
+  // Cantos de tronco, que é o que faz uma caixa parecer uma casa.
+  { kind: 'fill', block: 'oak_log', box: [0, 1, 0, 0, 3, 0], replace: 'any' },
+  { kind: 'fill', block: 'oak_log', box: [6, 1, 0, 6, 3, 0], replace: 'any' },
+  { kind: 'fill', block: 'oak_log', box: [0, 1, 6, 0, 3, 6], replace: 'any' },
+  { kind: 'fill', block: 'oak_log', box: [6, 1, 6, 6, 3, 6], replace: 'any' },
+  // Telhado de laje, uma fileira acima da casca.
+  { kind: 'fill', block: 'cobblestone_slab', box: [0, 5, 0, 6, 5, 6], replace: 'any' },
+  // Porta na parede norte e janelas de vidro nas laterais.
+  { kind: 'fill', block: 'air', box: [3, 1, 0, 3, 2, 0], replace: 'any' },
+  // A porta ocupa duas células desde o M8: as duas metades entram aqui, senão
+  // a aldeia nasce com meia porta e o ouvinte de `world/multiblock.ts` — que
+  // ignora a geração de propósito — não tem o que consertar.
+  { kind: 'point', block: 'oak_door', box: [3, 1, 0, 3, 1, 0], replace: 'any', state: 3 },
+  { kind: 'point', block: 'oak_door_top', box: [3, 2, 0, 3, 2, 0], replace: 'any', state: 3 },
+  { kind: 'point', block: 'glass', box: [0, 2, 3, 0, 2, 3], replace: 'any' },
+  { kind: 'point', block: 'glass', box: [6, 2, 3, 6, 2, 3], replace: 'any' },
+  { kind: 'point', block: 'glass', box: [3, 2, 6, 3, 2, 6], replace: 'any' },
+  // Mobília: mesa de trabalho, tocha e cama.
+  { kind: 'point', block: 'crafting_table', box: [1, 1, 5, 1, 1, 5], replace: 'any' },
+  // Tocha pendurada na parede norte (encaixe 3 = apoio em −Z).
+  { kind: 'point', block: 'torch', box: [2, 2, 1, 2, 2, 1], replace: 'any', state: 3 },
+  // Cama com o pé em (5,1,1) e a cabeceira em (5,1,2): estado 2 é +Z.
+  { kind: 'point', block: 'bed', box: [5, 1, 1, 5, 1, 1], replace: 'any', state: 2 },
+  { kind: 'point', block: 'bed_head', box: [5, 1, 2, 5, 1, 2], replace: 'any', state: 3 },
+];
+
+const VILLAGE_PLACEMENT: Placement = {
+  attempts: 1, minY: 0, maxY: 0, surface: true,
+  biomes: ['plains', 'savanna', 'desert'],
+};
+
+/**
+ * Casa de aldeia: 7×5×7 com paredes de tábua, telhado de laje, porta, janela e
+ * um baú dentro. É o template do "pool" do doc — a aldeia é um punhado destas.
+ *
+ * Desde o M9 ela é a base das casas por ofício (abaixo), que acrescentam a
+ * frente; esta fica na tabela na mesma posição, porque a posição é o sal do
+ * sorteio das estruturas que vêm depois dela.
+ */
 const VILLAGE_HOUSE: StructureDef = {
   name: 'village_house',
+  village: true,
   size: [7, 6, 7],
-  pieces: [
-    // Fundação enterrada, para a casa não ficar com pé no ar na encosta.
-    { kind: 'fill', block: 'cobblestone', box: [0, -3, 0, 6, 0, 6], replace: 'any' },
-    // Casca de tábuas e miolo vazio.
-    { kind: 'hollow', block: 'oak_planks', box: [0, 0, 0, 6, 4, 6], replace: 'any' },
-    { kind: 'fill', block: 'air', box: [1, 1, 1, 5, 3, 5], replace: 'any' },
-    // Cantos de tronco, que é o que faz uma caixa parecer uma casa.
-    { kind: 'fill', block: 'oak_log', box: [0, 1, 0, 0, 3, 0], replace: 'any' },
-    { kind: 'fill', block: 'oak_log', box: [6, 1, 0, 6, 3, 0], replace: 'any' },
-    { kind: 'fill', block: 'oak_log', box: [0, 1, 6, 0, 3, 6], replace: 'any' },
-    { kind: 'fill', block: 'oak_log', box: [6, 1, 6, 6, 3, 6], replace: 'any' },
-    // Telhado de laje, uma fileira acima da casca.
-    { kind: 'fill', block: 'cobblestone_slab', box: [0, 5, 0, 6, 5, 6], replace: 'any' },
-    // Porta na parede norte e janelas de vidro nas laterais.
-    { kind: 'fill', block: 'air', box: [3, 1, 0, 3, 2, 0], replace: 'any' },
-    // A porta ocupa duas células desde o M8: as duas metades entram aqui, senão
-    // a aldeia nasce com meia porta e o ouvinte de `world/multiblock.ts` — que
-    // ignora a geração de propósito — não tem o que consertar.
-    { kind: 'point', block: 'oak_door', box: [3, 1, 0, 3, 1, 0], replace: 'any', state: 3 },
-    { kind: 'point', block: 'oak_door_top', box: [3, 2, 0, 3, 2, 0], replace: 'any', state: 3 },
-    { kind: 'point', block: 'glass', box: [0, 2, 3, 0, 2, 3], replace: 'any' },
-    { kind: 'point', block: 'glass', box: [6, 2, 3, 6, 2, 3], replace: 'any' },
-    { kind: 'point', block: 'glass', box: [3, 2, 6, 3, 2, 6], replace: 'any' },
-    // Mobília: mesa de trabalho, tocha e cama.
-    { kind: 'point', block: 'crafting_table', box: [1, 1, 5, 1, 1, 5], replace: 'any' },
-    // Tocha pendurada na parede norte (encaixe 3 = apoio em −Z).
-    { kind: 'point', block: 'torch', box: [2, 2, 1, 2, 2, 1], replace: 'any', state: 3 },
-    // Cama com o pé em (5,1,1) e a cabeceira em (5,1,2): estado 2 é +Z.
-    { kind: 'point', block: 'bed', box: [5, 1, 1, 5, 1, 1], replace: 'any', state: 2 },
-    { kind: 'point', block: 'bed_head', box: [5, 1, 2, 5, 1, 2], replace: 'any', state: 3 },
-  ],
+  pieces: HOUSE_PIECES,
   chests: [{ at: [1, 1, 1], loot: 'village' }],
-  placement: {
-    attempts: 1, minY: 0, maxY: 0, surface: true,
-    biomes: ['plains', 'savanna', 'desert'],
-  },
+  placement: VILLAGE_PLACEMENT,
 };
+
+/**
+ * Terreiro na frente da porta (M9): fundação, piso de terra batida na altura
+ * do piso da casa, ar em cima, e o bloco de trabalho do ofício. É onde o
+ * aldeão passa a manhã — fora de casa, onde se vê.
+ */
+function yard(workstation: string): Piece[] {
+  return [
+    { kind: 'fill', block: 'cobblestone', box: [0, -3, -3, 6, -1, -1], replace: 'any' },
+    { kind: 'fill', block: 'dirt_path', box: [0, 0, -3, 6, 0, -1], replace: 'any' },
+    { kind: 'fill', block: 'air', box: [0, 1, -3, 6, 3, -1], replace: 'any' },
+    ...frontStep(-4),
+    { kind: 'point', block: workstation, box: [5, 1, -2, 5, 1, -2], replace: 'any' },
+  ];
+}
+
+/**
+ * Degrau largo na borda da frente (M9). A casa assenta na altura da origem, e
+ * a frente avança sobre o terreno: numa encosta ela virava uma plataforma dois
+ * blocos acima do chão, que ninguém sobe — o aldeão ficava ao pé dela, a seis
+ * blocos da cama. Com o degrau, a descida é de um bloco por vez.
+ */
+function frontStep(z: number): Piece[] {
+  return [
+    { kind: 'fill', block: 'cobblestone', box: [2, -3, z, 4, -2, z], replace: 'any' },
+    { kind: 'fill', block: 'dirt_path', box: [2, -1, z, 4, -1, z], replace: 'any' },
+    { kind: 'fill', block: 'air', box: [2, 0, z, 4, 2, z], replace: 'any' },
+  ];
+}
+
+/**
+ * Horta cercada do fazendeiro (M9, doc 14: "cercado de plantação"): dois
+ * canteiros de terra arada com um corredor no meio, água tampada por laje em
+ * cada canteiro e cerca em volta, aberta só no corredor. As plantas nascem
+ * meio crescidas.
+ */
+const FARM_YARD: readonly Piece[] = [
+  { kind: 'fill', block: 'dirt', box: [-1, -3, -6, 7, 0, -1], replace: 'any' },
+  { kind: 'fill', block: 'farmland', box: [0, 0, -5, 2, 0, -2], replace: 'any' },
+  { kind: 'fill', block: 'farmland', box: [4, 0, -5, 6, 0, -2], replace: 'any' },
+  { kind: 'fill', block: 'dirt_path', box: [3, 0, -6, 3, 0, -1], replace: 'any' },
+  { kind: 'fill', block: 'dirt_path', box: [0, 0, -1, 6, 0, -1], replace: 'any' },
+  { kind: 'fill', block: 'air', box: [-1, 1, -6, 7, 3, -1], replace: 'any' },
+  { kind: 'fill', block: 'wheat', box: [0, 1, -5, 2, 1, -2], replace: 'any', state: 5, alt: 'carrots', altChance: 0.3 },
+  { kind: 'fill', block: 'wheat', box: [4, 1, -5, 6, 1, -2], replace: 'any', state: 5, alt: 'potatoes', altChance: 0.3 },
+  { kind: 'point', block: 'water', box: [1, 0, -4, 1, 0, -4], replace: 'any' },
+  { kind: 'point', block: 'water', box: [5, 0, -4, 5, 0, -4], replace: 'any' },
+  // A água fica na altura da terra arada (é o que a hidrata) e ganha uma laje
+  // por cima: um buraco de água aberto no meio da horta prendia o aldeão, que
+  // caía nele e não conseguia pular para fora.
+  { kind: 'point', block: 'oak_slab', box: [1, 1, -4, 1, 1, -4], replace: 'any' },
+  { kind: 'point', block: 'oak_slab', box: [5, 1, -4, 5, 1, -4], replace: 'any' },
+  // As laterais param um bloco antes da casa: é a passagem de quem chega pelo
+  // lado. Fechada, a porta do fazendeiro só se alcançava pela abertura do
+  // corredor lá na frente, e quem vinha rente à parede ficava preso na quina.
+  { kind: 'fill', block: 'oak_fence', box: [-1, 1, -6, -1, 1, -2], replace: 'any' },
+  { kind: 'fill', block: 'oak_fence', box: [7, 1, -6, 7, 1, -2], replace: 'any' },
+  { kind: 'fill', block: 'oak_fence', box: [-1, 1, -6, 2, 1, -6], replace: 'any' },
+  { kind: 'fill', block: 'oak_fence', box: [4, 1, -6, 7, 1, -6], replace: 'any' },
+  ...frontStep(-7),
+];
+
+function houseOf(name: string, front: readonly Piece[]): StructureDef {
+  return {
+    name, village: true, size: [9, 6, 13],
+    pieces: [...front, ...HOUSE_PIECES],
+    chests: [{ at: [1, 1, 1], loot: 'village' }],
+    placement: VILLAGE_PLACEMENT,
+  };
+}
+
+/**
+ * Onde fica cada coisa numa casa de aldeia, relativo à origem — o que o
+ * aldeão precisa saber para morar nela (`game/village.ts`).
+ */
+export interface VillageHouseSpec {
+  structure: StructureDef;
+  /** Pé da cama. */
+  bed: readonly [number, number, number];
+  /** Metade de baixo da porta. */
+  door: readonly [number, number, number];
+  /** Para onde é a rua, em índice de `FACING_STEP` (3 = −Z). */
+  doorOut: number;
+  /** Onde o ofício trabalha de dia. */
+  work: readonly [number, number, number];
+}
+
+/** Uma casa por profissão, **na ordem de `PROFESSIONS`** (`data/villagers.ts`). */
+export const VILLAGE_HOUSES: readonly VillageHouseSpec[] = [
+  {
+    structure: houseOf('village_house_farmer', FARM_YARD),
+    bed: [5, 1, 1], door: [3, 1, 0], doorOut: 3, work: [3, 1, -3],
+  },
+  {
+    structure: houseOf('village_house_butcher', yard('crafting_table')),
+    bed: [5, 1, 1], door: [3, 1, 0], doorOut: 3, work: [5, 1, -2],
+  },
+  {
+    structure: houseOf('village_house_smith', yard('furnace')),
+    bed: [5, 1, 1], door: [3, 1, 0], doorOut: 3, work: [5, 1, -2],
+  },
+  {
+    structure: houseOf('village_house_librarian', yard('bookshelf')),
+    bed: [5, 1, 1], door: [3, 1, 0], doorOut: 3, work: [5, 1, -2],
+  },
+];
 
 /**
  * Poço central da aldeia: o marco que diz "aqui é o meio". Fica na âncora da
@@ -256,6 +381,7 @@ const VILLAGE_HOUSE: StructureDef = {
  */
 const VILLAGE_WELL: StructureDef = {
   name: 'village_well',
+  village: true,
   size: [5, 5, 5],
   pieces: [
     { kind: 'fill', block: 'cobblestone', box: [0, -4, 0, 4, 0, 4], replace: 'any' },
@@ -266,12 +392,14 @@ const VILLAGE_WELL: StructureDef = {
     { kind: 'fill', block: 'oak_fence', box: [1, 2, 3, 1, 3, 3], replace: 'any' },
     { kind: 'fill', block: 'oak_fence', box: [3, 2, 3, 3, 3, 3], replace: 'any' },
     { kind: 'fill', block: 'cobblestone_slab', box: [1, 4, 1, 3, 4, 3], replace: 'any' },
+    // O sino (M9), pendurado no meio do telhado, sobre a água.
+    { kind: 'point', block: 'bell', box: [2, 3, 2, 2, 3, 2], replace: 'any' },
   ],
-  placement: {
-    attempts: 1, minY: 0, maxY: 0, surface: true,
-    biomes: ['plains', 'savanna', 'desert'],
-  },
+  placement: VILLAGE_PLACEMENT,
 };
+
+/** Onde fica o sino do poço, relativo à origem do poço. */
+export const WELL_BELL: readonly [number, number, number] = [2, 3, 2];
 
 /*
  * As três estruturas do doc 03 §7 que faltavam (2026-09-22). Entram **no fim**
@@ -357,6 +485,8 @@ const SHIPWRECK: StructureDef = {
 
 export const STRUCTURES: readonly StructureDef[] = [
   DUNGEON, MINESHAFT, VILLAGE_HOUSE, VILLAGE_WELL, DESERT_WELL, WITCH_HUT, SHIPWRECK,
+  // M9: as casas por ofício, no fim para não mexer no sal de quem vem antes.
+  ...VILLAGE_HOUSES.map((house) => house.structure),
 ];
 
 export function structureByName(name: string): StructureDef | undefined {
@@ -367,5 +497,9 @@ export function structureByName(name: string): StructureDef | undefined {
 export const VILLAGE_REGION = 32;
 /** Raio, em chunks, em que as casas da aldeia se espalham a partir do poço. */
 export const VILLAGE_RADIUS = 2;
-/** Quantos aldeões nascem por aldeia (doc 03 §7). */
+/**
+ * Quantos aldeões uma aldeia tem (doc 03 §7). Sorteado por aldeia, e os
+ * moradores vão para as casas de menor sorteio; casa sem morador continua de
+ * pé — é a cama vaga que a aldeia tem para crescer.
+ */
 export const VILLAGERS_PER_VILLAGE: readonly [number, number] = [3, 8];

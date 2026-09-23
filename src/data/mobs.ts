@@ -28,7 +28,14 @@ export type GoalName =
   | 'followOwner'
   | 'breed'
   | 'wander'
-  | 'lookAtPlayer';
+  | 'lookAtPlayer'
+  // --- aldeia (M9, `entity/ai/villagegoals.ts`) ---
+  | 'trade'
+  | 'avoidHostile'
+  | 'goHome'
+  | 'work'
+  | 'stayInVillage'
+  | 'defendVillage';
 
 /** Traços que o motor consulta direto, sem passar por goal. */
 export interface MobTraits {
@@ -81,6 +88,11 @@ export interface MobTraits {
   milkable?: boolean;
   /** Pega e põe blocos do chão (enderman, doc 07 §1). */
   carriesBlocks?: boolean;
+  /**
+   * Uma pele por `variant` (M9): a profissão do aldeão. Índice fora da lista
+   * usa a pele base do mob.
+   */
+  variantSkins?: readonly string[];
 }
 
 export interface SpawnRule {
@@ -333,17 +345,27 @@ const SPECS: MobSpec[] = [
     despawnable: true, traits: { splitsOnDeath: true },
   },
 
-  // --- aldeia (M6) --------------------------------------------------------
+  // --- aldeia (M6, rotina no M9) -------------------------------------------
   // O aldeão **não** tem regra de spawn: ele nasce com a aldeia, e só. Sem
   // isso o mundo encheria de aldeões perdidos no meio do nada.
+  //
+  // A ordem dos goals é a rotina (M9): negociar vence tudo (ele para e olha
+  // para quem está negociando), fugir de monstro vence a casa, a casa (de
+  // noite e no alarme do sino) vence o trabalho, e o trabalho vence o passeio.
   {
     id: 12, name: 'villager', display: 'Aldeão', category: 'passive',
-    health: 20, width: 0.6, height: 1.95, speed: 0.9,
+    health: 20, width: 0.6, height: 1.95, speed: 2.4,
     followRange: 12, xp: [0, 0],
     drops: [],
-    goals: ['floatInWater', 'panic', 'wander', 'lookAtPlayer'],
+    goals: [
+      'floatInWater', 'trade', 'panic', 'avoidHostile', 'goHome', 'work', 'stayInVillage',
+      'wander', 'lookAtPlayer',
+    ],
     model: 'humanoid', skin: 'villager', sound: 'villager',
-    despawnable: false, traits: {},
+    despawnable: false,
+    traits: {
+      variantSkins: ['villager_farmer', 'villager_butcher', 'villager_smith', 'villager_librarian'],
+    },
   },
 
   /*
@@ -399,12 +421,50 @@ const SPECS: MobSpec[] = [
     despawnable: true,
     traits: { flies: true, shootsFireball: true, fireImmune: true, modelScale: 4 },
   },
+
+  // --- aldeia (M9) --------------------------------------------------------
+  /*
+   * Golem de ferro: nasce com a aldeia e a defende. Não caça o jogador — só
+   * quem bate num aldeão perto dele, ou nele mesmo (`neutralUntilProvoked`).
+   * O alvo de todo dia é o hostil que chega perto das casas (`defendVillage`).
+   *
+   * Humanoide em escala 1,4: 2,7 blocos de altura, a leitura de "maior que
+   * gente" sem um modelo novo.
+   */
+  {
+    id: 16, name: 'iron_golem', display: 'Golem de Ferro', category: 'neutral',
+    health: 100, width: 0.6, height: 1.95, speed: 3.2,
+    attack: { damage: [7, 11, 15], reach: 2.2, cooldownTicks: 20 },
+    followRange: 16, xp: [0, 0],
+    drops: [
+      { item: 'iron_ingot', count: [3, 5] },
+      { item: 'poppy', count: [0, 2] },
+    ],
+    goals: [
+      'floatInWater', 'defendVillage', 'attackMelee', 'moveToTarget', 'stayInVillage',
+      'wander', 'lookAtPlayer',
+    ],
+    model: 'humanoid', skin: 'iron_golem', sound: 'iron_golem',
+    despawnable: false,
+    traits: { neutralUntilProvoked: true, modelScale: 1.4 },
+  },
 ];
 
-export const MOBS: readonly MobDef[] = SPECS.map((spec) => ({
-  ...spec,
-  traits: spec.traits ?? {},
-}));
+/**
+ * Indexada **pelo id**, não pela ordem de declaração.
+ *
+ * `mobDef(id)` lê `MOBS[id]`, e o morcego (id 15) entrou na lista antes do
+ * porco zumbi (13) e do ghast (14) em 2026-09-14: de lá até 2026-09-23 o
+ * `mobDef(13)` devolvia o morcego, o 14 o porco zumbi e o 15 o ghast. As três
+ * criaturas trocavam de corpo e de IA — o morcego das cavernas atirava bola de
+ * fogo. A lista é ordenada aqui e o buraco na numeração vira erro no boot.
+ */
+export const MOBS: readonly MobDef[] = SPECS
+  .map((spec) => ({ ...spec, traits: spec.traits ?? {} }))
+  .sort((a, b) => a.id - b.id);
+MOBS.forEach((mob, index) => {
+  if (mob.id !== index) throw new Error(`id de mob fora de sequência: ${mob.name} (${mob.id})`);
+});
 
 export const MOB_BY_NAME: ReadonlyMap<string, MobDef> = new Map(
   MOBS.map((mob) => [mob.name, mob]),

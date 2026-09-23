@@ -12,6 +12,60 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-23 · 10:05 → 11:03 · M9: gente no mundo
+
+**Pedido:** *"M12 testado com sucesso, qual o próximo ponto?"* — recomendado o M9 — e *"Pode
+implementar o M9"*.
+
+**Resultado:** M9 fechado. Quatro ofícios com trocas como dado; rotina de dia e noite com a porta
+atravessada de verdade e o aldeão deitado na cama; aldeia com caminhos de terra, hortas cercadas,
+terreiro por ofício e sino no poço; golem de ferro; reputação por aldeia gravada na meta do mundo;
+troca numa tela do sistema de contêineres (a leitura do critério está no doc 15 §3). **Medido:** 47
+de 47 aldeões em casa ao entardecer em 11 aldeias; 20 aldeões em 0,08 ms por tick (aceite: 1 ms).
+Vista no Chrome: a aldeia do alto e a tela "Aldeão — Fazendeiro".
+
+Três defeitos antigos apareceram e foram corrigidos: **`mobDef` trocava morcego, porco zumbi e
+ghast** (a tabela estava na ordem de declaração, desde 2026-09-14), **nenhum mob subia um degrau
+de bloco inteiro** (pulo de 0,83, desde o M5) e **mob em coluna não carregada caía no vazio**. Os
+dois primeiros com regressão. O M12 foi registrado como validado em campo.
+
+Portões: **2023 testes** em 101 arquivos, lint limpo, build ok, **239,4 KB** de 350, smoke verde.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| **Dado** | | |
+| `+` | `src/data/villagers.ts` | ofícios, ofertas, horários da rotina, prazos do sino e da reputação |
+| `~` | `src/data/mobs.ts` | goals da aldeia, `variantSkins`, golem de ferro; tabela ordenada pelo id (correção) |
+| `~` | `src/data/mobskins.ts` | pele por ofício e do golem |
+| `~` | `src/data/structures.ts` | casa por ofício com terreiro ou horta cercada, degrau da frente, sino no poço, `village`, `VILLAGE_HOUSES` |
+| `~` | `src/data/blocks.ts`, `data/loot.ts`, `data/textures.ts` | sino (forma própria) e caminho de terra |
+| **Mob** | | |
+| `+` | `src/entity/villagestate.ts` | casa, porta, posto, poço, trocas e alvo do golem, junto do `MobStore` |
+| `+` | `src/entity/ai/villagegoals.ts` | `trade`, `avoidHostile`, `goHome`, `work`, `stayInVillage`, `defendVillage`, travessia da porta, saída de canto |
+| `~` | `src/entity/ai/goals.ts` | `dayTime`, `hitMob`, `setDoor`, `villageSound` no contexto |
+| `~` | `src/entity/mobs.ts` | goals unidos, golpe entre mobs, eventos de porta e de golpe do jogador, mob parado fora do mundo carregado |
+| `~` | `src/entity/mobstore.ts` | `FLAG_SLEEPING`, `FLAG_TRADING`, estado da aldeia; pulo que sobe um bloco (correção) |
+| `~` | `src/entity/ai/pathfinder.ts` | porta é passagem |
+| **Mundo e jogo** | | |
+| `+` | `src/world/gen/village.ts` | plano da aldeia (poço, casa, ofício, moradores) e caminhos de terra |
+| `~` | `src/world/gen/structures.ts` | aldeia sai do plano; sem marcos de aldeão |
+| `+` | `src/game/village.ts` | moradores com o chunk, reputação, sino, porta |
+| `+` | `src/game/trading.ts` | ofertas, pagamento e reabastecimento diário |
+| `~` | `src/game/session.ts`, `sessionwiring.ts`, `workbench.ts` | aldeia e troca ligadas; clique direito no aldeão; sino; tela `trading` |
+| `~` | `src/game/savegame.ts`, `src/save/db.ts` | `villageBans` na meta do mundo |
+| **Tela, render e som** | | |
+| `+` | `src/ui/containers/tradepanel.ts` | lista de ofertas com o desenho dos itens |
+| `~` | `src/ui/containers/screen.ts`, `screenstyle.ts`, `src/ui/gamescreens.ts` | tela de troca |
+| `~` | `src/render/entityatlas.ts`, `render/scenefeed.ts` | pele por variante; aldeão deitado |
+| `~` | `src/world/mesh/shapes.ts`, `mesh/blockinfo.ts` | forma do sino |
+| `~` | `src/audio/synth.ts` | sino, bigorna, voz do golem |
+| **Testes e docs** | | |
+| `+` | `tests/village.test.ts` | 15 testes: aldeia gerada, moradores, entardecer, trabalho, sino, troca, esgotar e reabastecer, reputação e meta, golem contra zumbi, chunk leva e traz, A* pela porta, orçamento |
+| `~` | `tests/mobs.test.ts` | contagem com o golem; regressões de `mobDef` e do degrau |
+| `~` | `docs/14-roadmap.md`, `docs/15-status.md`, `README.md` | M9 fechado, M12 validado, §4 com os quatro achados |
+
+---
+
 ## 2026-09-23 · 09:10 → 09:58 · M12: o mundo chega antes do jogador
 
 **Pedido:** *"Deu tudo certo nos testes do M11 e M13. Qual seria o próximo marco para atacarmos?"* —

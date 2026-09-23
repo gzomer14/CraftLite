@@ -106,6 +106,11 @@ export function mobEvents(s: Session, events: SessionEvents): MobEvents {
         fireball ? FIREBALL_FLAGS : 0,
       );
     },
+    // Aldeia (M9): o aldeão abre a porta de casa, e bater nele tem memória.
+    onDoor: (x: number, y: number, z: number, open: boolean) => {
+      s.villages.onDoor(x, y, z, open);
+    },
+    onHurtByPlayer: (i: number) => { s.villages.onHurtByPlayer(i); },
   };
 }
 

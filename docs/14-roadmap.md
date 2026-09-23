@@ -182,22 +182,28 @@ parte do aparelho** — o resto está entregue e medido (doc 15 §2 e §3).
 
 ---
 
-## M9 — Gente no mundo
+## M9 — Gente no mundo ✅
 
 > Proposta de 2026-09-16. Depende do M8 só no espírito: primeiro as coisas parecem coisas,
 > depois o mundo fica habitado.
 
-- [ ] **Aldeão** com profissão, rotina de dia e noite (trabalha, dorme na cama, entra em casa ao
+- [x] **Aldeão** com profissão, rotina de dia e noite (trabalha, dorme na cama, entra em casa ao
       anoitecer) e troca por esmeralda — a tabela de trocas é dado, como tudo o mais.
-- [ ] **Aldeia de verdade**: várias casas ligadas por caminho, poço no meio, cercado de plantação,
+      *(2026-09-23: quatro ofícios em `data/villagers.ts`; rotina em `entity/ai/villagegoals.ts`.)*
+- [x] **Aldeia de verdade**: várias casas ligadas por caminho, poço no meio, cercado de plantação,
       e sino. Hoje a aldeia é um punhado de casas soltas.
-- [ ] **Golem de ferro** que nasce na aldeia e defende quem mora lá.
-- [ ] **Reputação**: bater em aldeão fecha as trocas por um tempo.
-- [ ] Sons de aldeia (bigorna ao longe, porta, sino) no mesmo sintetizador de sempre.
+      *(2026-09-23: `world/gen/village.ts`; o sino fica pendurado no poço.)*
+- [x] **Golem de ferro** que nasce na aldeia e defende quem mora lá. *(Um por aldeia, com o poço;
+      não se constrói golem nem nasce um novo com o tempo.)*
+- [x] **Reputação**: bater em aldeão fecha as trocas por um tempo. *(Um dia de jogo, por aldeia,
+      gravado na meta do mundo; o golem da aldeia se vira contra o jogador.)*
+- [x] Sons de aldeia (bigorna ao longe, porta, sino) no mesmo sintetizador de sempre.
 
 **Critério de aceite:** chegar numa aldeia ao entardecer e ver os aldeões entrarem em casa
 sozinhos; trocar dois itens sem abrir nenhum menu que não exista hoje. 20 aldeões no tick sem
-passar de 1 ms (o orçamento atual de 20 mobs é 0,20 ms).
+passar de 1 ms (o orçamento atual de 20 mobs é 0,20 ms). *(2026-09-23: 47 de 47 aldeões deitados
+na própria cama em 11 aldeias; a troca é uma tela do sistema de contêineres — ver doc 15 §3 —;
+20 aldeões em 0,08 ms por tick.)*
 
 ---
 

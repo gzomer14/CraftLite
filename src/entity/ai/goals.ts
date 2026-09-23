@@ -33,6 +33,8 @@ export interface AiContext {
   skyLight: number;
   blockLight: number;
   isDay: boolean;
+  /** Tick do dia, 0..23999 — a rotina da aldeia (M9). */
+  dayTime: number;
   /** Aleatório do jogo — mobs não precisam ser determinísticos pela seed. */
   random(): number;
 
@@ -47,6 +49,12 @@ export interface AiContext {
   playSound(i: number, kind: 'ambient' | 'attack'): void;
   /** Os dois se encontraram: nasce o filhote entre eles. */
   breed(i: number, partner: number): void;
+  /** Um mob acerta outro — o golem no zumbi (M9). */
+  hitMob(i: number, target: number, damage: number): void;
+  /** Abre ou fecha a porta em `(x, y, z)`, as duas folhas (M9). */
+  setDoor(x: number, y: number, z: number, open: boolean): void;
+  /** Som com nome, na posição do mob — a bigorna do ferreiro (M9). */
+  villageSound(i: number, name: string): void;
 }
 
 export type Goal = (ctx: AiContext, i: number) => boolean;
@@ -84,7 +92,12 @@ const BREED_TOUCH = 1.6;
 /** Distância em que o esqueleto recua em vez de avançar. */
 const SHOOT_MIN = 5;
 
-export const GOALS: Record<GoalName, Goal> = {
+/** Os goals daqui; os da aldeia estão em `villagegoals.ts` e o `Mobs` junta os dois. */
+export type BaseGoalName = Exclude<
+  GoalName, 'trade' | 'avoidHostile' | 'goHome' | 'work' | 'stayInVillage' | 'defendVillage'
+>;
+
+export const GOALS: Record<BaseGoalName, Goal> = {
   /** Não afogar: sobe enquanto a cabeça está submersa. Nunca bloqueia. */
   floatInWater(ctx, i) {
     const s = ctx.store;

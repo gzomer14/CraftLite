@@ -313,6 +313,7 @@ export class SaveGame {
     this.session.dayNight.time = this.meta.time % TICKS_PER_DAY;
     this.session.weather.setSeed(this.session.world.seed);
     this.session.survival.difficulty = this.meta.difficulty;
+    this.session.villages.loadBans(this.meta.villageBans);
     if (saved === undefined) return false;
     this.restore(saved);
     return true;
@@ -324,6 +325,7 @@ export class SaveGame {
       this.meta.time = this.session.dayNight.totalTicks;
       this.meta.difficulty = this.session.survival.difficulty;
       this.meta.gameMode = this.player.mode;
+      this.meta.villageBans = this.session.villages.saveBans();
       await this.manager.flush();
       await this.manager.savePlayer(this.snapshot());
       await this.manager.saveTiles(this.tileRecords());

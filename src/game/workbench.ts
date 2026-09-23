@@ -28,7 +28,8 @@ const BOOKSHELF = BLOCK_BY_NAME.get('bookshelf')?.id ?? -1;
 const LAPIS = ITEM_BY_NAME.get('lapis_lazuli')?.id ?? -1;
 
 /** O que o jogador tem aberto no momento. */
-export type OpenScreen = 'none' | 'inventory' | 'crafting' | 'furnace' | 'chest' | 'enchanting';
+export type OpenScreen =
+  | 'none' | 'inventory' | 'crafting' | 'furnace' | 'chest' | 'enchanting' | 'trading';
 
 /** O que a bancada precisa da sessão. */
 export interface WorkbenchHost {

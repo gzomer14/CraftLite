@@ -21,10 +21,13 @@ import { PaperDoll } from './paperdoll';
 import { ItemTooltip } from './tooltip';
 import { clickContainer } from './containerclick';
 import { injectStyle } from './screenstyle';
+import { TradePanel } from './tradepanel';
+import type { TradeOfferView, TradeResult } from '../../game/trading';
 import type { RecipeEntry } from '../../game/crafting';
 
 /** Qual tela está aberta. */
-export type ScreenKind = 'none' | 'inventory' | 'crafting' | 'furnace' | 'chest' | 'enchanting';
+export type ScreenKind =
+  | 'none' | 'inventory' | 'crafting' | 'furnace' | 'chest' | 'enchanting' | 'trading';
 
 /** Por que uma oferta de encantamento não pôde ser comprada. */
 export type EnchantResult = 'ok' | 'no-offer' | 'no-level' | 'no-lapis';
@@ -70,6 +73,12 @@ export interface ContainerScreenCallbacks {
    * contar o item como obtido (conquistas).
    */
   onFurnaceOutput?: (furnace: Furnace, item: number) => void;
+  /** Ofertas do aldeão com quem se negocia (M9). */
+  tradeOffers?: () => readonly TradeOfferView[];
+  /** Faz a troca; a mensagem vem do retorno. */
+  onBuyTrade?: (slot: number) => TradeResult;
+  /** Título da tela de troca: "Aldeão — Ferreiro". */
+  tradeTitle?: () => string;
   /** Duração do toque longo, das opções (doc 08 §6). */
   longPressMs?: () => number;
   /** Vibração curta ao confirmar o toque longo; ausente = sem retorno tátil. */
@@ -134,6 +143,8 @@ export class ContainerScreen {
   } | null = null;
   private readonly book: RecipeBookPanel | null;
   private readonly bookToggle: HTMLButtonElement;
+  /** Ofertas do aldeão (M9), criadas na primeira tela de troca. */
+  private trades: TradePanel | null = null;
   /** Rodapé com o botão de fechar — a única saída sem teclado. */
   private readonly footer: HTMLDivElement;
   /** Colunas do painel; `column` é onde `addSection` escreve agora. */
@@ -356,6 +367,7 @@ export class ContainerScreen {
     const titles: Record<ScreenKind, string> = {
       none: '', inventory: 'Inventário', crafting: 'Bancada',
       furnace: 'Fornalha', chest: 'Baú', enchanting: 'Mesa de Encantamento',
+      trading: this.callbacks.tradeTitle?.() ?? 'Aldeão',
     };
     this.title.textContent = titles[this.kind];
 
@@ -391,6 +403,19 @@ export class ContainerScreen {
       this.addSection('Item', 1, [ENCHANT_ITEM], 'cont', 'Item a encantar');
       this.addSection('', 1, [ENCHANT_LAPIS], 'cont', 'Lápis-lazúli');
       this.addOffers();
+    } else if (this.kind === 'trading') {
+      this.trades ??= new TradePanel({
+        offers: () => this.callbacks.tradeOffers?.() ?? [],
+        buy: (slot) => {
+          const result = this.callbacks.onBuyTrade?.(slot) ?? 'closed';
+          this.refresh();
+          return result;
+        },
+        spriteOf: this.callbacks.spriteOf,
+        colorOf: this.callbacks.colorOf,
+      });
+      this.trades.reset();
+      this.column.appendChild(this.trades.element);
     } else if (this.kind === 'chest') {
       const size = this.container?.size ?? 27;
       const indices: number[] = [];
@@ -762,6 +787,7 @@ export class ContainerScreen {
 
     if (this.kind === 'furnace') this.refreshFurnace();
     if (this.kind === 'enchanting') this.refreshOffers();
+    if (this.kind === 'trading') this.trades?.refresh();
   }
 
   /**

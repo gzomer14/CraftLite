@@ -30,6 +30,7 @@ export interface LootEntry {
 export const BLOCK_LOOT: Record<string, LootEntry> = {
   stone: { drops: [{ item: 'cobblestone', count: 1 }] },
   grass_block: { drops: [{ item: 'dirt', count: 1 }] },
+  dirt_path: { drops: [{ item: 'dirt', count: 1 }] },
   podzol: { drops: [{ item: 'dirt', count: 1 }] },
   coarse_dirt: { drops: [{ item: 'dirt', count: 1 }] },
   gravel: {

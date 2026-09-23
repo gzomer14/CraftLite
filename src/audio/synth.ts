@@ -351,6 +351,8 @@ const MOB_VOICES: Record<string, VoiceSpec> = {
   bat: { freq: 900, type: 'triangle', formants: [2400, 4200], vibrato: 0.06, noise: 0.22 },
   // O choro do ghast (M7): agudo, trêmulo e fino — ele é ouvido antes de visto.
   ghast: { freq: 520, type: 'sine', formants: [900, 2100], vibrato: 0.08, noise: 0.18 },
+  // O golem de ferro (M9): grave e metálico, mais rangido que voz.
+  iron_golem: { freq: 70, type: 'square', formants: [240, 620], noise: 0.35 },
 };
 
 /** Variação de cada tipo de vocalização a partir da voz base. */
@@ -403,6 +405,11 @@ const BASE_SOUNDS: Record<string, Recipe> = {
   // M6: coletar orbe é um "plim" curto e agudo; encantar é um acorde místico.
   'ui/xp': { kind: 'tones', duration: 0.08, freqs: [1318.5, 1760], type: 'sine', gain: 0.18, decay: 0.07 },
   'ui/enchant': { kind: 'arpeggio', notes: [261.63, 392, 523.25, 659.25], step: 0.09, gain: 0.26, decay: 0.6 },
+
+  // Aldeia (M9): o sino do poço, com parciais fora de série harmônica — é isso
+  // que soa "sino" e não "nota" —, e a bigorna do ferreiro, curta e seca.
+  'block/bell': { kind: 'tones', duration: 0.9, freqs: [440, 1080, 1590, 2320], type: 'sine', gain: 0.32, decay: 0.85 },
+  'village/anvil': { kind: 'tones', duration: 0.14, freqs: [1600, 2400, 3500], type: 'square', gain: 0.16, decay: 0.12 },
 
   'mob/enderman_teleport': { kind: 'tones', duration: 0.3, freqs: [180, 900, 1800], type: 'sine', gain: 0.35, decay: 0.24, freqTo: 3000 },
 

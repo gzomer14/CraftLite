@@ -21,17 +21,14 @@
 
 import { AIR, BLOCK_BY_NAME, makeState } from '../../data/blocks';
 import { BIOMES } from '../../data/biomes';
-import {
-  CHEST_LOOT, STRUCTURES, VILLAGERS_PER_VILLAGE, VILLAGE_RADIUS, VILLAGE_REGION,
-  structureByName, type Piece, type StructureDef,
-} from '../../data/structures';
-import { hash2, hash3 } from '../../core/rng';
+import { CHEST_LOOT, STRUCTURES, type Piece, type StructureDef } from '../../data/structures';
+import { hash3 } from '../../core/rng';
+import { placeVillage, placeVillagePaths } from './village';
 import { SEA_LEVEL, SECTION_SIZE, WORLD_HEIGHT, type ChunkColumn } from '../chunk';
 import type { HeightField } from './heightfield';
 
 /** Sal do RNG de estrutura — separado do terreno, dos minérios e da decoração. */
 const SALT_STRUCTURE = 40;
-const SALT_VILLAGE = 41;
 const SALT_LOOT = 42;
 
 /**
@@ -59,6 +56,8 @@ function blockId(name: string): number {
 export function placeStructures(
   chunk: ChunkColumn, seed: number, field: HeightField,
 ): void {
+  // Caminhos da aldeia primeiro: a casa que passa por cima de um vence (M9).
+  placeVillagePaths(chunk, seed, field);
   for (let dz = -SEARCH_RADIUS; dz <= SEARCH_RADIUS; dz++) {
     for (let dx = -SEARCH_RADIUS; dx <= SEARCH_RADIUS; dx++) {
       placeFromOrigin(chunk, seed, field, chunk.cx + dx, chunk.cz + dz);
@@ -73,10 +72,10 @@ function placeFromOrigin(
   for (let i = 0; i < STRUCTURES.length; i++) {
     const def = STRUCTURES[i];
     // A aldeia tem regra de região própria; as demais são por chunk.
-    if (def.name === 'village_house' || def.name === 'village_well') continue;
+    if (def.village === true) continue;
     tryPlace(chunk, seed, field, def, ocx, ocz, i);
   }
-  placeVillage(chunk, seed, field, ocx, ocz);
+  placeVillage(seed, field, ocx, ocz, (def, ox, oy, oz) => stamp(chunk, seed, def, ox, oy, oz));
 }
 
 /** Tentativas por chunk da estrutura, com posição sorteada dentro dele. */
@@ -124,54 +123,6 @@ function biomeAllows(def: StructureDef, field: HeightField, ox: number, oz: numb
   if (allowed === undefined || allowed.length === 0) return true;
   const biome = BIOMES[field.sample(ox, oz).biome];
   return allowed.indexOf(biome.name) >= 0;
-}
-
-/**
- * Aldeia: um poço por região de 32×32 chunks e casas nos chunks em volta
- * (doc 03 §7). Os aldeões nascem junto com o poço.
- */
-function placeVillage(
-  chunk: ChunkColumn, seed: number, field: HeightField, ocx: number, ocz: number,
-): void {
-  const regionX = Math.floor(ocx / VILLAGE_REGION);
-  const regionZ = Math.floor(ocz / VILLAGE_REGION);
-  const pick = hash2(seed, regionX, regionZ, SALT_VILLAGE);
-  // Chunk-âncora da região, sorteado dentro dela.
-  const anchorX = regionX * VILLAGE_REGION + (pick % VILLAGE_REGION);
-  const anchorZ = regionZ * VILLAGE_REGION + ((pick >>> 8) % VILLAGE_REGION);
-
-  const distX = Math.abs(ocx - anchorX);
-  const distZ = Math.abs(ocz - anchorZ);
-  if (distX > VILLAGE_RADIUS || distZ > VILLAGE_RADIUS) return;
-
-  const isAnchor = distX === 0 && distZ === 0;
-  const def = structureByName(isAnchor ? 'village_well' : 'village_house');
-  if (def === undefined) return;
-
-  // Nem todo chunk do raio ganha casa: aldeia com casa em todo lugar vira
-  // quarteirão, não vilarejo.
-  if (!isAnchor) {
-    const roll = hash2(seed, ocx, ocz, SALT_VILLAGE + 1) / 4294967296;
-    if (roll > 0.55) return;
-  }
-
-  const offset = hash2(seed, ocx, ocz, SALT_VILLAGE + 2);
-  const ox = ocx * SECTION_SIZE + 2 + (offset & 7);
-  const oz = ocz * SECTION_SIZE + 2 + ((offset >>> 3) & 7);
-  if (!biomeAllows(def, field, ox, oz)) return;
-  const oy = pickY(def, ox, oz, offset, field);
-  if (oy < 0) return;
-
-  stamp(chunk, seed, def, ox, oy, oz);
-
-  if (isAnchor) {
-    const [min, max] = VILLAGERS_PER_VILLAGE;
-    const count = min + ((offset >>> 12) % (max - min + 1));
-    for (let i = 0; i < count; i++) {
-      const jitter = hash3(seed, ox, i, oz, SALT_VILLAGE + 3);
-      markInChunk(chunk, 'mob', ox + 2 + (jitter & 7) - 3, oy + 1, oz + 2 + ((jitter >>> 3) & 7) - 3, 'villager');
-    }
-  }
 }
 
 /**

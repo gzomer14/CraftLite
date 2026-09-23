@@ -17,7 +17,7 @@ export type BlockShape =
   | 'cube' | 'cross' | 'slab' | 'stairs' | 'fence' | 'fence_gate' | 'door' | 'trapdoor'
   | 'torch' | 'carpet' | 'flat' | 'liquid' | 'pane' | 'ladder' | 'sign' | 'painting'
   | 'lever' | 'button' | 'plate' | 'repeater' | 'piston' | 'piston_head' | 'rail' | 'bed'
-  | 'chest' | 'cake' | 'none';
+  | 'chest' | 'cake' | 'bell' | 'none';
 
 /**
  * De que o bloco precisa para continuar existindo (M7).
@@ -734,6 +734,15 @@ SPECS.push(
     ...plant(), emission: 1 },
   { id: 141, name: 'red_mushroom', display: 'Cogumelo Vermelho', tex: 'block/red_mushroom',
     ...plant() },
+  /*
+   * Aldeia (M9). O sino fica pendurado debaixo do telhado do poço: tocá-lo
+   * manda os aldeões para casa (`game/village.ts`). O caminho é a terra batida
+   * que liga as casas ao poço — não se obtém como item, quebrado dá terra.
+   */
+  { id: 142, name: 'bell', display: 'Sino', tex: 'block/bell', shape: 'bell',
+    hardness: 5, opaque: false, lightAttenuation: 0, ...rock('pickaxe', 1), sound: 'stone' },
+  { id: 143, name: 'dirt_path', display: 'Caminho de Terra', ...soil(), itemless: true,
+    tex: { top: 'block/dirt_path_top', side: 'block/dirt', bottom: 'block/dirt' } },
 );
 SPECS.push(...dyedSpecs());
 

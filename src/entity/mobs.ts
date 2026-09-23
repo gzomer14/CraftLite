@@ -11,9 +11,10 @@
 import { LAVA, blockIdOf } from '../data/blocks';
 import { ITEM_BY_NAME } from '../data/items';
 import { lootingBonus } from '../game/enchanting';
-import { MOBS, mobDef, type MobDef } from '../data/mobs';
+import { MOBS, mobDef, type GoalName, type MobDef } from '../data/mobs';
 import { raycast } from '../world/raycast';
-import { GOALS, type AiContext } from './ai/goals';
+import { GOALS, type AiContext, type Goal } from './ai/goals';
+import { VILLAGE_GOALS } from './ai/villagegoals';
 import { babyVariant, deathDrops, tickHusbandry } from './husbandry';
 import { Pathfinder, REQUESTS_PER_TICK, standHeight } from './ai/pathfinder';
 import {
@@ -79,6 +80,10 @@ export interface MobEvents {
     x: number, y: number, z: number,
     dx: number, dy: number, dz: number, damage: number, fireball?: boolean,
   ): void;
+  /** Um aldeão abriu ou fechou a porta de casa (M9). Quem ouve troca as duas folhas. */
+  onDoor?(x: number, y: number, z: number, open: boolean): void;
+  /** O jogador acertou este mob (M9: reputação da aldeia, golem que se vira). */
+  onHurtByPlayer?(i: number): void;
 }
 
 export interface PlayerView {
@@ -106,6 +111,8 @@ export class Mobs {
   difficulty = 2;
   /** Dia claro? Vem do ciclo dia/noite. */
   isDay = true;
+  /** Tick do dia, 0..23999 — a rotina da aldeia (M9). */
+  dayTime = 1000;
   /**
    * Nível de Pilhagem da arma que está desferindo o golpe atual (M6).
    *
@@ -161,6 +168,12 @@ export class Mobs {
       requestPath: (i, x, y, z) => this.enqueuePath(i, x, y, z),
       playSound: (i, kind) => this.emitSound(i, kind),
       breed: (i, partner) => this.breed(i, partner),
+      dayTime: 1000,
+      hitMob: (i, target, damage) => this.hitMob(i, target, damage),
+      setDoor: (x, y, z, open) => { this.events.onDoor?.(x, y, z, open); },
+      villageSound: (i, name) => {
+        this.events.onSound(name, this.store.x[i], this.store.centerY(i), this.store.z[i]);
+      },
     };
   }
 
@@ -218,9 +231,19 @@ export class Mobs {
     ctx.playerHeld = player.held;
     ctx.difficulty = this.difficulty;
     ctx.isDay = this.isDay;
+    ctx.dayTime = this.dayTime;
 
     const s = this.store;
     for (let i = 0; i < s.active; i++) {
+      /*
+       * Mob em coluna não carregada fica parado (M9). Sem isto o `getBlock` de
+       * fora do mundo carregado responde ar, e todo bicho que ficou para trás
+       * caía até o fundo do mundo e morria de "void" — os aldeões de uma
+       * aldeia de que o jogador se afastava inclusive.
+       */
+      if (!this.world.isLoaded(Math.floor(s.x[i]), Math.floor(s.z[i]))) continue;
+      // Morto por outro mob no tick (ver `hitMob`): morre agora, no próprio slot.
+      if (s.health[i] <= 0) { this.die(i, mobDef(s.type[i])); i--; continue; }
       s.age[i]++;
       if (s.pathCooldown[i] > 0) s.pathCooldown[i]--;
       if (s.tickGrowth(i)) this.emitSound(i, 'ambient');
@@ -388,7 +411,7 @@ export class Mobs {
   private runGoals(i: number): void {
     const goals = mobDef(this.store.type[i]).goals;
     for (let g = 0; g < goals.length; g++) {
-      if (GOALS[goals[g]](this.ctx, i)) return;
+      if (ALL_GOALS[goals[g]](this.ctx, i)) return;
     }
   }
 
@@ -494,6 +517,8 @@ export class Mobs {
       else s.setFlag(i, FLAG_ANGRY, true);
       if (def.traits.callsForHelp === true) this.callForHelp(i);
       if (def.traits.teleportsOnDamage === true) this.teleport(i);
+      // Antes de morrer: quem ouve precisa do mob ainda no slot.
+      this.events.onHurtByPlayer?.(i);
     }
 
     if (s.health[i] > 0) {
@@ -676,6 +701,31 @@ export class Mobs {
     this.events.onXp(1 + Math.floor(this.rng() * 7), x, y, z);
   }
 
+  /**
+   * Golpe de um mob em outro (M9: o golem no zumbi), com o empurrão para cima
+   * que é a assinatura do golem. Se o alvo morrer, o slot dele vira outro mob —
+   * quem guardava o índice (`VillageState.targetMob`) revalida no tick seguinte.
+   */
+  private hitMob(i: number, target: number, damage: number): void {
+    const s = this.store;
+    if (target < 0 || target >= s.active || damage <= 0) return;
+    const dx = s.x[target] - s.x[i];
+    const dz = s.z[target] - s.z[i];
+    const length = Math.hypot(dx, dz) || 1;
+    /*
+     * Sem `damage()`: ele remove o morto na hora, e remover trocaria o último
+     * mob do pool para este slot — que pode ser o próprio golem, no meio do
+     * goal dele. A vida vai a zero aqui e a morte acontece no tick da vítima
+     * (`tick`, primeira checagem do laço).
+     */
+    s.health[target] -= damage;
+    s.hurtTicks[target] = HURT_TICKS;
+    if (s.health[target] > 0) this.emitSound(target, 'hurt');
+    s.vx[target] += (dx / length) * 0.3;
+    s.vz[target] += (dz / length) * 0.3;
+    s.vy[target] = 0.45;
+  }
+
   /** Provoca um mob (usado quando o jogador olha para o enderman, por exemplo). */
   provoke(i: number): void {
     this.store.setFlag(i, FLAG_ANGRY, true);
@@ -739,6 +789,9 @@ export class Mobs {
 
 /** Total de tipos de mob — o renderer usa para dimensionar buffers. */
 export const MOB_TYPES = MOBS.length;
+
+/** Todos os goals: os de sempre e os da aldeia (M9). */
+const ALL_GOALS: Record<GoalName, Goal> = { ...GOALS, ...VILLAGE_GOALS };
 
 /**
  * Distância do raio até a AABB, ou −1 se não acerta (slab method).

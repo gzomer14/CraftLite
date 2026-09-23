@@ -49,6 +49,8 @@ export class EntityAtlas {
    * por id de mob. Tabela plana para o render não montar string por quadro.
    */
   private readonly woolLayers = new Map<number, Int16Array>();
+  /** Camada de cada variante, por id de mob (M9: profissão do aldeão). */
+  private readonly variantLayers = new Map<number, Int16Array>();
 
   /**
    * `overrides` é a arte do jogador (`render/pack.ts`), por nome de skin. Ela
@@ -107,6 +109,24 @@ export class EntityAtlas {
       this.woolLayers.set(mob.id, table);
     }
 
+    // Uma pele por variante (M9: a profissão do aldeão).
+    for (const mob of MOBS) {
+      const skins = mob.traits.variantSkins;
+      if (skins === undefined) continue;
+      const model = modelOf(mob.model);
+      const table = new Int16Array(skins.length);
+      for (let v = 0; v < skins.length; v++) {
+        const name = skins[v];
+        const recipe = MOB_SKINS[name];
+        table[v] = pixels.length;
+        this.layers.set(name, pixels.length);
+        pixels.push(custom(name, () => (
+          recipe === undefined ? flatColor([220, 60, 200]) : generateSkin(model, recipe, seedOf(name))
+        )));
+      }
+      this.variantLayers.set(mob.id, table);
+    }
+
     for (const name of EXTRA_LAYERS) {
       const recipe = MOB_SKINS[name];
       this.layers.set(name, pixels.length);
@@ -140,6 +160,8 @@ export class EntityAtlas {
 
   /** Camada de um mob com a variante dele: a cor e a tosquia da ovelha. */
   layerForMob(def: MobDef, variant: number): number {
+    const skins = this.variantLayers.get(def.id);
+    if (skins !== undefined) return variant < skins.length ? skins[variant] : this.layerOf(def.skin);
     const table = this.woolLayers.get(def.id);
     if (table === undefined) return this.layerOf(def.skin);
     return (variant & SHEARED) !== 0 ? table[COLOR_MASK + 1] : table[variant & COLOR_MASK];
@@ -168,6 +190,7 @@ export class EntityAtlas {
 export function entitySkinNames(): string[] {
   const names: string[] = [];
   for (const mob of MOBS) names.push(mob.skin);
+  for (const mob of MOBS) for (const skin of mob.traits.variantSkins ?? []) names.push(skin);
   for (const name of EXTRA_LAYERS) names.push(name);
   names.push(SHADOW_LAYER);
   return names;

@@ -279,7 +279,8 @@ function hashOf(key: number): number {
  * Altura em que uma entidade de `tall` blocos consegue ficar em pé na coluna
  * `(x,·,z)`, partindo de `fromY`. Devolve −1 se não dá.
  *
- * Aceita subir 1 bloco (degrau) ou cair até 3 (queda sem dano).
+ * Aceita subir 1 bloco (degrau) ou cair até 3 (queda sem dano). Porta é
+ * passagem, aberta ou fechada.
  */
 export function standHeight(
   world: World, x: number, fromY: number, z: number, tall: number,
@@ -289,7 +290,10 @@ export function standHeight(
     if (!defOf(world.getBlock(x, y - 1, z)).solid) continue;
     let free = true;
     for (let h = 0; h < tall; h++) {
-      if (defOf(world.getBlock(x, y + h, z)).solid) { free = false; break; }
+      const def = defOf(world.getBlock(x, y + h, z));
+      // Porta conta como passagem (M9): o aldeão abre a de casa, e o zumbi
+      // para diante dela — que é onde ele deveria parar, arrombando no Difícil.
+      if (def.solid && def.shape !== 'door') { free = false; break; }
     }
     if (free) return y;
   }

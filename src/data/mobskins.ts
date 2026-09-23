@@ -52,6 +52,63 @@ export const MOB_SKINS: Record<string, SkinRecipe> = {
     ],
   },
 
+  /*
+   * Profissões (M9): o mesmo aldeão com a roupa do ofício — chapéu de palha,
+   * avental branco de açougue, avental escuro de forja e a túnica clara do
+   * bibliotecário. A leitura é de longe, pela cor do tronco, não pelo detalhe.
+   */
+  villager_farmer: {
+    base: [122, 88, 62], noise: 0.06,
+    parts: { head: [200, 162, 132], arm: [122, 88, 62], leg: [74, 56, 40] },
+    details: [
+      { kind: 'band', part: 'head', color: [210, 180, 96], y: 0, h: 2 },
+      { kind: 'eyes', part: 'head', color: INK, y: 0.32, size: 2, gap: 4 },
+      { kind: 'mouth', part: 'head', color: [162, 122, 96], y: 0.62, w: 5, h: 3 },
+      { kind: 'band', part: 'body', color: [96, 132, 64], y: 0.4, h: 6 },
+    ],
+  },
+  villager_butcher: {
+    base: [122, 88, 62], noise: 0.06,
+    parts: { head: [200, 162, 132], arm: [122, 88, 62], leg: [74, 56, 40] },
+    details: [
+      { kind: 'eyes', part: 'head', color: INK, y: 0.32, size: 2, gap: 4 },
+      { kind: 'mouth', part: 'head', color: [162, 122, 96], y: 0.62, w: 5, h: 3 },
+      { kind: 'band', part: 'body', color: [232, 228, 220], y: 0.3, h: 9 },
+      { kind: 'band', part: 'body', color: [176, 60, 56], y: 0.75, h: 1 },
+    ],
+  },
+  villager_smith: {
+    base: [104, 74, 54], noise: 0.06,
+    parts: { head: [196, 156, 126], arm: [104, 74, 54], leg: [62, 48, 36] },
+    details: [
+      { kind: 'eyes', part: 'head', color: INK, y: 0.32, size: 2, gap: 4 },
+      { kind: 'mouth', part: 'head', color: [158, 118, 92], y: 0.62, w: 5, h: 3 },
+      { kind: 'band', part: 'body', color: [46, 42, 42], y: 0.3, h: 9 },
+    ],
+  },
+  villager_librarian: {
+    base: [206, 190, 158], noise: 0.05,
+    parts: { head: [200, 162, 132], arm: [206, 190, 158], leg: [96, 78, 60] },
+    details: [
+      { kind: 'band', part: 'head', color: [150, 44, 42], y: 0, h: 2 },
+      { kind: 'eyes', part: 'head', color: INK, y: 0.32, size: 2, gap: 4 },
+      { kind: 'mouth', part: 'head', color: [162, 122, 96], y: 0.62, w: 5, h: 3 },
+      { kind: 'band', part: 'body', color: [150, 44, 42], y: 0.2, h: 3 },
+    ],
+  },
+
+  // Golem de ferro (M9): ferro batido, olhos vermelhos e a trepadeira no peito.
+  iron_golem: {
+    base: [196, 190, 182], noise: 0.12,
+    parts: { head: [208, 202, 194], arm: [186, 180, 172], leg: [176, 170, 162] },
+    details: [
+      { kind: 'eyes', part: 'head', color: [168, 36, 30], y: 0.36, size: 2, gap: 3 },
+      { kind: 'mouth', part: 'head', color: [150, 146, 140], y: 0.66, w: 4, h: 2 },
+      { kind: 'patch', part: 'body', color: [88, 128, 56], count: 3, radius: 2 },
+      { kind: 'patch', part: 'leg', color: [88, 128, 56], count: 1, radius: 1.5 },
+    ],
+  },
+
   cow: {
     base: [86, 62, 42], noise: 0.1,
     parts: { head: [74, 54, 38], leg: [56, 42, 30] },

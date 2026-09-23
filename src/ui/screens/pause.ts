@@ -240,7 +240,8 @@ function injectStyle(): void {
   const css = document.createElement('style');
   css.textContent = `
 #pause-menu{position:fixed;inset:0;z-index:15;background:#00000099;
-  display:grid;place-content:center;justify-items:center;gap:14px;
+  display:grid;justify-content:center;align-content:center;align-content:safe center;
+  justify-items:center;gap:14px;overflow-y:auto;touch-action:pan-y;overscroll-behavior:contain;
   font-family:ui-monospace,"Courier New",monospace;color:#fff;text-align:center;padding:24px}
 #pause-menu h1{margin:0;font-size:clamp(22px,5vw,36px);text-shadow:2px 2px 0 #000}
 #pause-menu p{margin:0;min-height:1.2em;opacity:.75;font-size:12px}
@@ -260,6 +261,17 @@ function injectStyle(): void {
 #pause-menu .achievements .row.next strong{color:#d9c27a}
 #pause-menu .achievements strong{color:#f7d94c;font-size:13px}
 #pause-menu .achievements span{color:#d8d0e0;font-size:11px}
+/*
+ * Celular deitado (campo, 2026-09-23): sete botões em coluna passavam da
+ * altura da tela, e o menu não rolava — a página inteira tem touch-action:none
+ * (doc 09 §2.3), e o menu não era um contêiner de rolagem. Agora ele rola
+ * (pan-y acima) e, com pouca altura, os botões vão em duas colunas.
+ */
+@media (max-height:600px){
+  #pause-menu{gap:8px;padding:12px}
+  #pause-menu .actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  #pause-menu button{min-width:180px;min-height:40px;padding:8px 12px}
+}
 `;
   document.head.appendChild(css);
 }

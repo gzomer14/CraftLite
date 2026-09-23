@@ -12,6 +12,35 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-23 · 17:10 → 17:53 · M10 no campo: mão, pausa e mapa voando
+
+**Pedido:** *"Os itens na minha mão estão com uma posição bem estranha (…) Para bússola fica horrível
+de enxergar para onde ela realmente está apontando. (…) o menu está super extenso e não possui
+opção de rolar (…) O mapa funcionou tudo, porém seu carregamento por onde já passei não funcionou
+direito"*, com cinco prints do celular.
+
+**Resultado:** três correções. Bússola, relógio e mapa ganharam a pose de leitura (de frente, na
+arte: `hold: 'face'`). O menu de pausa rola e, em tela baixa, vai em duas colunas; as telas de
+menu não escondem mais o topo de um painel alto. O mapa lê primeiro o chunk mais perto ainda não
+mapeado: voando a 20 blocos/s, de 49 buracos para zero, e o custo caiu para 0,23 ms/s. Visto no
+Chrome headless: a bússola e o mapa na mão, a pausa em 915×412 e o mapa depois de voar.
+
+Portões: **2064 testes** em 102 arquivos, lint limpo, build ok, **249,5 KB** de 350, smoke 7/7.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/game/worldmap.ts` | `explore` procura primeiro o chunk mais perto sem mapa; o rodízio virou opcional |
+| `~` | `src/game/journal.ts` | um passo de mapa por tick, releitura a cada quatro |
+| `~` | `src/render/hand.ts` | `facingPose`, escolhida pela arte do item |
+| `~` | `src/data/itemart.ts` | `hold: 'face'` em bússola, relógio e mapa |
+| `~` | `src/ui/screens/pause.ts` | pausa rola e vai em duas colunas em tela baixa |
+| `~` | `src/ui/screens/menu.ts` | painel centralizado por `margin:auto`, tela com `pan-y` |
+| `~` | `tests/journal.test.ts` | mapa voando a 20 blocos/s sem buraco |
+| `~` | `tests/hand.test.ts` | pose de leitura de frente e dentro da tela |
+| `~` | `docs/15-status.md`, `docs/16-auditoria.md`, `README.md` | §2, §4, §6, esta sessão, contagem |
+
+---
+
 ## 2026-09-23 · 15:15 → 16:05 · M10: saber onde se está
 
 **Pedido:** *"Qual o próximo marco para implementarmos?"* — recomendado o M10 — e *"Pode seguir sim

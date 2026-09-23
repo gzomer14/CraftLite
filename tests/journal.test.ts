@@ -319,6 +319,48 @@ describe('espectador', () => {
   });
 });
 
+describe('mapa voando', () => {
+  /*
+   * Campo, 2026-09-23: "Sai voando sem abrir o mapa, quando abri (…) onde eu
+   * já passei estava tudo mal carregado" — um xadrez. O mapa lia um chunk por
+   * vez em rodízio fixo; voando, o anel andava mais rápido que a volta.
+   */
+  it('voando a 20 blocos por segundo, o mapa não deixa buraco em volta do caminho', () => {
+    const seed = 2;
+    const noise = new TerrainNoise(seed);
+    const world = new World(seed);
+    const journal = new Journal();
+    const player = new Player(8.5, 120, 8.5);
+    player.flying = true;
+    const loaded = new Set<string>();
+    const load = (): void => {
+      const cx0 = Math.floor(player.x) >> 4;
+      const cz0 = Math.floor(player.z) >> 4;
+      for (let dz = -5; dz <= 5; dz++) {
+        for (let dx = -5; dx <= 5; dx++) {
+          const key = `${cx0 + dx},${cz0 + dz}`;
+          if (loaded.has(key)) continue;
+          loaded.add(key);
+          world.addChunk(generateChunk(seed, noise, cx0 + dx, cz0 + dz));
+        }
+      }
+    };
+    for (let t = 0; t < 400; t++) {
+      if (t % 8 === 0) load();
+      player.x += 1;
+      journal.tick(world, player, false);
+    }
+    // Todo chunk a até dois de distância do caminho está no mapa.
+    let holes = 0;
+    for (let x = 16; x < player.x - 32; x += 16) {
+      for (let dz = -2; dz <= 2; dz++) {
+        if ((journal.map.pixel(x, 8 + dz * 16) & PIXEL_KNOWN) === 0) holes++;
+      }
+    }
+    expect(holes).toBe(0);
+  }, 60_000);
+});
+
 describe('critério de aceite do M10', () => {
   /*
    * Sai da base, anda 500 blocos pelo terreno de verdade (seed 2), e volta

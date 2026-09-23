@@ -31,6 +31,7 @@ import {
 } from '../core/math';
 import { defOf, makeState, texOf, AIR } from '../data/blocks';
 import { itemDef } from '../data/items';
+import { ITEM_ART } from '../data/itemart';
 import {
   ITEM_FLOATS_PER_VERTEX, buildExtrudedSprite, extrudedVertexCapacity, maskFromSheet,
 } from './itemmodel';
@@ -229,9 +230,12 @@ export interface HandPose {
  * de um celular em paisagem sai da tela num monitor 21:9, e some de vez em
  * retrato.
  */
-export function handPose(swing: number, bob: number, aspect: number, out: HandPose): HandPose {
+export function handPose(
+  swing: number, bob: number, aspect: number, out: HandPose, facing = false,
+): HandPose {
   // Meia senoide: sai da posição de descanso, vai ao extremo e volta.
   const arc = Math.sin(swing * Math.PI);
+  if (facing) return facingPose(arc, bob, aspect, out);
   const z = -0.78 + arc * 0.06;
   const halfHeight = Math.tan(HAND_FOV / 2) * Math.abs(z);
   const halfWidth = halfHeight * aspect;
@@ -249,6 +253,26 @@ export function handPose(swing: number, bob: number, aspect: number, out: HandPo
   // A escala segue a altura visível, senão a mão encolhe em tela estreita.
   // 0.5 dá um item com cerca de um quarto da altura da tela.
   out.scale = halfHeight * 0.5;
+  return out;
+}
+
+/**
+ * Pose de leitura (campo, 2026-09-23): bússola, relógio e mapa de frente para
+ * quem olha, mais baixos e mais perto do meio que a ferramenta, quase sem giro.
+ * Na pose de ferramenta — 35° de lado e inclinada — a face do mostrador virava
+ * uma fita, e não se via para onde a agulha apontava.
+ */
+function facingPose(arc: number, bob: number, aspect: number, out: HandPose): HandPose {
+  const z = -0.78 + arc * 0.04;
+  const halfHeight = Math.tan(HAND_FOV / 2) * Math.abs(z);
+  const halfWidth = halfHeight * aspect;
+  out.z = z;
+  out.x = halfWidth * 0.42 - arc * halfWidth * 0.05 + Math.cos(bob) * halfWidth * 0.015;
+  out.y = -halfHeight * 0.5 - arc * halfHeight * 0.12
+    + Math.abs(Math.sin(bob)) * halfHeight * 0.03;
+  out.yaw = 0.12 - arc * 0.2;
+  out.pitch = -0.32 + arc * 0.4;
+  out.scale = halfHeight * 0.36;
   return out;
 }
 
@@ -273,6 +297,8 @@ export class HandRenderer {
   /** Tile atual de um item — a folha de `ItemSprites`, com o quadro do mostrador. */
   tileOf: ((item: number) => number | undefined) | null = null;
   private mode = 2;
+  /** Item de leitura na mão: pose de frente (`ItemArt.hold`). */
+  private facing = false;
   /** Tint do bloco na mão (lã colorida); branco para o resto. */
   private readonly tint = new Float32Array([1, 1, 1]);
   private vertexCount = 0;
@@ -353,6 +379,8 @@ export class HandRenderer {
     if (item === this.held && tile === this.heldTile) return;
     this.held = item;
     this.heldTile = tile;
+    const name = item < 0 ? undefined : itemDef(item)?.name;
+    this.facing = name !== undefined && ITEM_ART[name]?.hold === 'face';
 
     if (item < 0) {
       this.mode = 2;
@@ -408,7 +436,7 @@ export class HandRenderer {
 
     const swing = this.animation.swingAt(alpha);
     const bob = this.animation.bobAt(alpha);
-    const pose = handPose(swing, bob, aspect, this.pose);
+    const pose = handPose(swing, bob, aspect, this.pose, this.facing);
 
     // model = T(pose) · Ry · Rx · S — montado a cada frame em matrizes que já
     // existem, sem alocar.

@@ -34,6 +34,12 @@ export interface ItemArt {
    * silhueta em cada ângulo. Quem escolhe o quadro é `ui/dials.ts`.
    */
   dial?: DialKind;
+  /**
+   * Como a mão segura o item (campo, 2026-09-23). Ausente = como ferramenta,
+   * de lado, na diagonal. `'face'` = de frente para quem olha, como quem lê:
+   * bússola, relógio e mapa, que de lado viravam uma fita e não se lia a agulha.
+   */
+  hold?: 'face';
 }
 
 export type DialKind = 'needle' | 'sky';
@@ -1000,9 +1006,11 @@ function buildArt(): Record<string, ItemArt> {
   out.shears = { shape: 'shears', color: [214, 214, 220], accent: [160, 60, 50] };
   // M10: a bússola em ferro com face clara, o relógio em ouro com o disco do
   // céu; o mapa em papel, com a terra no principal e a água no acento.
-  out.compass = { shape: 'dial', color: [168, 168, 176], accent: [226, 222, 208], dial: 'needle' };
-  out.clock = { shape: 'dial', color: [232, 190, 60], accent: [96, 150, 220], dial: 'sky' };
-  out.map = { shape: 'map', color: [226, 214, 176], accent: [70, 120, 196] };
+  out.compass = {
+    shape: 'dial', color: [168, 168, 176], accent: [226, 222, 208], dial: 'needle', hold: 'face',
+  };
+  out.clock = { shape: 'dial', color: [232, 190, 60], accent: [96, 150, 220], dial: 'sky', hold: 'face' };
+  out.map = { shape: 'map', color: [226, 214, 176], accent: [70, 120, 196], hold: 'face' };
   /*
    * Corante e cama coloridos (M8). São a mesma silhueta em oito cores — o
    * caso que este módulo existe para resolver: o desenho é o papel, a cor é o

@@ -9,11 +9,11 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-23 16:05 — **M10 fechado: saber onde se está.** Bússola e
-relógio com o mostrador girando, mapa explorado com tela própria, marcadores na borda da tela (e
-"Última morte" sozinho), estatísticas na pausa, espectador no Criativo, e **itens no chão no save**.
-No caminho: item no chão perdia o encantamento, o F3 tinha os eixos de leste e oeste trocados, e
-apagar um mundo deixava baús e veículos no banco (§4).
+**Última atualização:** 2026-09-23 17:53 — **M10 no campo: três correções.** Bússola e mapa na
+mão ficavam de perfil (agora de frente, pose de leitura); o menu de pausa passava da altura do
+celular deitado e não rolava (agora rola, e em tela baixa vai em duas colunas); e o mapa saía em
+xadrez voando (agora lê primeiro o chunk mais perto ainda não mapeado). §4. Antes, 16:05: M10
+fechado.
 
 ---
 
@@ -68,11 +68,11 @@ Medidas em 2026-09-23 16:04, ao fechar o M10, com `npm test`, `npm run build`,
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
 | Bundle (gzip, tudo) | **249,5 KB** (240,0 antes do M10; 239,4 no M9; 229,0 no M12; 226,3 antes dele) | < 350 KB | `npm run size` |
-| Testes | **2061**, 102 arquivos (2036 antes do M10; 2023 no M9) | manter verde | `npm test` |
+| Testes | **2064**, 102 arquivos (2036 antes do M10; 2023 no M9) | manter verde | `npm test` |
 | Smoke test de navegador | **7 passos verdes**: carregar, criar, andar 10 s, quebrar, salvar, recarregar, conferir | verde | `npm run smoke` |
 | Camadas de atlas | **194** com 16 cores de lã e cama (222 no M11 com 8 cores; lã e cama viraram tint no M13) | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Memória de áudio | **3,33 MB** (era 3,26; +3 sons curtos de balde e arremesso) | < 3,5 MB | `tests/audio.test.ts` |
-| Mapa explorado (M10) | **0,27 ms por segundo de jogo**; 500 blocos = 16 regiões, ~135 KB | < 1 ms/s; ≤ 64 regiões | `tests/journal.test.ts` |
+| Mapa explorado (M10) | **0,23 ms por segundo de jogo**; 500 blocos = 16 regiões, ~146 KB; voando a 20 blocos/s, zero buraco | < 1 ms/s; ≤ 64 regiões | `tests/journal.test.ts` |
 | Geração de chunk | **6,2 ms** (mediana; os cogumelos não mexeram no número) | < 25 ms | `tests/perf.test.ts` |
 | Geração de chunk do Nether | 5,1 ms (mediana; 3,8 antes de a luz entrar) | < 25 ms | `tests/perf.test.ts` |
 | Meshing de section | 0,64 ms (mediana) | < 8 ms | `tests/perf.test.ts` |
@@ -1630,6 +1630,9 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-23 | `game/worldmap.ts`, `game/journal.ts` | **O mapa saía em xadrez voando** (M10; campo: *"onde eu já passei estava tudo mal carregado, e o local atual (…) carregando bem devagar"*). O mapa lia um chunk do anel a cada dois ticks em rodízio fixo, e o chunk ainda não carregado na sua vez era pulado; voando, o anel andava mais rápido que a volta. Agora cada tick lê o chunk carregado **mais perto ainda não mapeado**, e o rodízio de releitura só roda (a cada quatro ticks) com o anel inteiro mapeado. Voando a 20 blocos/s: 49 buracos antes, zero agora (`tests/journal.test.ts`); custo caiu para 0,23 ms/s. |
+| 2026-09-23 | `render/hand.ts`, `data/itemart.ts` | **Bússola, relógio e mapa na mão ficavam de perfil** (M10; campo: *"fica horrível de enxergar para onde ela realmente está apontando"*). Todo item plano usava a pose de ferramenta, 35° de lado. A arte ganhou `hold: 'face'`, e esses itens ficam de frente, mais baixos e mais perto do meio. Regressão em `tests/hand.test.ts`. |
+| 2026-09-23 | `ui/screens/pause.ts`, `ui/screens/menu.ts` | **O menu de pausa passava da altura do celular deitado e não rolava** (campo: *"quase não consegui chegar na opção de salvar e sair"*). A página tem `touch-action:none` (doc 09 §2.3) e o menu não era contêiner de rolagem. Agora rola (`pan-y`), e com menos de 600 px de altura os botões vão em duas colunas. As telas de menu (mapa, opções, mundos) centralizavam com `place-items:center`, que escondia o topo de um painel mais alto que a tela; agora é `margin:auto`. |
 | 2026-09-23 | `entity/itementity.ts` | **Item no chão perdia o encantamento** (M6). As pilhas no chão guardavam item, quantidade e dano, não `ench`: a espada encantada que caía na morte (ou era jogada fora) voltava comum ao ser recolhida. Achado ao pôr os itens no save (M10). Regressão em `tests/savegame.test.ts`. |
 | 2026-09-23 | `ui/debug.ts` | **O F3 trocava os eixos de leste e oeste.** Olhando para +X ele dizia "oeste (-X)". Os nomes estavam certos para norte em +Z (o leste de quem olha para o norte é −X); os eixos entre parênteses, não. O mapa do M10 segue a mesma rosa. |
 | 2026-09-23 | `save/db.ts` | **Apagar um mundo deixava baús, veículos (e agora itens e mapa) no banco** (M4). `deleteWorld` limpava chunks, jogador e miniatura, mas não os registros de `settings`. Com o mapa, que chega a 2 MB, a sobra deixou de ser desprezível; agora sai tudo que começa com o id do mundo. |
@@ -1938,7 +1941,8 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
 
 ## 6. Próximo passo recomendado
 
-0. **Olhar o M10 num aparelho** e depois escolher o próximo marco (M14 água e paisagem, M15
+0. **Olhar o M10 num aparelho de novo** (a primeira volta, em 2026-09-23, rendeu as três correções
+   das 17:53 — mão, pausa e mapa voando; §4) e depois escolher o próximo marco (M14 água e paisagem, M15
    oficina, M16 fim da jornada ou M17 alcance). O M10 só foi visto em testes e no Chrome headless.
    Em ordem de quanto pode estar errado:
    - **tela do mapa no celular**: abrir usando o mapa (8 papéis e uma bússola; no Criativo, pela

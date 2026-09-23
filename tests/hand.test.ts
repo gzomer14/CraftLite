@@ -9,6 +9,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { handPose, HandAnimation, HAND_FOV, SWING_TICKS, type HandPose } from '../src/render/hand';
+import { ITEM_ART } from '../src/data/itemart';
 
 const pose = (): HandPose => ({ x: 0, y: 0, z: 0, yaw: 0, pitch: 0, scale: 1 });
 
@@ -126,5 +127,34 @@ describe('animação da mão', () => {
     const animation = new HandAnimation();
     for (let i = 0; i < 10; i++) animation.tick(0);
     expect(animation.bobAt(0)).toBe(animation.bobAt(1));
+  });
+});
+
+describe('pose de leitura (bússola, relógio e mapa)', () => {
+  /*
+   * Campo, 2026-09-23: na pose de ferramenta a bússola ficava de perfil, e
+   * "fica horrível de enxergar para onde ela realmente está apontando".
+   */
+  it('de frente para quem olha, e dentro da tela em qualquer ponto do golpe', () => {
+    for (const aspect of ASPECTS) {
+      for (let step = 0; step <= 10; step++) {
+        const p = handPose(step / 10, 0, aspect, pose(), true);
+        const { w, h } = halfExtents(p, aspect);
+        expect(Math.abs(p.x)).toBeLessThan(w);
+        expect(Math.abs(p.y)).toBeLessThan(h);
+      }
+      const rest = handPose(0, 0, aspect, pose(), true);
+      const tool = handPose(0, 0, aspect, pose());
+      // Quase sem giro de lado — a ferramenta gira 0,62 rad.
+      expect(Math.abs(rest.yaw)).toBeLessThan(0.2);
+      expect(Math.abs(rest.yaw)).toBeLessThan(Math.abs(tool.yaw) / 3);
+    }
+  });
+
+  it('só os itens de leitura usam a pose de frente', () => {
+    expect(ITEM_ART.compass.hold).toBe('face');
+    expect(ITEM_ART.clock.hold).toBe('face');
+    expect(ITEM_ART.map.hold).toBe('face');
+    expect(ITEM_ART.iron_sword.hold).toBeUndefined();
   });
 });

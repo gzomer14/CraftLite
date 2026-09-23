@@ -27,18 +27,20 @@ export class Journal {
   private ticks = 0;
 
   /**
-   * Um tick: tempo de jogo, distância percorrida e, a cada dois, um passo do
-   * mapa. Um chunk a cada dois ticks renova o anel inteiro em ~8 s — o jogador
-   * correndo anda 45 blocos nisso, e a borda do anel está a 64 à frente — e
-   * deixa o mapa em ~0,3 ms por segundo de jogo no desktop, com folga para o
-   * celular fraco caber no 1 ms do doc 14.
+   * Um tick: tempo de jogo, distância percorrida e um passo do mapa.
+   *
+   * O mapa lê a cada tick o chunk mais perto **ainda não mapeado** — é o que
+   * acompanha quem voa (20 chunks por segundo; voando reto, entram uns 7) — e,
+   * com tudo em volta já mapeado, relê um a cada quatro ticks para mostrar o
+   * que mudou. Parado, custa um quarto; andando, só o que é novo.
    */
   tick(world: World, player: Player, riding: boolean): void {
     this.stats.add('play_time');
     this.trackDistance(player, riding);
-    if ((this.ticks++ & 1) === 0 && dimensionOf(world.dimension).hasSky) {
-      this.map.explore(world, player.x, player.z);
+    if (dimensionOf(world.dimension).hasSky) {
+      this.map.explore(world, player.x, player.z, (this.ticks & 3) === 0);
     }
+    this.ticks++;
   }
 
   /** Jogador morreu no Sobrevivência: conta, e marca onde o inventário caiu. */

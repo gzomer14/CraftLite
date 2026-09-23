@@ -236,9 +236,12 @@ function injectMenuStyle(): void {
   const css = document.createElement('style');
   css.textContent = `
 .menu-screen{position:fixed;inset:0;z-index:16;background:#0b1016e6;
-  display:grid;place-items:center;padding:16px;overflow:auto;
+  display:grid;place-items:start center;padding:16px;overflow:auto;
+  touch-action:pan-y;overscroll-behavior:contain;
   font-family:ui-monospace,"Courier New",monospace;color:#fff}
-.menu-panel{width:min(560px,100%);background:#1c2530;border:2px solid #000;
+/* margin auto centraliza quando cabe; quando não cabe, o topo não some acima
+   da rolagem (com place-items:center o título do painel alto ficava inalcançável). */
+.menu-panel{margin-block:auto;width:min(560px,100%);background:#1c2530;border:2px solid #000;
   box-shadow:inset 2px 2px 0 #ffffff26,inset -2px -2px 0 #00000059;padding:18px}
 .menu-panel h1{margin:0 0 12px;font-size:clamp(20px,4vw,30px);text-shadow:2px 2px 0 #000;
   text-align:center}

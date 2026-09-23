@@ -7,11 +7,11 @@
  * doc 14 pede — sair 500 blocos e voltar pelo mapa — sem o jogador precisar
  * montar um mosaico de folhas.
  *
- * **Como enche.** A cada dois ticks (`game/journal.ts`), um chunk do quadrado
- * de `EXPLORE_RADIUS` em volta do jogador é lido, na ordem do mais perto para o
- * mais longe; o anel inteiro (81 chunks) se renova a cada ~8 s, e o que o
- * jogador construir aparece na volta seguinte. Só na dimensão com céu: o
- * Nether, visto de cima, é o teto de rocha-mãe.
+ * **Como enche.** A cada tick (`game/journal.ts`), o chunk carregado mais
+ * perto do jogador, dentro de `EXPLORE_RADIUS`, que ainda não está no mapa é
+ * lido; com o anel todo mapeado, um chunk é relido em rodízio a cada quatro
+ * ticks, e o que o jogador construir aparece na volta seguinte (~16 s). Só na
+ * dimensão com céu: o Nether, visto de cima, é o teto de rocha-mãe.
  *
  * **O pixel.** Um por coluna de bloco, 16 bits: bit 15 = explorado; bits 10–11
  * = sombra (0 escuro, 1 normal, 2 claro); bits 0–9 = id do bloco do topo. A cor
@@ -95,13 +95,32 @@ export class WorldMap {
   }
 
   /**
-   * Um passo de exploração: lê um chunk do anel em volta de `(px, pz)`.
-   * Devolve true se leu um chunk (false se o da vez não está carregado).
+   * Um passo de exploração em volta de `(px, pz)`: o chunk carregado **mais
+   * perto que ainda não está no mapa**; se o anel inteiro já está, `refresh`
+   * diz se renova um em rodízio (para o que o jogador construiu aparecer).
+   * Devolve true se leu um chunk.
+   *
+   * Era só o rodízio, um chunk por vez em ordem fixa: voando, o anel andava
+   * mais rápido que a volta, e chunk que não estava carregado na sua vez era
+   * pulado — o mapa saía em xadrez (campo, 2026-09-23). Achar o próximo buraco
+   * custa 81 consultas de mapa, muito menos que ler um chunk.
    */
-  explore(world: World, px: number, pz: number): boolean {
+  explore(world: World, px: number, pz: number, refresh = true): boolean {
+    const ccx = Math.floor(px) >> 4;
+    const ccz = Math.floor(pz) >> 4;
+    for (let i = 0; i < OFFSETS.length; i++) {
+      const cx = ccx + OFFSETS[i][0];
+      const cz = ccz + OFFSETS[i][1];
+      if ((this.pixel(cx << 4, cz << 4) & PIXEL_KNOWN) !== 0) continue;
+      const chunk = world.getChunk(cx, cz);
+      if (chunk === undefined) continue;
+      this.sampleChunk(world, chunk, px, pz);
+      return true;
+    }
+    if (!refresh) return false;
     const offset = OFFSETS[this.cursor];
     this.cursor = (this.cursor + 1) % OFFSETS.length;
-    const chunk = world.getChunk((Math.floor(px) >> 4) + offset[0], (Math.floor(pz) >> 4) + offset[1]);
+    const chunk = world.getChunk(ccx + offset[0], ccz + offset[1]);
     if (chunk === undefined) return false;
     this.sampleChunk(world, chunk, px, pz);
     return true;

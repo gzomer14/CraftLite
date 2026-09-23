@@ -12,6 +12,31 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-23 · 14:00 → 14:08 · O pool de mobs cheio esvaziava a aldeia
+
+**Pedido:** *"Novamente criei um novo mundo com seed 2, cheguei em uma Vila e não encontrei
+literalmente nenhum aldeão, iron golem, nada"* — com dois prints; o do F3 mostra *"140 mobs"*.
+
+**Resultado:** 140 é o pool inteiro em T2 (`2 × maxMobs`). Os grupos de bichos de chunk novo não
+tinham teto, e desde o M9 o mob de coluna descarregada ficava parado no pool para sempre; o aldeão,
+nascendo com o chunk da casa, desistia em silêncio. O modo criativo não tem relação. Agora o chunk
+que sai leva os mobs comuns dele, os grupos de chunk novo param em metade do pool, e aldeão e golem
+tomam a vaga do mob comum mais longe. Três regressões, que falham no código anterior.
+
+Portões: **2027 testes** em 101 arquivos, lint limpo, build ok, **239,6 KB** de 350.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/entity/mobs.ts` | `forgetChunk` (mob comum sai com a coluna) e `makeRoom` (libera o slot do comum mais longe) |
+| `~` | `src/entity/spawn.ts` | `populateChunk` para em metade do pool (`POPULATE_POOL_SHARE`) |
+| `~` | `src/game/village.ts` | aldeão e golem nascem com prioridade (`VillageHost.makeRoom`) |
+| `~` | `src/game/session.ts` | liga `forgetChunk` no chunk que sai e `makeRoom` na aldeia |
+| `~` | `tests/village.test.ts` | aldeia com o pool cheio; chunk que sai leva o bicho e deixa domado e morador |
+| `~` | `tests/spawn.test.ts` | teto dos grupos de chunk novo |
+| `~` | `docs/15-status.md`, `docs/16-auditoria.md`, `README.md` | status, esta sessão, contagem de testes |
+
+---
+
 ## 2026-09-23 · 13:30 → 13:55 · A aldeia nascia pela metade
 
 **Pedido:** *"ao chegar em uma aldeia tinha somente 1 aldeão, travado na casa dele. Não tinha

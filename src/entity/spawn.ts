@@ -81,6 +81,8 @@ const MAX_HOSTILE_DISTANCE = 128;
 const CAVE_Y_SPREAD = 16;
 /** Chance de um chunk novo já nascer com um grupo de bichos (doc 07 §4). */
 const INITIAL_PASSIVE_CHANCE = 0.1;
+/** Fração do pool que os grupos de chunk novo podem ocupar. */
+const POPULATE_POOL_SHARE = 0.5;
 
 export interface SpawnCaps {
   hostile: number;
@@ -198,6 +200,9 @@ export class MobSpawner {
    */
   populateChunk(chunk: ChunkColumn): number {
     if (this.random() > INITIAL_PASSIVE_CHANCE) return 0;
+    // Sem cap de categoria (o mundo nasce com bichos), mas não além de metade
+    // do pool: o resto é dos hostis, e das aldeias.
+    if (this.mobs.count >= this.mobs.store.capacity * POPULATE_POOL_SHARE) return 0;
     const ids = MOBS_BY_CATEGORY.passive;
     if (ids.length === 0) return 0;
     const typeId = this.pickWeighted(ids);

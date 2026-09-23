@@ -50,6 +50,8 @@ export interface VillageHost {
   message(text: string): void;
   /** Abre a porta em `(x, y, z)` se `open` for diferente do estado atual. */
   toggleDoor(x: number, y: number, z: number): void;
+  /** Pool de mobs cheio: libera um slot de mob comum. false se não há. */
+  makeRoom(): boolean;
 }
 
 export class Villages {
@@ -102,7 +104,7 @@ export class Villages {
     if (this.residentOf(bedX, bedY, bedZ) >= 0) return;
 
     const oy = bedY - house.bed[1];
-    const i = mobs.spawn(
+    const i = this.spawn(
       VILLAGER, slot.ox + house.door[0] + 0.5, oy + 1, slot.oz + house.door[2] + 2.5, slot.profession,
     );
     if (i < 0) return;
@@ -130,9 +132,17 @@ export class Villages {
         && v.centerX[k] === bellX && v.centerZ[k] === bellZ) return;
     }
     // Ao lado do poço, fora do anel de caminho.
-    const i = mobs.spawn(GOLEM, this.origin[0] - 2.5, floor, this.origin[1] + 2.5);
+    const i = this.spawn(GOLEM, this.origin[0] - 2.5, floor, this.origin[1] + 2.5);
     if (i < 0) return;
     v.setCenter(i, bellX, floor, bellZ);
+  }
+
+  /** Nasce com prioridade: com o pool cheio, toma a vaga de um mob comum. */
+  private spawn(type: number, x: number, y: number, z: number, variant = 0): number {
+    const { mobs } = this.host;
+    const i = mobs.spawn(type, x, y, z, variant);
+    if (i >= 0 || !this.host.makeRoom()) return i;
+    return mobs.spawn(type, x, y, z, variant);
   }
 
   /** Altura do bloco `id` na coluna `(x, z)`, de cima para baixo, ou −1. */

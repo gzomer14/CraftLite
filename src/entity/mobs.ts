@@ -208,6 +208,45 @@ export class Mobs {
     return this.store.spawn(typeId, x, y, z, variant);
   }
 
+  /**
+   * Coluna saiu do mundo: os mobs comuns que estão nela saem junto.
+   *
+   * Mob não vai para o save (doc 11 §2), então é o mesmo que acontece ao
+   * recarregar — e o chunk que voltar ganha bichos de novo (`populateChunk`).
+   * Sem isto, desde que o mob em coluna descarregada passou a ficar parado
+   * (M9), todo bicho deixado para trás ocupava o pool para sempre: andando por
+   * um mundo em RD 16 o pool enchia de vacas, e a aldeia não tinha onde nascer.
+   * Domado, nomeado e morador de aldeia ficam (a aldeia cuida dos seus).
+   */
+  forgetChunk(cx: number, cz: number): void {
+    const s = this.store;
+    for (let i = 0; i < s.active; i++) {
+      if (s.hasFlag(i, FLAG_PERSISTENT) || s.village.member[i] === 1) continue;
+      if (Math.floor(s.x[i]) >> 4 !== cx || Math.floor(s.z[i]) >> 4 !== cz) continue;
+      s.removeAt(i);
+      i--;
+    }
+  }
+
+  /**
+   * Pool cheio: libera o slot do mob comum mais longe de `(x, z)`. Devolve
+   * false se só há domados, nomeados e moradores. É a vaga do aldeão e do golem:
+   * a aldeia não pode ficar vazia porque o mundo encheu de bicho.
+   */
+  makeRoom(x: number, z: number): boolean {
+    const s = this.store;
+    let far = -1;
+    let farDistance = -1;
+    for (let i = 0; i < s.active; i++) {
+      if (s.hasFlag(i, FLAG_PERSISTENT) || s.village.member[i] === 1) continue;
+      const distance = (s.x[i] - x) ** 2 + (s.z[i] - z) ** 2;
+      if (distance > farDistance) { farDistance = distance; far = i; }
+    }
+    if (far < 0) return false;
+    s.removeAt(far);
+    return true;
+  }
+
   clear(): void {
     this.store.clear();
     this.pathQueue.length = 0;

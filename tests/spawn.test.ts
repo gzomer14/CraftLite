@@ -280,6 +280,21 @@ describe('população inicial do chunk', () => {
   });
 });
 
+describe('população inicial com teto', () => {
+  it('os grupos de chunk novo param em metade do pool', () => {
+    const world = meadow(true);
+    const { mobs, spawner } = build(world);
+    spawner.isDay = true;
+    for (let n = 0; n < 20000; n++) {
+      const chunk = world.getChunk((n % 9) - 4, (((n / 9) | 0) % 9) - 4);
+      if (chunk !== undefined) spawner.populateChunk(chunk);
+    }
+    // Um grupo pode passar um pouco da metade, nunca encher o pool.
+    expect(mobs.count).toBeGreaterThan(0);
+    expect(mobs.count).toBeLessThanOrEqual(mobs.store.capacity / 2 + 8);
+  });
+});
+
 describe('regras declaradas', () => {
   it('toda regra de spawn é coerente e aponta para bloco e bioma que existem', () => {
     for (const name of Object.keys(SPAWN_RULES)) {

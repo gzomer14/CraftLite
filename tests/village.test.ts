@@ -20,7 +20,7 @@ import { VILLAGE_HOUSES } from '../src/data/structures';
 import { ITEM_BY_NAME } from '../src/data/items';
 import { MOB_BY_NAME } from '../src/data/mobs';
 import { HOME_START, TRADE_BAN_TICKS } from '../src/data/villagers';
-import { FLAG_ANGRY, FLAG_SLEEPING } from '../src/entity/mobstore';
+import { FLAG_ANGRY, FLAG_PERSISTENT, FLAG_SLEEPING } from '../src/entity/mobstore';
 import { Pathfinder } from '../src/entity/ai/pathfinder';
 
 const BELL = BLOCK_BY_NAME.get('bell')!.id;
@@ -30,6 +30,7 @@ const FARMLAND = BLOCK_BY_NAME.get('farmland')!.id;
 const VILLAGER = MOB_BY_NAME.get('villager')!.id;
 const GOLEM = MOB_BY_NAME.get('iron_golem')!.id;
 const ZOMBIE = MOB_BY_NAME.get('zombie')!.id;
+const COW = MOB_BY_NAME.get('cow')!.id;
 const EMERALD = ITEM_BY_NAME.get('emerald')!.id;
 
 interface Scene {
@@ -67,7 +68,7 @@ function findVillageSeed(): Scene {
 }
 
 /** A aldeia inteira no mundo, com uma sessão morando nela. */
-function villageSession(): { scene: Scene; session: Session; player: Player } {
+function villageSession(fillPool = false): { scene: Scene; session: Session; player: Player } {
   const scene = findVillageSeed();
   const { world, seed, noise } = scene;
   const player = new Player(scene.wellX + 0.5, scene.wellY + 2, scene.wellZ - 3.5);
@@ -87,6 +88,11 @@ function villageSession(): { scene: Scene; session: Session; player: Player } {
       world.addChunk(chunk);
       chunks.push(chunk);
     }
+  }
+  if (fillPool) {
+    // O pool cheio de bichos que ficaram para trás, longe dali.
+    const s = session.mobs.store;
+    while (s.spawn(COW, scene.wellX + 500 + s.active, 70, scene.wellZ) >= 0) { /* enche */ }
   }
   for (const chunk of chunks) session.onChunkLoaded(chunk);
   // Sem bicho nascendo sozinho no meio do teste.
@@ -161,6 +167,45 @@ describe('a aldeia gerada', () => {
     let golems = 0;
     for (let i = 0; i < s.active; i++) if (s.type[i] === GOLEM) golems++;
     expect(golems).toBe(1);
+  });
+});
+
+describe('pool de mobs cheio', () => {
+  /*
+   * No campo, em T2 com RD 16: "E: 140 mobs" — o pool inteiro — e a aldeia
+   * vazia. Os grupos de bichos de chunk novo não tinham teto, e desde o M9 o
+   * mob de coluna descarregada ficava parado no pool para sempre.
+   */
+  it('a aldeia nasce mesmo com o pool cheio de bichos', () => {
+    const { session } = villageSession(true);
+    const s = session.mobs.store;
+    expect(s.active).toBe(s.capacity);
+    expect(residents(session).length).toBeGreaterThanOrEqual(3);
+    let golems = 0;
+    for (let i = 0; i < s.active; i++) if (s.type[i] === GOLEM) golems++;
+    expect(golems).toBe(1);
+  });
+
+  it('o chunk que sai leva os bichos comuns dele; domado e morador ficam', () => {
+    const { scene, session } = villageSession();
+    const s = session.mobs.store;
+    const people = residents(session).length;
+    const x = scene.wellX + 40.5;
+    const cow = s.spawn(COW, x, 70, scene.wellZ + 0.5);
+    const pet = s.spawn(COW, x, 70, scene.wellZ + 0.5);
+    s.setFlag(pet, FLAG_PERSISTENT, true);
+    expect(cow).toBeGreaterThanOrEqual(0);
+    const before = s.active;
+    session.mobs.forgetChunk(Math.floor(x) >> 4, scene.wellZ >> 4);
+    expect(s.active).toBe(before - 1);
+    let pets = 0;
+    for (let i = 0; i < s.active; i++) if (s.hasFlag(i, FLAG_PERSISTENT)) pets++;
+    expect(pets).toBe(1);
+    // Os moradores da aldeia não são de chunk nenhum aqui: a aldeia cuida deles.
+    for (let cx = -3; cx <= 3; cx++) {
+      for (let cz = -3; cz <= 3; cz++) session.mobs.forgetChunk((scene.wellX >> 4) + cx, (scene.wellZ >> 4) + cz);
+    }
+    expect(residents(session).length).toBe(people);
   });
 });
 

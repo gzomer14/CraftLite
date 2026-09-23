@@ -236,6 +236,7 @@ export class Session {
       sound: (name, x, y, z) => { this.events.onSound?.(name, x, y, z); },
       message: (text) => { this.events.onMessage?.(text); },
       toggleDoor: (x, y, z) => { this.blockUse.toggle(x, y, z); },
+      makeRoom: () => this.mobs.makeRoom(this.player.x, this.player.z),
     });
     this.trading = new Trading({
       mobs: this.mobs.store, inventory: this.inventory,
@@ -751,6 +752,7 @@ export class Session {
     this.systems.forgetChunk(chunk.cx, chunk.cz);
     this.spawners.forgetChunk(chunk.cx, chunk.cz);
     this.villages.onChunkUnloaded(chunk);
+    this.mobs.forgetChunk(chunk.cx, chunk.cz);
   }
 
   /** Pede ao dono da UI que abra o editor da placa nesta posição. */

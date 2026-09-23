@@ -24,6 +24,8 @@ export const PATH_MAX = 24;
 export const FLAG_ANGRY = 1;
 export const FLAG_TAMED = 2;
 /** Nunca despawna (domado, nomeado, ou colocado à mão pelo jogador). */
+/** Ticks batendo de frente sem sair do lugar até o mob largar o destino. */
+const BLOCKED_GIVE_UP = 20;
 export const FLAG_PERSISTENT = 4;
 export const FLAG_IN_WATER = 8;
 export const FLAG_CLIMBING = 16;
@@ -128,6 +130,8 @@ export class MobStore {
   readonly pathCooldown: Int16Array;
   readonly wanderCooldown: Int16Array;
   readonly jumpCooldown: Int16Array;
+  /** Ticks seguidos batendo de frente com um destino (ver `BLOCKED_GIVE_UP`). */
+  readonly blockedTicks: Int16Array;
 
   /** Caminho do A*, achatado: PATH_MAX nós por mob. */
   readonly pathX: Int16Array;
@@ -185,6 +189,7 @@ export class MobStore {
     this.pathCooldown = i16();
     this.wanderCooldown = i16();
     this.jumpCooldown = i16();
+    this.blockedTicks = i16();
     this.pathX = new Int16Array(capacity * PATH_MAX);
     this.pathY = new Int16Array(capacity * PATH_MAX);
     this.pathZ = new Int16Array(capacity * PATH_MAX);
@@ -242,6 +247,7 @@ export class MobStore {
     this.pathCooldown[i] = 0;
     this.wanderCooldown[i] = (this.random() * 40) | 0;
     this.jumpCooldown[i] = 0;
+    this.blockedTicks[i] = 0;
     this.pathLen[i] = 0;
     this.pathIndex[i] = 0;
     this.limbSwing[i] = 0;
@@ -417,6 +423,24 @@ export class MobStore {
     } else {
       this.setFlag(i, FLAG_CLIMBING, false);
     }
+    /*
+     * Desiste do destino depois de um segundo batendo de frente sem sair do
+     * lugar. Parede alta demais para o pulo (tronco, a mureta do poço, a casa)
+     * prendia o bicho para sempre: o destino só se cumpre ao chegar, e o
+     * `wander` não sorteia outro enquanto há um. No campo: o golem "preso no
+     * poço" e os aldeões "trancando" em árvore e cacto; medido, até 105 s
+     * empurrando a mesma parede. Quem pede o destino a cada tick (caminho do
+     * A*, perseguição) pede de novo e não sente.
+     */
+    const stalled = blocked && Math.abs(result.dx) + Math.abs(result.dz) < 0.01;
+    if (stalled && this.hasMove[i] === 1 && def.traits.climbsWalls !== true) {
+      if (++this.blockedTicks[i] >= BLOCKED_GIVE_UP) {
+        this.blockedTicks[i] = 0;
+        this.clearMoveTarget(i);
+      }
+    } else {
+      this.blockedTicks[i] = 0;
+    }
     if (this.jumpCooldown[i] > 0) this.jumpCooldown[i]--;
 
     // Atrito horizontal.
@@ -573,6 +597,7 @@ function copyEntry(s: MobStore, to: number, from: number): void {
   s.pathCooldown[to] = s.pathCooldown[from];
   s.wanderCooldown[to] = s.wanderCooldown[from];
   s.jumpCooldown[to] = s.jumpCooldown[from];
+  s.blockedTicks[to] = s.blockedTicks[from];
   s.pathLen[to] = s.pathLen[from];
   s.pathIndex[to] = s.pathIndex[from];
   s.limbSwing[to] = s.limbSwing[from];

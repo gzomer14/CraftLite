@@ -52,6 +52,11 @@ export class VillageState {
    */
   readonly bestDistance: Float32Array;
   readonly stuckTicks: Int16Array;
+  /**
+   * Ronda do golem: ticks até largar o ponto atual (`workX/Z` com `hasWork`,
+   * que o golem não usa para trabalho) e sortear outro.
+   */
+  readonly patrolTicks: Int16Array;
 
   constructor(capacity: number) {
     const i32 = (): Int32Array => new Int32Array(capacity);
@@ -70,6 +75,7 @@ export class VillageState {
     this.targetMob = new Int16Array(capacity);
     this.bestDistance = new Float32Array(capacity);
     this.stuckTicks = new Int16Array(capacity);
+    this.patrolTicks = new Int16Array(capacity);
   }
 
   /** Slot novo: ninguém é da aldeia até alguém dizer que é. */
@@ -82,6 +88,7 @@ export class VillageState {
     this.targetMob[i] = -1;
     this.bestDistance[i] = Infinity;
     this.stuckTicks[i] = 0;
+    this.patrolTicks[i] = 0;
     this.tradeUses.fill(0, i * MAX_TRADES, (i + 1) * MAX_TRADES);
   }
 
@@ -101,6 +108,7 @@ export class VillageState {
     this.targetMob[to] = this.targetMob[from];
     this.bestDistance[to] = this.bestDistance[from];
     this.stuckTicks[to] = this.stuckTicks[from];
+    this.patrolTicks[to] = this.patrolTicks[from];
     this.tradeUses.copyWithin(to * MAX_TRADES, from * MAX_TRADES, (from + 1) * MAX_TRADES);
   }
 

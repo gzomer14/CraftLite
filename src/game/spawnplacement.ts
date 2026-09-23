@@ -6,7 +6,8 @@
  * `main.ts` chama `boot()` no topo e não pode ser importado por um teste.
  */
 
-import { SEA_LEVEL } from '../world/chunk';
+import { defOf } from '../data/blocks';
+import { SEA_LEVEL, WORLD_HEIGHT } from '../world/chunk';
 import type { World } from '../world/world';
 import type { Player } from '../entity/player';
 
@@ -41,6 +42,19 @@ export function trySpawn(world: World, player: Player, restored: boolean): boole
   if (chunk === undefined) return false;
   const height = chunk.heightMap[((z & 15) << 4) | (x & 15)];
   if (height <= 0) return false;
-  player.setPosition(x + 0.5, Math.max(height + 1, SEA_LEVEL + 1), z + 0.5);
+  player.setPosition(x + 0.5, freeStandY(world, x, Math.max(height + 1, SEA_LEVEL + 1), z), z + 0.5);
   return true;
+}
+
+/**
+ * Primeira altura, a partir de `y` para cima, com pés e cabeça fora de bloco
+ * sólido. O mapa de altura diz onde está o topo, mas é a última defesa contra
+ * nascer dentro de um tronco (relato de campo 2026-09-23: renascer "dentro da
+ * árvore tomando dano").
+ */
+export function freeStandY(world: World, x: number, y: number, z: number): number {
+  let feet = Math.max(1, Math.floor(y));
+  while (feet < WORLD_HEIGHT - 2
+    && (defOf(world.getBlock(x, feet, z)).solid || defOf(world.getBlock(x, feet + 1, z)).solid)) feet++;
+  return feet;
 }

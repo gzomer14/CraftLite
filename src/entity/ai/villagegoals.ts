@@ -18,7 +18,8 @@
  * uma porta quebrada pelo jogador vira um vão, e o caminho continua o mesmo.
  *
  * O golem não segue rotina: ele caça o hostil que chega perto do poço
- * (`defendVillage`) e, provocado, o jogador — isso já é `attackMelee`.
+ * (`defendVillage`) e, provocado, o jogador — isso já é `attackMelee`; no resto
+ * do tempo faz ronda pela aldeia (`patrol`).
  */
 
 import { defOf, stateBitsOf } from '../../data/blocks';
@@ -40,6 +41,12 @@ const ARRIVED = 1.6;
 /** Distância da porta a partir da qual ela pode ser fechada atrás de quem passou. */
 const DOOR_CLOSE_MIN = 1.8;
 const DOOR_CLOSE_MAX = 6;
+/** Ronda do golem: distância do poço, pausa em cada ponto e prazo para chegar. */
+const PATROL_MIN = 6;
+const PATROL_MAX = 22;
+const PATROL_PAUSE_MIN = 60;
+const PATROL_PAUSE_SPREAD = 140;
+const PATROL_TIMEOUT = 600;
 /** Ciclo de trabalho: `WORK_SHIFT` ticks no posto a cada `WORK_CYCLE` (40 s em 60 s). */
 const WORK_CYCLE = 1200;
 const WORK_SHIFT = 800;
@@ -58,7 +65,7 @@ const DOOR_OPEN = 4;
 const WAY = new Float64Array(3);
 
 export const VILLAGE_GOALS: Pick<Record<GoalName, Goal>,
-  'trade' | 'avoidHostile' | 'goHome' | 'work' | 'stayInVillage' | 'defendVillage'> = {
+  'trade' | 'avoidHostile' | 'goHome' | 'work' | 'stayInVillage' | 'patrol' | 'defendVillage'> = {
   /** Negociando: parado, de frente para o jogador. */
   trade(ctx, i) {
     const s = ctx.store;
@@ -184,6 +191,44 @@ export const VILLAGE_GOALS: Pick<Record<GoalName, Goal>,
     const limit = mobDef(s.type[i]).category === 'passive' ? 10 : VILLAGE_LEASH;
     if (distance <= limit && !insideHome(s, i)) return false;
     goTo(ctx, i, gx, v.centerY[i], gz, 0.8);
+    return true;
+  },
+
+  /**
+   * Golem: ronda pela aldeia. Sorteia um ponto a 6–22 blocos do poço, vai até
+   * ele pelo A*, para um pouco olhando em volta, e sorteia outro. Antes ele só
+   * tinha o `wander` (8 blocos em linha reta, a partir do poço) e, no campo,
+   * "ficou preso no poço" em vez de guardar a aldeia.
+   */
+  patrol(ctx, i) {
+    const s = ctx.store;
+    const v = s.village;
+    if (v.member[i] === 0) return false;
+    if (v.patrolTicks[i] > 0) v.patrolTicks[i]--;
+    const px = v.workX[i] + 0.5;
+    const pz = v.workZ[i] + 0.5;
+    const arrived = v.hasWork[i] === 1 && Math.hypot(s.x[i] - px, s.z[i] - pz) <= ARRIVED + 0.5;
+    if (arrived && v.hasWork[i] === 1) {
+      // Chegou: fica parado um tempo, e o próximo ponto sai quando ele acabar.
+      v.hasWork[i] = 0;
+      v.patrolTicks[i] = PATROL_PAUSE_MIN + Math.floor(ctx.random() * PATROL_PAUSE_SPREAD);
+    }
+    if (v.hasWork[i] === 0) {
+      if (v.patrolTicks[i] > 0) { s.clearMoveTarget(i); return true; }
+      const angle = ctx.random() * Math.PI * 2;
+      const radius = PATROL_MIN + ctx.random() * (PATROL_MAX - PATROL_MIN);
+      v.workX[i] = Math.floor(v.centerX[i] + Math.sin(angle) * radius);
+      v.workY[i] = v.centerY[i];
+      v.workZ[i] = Math.floor(v.centerZ[i] + Math.cos(angle) * radius);
+      v.hasWork[i] = 1;
+      v.bestDistance[i] = Infinity;
+      v.patrolTicks[i] = PATROL_TIMEOUT;
+    } else if (v.patrolTicks[i] <= 0) {
+      // Ponto inalcançável (dentro de uma casa, atrás da horta): larga e sorteia outro.
+      v.hasWork[i] = 0;
+      return true;
+    }
+    goTo(ctx, i, v.workX[i] + 0.5, v.workY[i], v.workZ[i] + 0.5, 0.6);
     return true;
   },
 

@@ -5,6 +5,7 @@
  * que o loop de sobrevivência inteiro possa ser testado sem GL nem DOM.
  */
 
+import { freeStandY } from './spawnplacement';
 import { AIR, BLOCK_BY_NAME, blockIdOf, defOf } from '../data/blocks';
 import { itemDef, stackTool, type ItemStack } from '../data/items';
 import type { ContainerView } from './container';
@@ -713,8 +714,12 @@ export class Session {
   /**
    * Renasce no ponto da cama, se houver, senão no spawn do mundo.
    * `spawnX`/`spawnZ` são o spawn do mundo, não o do jogador.
+   *
+   * Devolve true se a posição é exata (a cama). Sem cama, a altura é só um
+   * palpite enquanto a coluna não chegou: quem chama segura a física e deixa
+   * `trySpawn` assentar o jogador no topo da coluna quando ela carregar.
    */
-  respawn(spawnX: number, spawnZ: number): void {
+  respawn(spawnX: number, spawnZ: number): boolean {
     this.survival.respawn();
     /*
      * Morrer fora da superfície devolve o jogador **à superfície**, não ao
@@ -728,9 +733,10 @@ export class Session {
     const z = useBed ? this.spawnZ : spawnZ;
     const chunk = this.world.getChunk(x >> 4, z >> 4);
     const height = chunk?.heightMap[((z & 15) << 4) | (x & 15)] ?? 70;
-    const y = useBed ? this.spawnY : Math.min(height + 1, WORLD_HEIGHT - 2);
+    const y = useBed ? this.spawnY : freeStandY(this.world, x, Math.min(height + 1, WORLD_HEIGHT - 2), z);
     this.player.setPosition(x + 0.5, Math.min(y, WORLD_HEIGHT - 2), z + 0.5);
     this.player.fallDistance = 0;
+    return useBed;
   }
 
   /**

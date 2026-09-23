@@ -35,6 +35,7 @@ export type GoalName =
   | 'goHome'
   | 'work'
   | 'stayInVillage'
+  | 'patrol'
   | 'defendVillage';
 
 /** Traços que o motor consulta direto, sem passar por goal. */
@@ -441,8 +442,7 @@ const SPECS: MobSpec[] = [
       { item: 'poppy', count: [0, 2] },
     ],
     goals: [
-      'floatInWater', 'defendVillage', 'attackMelee', 'moveToTarget', 'stayInVillage',
-      'wander', 'lookAtPlayer',
+      'floatInWater', 'defendVillage', 'attackMelee', 'moveToTarget', 'patrol', 'lookAtPlayer',
     ],
     model: 'humanoid', skin: 'iron_golem', sound: 'iron_golem',
     despawnable: false,

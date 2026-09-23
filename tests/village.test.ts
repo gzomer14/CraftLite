@@ -454,6 +454,27 @@ describe('reputação e golem', () => {
     expect(session.villages.isBanned(i)).toBe(true);
   });
 
+  /* Campo, 2026-09-23: o golem "ficou preso no poço" em vez de guardar a aldeia. */
+  it('o golem faz ronda pela aldeia, longe do poço', () => {
+    const { scene, session } = villageSession();
+    const s = session.mobs.store;
+    let golem = -1;
+    for (let i = 0; i < s.active; i++) if (s.type[i] === GOLEM) golem = i;
+    expect(golem).toBeGreaterThanOrEqual(0);
+    session.dayNight.setTimeOfDay(3000);
+    let walked = 0;
+    let farthest = 0;
+    for (let t = 0; t < 2400; t++) {
+      const x = s.x[golem];
+      const z = s.z[golem];
+      session.tick();
+      walked += Math.hypot(s.x[golem] - x, s.z[golem] - z);
+      farthest = Math.max(farthest, Math.hypot(s.x[golem] - scene.wellX, s.z[golem] - scene.wellZ));
+    }
+    expect(walked, 'andou em 2 min (antes, 35)').toBeGreaterThan(90);
+    expect(farthest, 'se afastou do poço').toBeGreaterThan(10);
+  }, 30_000);
+
   it('o golem mata o zumbi que chega perto do poço', () => {
     const { scene, session } = villageSession();
     const s = session.mobs.store;

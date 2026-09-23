@@ -257,10 +257,19 @@ async function boot(): Promise<void> {
     session: () => session,
     onCreativeClose: () => { controls.reset(); },
   });
-  const deathScreen = new DeathScreen({
-    onRespawn: () => { deathScreen.hide(); session.respawn(meta.spawn[0], meta.spawn[2]); },
-    onQuit: () => { deathScreen.hide(); session.respawn(meta.spawn[0], meta.spawn[2]); },
-  });
+  /*
+   * O ponto de renascimento pode estar longe, com a coluna ainda por carregar:
+   * a física espera o chão, como no nascimento. Antes a altura saía de um "70"
+   * de reserva, e quem renascia numa coluna de árvore nascia dentro do tronco.
+   * Sem cama, `trySpawn` assenta o jogador no topo quando a coluna chega; com
+   * cama, a posição é exata e só espera o chão existir.
+   */
+  const respawn = (): void => {
+    deathScreen.hide();
+    restored = session.respawn(meta.spawn[0], meta.spawn[2]);
+    spawned = false;
+  };
+  const deathScreen = new DeathScreen({ onRespawn: respawn, onQuit: respawn });
 
   const session = new Session(world, player, {
     onDimensionChange: (dimension) => {

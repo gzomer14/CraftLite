@@ -303,10 +303,18 @@ export function standHeight(
 /**
  * Custo extra de pisar num bloco perigoso; −1 = intransitável.
  * Água custa caro mas passa; lava e cacto não.
+ *
+ * Olha também o **chão**, e não só o bloco dos pés: o cacto é sólido, então
+ * `standHeight` o aceitava como degrau, e o caminho subia em cima dele — o
+ * aldeão "trancava" no cacto tentando escalá-lo (campo, 2026-09-23). Cerca e
+ * portão têm 1,5 de altura: o pulo não alcança o topo, e o degrau é mentira.
  */
 function hazardPenalty(world: World, x: number, y: number, z: number): number {
   const def = defOf(world.getBlock(x, y, z));
   if (def.name === 'lava' || def.name === 'cactus') return -1;
+  const ground = defOf(world.getBlock(x, y - 1, z));
+  if (ground.name === 'cactus' || ground.name === 'lava' || ground.name === 'magma_block') return -1;
+  if (ground.shape === 'fence' || ground.shape === 'fence_gate') return -1;
   if (def.name === 'water') return 4;
   return 0;
 }

@@ -94,7 +94,7 @@ const SHOOT_MIN = 5;
 
 /** Os goals daqui; os da aldeia estão em `villagegoals.ts` e o `Mobs` junta os dois. */
 export type BaseGoalName = Exclude<
-  GoalName, 'trade' | 'avoidHostile' | 'goHome' | 'work' | 'stayInVillage' | 'defendVillage'
+  GoalName, 'trade' | 'avoidHostile' | 'goHome' | 'work' | 'stayInVillage' | 'patrol' | 'defendVillage'
 >;
 
 export const GOALS: Record<BaseGoalName, Goal> = {

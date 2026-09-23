@@ -127,3 +127,36 @@ describe('item largado pelo jogador', () => {
     expect(coletou, 'o arremessado ainda está no prazo dele').toBe(0);
   });
 });
+
+describe('item em coluna descarregada', () => {
+  /*
+   * Quem morria longe do ponto de renascimento perdia o inventário enquanto
+   * voltava: fora do mundo carregado o chão responde ar, e o monte caía até
+   * sumir. E os 5 min de vida corriam mesmo longe.
+   */
+  it('fica parado e não envelhece', () => {
+    const world = makeWorld();
+    const items = new ItemEntities(8);
+    items.spawn(200.5, 70, 200.5, { item: WOOD, count: 5, damage: 0 });
+    run(items, world, 200, 0, 64, 0);
+    let y = 0;
+    let age = -1;
+    items.forEach((_x, iy, _z, _item, _count, iage) => { y = iy; age = iage; }, 1);
+    expect(y).toBeCloseTo(70, 5);
+    expect(age).toBe(0);
+  });
+
+  it('com o pool cheio, o item mais velho dá a vaga', () => {
+    const world = makeWorld();
+    const items = new ItemEntities(3);
+    for (let n = 0; n < 3; n++) {
+      items.spawn(n * 3, 65, 0, { item: WOOD, count: 1, damage: 0 });
+      run(items, world, 10, 30, 64, 30);
+    }
+    expect(items.spawn(9, 65, 0, { item: STONE, count: 1, damage: 0 })).toBe(true);
+    const xs: number[] = [];
+    items.forEach((x) => { xs.push(Math.round(x)); }, 1);
+    expect(xs).not.toContain(0);
+    expect(xs).toContain(9);
+  });
+});

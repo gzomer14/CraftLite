@@ -14,6 +14,8 @@ import { AIR, BLOCK_BY_NAME, makeState } from '../src/data/blocks';
 const GROUND_Y = 63;
 const stone = makeState(BLOCK_BY_NAME.get('stone')!.id);
 const lava = makeState(BLOCK_BY_NAME.get('lava')!.id);
+const cactus = makeState(BLOCK_BY_NAME.get('cactus')!.id);
+const fence = makeState(BLOCK_BY_NAME.get('oak_fence')!.id);
 
 function flatWorld(radius = 3): World {
   const world = new World(99);
@@ -153,4 +155,23 @@ describe('A* com orçamento', () => {
     finder.find(world, 2, GROUND_Y + 1, 2, 8, GROUND_Y + 1, 2, 2);
     expect(finder.outLength).toBe(first);
   });
+});
+
+describe('chão que não se pisa', () => {
+  /*
+   * O cacto é sólido, e `standHeight` o aceitava como degrau: o caminho subia
+   * em cima dele, e o aldeão "trancava" tentando escalá-lo (campo, 2026-09-23).
+   * Cerca tem 1,5 de altura — o pulo não alcança o topo.
+   */
+  for (const [name, block] of [['cacto', cactus], ['cerca', fence]] as const) {
+    it(`o caminho contorna a fileira de ${name} em vez de subir nela`, () => {
+      const world = flatWorld();
+      for (let z = -8; z <= 24; z++) if (z !== 20) world.setBlock(6, GROUND_Y + 1, z, block, 'gen');
+      const finder = new Pathfinder();
+      expect(finder.find(world, 2, GROUND_Y + 1, 8, 10, GROUND_Y + 1, 8, 1.8, 2000)).toBe(true);
+      for (let n = 0; n < finder.outLength; n++) {
+        expect(finder.outY[n], `nó ${n} em cima do ${name}`).toBe(GROUND_Y + 1);
+      }
+    });
+  }
 });

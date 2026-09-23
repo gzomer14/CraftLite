@@ -13,7 +13,7 @@ import { AUTOSAVE_TICKS, SaveManager } from '../src/save/savemanager';
 import {
   SaveGame, containerFrom, tileFrom, type ContainerRecord, type TileRecord,
 } from '../src/game/savegame';
-import { trySpawn } from '../src/game/spawnplacement';
+import { freeStandY, trySpawn } from '../src/game/spawnplacement';
 import { newWorldMeta } from '../src/ui/menuflow';
 import { Session } from '../src/game/session';
 import { Player } from '../src/entity/player';
@@ -724,5 +724,32 @@ describe('veículos e dimensão no save (M7)', () => {
     expect(save.snapshot().dimension).toBe(0);
     session.enterDimension(1);
     expect(save.snapshot().dimension).toBe(1);
+  });
+});
+
+describe('renascer não enterra o jogador', () => {
+  /*
+   * Campo, 2026-09-23: nasceu em cima de uma árvore, morreu longe, e renasceu
+   * "dentro da árvore tomando dano". A coluna de renascimento não estava
+   * carregada e a altura saía de um 70 de reserva.
+   */
+  it('a altura livre sobe até sair do tronco', () => {
+    const world = flatWorld();
+    const log = makeState(BLOCK_BY_NAME.get('oak_log')!.id);
+    for (let y = GROUND_Y + 1; y <= GROUND_Y + 5; y++) world.setBlock(4, y, 4, log, 'gen');
+    expect(freeStandY(world, 4, GROUND_Y + 2, 4)).toBe(GROUND_Y + 6);
+    expect(freeStandY(world, 5, GROUND_Y + 1, 4)).toBe(GROUND_Y + 1);
+  });
+
+  it('sem cama e com a coluna longe, o renascimento avisa que a altura é palpite', () => {
+    const world = flatWorld();
+    const player = new Player(8.5, GROUND_Y + 1, 8.5);
+    const session = new Session(world, player, {
+      onOpenScreen: () => { /* nada */ }, onDeath: () => { /* nada */ }, onPickup: () => { /* nada */ },
+    });
+    // O spawn do mundo fora das colunas carregadas: quem chama segura a física
+    // e deixa `trySpawn` assentar o jogador quando a coluna chegar.
+    expect(session.respawn(500, 500)).toBe(false);
+    expect(trySpawn(world, player, false)).toBe(false);
   });
 });

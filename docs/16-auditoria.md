@@ -12,6 +12,40 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-23 · 14:30 → 15:12 · Mob preso em parede, golem sem ronda, item no vazio, renascer no tronco
+
+**Pedido:** *"Agora apareceu os aldeões, e também o iron golem (…) tudo perfeito. Só achei estranho
+que (…) o iron golem ficou preso no poço (…) os aldeões também parecem trancar muito fácil em
+qualquer objeto (…) como arvores, cactos"*; perguntas sobre perder itens ao morrer e o que acontece
+com eles longe; e, no meio, *"depois morri e voltei para o mesmo lugar só que literalmente dentro da
+árvore tomando dano"*.
+
+**Resultado:** o mob empurrava para sempre a parede que não conseguia pular (medido: 105 s o golem),
+agora larga o destino em 1 s; o A* não sobe mais em cacto nem cerca; o golem ganhou ronda pela
+aldeia (129 blocos em 2 min, antes 35). Perder itens: no Sobrevivência o inventário cai no chão
+(não há opção de manter); o item em coluna descarregada caía no vazio e envelhecia mesmo longe —
+agora fica parado e não envelhece, e o pool (512) cede o mais velho. **Não vai para o save** — fica
+como pendência. Renascer longe usava um `?? 70` de altura: agora espera a coluna, como o
+nascimento. Nove regressões, todas falhando no código anterior.
+
+Portões: **2036 testes** em 101 arquivos, lint limpo, build ok, **240,0 KB** de 350.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/entity/mobstore.ts` | `blockedTicks` e `BLOCKED_GIVE_UP`: um segundo contra a parede larga o destino |
+| `~` | `src/entity/ai/pathfinder.ts` | chão de cacto, lava, magma, cerca e portão é intransitável |
+| `~` | `src/entity/ai/villagegoals.ts` | goal `patrol` do golem |
+| `~` | `src/entity/villagestate.ts` | `patrolTicks` |
+| `~` | `src/data/mobs.ts`, `src/entity/ai/goals.ts` | `patrol` no nome dos goals e na lista do golem (no lugar de `stayInVillage` + `wander`) |
+| `~` | `src/entity/itementity.ts` | item em coluna descarregada parado e sem envelhecer; pool cheio cede o mais velho |
+| `~` | `src/game/spawnplacement.ts` | `freeStandY`; `trySpawn` a usa |
+| `~` | `src/game/session.ts` | `respawn` devolve se a posição é exata e usa `freeStandY` |
+| `~` | `src/main.ts` | renascer segura a física até a coluna chegar |
+| `~` | `tests/mobs.test.ts`, `tests/pathfinding.test.ts`, `tests/itemdrop.test.ts`, `tests/savegame.test.ts`, `tests/village.test.ts` | as nove regressões |
+| `~` | `docs/15-status.md`, `docs/16-auditoria.md`, `README.md` | status, esta sessão, contagem de testes |
+
+---
+
 ## 2026-09-23 · 14:00 → 14:08 · O pool de mobs cheio esvaziava a aldeia
 
 **Pedido:** *"Novamente criei um novo mundo com seed 2, cheguei em uma Vila e não encontrei

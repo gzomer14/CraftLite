@@ -103,7 +103,9 @@ export class ItemEntities {
     x: number, y: number, z: number, stack: ItemStack,
     throwDir?: ArrayLike<number> | null,
   ): boolean {
-    if (this.activeCount >= this.capacity) return false;
+    // Cheio: o mais velho dá a vaga. Item em coluna descarregada não envelhece
+    // (abaixo), então o monte da morte, recente, é o último a sair.
+    if (this.activeCount >= this.capacity && !this.evictOldest()) return false;
     const i = this.activeCount++;
     this.x[i] = x; this.y[i] = y; this.z[i] = z;
     this.prevX[i] = x; this.prevY[i] = y; this.prevZ[i] = z;
@@ -142,6 +144,13 @@ export class ItemEntities {
       this.prevX[i] = this.x[i];
       this.prevY[i] = this.y[i];
       this.prevZ[i] = this.z[i];
+      /*
+       * Coluna descarregada: o item fica parado e não envelhece, como o mob.
+       * Antes ele caía pelo "ar" de fora do mundo carregado e sumia — o
+       * inventário de quem morria longe do ponto de renascimento se perdia
+       * enquanto o jogador voltava andando —, e os 5 min corriam mesmo longe.
+       */
+      if (!world.isLoaded(Math.floor(this.x[i]), Math.floor(this.z[i]))) continue;
       this.age[i]++;
 
       if (this.age[i] > DESPAWN_TICKS) {
@@ -244,6 +253,17 @@ export class ItemEntities {
   }
 
   /** Troca com o último: remover do meio sem realocar. */
+  /** Tira o item mais velho do pool. false se o pool está vazio. */
+  private evictOldest(): boolean {
+    let oldest = -1;
+    for (let i = 0; i < this.activeCount; i++) {
+      if (oldest < 0 || this.age[i] > this.age[oldest]) oldest = i;
+    }
+    if (oldest < 0) return false;
+    this.removeAt(oldest);
+    return true;
+  }
+
   private removeAt(i: number): void {
     const last = --this.activeCount;
     if (i === last) return;

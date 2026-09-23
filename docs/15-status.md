@@ -9,11 +9,11 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-23 14:08 — **Aldeia vazia de novo no campo, agora por outro motivo:
-o pool de mobs estava cheio** (*"E: 140 mobs"* em T2, que é o pool inteiro). Os grupos de bichos de
-chunk novo não tinham teto e, desde o M9, mob de coluna descarregada ficava no pool para sempre.
-Corrigido (§4). Antes, 13:55: a aldeia nascia pela metade na divisa de bioma e o aldeão parava na
-porta.
+**Última atualização:** 2026-09-23 15:12 — **Aldeia validada em campo (aldeões, golem, reputação).
+Quatro correções do relato seguinte:** mob empurrava para sempre a parede que não conseguia pular
+(golem "preso no poço", aldeão "trancando" em árvore), o A* subia em cacto e cerca, item em coluna
+descarregada caía no vazio, e renascer longe punha o jogador dentro do tronco. O golem ganhou ronda
+(§4). Antes, 14:08: o pool de mobs cheio esvaziava a aldeia.
 
 ---
 
@@ -67,8 +67,8 @@ Medidas em 2026-09-23 11:03, ao fechar o M9, com `npm test`, `npm run build`,
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **239,6 KB** (239,4 no M9; 229,0 no M12; 226,3 antes dele) | < 350 KB | `npm run size` |
-| Testes | **2027**, 101 arquivos (2023 no M9; 2003 no M12) | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **240,0 KB** (239,4 no M9; 229,0 no M12; 226,3 antes dele) | < 350 KB | `npm run size` |
+| Testes | **2036**, 101 arquivos (2023 no M9; 2003 no M12) | manter verde | `npm test` |
 | Smoke test de navegador | **7 passos verdes**: carregar, criar, andar 10 s, quebrar, salvar, recarregar, conferir | verde | `npm run smoke` |
 | Camadas de atlas | **194** com 16 cores de lã e cama (222 no M11 com 8 cores; lã e cama viraram tint no M13) | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Memória de áudio | **3,33 MB** (era 3,26; +3 sons curtos de balde e arremesso) | < 3,5 MB | `tests/audio.test.ts` |
@@ -1580,6 +1580,11 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-23 | `entity/mobstore.ts` | **Mob empurrava para sempre a parede que não conseguia pular** (M5; campo: *"o iron golem ficou preso no poço"*, *"os aldeões também parecem trancar muito fácil em qualquer objeto (…) arvores, cactos"*). O destino de movimento só se cumpria ao chegar, e o `wander` não sorteia outro enquanto há um: contra tronco, mureta do poço ou parede de casa, o bicho empurrava a mesma parede — medido, até **105 s** o golem e 70 s um aldeão. Agora, um segundo batendo de frente sem sair do lugar larga o destino (`BLOCKED_GIVE_UP`); quem pede o destino a cada tick (A*, perseguição) nem sente. Com isso o golem passou de 6 para 85–97 blocos andados em 2 min. Regressão em `tests/mobs.test.ts`. |
+| 2026-09-23 | `entity/ai/pathfinder.ts` | **O A* subia em cacto e em cerca** (M5). `hazardPenalty` olhava o bloco dos pés, não o chão: o cacto, sólido, virava degrau, e a cerca (1,5 de altura) também, sem o pulo alcançar o topo. Chão de cacto, lava, magma, cerca e portão agora é intransitável. Regressão em `tests/pathfinding.test.ts`. |
+| 2026-09-23 | `entity/ai/villagegoals.ts`, `data/mobs.ts` | **O golem não fazia ronda** (M9). Tinha só o `wander` — 8 blocos em linha reta a partir do poço. Ganhou o goal `patrol`: ponto sorteado a 6–22 blocos do poço, caminho pelo A*, pausa, outro ponto; ponto inalcançável é largado em 30 s. Em 2 min, 129 blocos andados (antes, 35). Regressão em `tests/village.test.ts`. |
+| 2026-09-23 | `entity/itementity.ts` | **Item em coluna descarregada caía no vazio** (M4; pergunta de campo sobre o inventário da morte longe do renascimento). Fora do mundo carregado o chão responde ar, e o monte da morte sumia enquanto o jogador voltava. Agora fica parado e **não envelhece** (os 5 min só correm com a coluna carregada, como no original); com o pool cheio (512), o item mais velho dá a vaga, e o monte recente é o último a sair. **Ainda não vai para o save**: sair do mundo perde o que está no chão (§5). Regressão em `tests/itemdrop.test.ts`. |
+| 2026-09-23 | `game/session.ts`, `game/spawnplacement.ts`, `main.ts` | **Renascer longe punha o jogador dentro do tronco** (M4; campo: *"voltei para o mesmo lugar só que literalmente dentro da árvore tomando dano"*). Sem a coluna de renascimento carregada, a altura saía de um `?? 70` de reserva. Agora `respawn` diz se a posição é exata (cama) e o `main` segura a física até a coluna chegar, deixando `trySpawn` assentar o jogador no topo — o mesmo caminho do nascimento; e `freeStandY` sobe até pés e cabeça estarem livres. Regressão em `tests/savegame.test.ts`. |
 | 2026-09-23 | `entity/mobs.ts`, `entity/spawn.ts`, `game/village.ts` | **O pool de mobs enchia e a aldeia não tinha onde nascer** (M9; campo, seed `2` em T2 com RD 16: aldeia inteira, nenhum aldeão, nenhum golem, e o F3 mostrando *"140 mobs"* — o pool é `2 × maxMobs` = 140). Três causas somadas: `populateChunk` dá um grupo de bichos a 10% dos chunks novos **sem teto** (em RD 16 são ~860 colunas); a correção do M9 que deixa o mob de coluna descarregada parado fez os bichos deixados para trás **nunca saírem do pool** (antes eles caíam no vazio, o que liberava a vaga por acidente); e o aldeão, ao nascer com o chunk da casa, desistia em silêncio com o pool cheio. Agora o chunk que sai leva os mobs comuns dele (`Mobs.forgetChunk`; domado, nomeado e morador ficam — mob não vai para o save, então é o mesmo que recarregar), os grupos de chunk novo param em metade do pool, e aldeão e golem tomam a vaga do mob comum mais longe (`Mobs.makeRoom`). Três regressões (`village.test.ts`, `spawn.test.ts`), que falham no código anterior. |
 | 2026-09-23 | `world/gen/village.ts` | **Aldeia pela metade: um aldeão só, sem golem** (M9; relato de campo: *"tinha somente 1 aldeão, travado na casa dele (…) não tinha iron golem"*). Cada peça da aldeia conferia o bioma do **próprio** ponto: na divisa da planície nasciam duas ou três casas soltas, sem poço — sem golem e sem sino —, e os moradores eram sorteados entre as casas **do plano**, que não tinham nascido. Em 24 seeds, 4 das 11 aldeias estavam assim, com 1 morador. A seed `2`, usada nos testes do M9, é toda planície. Agora a aldeia existe ou não pelo bioma do poço (que não depende da janela do chunk), e de pé ela constrói todas as casas, menos sobre a água. E o poço na beira da região de 32 chunks contava casas da aldeia vizinha na fila de moradores (`occupantRank`). Regressão em `tests/village.test.ts` ("plano da aldeia em várias seeds"). **Mundos já criados:** chunk gerado antes continua como estava; a aldeia certa aparece em terreno novo. |
 | 2026-09-23 | `entity/ai/villagegoals.ts` | **O aldeão passava a manhã plantado na soleira da porta** (M9). "Chegou ao posto" valia a 2,6 blocos dele, que é a porta de casa, e ele ficava ali de 1000 a 9000 — visto de fora, travado. Agora ele chega ao posto (1,6) e trabalha em turnos de 40 s a cada minuto, defasados por aldeão; entre um e outro vai para perto do poço. Regressão: cada aldeão anda mais de 20 blocos numa manhã de 2 min (antes, 7,8). |
@@ -1726,7 +1731,12 @@ trocando de aba ao apertar os mesmos botões. Instalar como PWA não muda. A mit
 ar — **o direcional ←/→ troca o item** —, e agora a tela de Opções diz isso quando há controle
 ligado.
 
-**Não há mais pendência de funcionalidade em aberto.** O que resta é a dependência externa ao
+**Pendência aberta em 2026-09-23: item no chão não vai para o save.** O inventário que cai na
+morte sobrevive a ir e voltar andando (a coluna descarregada congela o item, §4), mas não a sair do
+mundo: `game/savegame.ts` grava baús, veículos e placas, não `ItemEntities`. Mob também não vai
+(doc 11 §2), mas perder o próprio inventário ao fechar o jogo é outra coisa. Não depende de nada.
+
+Fora ela, **não há pendência de funcionalidade em aberto.** O que resta é a dependência externa ao
 código:
 
 ```
@@ -1872,7 +1882,14 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
 
 ## 6. Próximo passo recomendado
 
-0. **Olhar o M9 num aparelho, de novo, num mundo novo** e depois seguir o roteiro: **M10** (saber
+0. **Aldeia validada em campo em 2026-09-23** (*"apareceu os aldeões, e também o iron golem. Bati
+   no aldeão e o iron golem também veio me bater, tudo perfeito"*). Falta conferir depois das
+   correções das 15:12: golem fazendo ronda, aldeão sem travar em árvore/cacto, e renascer longe
+   (morrer longe do ponto de nascimento, sem cama). **Pendência nova:** item no chão não vai para o
+   save — sair do mundo com o inventário da morte no chão o perde. Depois, **M10**.
+   Roteiro anterior, para referência:
+
+   **Olhar o M9 num aparelho, de novo, num mundo novo** e depois seguir o roteiro: **M10** (saber
    onde se está — bússola, relógio, mapa). A primeira volta de campo achou a aldeia pela metade e
    o aldeão parado na porta (§4, 2026-09-23 13:55); a aldeia certa só nasce em terreno gerado
    depois da correção. Em ordem de quanto pode estar errado:

@@ -161,6 +161,39 @@ describe('tabela de mobs', () => {
 });
 
 describe('física e perseguição', () => {
+  /*
+   * Campo, 2026-09-23: o golem "preso no poço" e aldeões "trancando" em árvore.
+   * O destino só se cumpria ao chegar; contra uma parede alta demais para o
+   * pulo, o bicho empurrava para sempre (medido: 105 s na mesma parede).
+   */
+  it('contra uma parede alta demais, o mob larga o destino em um segundo', () => {
+    const { world } = harness();
+    for (let z = 0; z < 16; z++) {
+      for (let y = GROUND_Y + 1; y <= GROUND_Y + 3; y++) world.setBlock(12, y, z, stone, 'gen');
+    }
+    const store = new MobStore(4);
+    const i = store.spawn(COW, 10.5, GROUND_Y + 1, 8.5);
+    store.setMoveTarget(i, 15.5, GROUND_Y + 1, 8.5, 1);
+    let released = -1;
+    for (let t = 0; t < 200 && released < 0; t++) {
+      store.tickPhysics(world, i);
+      if (store.hasMove[i] === 0) released = t;
+    }
+    expect(released, 'largou o destino').toBeGreaterThan(0);
+    expect(released).toBeLessThanOrEqual(60);
+    expect(store.x[i]).toBeLessThan(12);
+  });
+
+  it('andando livre, o destino não é largado no caminho', () => {
+    const { world } = harness();
+    const store = new MobStore(4);
+    const i = store.spawn(COW, 2.5, GROUND_Y + 1, 8.5);
+    store.setMoveTarget(i, 20.5, GROUND_Y + 1, 8.5, 1);
+    for (let t = 0; t < 40; t++) store.tickPhysics(world, i);
+    expect(store.hasMove[i]).toBe(1);
+    expect(store.x[i]).toBeGreaterThan(3.5);
+  });
+
   it('o mob pousa no chão em vez de atravessar', () => {
     const { mobs } = harness();
     const i = mobs.spawn(ZOMBIE, 8.5, GROUND_Y + 6, 8.5);

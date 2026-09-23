@@ -61,6 +61,13 @@ export class PlayerActions {
     const { controls, session, hand } = this;
     const { interaction, inventory, player } = session;
 
+    // Espectador (M10): olha, não toca. Sem mira, sem quebrar, sem usar.
+    if (player.spectator) {
+      interaction.state.target = null;
+      this.idle();
+      return;
+    }
+
     const dir = this.aimDirection();
     interaction.updateTargetAlong(dir[0], dir[1], dir[2]);
 

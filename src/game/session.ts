@@ -5,6 +5,7 @@
  * que o loop de sobrevivência inteiro possa ser testado sem GL nem DOM.
  */
 
+import { Journal } from './journal';
 import { freeStandY } from './spawnplacement';
 import { AIR, BLOCK_BY_NAME, blockIdOf, defOf } from '../data/blocks';
 import { itemDef, stackTool, type ItemStack } from '../data/items';
@@ -84,6 +85,8 @@ export interface SessionEvents {
    * **antes** de o mundo novo ter chunk nenhum.
    */
   onDimensionChange?: (dimension: number) => void;
+  /** O jogador usou o mapa (M10): quem ouve abre a tela do mapa. */
+  onOpenMap?: () => void;
 }
 
 export interface SessionOptions {
@@ -99,6 +102,8 @@ export class Session {
   readonly inventory = new Inventory();
   readonly survival = new Survival();
   readonly items = new ItemEntities();
+  /** Mapa explorado, marcadores e estatísticas (M10). */
+  readonly journal = new Journal();
   readonly orbs = new XpOrbs();
   readonly xp = new Experience();
   readonly mobs: Mobs;
@@ -204,7 +209,7 @@ export class Session {
     });
     this.workbench = new Workbench({
       world, player, inventory: this.inventory, recipes: this.recipes, tiles: this.tiles,
-      xp: this.xp, achievements: this.achievements,
+      xp: this.xp, achievements: this.achievements, stats: this.journal.stats,
       onOpenScreen: (screen, container) => {
         // Qualquer tela que não seja a de troca solta o aldeão que negociava.
         if (screen !== 'trading') this.villages.stopTrading();
@@ -249,7 +254,7 @@ export class Session {
     });
     this.combat = new PlayerCombat({
       world, player, inventory: this.inventory, survival: this.survival, mobs: this.mobs,
-      achievements: this.achievements,
+      achievements: this.achievements, stats: this.journal.stats,
       isBlocking: () => this.isBlocking,
       sound: (name, x, y, z) => { this.events.onSound?.(name, x, y, z); },
       blockRemoved: (x, y, z, previous) => {
@@ -287,6 +292,7 @@ export class Session {
       vehicles: this.vehicles,
       fire: this.fire,
       achievement: (name) => { this.achievements.event(name); },
+      openMap: () => { this.events.onOpenMap?.(); },
     });
     wireInventory(this, events, (stack) => this.dropItem(stack));
     this.wireInteraction();
@@ -309,6 +315,7 @@ export class Session {
       this.fluids.scheduleAround(x, y, z);
       this.breakPortalAround(x, y, z);
       this.damageTool();
+      this.journal.stats.add('blocks_mined');
     };
     this.interaction.onBlockPlaced = (x, y, z, state) => {
       this.tiles.create(x, y, z, blockIdOf(state));
@@ -317,6 +324,7 @@ export class Session {
       if (blockIdOf(state) === OAK_SIGN) this.editSignAt(x, y, z);
       this.fluids.scheduleAround(x, y, z);
       this.achievements.place(defOf(state).name);
+      this.journal.stats.add('blocks_placed');
     };
   }
 
@@ -327,6 +335,7 @@ export class Session {
     this.dayNight.tick();
     this.weather.update(this.dayNight.totalTicks);
     this.trackMovement();
+    this.journal.tick(this.world, this.player, this.vehicles.isRiding);
     this.combat.tick();
     this.itemUser.tick();
 
@@ -349,8 +358,11 @@ export class Session {
     }
 
     this.achievements.depth(Math.floor(this.player.y));
-    this.items.tick(this.world, this.player.x, this.player.y, this.player.z);
-    this.orbs.tick(this.world, this.player.x, this.player.y, this.player.z);
+    // O espectador (M10) não recolhe nada: para os itens e orbes, ele está
+    // muito abaixo do mundo, e a física deles continua.
+    const pickupY = this.player.spectator ? SPECTATOR_Y : this.player.y;
+    this.items.tick(this.world, this.player.x, pickupY, this.player.z);
+    this.orbs.tick(this.world, this.player.x, pickupY, this.player.z);
     this.vehicles.tick(this.world);
     this.rails.tick();
     this.vehicles.syncRider();
@@ -426,7 +438,9 @@ export class Session {
 
   /** Faz a troca `slot` com o aldeão da tela aberta. */
   buyTrade(slot: number): ReturnType<Trading['buy']> {
-    return this.trading.buy(this.villages.trader(), slot);
+    const result = this.trading.buy(this.villages.trader(), slot);
+    if (result === 'ok') this.journal.stats.add('trades');
+    return result;
   }
 
   /** Pontos de armadura equipada, para a barra do HUD (doc 08 §3.4). */
@@ -775,3 +789,5 @@ export class Session {
 
 /** Visão do jogador entregue aos mobs — reusada, nunca recriada por tick. */
 const PLAYER_VIEW = { x: 0, y: 0, z: 0, eyeY: 0, held: -1, alive: true };
+/** Altura "fora do alcance" do espectador para a coleta de itens e orbes. */
+const SPECTATOR_Y = -1e6;

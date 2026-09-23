@@ -94,6 +94,12 @@ export interface PlayerSave {
   absorption?: number;
   /** Ponto de renascimento definido pela cama, se houver. */
   bedSpawn?: [number, number, number];
+  /** Marcadores de ponto de interesse (M10). Ausente = nenhum. */
+  markers?: unknown[];
+  /** Estatísticas, uma por linha de `data/stats.ts` (M10). Ausente = zeros. */
+  stats?: number[];
+  /** Espectador do Criativo ligado (M10). */
+  spectator?: boolean;
   /**
    * Quando este registro foi escrito (`Date.now()`).
    *
@@ -237,7 +243,7 @@ export class SaveDatabase {
   async deleteWorld(worldId: string): Promise<void> {
     const db = await this.open();
     const tx = db.transaction(
-      [STORE_WORLDS, STORE_CHUNKS, STORE_PLAYERS, STORE_THUMBS], 'readwrite',
+      [STORE_WORLDS, STORE_CHUNKS, STORE_PLAYERS, STORE_THUMBS, STORE_SETTINGS], 'readwrite',
     );
     tx.objectStore(STORE_WORLDS).delete(worldId);
     tx.objectStore(STORE_THUMBS).delete(worldId);
@@ -249,6 +255,15 @@ export class SaveDatabase {
       deleteByPrefix(tx.objectStore(STORE_CHUNKS), dimensionIdFor(worldId, dim));
     }
     deleteByPrefix(tx.objectStore(STORE_PLAYERS), worldId);
+    /*
+     * Registros do mundo em `settings`: baús, veículos e itens de cada
+     * dimensão (`<id>.tiles`, `<id>#1.tiles`…) e o mapa (`<id>.map.*`, M10).
+     * Até o M10 eles sobravam no banco depois de apagar o mundo; com o mapa,
+     * que chega a 2 MB, a sobra deixou de ser desprezível.
+     */
+    const settings = tx.objectStore(STORE_SETTINGS);
+    settings.delete(IDBKeyRange.bound(`${worldId}.`, `${worldId}.\uffff`));
+    settings.delete(IDBKeyRange.bound(`${worldId}#`, `${worldId}#\uffff`));
     await done(tx);
   }
 

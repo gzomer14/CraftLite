@@ -103,7 +103,7 @@ export interface ItemDef {
 export type ItemUse =
   | 'fill_bucket' | 'pour_water' | 'pour_lava' | 'drink_milk' | 'shears' | 'throw_egg'
   | 'throw_snowball' | 'dye_sheep' | 'eat' | 'charge' | 'place_boat' | 'place_minecart'
-  | 'ignite' | 'till' | 'plant';
+  | 'ignite' | 'till' | 'plant' | 'open_map';
 
 /**
  * Materiais de ferramenta (doc 05 §2).
@@ -523,6 +523,25 @@ for (const dye of DYES.slice(LEGACY_DYE_COUNT)) {
   register({
     id: nextId++, name: `${dye.name}_dye`, display: `Corante ${dye.display}`,
     tex: `item/${dye.name}_dye`, maxStack: 64, use: 'dye_sheep',
+  });
+}
+
+// --- apêndice do M10: saber onde se está, no fim da fila de ids -------------
+// A bússola aponta para o nascimento do mundo e o relógio mostra o céu; os dois
+// giram no desenho (`render/itemsprites.ts`, quadros de mostrador) e enlouquecem
+// no Nether. O mapa abre a tela do mapa explorado (`ui/screens/mapscreen.ts`).
+for (const item of [
+  { name: 'compass', display: 'Bússola' },
+  { name: 'clock', display: 'Relógio' },
+  { name: 'map', display: 'Mapa', use: 'open_map' },
+] satisfies AppendixItem[]) {
+  register({
+    id: nextId++,
+    name: item.name,
+    display: item.display,
+    tex: `item/${item.name}`,
+    maxStack: 64,
+    ...(item.use !== undefined ? { use: item.use } : {}),
   });
 }
 

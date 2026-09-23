@@ -8,6 +8,7 @@
  * e aos mobs.
  */
 
+import type { Stats } from './stats';
 import { AIR, defOf } from '../data/blocks';
 import { itemDef, type ItemStack } from '../data/items';
 import { mobDef } from '../data/mobs';
@@ -38,6 +39,8 @@ export interface CombatHost {
   readonly survival: Survival;
   readonly mobs: Mobs;
   readonly achievements: Achievements;
+  /** Contadores do jogador (M10). */
+  readonly stats?: Stats;
   /** Escudo levantado agora (uso de segurar, `game/itemuse.ts`). */
   isBlocking(): boolean;
   sound(name: string, x: number, y: number, z: number): void;
@@ -106,7 +109,10 @@ export class PlayerCombat {
     const type = store.type[index];
     const died = mobs.damage(index, damage, 'player');
     mobs.looting = 0;
-    if (died) this.host.achievements.kill(mobDef(type).name);
+    if (died) {
+      this.host.achievements.kill(mobDef(type).name);
+      this.host.stats?.add('mobs_killed');
+    }
     if (!died) {
       // Empurrão só depois do dano: se ele morreu, este índice já é outro mob.
       store.vx[index] += (px / length) * HIT_KNOCKBACK;

@@ -15,6 +15,7 @@ import {
   createAabb, isSpaceBlocked, moveWithCollision, setAabbFromBase, type Aabb,
 } from '../world/physics';
 import type { World } from '../world/world';
+import { WORLD_HEIGHT } from '../world/chunk';
 
 // --- dimensões (doc 06 §1) ---
 export const PLAYER_WIDTH = 0.6;
@@ -149,6 +150,13 @@ export class Player {
   mode: GameMode = 'survival';
   /** Voo do modo criativo (doc 06 §9). */
   flying = false;
+  /**
+   * Espectador (M10): no Criativo, voa **atravessando** bloco, sem colisão, e
+   * o mundo não o vê — mob não mira, item não é recolhido, bloco não quebra.
+   * É a ferramenta de quem constrói grande: olhar por dentro da parede. Não é
+   * um terceiro modo de jogo; só existe com `mode === 'creative'`.
+   */
+  spectator = false;
 
   /** Altura acumulada da queda, para o dano do doc 06 §6. */
   fallDistance = 0;
@@ -194,6 +202,7 @@ export class Player {
     this.sneaking = input.sneak && this.onGround;
     this.updateFluidState(world);
 
+    if (this.spectator && this.mode === 'creative') this.flying = true;
     if (this.flying && this.mode === 'creative') {
       this.tickFlying(world, input);
       return;
@@ -350,7 +359,16 @@ export class Player {
     this.applyInputAcceleration(input, speed * INPUT_SCALE);
     this.vy += ((input.jump ? 1 : 0) - (input.sneak ? 1 : 0)) * speed;
 
-    this.moveAndCollide(world);
+    if (this.spectator) {
+      // Espectador (M10): anda por dentro de tudo, só não sai do mundo.
+      this.x += this.vx;
+      this.z += this.vz;
+      this.y = Math.max(1, Math.min(WORLD_HEIGHT - 2, this.y + this.vy));
+      this.onGround = false;
+      this.syncAabb();
+    } else {
+      this.moveAndCollide(world);
+    }
 
     this.vx *= 0.6;
     this.vy *= 0.6;

@@ -32,6 +32,7 @@
  * bytes, e é por isso que o formato é testável sem IndexedDB nenhum.
  */
 
+import { regionKey, regionOfKey } from '../game/worldmap';
 import { ByteReader, ByteWriter } from './serialize';
 import {
   DIMENSION_COUNT, STORE_PLAYERS, STORE_SETTINGS, STORE_WORLDS, dimensionIdFor, newWorldId,
@@ -47,9 +48,14 @@ export const MAGIC = 'CRAFTLITE';
  * No fim de propósito: um leitor de v1 encontra tudo que conhece na mesma
  * ordem e nos mesmos offsets, e o campo novo é lido só quando a versão pede.
  */
-export const ARCHIVE_VERSION = 2;
+export const ARCHIVE_VERSION = 3;
 /** Primeira versão com miniatura. */
 const VERSION_WITH_THUMBNAIL = 2;
+/**
+ * Primeira versão com itens no chão e mapa explorado (M10). Vêm **depois** da
+ * miniatura, pela mesma razão dela: o leitor de v2 acha tudo no lugar.
+ */
+const VERSION_WITH_JOURNAL = 3;
 /** Extensão sugerida ao jogador. */
 export const ARCHIVE_EXTENSION = '.clw';
 
@@ -74,6 +80,21 @@ export interface WorldArchive {
   dimensions: ArchiveDimension[];
   /** Miniatura do mundo em PNG (v2+); ausente quando o mundo não tem uma. */
   thumbnail?: Uint8Array;
+  /** Itens no chão por dimensão, achatados por `ItemEntities` (v3+). */
+  items?: ArchiveItems[];
+  /** Regiões do mapa explorado, comprimidas por `encodeRegion` (v3+). */
+  map?: ArchiveMapRegion[];
+}
+
+export interface ArchiveItems {
+  dimension: number;
+  items: number[];
+}
+
+export interface ArchiveMapRegion {
+  rx: number;
+  rz: number;
+  data: Uint8Array;
 }
 
 const encoder = new TextEncoder();
@@ -108,6 +129,16 @@ export function packArchive(archive: WorldArchive): Uint8Array {
   const thumbnail = archive.thumbnail;
   writer.varint(thumbnail?.length ?? 0);
   if (thumbnail !== undefined && thumbnail.length > 0) writer.bytes(thumbnail);
+
+  writeJson(writer, archive.items ?? []);
+  const map = archive.map ?? [];
+  writer.varint(map.length);
+  for (const region of map) {
+    writer.i32(region.rx);
+    writer.i32(region.rz);
+    writer.varint(region.data.length);
+    writer.bytes(region.data);
+  }
   return writer.finish();
 }
 
@@ -149,13 +180,25 @@ export function unpackArchive(data: Uint8Array): WorldArchive {
    * Miniatura: só existe da v2 em diante. Ler incondicionalmente faria um
    * arquivo v1 — que acaba exatamente aqui — estourar em "truncado".
    */
-  if (version < VERSION_WITH_THUMBNAIL || reader.remaining === 0) {
-    return { version, meta, players, dimensions };
-  }
+  const archive: WorldArchive = { version, meta, players, dimensions };
+  if (version < VERSION_WITH_THUMBNAIL || reader.remaining === 0) return archive;
   const thumbLength = reader.varint();
-  if (thumbLength === 0) return { version, meta, players, dimensions };
   if (thumbLength > reader.remaining) throw new ArchiveError('Arquivo truncado.');
-  return { version, meta, players, dimensions, thumbnail: reader.bytes(thumbLength).slice() };
+  if (thumbLength > 0) archive.thumbnail = reader.bytes(thumbLength).slice();
+
+  if (version < VERSION_WITH_JOURNAL || reader.remaining === 0) return archive;
+  archive.items = readJson<ArchiveItems[]>(reader);
+  const regions: ArchiveMapRegion[] = [];
+  const regionCount = reader.varint();
+  for (let r = 0; r < regionCount; r++) {
+    const rx = reader.i32();
+    const rz = reader.i32();
+    const length = reader.varint();
+    if (length > reader.remaining) throw new ArchiveError('Arquivo truncado.');
+    regions.push({ rx, rz, data: reader.bytes(length).slice() });
+  }
+  archive.map = regions;
+  return archive;
 }
 
 function writeJson(writer: ByteWriter, value: unknown): void {
@@ -191,8 +234,11 @@ export async function exportWorld(db: SaveDatabase, worldId: string): Promise<Ui
   const players = allPlayers.filter((p) => p.worldId === worldId);
 
   const dimensions: ArchiveDimension[] = [];
+  const items: ArchiveItems[] = [];
   for (let dimension = 0; dimension < DIMENSION_COUNT; dimension++) {
     const id = dimensionIdFor(worldId, dimension);
+    const floor = (await db.get<number[]>(STORE_SETTINGS, `${id}.items`)) ?? [];
+    if (floor.length > 0) items.push({ dimension, items: floor });
     const chunks = await db.allChunks(id);
     const tiles = (await db.get<unknown[]>(STORE_SETTINGS, `${id}.tiles`)) ?? [];
     const vehicles = (await db.get<unknown[]>(STORE_SETTINGS, `${id}.vehicles`)) ?? [];
@@ -200,9 +246,17 @@ export async function exportWorld(db: SaveDatabase, worldId: string): Promise<Ui
     dimensions.push({ dimension, chunks, tiles, vehicles });
   }
 
+  const map: ArchiveMapRegion[] = [];
+  for (const key of (await db.get<number[]>(STORE_SETTINGS, `${worldId}.map`)) ?? []) {
+    const data = await db.get<Uint8Array>(STORE_SETTINGS, `${worldId}.map.${key}`);
+    if (data === undefined) continue;
+    const [rx, rz] = regionOfKey(key);
+    map.push({ rx, rz, data });
+  }
+
   const thumbnail = await db.loadThumbnail(worldId);
   return packArchive({
-    version: ARCHIVE_VERSION, meta, players, dimensions,
+    version: ARCHIVE_VERSION, meta, players, dimensions, items, map,
     ...(thumbnail !== undefined ? { thumbnail } : {}),
   });
 }
@@ -233,6 +287,19 @@ export async function importWorld(db: SaveDatabase, data: Uint8Array): Promise<W
     }
     if (dim.tiles.length > 0) await db.put(STORE_SETTINGS, dim.tiles, `${id}.tiles`);
     if (dim.vehicles.length > 0) await db.put(STORE_SETTINGS, dim.vehicles, `${id}.vehicles`);
+  }
+
+  for (const floor of archive.items ?? []) {
+    await db.put(STORE_SETTINGS, floor.items, `${dimensionIdFor(meta.id, floor.dimension)}.items`);
+  }
+  if (archive.map !== undefined && archive.map.length > 0) {
+    const index: number[] = [];
+    for (const region of archive.map) {
+      const key = regionKey(region.rx, region.rz);
+      await db.put(STORE_SETTINGS, region.data, `${meta.id}.map.${key}`);
+      index.push(key);
+    }
+    await db.put(STORE_SETTINGS, index, `${meta.id}.map`);
   }
 
   for (const player of archive.players) {

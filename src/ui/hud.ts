@@ -271,7 +271,9 @@ export class Hud {
   render(stacks: readonly (ItemStack | null)[]): void {
     for (let i = 0; i < HOTBAR_SLOTS; i++) {
       const stack = stacks[i] ?? null;
-      const key = stack === null ? '' : `${stack.item}x${stack.count}`;
+      const sprite = stack === null ? null : this.spriteOf?.(stack.item) ?? null;
+      // O sprite entra na chave: a bússola muda de quadro sem mudar de item (M10).
+      const key = stack === null ? '' : `${stack.item}x${stack.count}@${sprite ?? ''}`;
       if (this.rendered[i] === key) continue;
       this.rendered[i] = key;
 
@@ -286,7 +288,6 @@ export class Hud {
       }
       const def = itemDef(stack.item);
       const name = def?.display ?? '?';
-      const sprite = this.spriteOf?.(stack.item) ?? null;
       if (sprite !== null) {
         slot.classList.add('sprite');
         slot.style.backgroundPosition = sprite;

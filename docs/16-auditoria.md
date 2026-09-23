@@ -12,6 +12,71 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-23 · 15:15 → 16:05 · M10: saber onde se está
+
+**Pedido:** *"Qual o próximo marco para implementarmos?"* — recomendado o M10 — e *"Pode seguir sim
+com o M10, já com os itens no chão para o save."*
+
+**Resultado:** M10 fechado. Bússola e relógio com 16 quadros de mostrador na folha de sprites,
+girando na hotbar, no inventário e na mão; mapa explorado por mundo (regiões de 128, teto de 64,
+gravadas por região e comprimidas), com tela própria aberta pelo item ou pela tecla `M`;
+marcadores na borda de cima da tela e "Última morte" automático; estatísticas na pausa; espectador
+no Criativo; itens no chão no save, por dimensão, e `.clw` v3 com itens e mapa. **Critério medido**
+(seed 2, terreno de verdade): 500 blocos e volta pelo marcador, caminho inteiro no mapa, **0,27 ms
+por segundo de jogo**, 16 regiões, ~135 KB. Visto no Chrome headless (hotbar, mão, faixa e tela
+do mapa). Três achados corrigidos: item no chão perdia o encantamento, o F3 tinha leste e oeste
+trocados nos eixos, e apagar mundo deixava registros no banco. Débito anotado: `main.ts` 718 e
+`session.ts` 793 linhas.
+
+Portões: **2061 testes** em 102 arquivos, lint limpo, build ok, **249,5 KB** de 350, smoke 7/7.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| **Dado** | | |
+| `+` | `src/data/stats.ts` | tabela de estatísticas e o formato de cada número |
+| `~` | `src/data/items.ts` | apêndice do M10: `compass`, `clock`, `map` (uso `open_map`) |
+| `~` | `src/data/recipes.ts` | receitas de bússola, relógio e mapa |
+| `~` | `src/data/itemart.ts` | silhuetas `dial` e `map`, `dial` e `DIAL_FRAMES` na arte |
+| `~` | `src/data/keybinds.ts` | ação `map` na tecla `M` |
+| **Jogo** | | |
+| `+` | `src/game/worldmap.ts` | mapa explorado: pixel por coluna, regiões, teto, compressão por carreira |
+| `+` | `src/game/markers.ts` | marcadores, "Última morte", save |
+| `+` | `src/game/stats.ts` | contadores do jogador |
+| `+` | `src/game/journal.ts` | o caderno: mapa, marcadores e estatísticas num tick só |
+| `~` | `src/game/session.ts` | `journal`, contagem de bloco, troca e distância; espectador sem coleta |
+| `~` | `src/game/sessionwiring.ts` | a morte marca e conta |
+| `~` | `src/game/playercombat.ts`, `src/game/workbench.ts` | contam abate e fabricação |
+| `~` | `src/game/itemuse.ts` | uso `open_map` |
+| `~` | `src/game/savegame.ts` | itens no chão, mapa, marcadores, estatísticas e espectador no save |
+| `~` | `src/entity/itementity.ts` | encantamento no item do chão; `snapshot`/`restore` |
+| `~` | `src/entity/player.ts` | `spectator`: voo sem colisão |
+| **Save** | | |
+| `~` | `src/save/db.ts` | campos novos do jogador; apagar mundo limpa `settings` |
+| `~` | `src/save/savemanager.ts` | itens por dimensão e regiões do mapa com índice |
+| `~` | `src/save/archive.ts` | `.clw` v3: itens e mapa no fim |
+| **Render e UI** | | |
+| `+` | `src/render/mapcolors.ts` | cor do mapa tirada da textura de cada bloco |
+| `~` | `src/render/itemsprites.ts` | quadros de mostrador na folha; `setFrame`, `tileOf`, posições em cache |
+| `~` | `src/render/hand.ts` | refaz a mão quando só o quadro muda |
+| `+` | `src/ui/dials.ts` | quadro da bússola e do relógio |
+| `+` | `src/ui/mapview.ts` | conta da vista do mapa (mundo ↔ tela, pintura, rosa dos ventos) |
+| `+` | `src/ui/screens/mapscreen.ts` | tela do mapa com lista de marcadores |
+| `+` | `src/ui/markerbar.ts` | marcadores na borda de cima |
+| `~` | `src/ui/hudfeed.ts`, `src/ui/hud.ts` | gira os mostradores, alimenta a faixa; hotbar redesenha no quadro novo |
+| `~` | `src/ui/gameflow.ts`, `src/ui/screens/pause.ts` | mapa pela tecla, Esc fecha; Estatísticas e Espectador na pausa |
+| `~` | `src/ui/debug.ts` | eixos de leste e oeste do F3 |
+| `~` | `src/input/controls.ts`, `src/input/playeractions.ts` | tecla do mapa; espectador não interage |
+| `~` | `src/main.ts` | liga tela do mapa, faixa e mostradores; `items` no gancho `?smoke` |
+| **Testes** | | |
+| `+` | `tests/journal.test.ts` | 21 testes, com o critério de aceite em terreno de verdade |
+| `~` | `tests/savegame.test.ts` | itens no chão com encantamento, marcadores, estatísticas, espectador, mapa e morte no save |
+| `~` | `tests/dimensionrace.test.ts` | a sessão falsa ganhou os itens no chão |
+| **Docs** | | |
+| `~` | `docs/14-roadmap.md` | M10 marcado, com o critério medido |
+| `~` | `docs/15-status.md`, `docs/16-auditoria.md`, `README.md` | status, esta sessão, contagem |
+
+---
+
 ## 2026-09-23 · 14:30 → 15:12 · Mob preso em parede, golem sem ronda, item no vazio, renascer no tronco
 
 **Pedido:** *"Agora apareceu os aldeões, e também o iron golem (…) tudo perfeito. Só achei estranho

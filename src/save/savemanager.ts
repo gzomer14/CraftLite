@@ -275,6 +275,49 @@ export class SaveManager {
   }
 
   /**
+   * Itens no chão da dimensão atual (M10), achatados por `ItemEntities`.
+   * Mesma regra de chave dos veículos: o monte da morte no Nether não aparece
+   * na superfície.
+   */
+  async saveItems(items: readonly number[]): Promise<void> {
+    await this.db.put(STORE_SETTINGS, items, `${this.chunkStoreId}.items`);
+  }
+
+  async loadItems(): Promise<number[]> {
+    const stored = await this.db.get<number[]>(STORE_SETTINGS, `${this.chunkStoreId}.items`);
+    return stored ?? [];
+  }
+
+  /**
+   * Mapa explorado (M10): um registro por região, mais um índice com as chaves
+   * de todas. Só a superfície tem mapa, então a chave é a do mundo.
+   *
+   * Por região, e não num registro só: o mapa pode chegar a 2 MB, e regravar
+   * tudo a cada autosave por causa de uma região mudada seria o save inteiro
+   * do mundo de novo. O índice existe para carregar sem busca por prefixo.
+   */
+  async saveMapRegions(
+    changed: readonly (readonly [number, Uint8Array])[], forgotten: readonly number[],
+    index: readonly number[],
+  ): Promise<void> {
+    for (const [key, bytes] of changed) {
+      await this.db.put(STORE_SETTINGS, bytes, `${this.worldId}.map.${key}`);
+    }
+    for (const key of forgotten) await this.db.delete(STORE_SETTINGS, `${this.worldId}.map.${key}`);
+    await this.db.put(STORE_SETTINGS, [...index], `${this.worldId}.map`);
+  }
+
+  async loadMapRegions(): Promise<[number, Uint8Array][]> {
+    const index = await this.db.get<number[]>(STORE_SETTINGS, `${this.worldId}.map`);
+    const out: [number, Uint8Array][] = [];
+    for (const key of index ?? []) {
+      const bytes = await this.db.get<Uint8Array>(STORE_SETTINGS, `${this.worldId}.map.${key}`);
+      if (bytes !== undefined) out.push([key, bytes]);
+    }
+    return out;
+  }
+
+  /**
    * O registro do jogador, **o mais recente dos dois**.
    *
    * Antes o do IndexedDB vencia sempre e o de emergência era só o plano B para

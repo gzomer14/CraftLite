@@ -11,6 +11,8 @@
  *
  * O que **não** é salvo: nada que possa ser recalculado. Chunk nunca tocado
  * volta da seed, luz é recomputada ao carregar, e mob não persiste (doc 11 §2).
+ * Item no chão persiste desde o M10: é o inventário da morte que o jogador
+ * ainda vai buscar, e não se recalcula.
  */
 
 import { ChunkColumn } from '../world/chunk';
@@ -24,6 +26,8 @@ import { AUTOSAVE_TICKS, type SaveManager } from '../save/savemanager';
 import type { PlayerSave, WorldMeta } from '../save/db';
 import type { Player } from '../entity/player';
 import type { Session, VehicleRecord } from './session';
+import { encodeRegion } from './worldmap';
+import type { Marker } from './markers';
 
 /** Id do jogador local. O multiplayer do M7 vai usar outros (doc 12). */
 export const LOCAL_PLAYER = 'local';
@@ -128,16 +132,19 @@ export class SaveGame {
   switchDimension(dimension: number): void {
     const tiles = this.tileRecords();
     const vehicles = this.session.vehicles.snapshot();
-    this.switching = this.finishSwitch(dimension, tiles, vehicles)
+    const items = this.session.items.snapshot();
+    this.switching = this.finishSwitch(dimension, tiles, vehicles, items)
       .finally(() => { this.switching = null; });
   }
 
   private async finishSwitch(
     dimension: number, tiles: readonly TileRecord[], vehicles: readonly VehicleRecord[],
+    items: readonly number[],
   ): Promise<void> {
     try {
       await this.manager.saveTiles(tiles);
       await this.manager.saveVehicles(vehicles);
+      await this.manager.saveItems(items);
       // Isto grava os chunks pendentes — ainda com a chave antiga — e vira.
       await this.manager.setDimension(dimension);
       await this.loadDimensionState();
@@ -164,6 +171,7 @@ export class SaveGame {
     const tiles = await this.manager.loadTiles<TileRecord>();
     for (const record of tiles) this.restoreTile(record);
     this.session.vehicles.restore(await this.manager.loadVehicles<VehicleRecord>());
+    this.session.items.restore(await this.manager.loadItems());
   }
 
   /**
@@ -252,6 +260,9 @@ export class SaveGame {
       bedSpawn: this.session.spawnY >= 0
         ? [this.session.spawnX, this.session.spawnY, this.session.spawnZ]
         : undefined,
+      markers: this.session.journal.markers.snapshot(),
+      stats: this.session.journal.stats.snapshot(),
+      spectator: this.player.spectator ? true : undefined,
     };
   }
 
@@ -294,6 +305,11 @@ export class SaveGame {
       );
     }
 
+    this.session.journal.markers.restore(saved.markers as Partial<Marker>[] | undefined);
+    this.session.journal.stats.restore(saved.stats);
+    this.player.spectator = saved.spectator === true && this.player.mode === 'creative';
+    if (this.player.spectator) this.player.flying = true;
+
     if (saved.bedSpawn !== undefined) {
       this.session.spawnX = saved.bedSpawn[0];
       this.session.spawnY = saved.bedSpawn[1];
@@ -314,6 +330,7 @@ export class SaveGame {
     this.session.weather.setSeed(this.session.world.seed);
     this.session.survival.difficulty = this.meta.difficulty;
     this.session.villages.loadBans(this.meta.villageBans);
+    this.session.journal.map.load(await this.manager.loadMapRegions());
     if (saved === undefined) return false;
     this.restore(saved);
     return true;
@@ -330,6 +347,8 @@ export class SaveGame {
       await this.manager.savePlayer(this.snapshot());
       await this.manager.saveTiles(this.tileRecords());
       await this.manager.saveVehicles(this.session.vehicles.snapshot());
+      await this.manager.saveItems(this.session.items.snapshot());
+      await this.saveMap();
       // Mede **depois** de gravar os chunks: senão o número seria o do mundo
       // de antes deste save.
       await this.manager.measureWorld(this.meta);
@@ -339,6 +358,21 @@ export class SaveGame {
     } catch (error) {
       this.options.onError?.(error instanceof Error ? error.message : String(error));
     }
+  }
+
+  /** Grava as regiões do mapa que mudaram e apaga as que o teto esqueceu. */
+  private async saveMap(): Promise<void> {
+    const map = this.session.journal.map;
+    if (map.dirty.size === 0 && map.forgotten.size === 0) return;
+    const changed: [number, Uint8Array][] = [];
+    for (const key of map.dirty) {
+      const region = map.regions.get(key);
+      if (region !== undefined) changed.push([key, encodeRegion(region)]);
+    }
+    const forgotten = [...map.forgotten];
+    map.dirty.clear();
+    map.forgotten.clear();
+    await this.manager.saveMapRegions(changed, forgotten, [...map.regions.keys()]);
   }
 
   /**

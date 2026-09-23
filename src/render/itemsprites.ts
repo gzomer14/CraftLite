@@ -22,7 +22,7 @@ import {
   SHAPE_NONE, SHAPE_RAIL, SHAPE_STAIRS, SHAPE_TORCH, boxesFor,
 } from '../world/mesh/shapes';
 import { ITEMS, type ItemDef } from '../data/items';
-import { ITEM_ART, SHAPES, type ItemArt } from '../data/itemart';
+import { DIAL_FRAMES, ITEM_ART, SHAPES, type DialKind, type ItemArt } from '../data/itemart';
 import { ITEM_FINISHES, itemMaterialOf, type TextureStyleId } from '../data/texturestyle';
 import { drawItemArt3d } from './itemart3d';
 import type { Rgb } from './texgen';
@@ -65,6 +65,11 @@ export interface ItemSheet {
   rows: number;
   /** itemId → índice do tile. */
   index: Map<number, number>;
+  /**
+   * Mostradores (M10): itemId → tile de cada quadro, o 0 sendo o de `index`.
+   * Os quadros ficam no fim da folha, depois de todos os itens.
+   */
+  dials: Map<number, readonly number[]>;
 }
 
 /**
@@ -105,7 +110,15 @@ export function buildItemSheet(
       || overrides?.has(item.name) === true) drawable.push(item);
   }
 
-  const rows = Math.max(1, Math.ceil(drawable.length / COLUMNS));
+  // Mostradores ganham quadros extras no fim. Arte do jogador vence: um
+  // `item/compass.png` desenhado à mão é um quadro só, e fica parado.
+  let dialTiles = 0;
+  for (const item of drawable) {
+    if (ITEM_ART[item.name]?.dial !== undefined && overrides?.has(item.name) !== true) {
+      dialTiles += DIAL_FRAMES - 1;
+    }
+  }
+  const rows = Math.max(1, Math.ceil((drawable.length + dialTiles) / COLUMNS));
   const width = COLUMNS * size;
   const height = rows * size;
   const pixels = new Uint8ClampedArray(width * height * 4);
@@ -131,11 +144,103 @@ export function buildItemSheet(
       drawBlockIsometric(tile, item.placesBlock, source, size, style === 'nitido');
     }
 
+    if (custom === undefined && art?.dial !== undefined) drawDialFace(tile, size, art, 0);
     blit(pixels, width, tile, (i % COLUMNS) * size, Math.floor(i / COLUMNS) * size, size);
     index.set(item.id, i);
   }
 
-  return { pixels, width, height, columns: COLUMNS, rows, index };
+  // Os outros quadros dos mostradores: a mesma silhueta, outro ângulo.
+  const dials = new Map<number, readonly number[]>();
+  let next = drawable.length;
+  for (const item of drawable) {
+    const art = ITEM_ART[item.name];
+    if (art?.dial === undefined || overrides?.has(item.name) === true) continue;
+    const tiles = [index.get(item.id) ?? 0];
+    for (let frame = 1; frame < DIAL_FRAMES; frame++) {
+      tile.fill(0);
+      if (style === 'nitido') {
+        drawItemArt3d(tile, size, art, ITEM_FINISHES[itemMaterialOf(item.name, art.shape)]);
+      } else {
+        drawItemArt(tile, art, size);
+      }
+      drawDialFace(tile, size, art, frame);
+      blit(pixels, width, tile, (next % COLUMNS) * size, Math.floor(next / COLUMNS) * size, size);
+      tiles.push(next++);
+    }
+    dials.set(item.id, tiles);
+  }
+
+  return { pixels, width, height, columns: COLUMNS, rows, index, dials };
+}
+
+const NEEDLE: Rgb = [206, 40, 36];
+const NEEDLE_TAIL: Rgb = [70, 72, 84];
+const NIGHT: Rgb = [26, 32, 74];
+const SUN: Rgb = [252, 220, 70];
+const MOON: Rgb = [226, 226, 214];
+/** Centro da face do mostrador, em pixels de máscara (ver `SHAPES.dial`). */
+const DIAL_CENTER = 7.5;
+
+/**
+ * Pinta o mostrador do quadro `frame` por cima da silhueta: a agulha da
+ * bússola ou o disco dia/noite do relógio, só onde a máscara é face (`a`).
+ *
+ * Quadro 0 é agulha para cima e sol no alto; cada quadro gira 360°/16 no
+ * sentido horário.
+ */
+function drawDialFace(tile: Uint8ClampedArray, size: number, art: ItemArt, frame: number): void {
+  const mask = SHAPES[art.shape];
+  if (mask === undefined || art.dial === undefined) return;
+  const k = Math.max(1, Math.floor(size / SPRITE_SIZE));
+  const angle = (frame / DIAL_FRAMES) * Math.PI * 2;
+  const face = (mx: number, my: number): boolean => {
+    const role = mask[my]?.[mx];
+    return role === 'a' || role === 'A';
+  };
+  const paint = (mx: number, my: number, color: Rgb): void => {
+    if (!face(mx, my)) return;
+    for (let y = my * k; y < (my + 1) * k; y++) {
+      for (let x = mx * k; x < (mx + 1) * k; x++) {
+        const o = ((y * size) + x) << 2;
+        tile[o] = color[0]; tile[o + 1] = color[1]; tile[o + 2] = color[2]; tile[o + 3] = 255;
+      }
+    }
+  };
+  const dx = Math.sin(angle);
+  const dy = -Math.cos(angle);
+  drawDialKind(art.dial, angle, dx, dy, paint);
+}
+
+function drawDialKind(
+  kind: DialKind, angle: number, dx: number, dy: number,
+  paint: (mx: number, my: number, color: Rgb) => void,
+): void {
+  if (kind === 'needle') {
+    // Ponta vermelha para onde aponta, rabo escuro do outro lado.
+    for (let t = -3; t <= 4.01; t += 0.5) {
+      const color = t > 0 ? NEEDLE : NEEDLE_TAIL;
+      paint(Math.floor(DIAL_CENTER + dx * t + 0.5), Math.floor(DIAL_CENTER + dy * t + 0.5), color);
+    }
+    return;
+  }
+  // Céu: metade dia (o acento já pintado), metade noite, sol e lua opostos.
+  for (let my = 0; my < SPRITE_SIZE; my++) {
+    for (let mx = 0; mx < SPRITE_SIZE; mx++) {
+      const px = mx + 0.5 - DIAL_CENTER - 0.5;
+      const py = my + 0.5 - DIAL_CENTER - 0.5;
+      if (px * dx + py * dy < -0.3) paint(mx, my, NIGHT);
+    }
+  }
+  const sunX = DIAL_CENTER + Math.sin(angle) * 3;
+  const sunY = DIAL_CENTER - Math.cos(angle) * 3;
+  const moonX = DIAL_CENTER - Math.sin(angle) * 3;
+  const moonY = DIAL_CENTER + Math.cos(angle) * 3;
+  for (let oy = 0; oy <= 1; oy++) {
+    for (let ox = 0; ox <= 1; ox++) {
+      paint(Math.floor(sunX) + ox, Math.floor(sunY) + oy, SUN);
+      paint(Math.floor(moonX) + ox, Math.floor(moonY) + oy, MOON);
+    }
+  }
 }
 
 /**
@@ -503,6 +608,10 @@ export class ItemSprites {
   readonly cssUrl: string;
   readonly buildMs: number;
   private readonly sheet: ItemSheet;
+  /** `background-position` de cada tile, calculado uma vez: a hotbar pede todo quadro. */
+  private readonly positions: string[] = [];
+  /** Quadro atual de cada mostrador (M10). */
+  private readonly frames = new Map<number, number>();
 
   constructor(
     source: SpriteSource, overrides?: ReadonlyMap<string, Uint8ClampedArray>,
@@ -511,7 +620,25 @@ export class ItemSprites {
     const t0 = performance.now();
     this.sheet = buildItemSheet(source, overrides, options);
     this.cssUrl = toDataUrl(this.sheet);
+    const { columns, rows } = this.sheet;
+    for (let tile = 0; tile < columns * rows; tile++) {
+      const x = columns > 1 ? ((tile % columns) / (columns - 1)) * 100 : 0;
+      const y = rows > 1 ? (Math.floor(tile / columns) / (rows - 1)) * 100 : 0;
+      this.positions.push(`${x.toFixed(4)}% ${y.toFixed(4)}%`);
+    }
     this.buildMs = performance.now() - t0;
+  }
+
+  /** Gira o mostrador do item para o quadro `frame` (M10). */
+  setFrame(item: number, frame: number): void {
+    if (this.sheet.dials.has(item)) this.frames.set(item, frame);
+  }
+
+  /** Tile atual do item, já com o quadro do mostrador, ou `undefined`. */
+  tileOf(item: number): number | undefined {
+    const dial = this.sheet.dials.get(item);
+    if (dial !== undefined) return dial[this.frames.get(item) ?? 0] ?? dial[0];
+    return this.sheet.index.get(item);
   }
 
   get count(): number {
@@ -532,13 +659,9 @@ export class ItemSprites {
    * tamanho de slot, junto com o `background-size` de `sheetSize`.
    */
   position(item: number): string | null {
-    const tile = this.sheet.index.get(item);
+    const tile = this.tileOf(item);
     if (tile === undefined) return null;
-    const column = tile % this.sheet.columns;
-    const row = Math.floor(tile / this.sheet.columns);
-    const x = this.sheet.columns > 1 ? (column / (this.sheet.columns - 1)) * 100 : 0;
-    const y = this.sheet.rows > 1 ? (row / (this.sheet.rows - 1)) * 100 : 0;
-    return `${x.toFixed(4)}% ${y.toFixed(4)}%`;
+    return this.positions[tile] ?? null;
   }
 
   /** `background-size` que faz um tile caber exatamente no elemento. */

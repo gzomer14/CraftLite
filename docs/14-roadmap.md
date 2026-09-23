@@ -207,22 +207,27 @@ na própria cama em 11 aldeias; a troca é uma tela do sistema de contêineres �
 
 ---
 
-## M10 — Saber onde se está
+## M10 — Saber onde se está ✅
 
 > Proposta de 2026-09-16. O jogo tem 10 biomas, duas dimensões e mundo infinito, e **nenhuma
-> forma de se localizar** além de olhar em volta.
+> forma de se localizar** além de olhar em volta. Feito em 2026-09-23 (doc 15 §3).
 
-- [ ] **Bússola** e **relógio** como itens, desenhados com a agulha girando de verdade.
-- [ ] **Mapa** que preenche conforme o jogador anda, guardado no save como uma imagem pequena por
+- [x] **Bússola** e **relógio** como itens, desenhados com a agulha girando de verdade.
+- [x] **Mapa** que preenche conforme o jogador anda, guardado no save como uma imagem pequena por
       região (o `.clw` já tem miniatura — é a mesma máquina).
-- [ ] **Marcador** de ponto de interesse, colocado pelo jogador, visível na borda da tela.
-- [ ] **Tela de estatísticas**: blocos minerados, distância andada, mortes, tempo de jogo. Os
+- [x] **Marcador** de ponto de interesse, colocado pelo jogador, visível na borda da tela.
+- [x] **Tela de estatísticas**: blocos minerados, distância andada, mortes, tempo de jogo. Os
       números já passam todos por `game/achievements.ts`.
-- [ ] **Modo espectador** no criativo: atravessar parede e voar sem colisão, que é a ferramenta de
+- [x] **Modo espectador** no criativo: atravessar parede e voar sem colisão, que é a ferramenta de
       quem constrói grande.
+- [x] **Itens no chão vão para o save** (acrescentado a pedido em 2026-09-23): o inventário da
+      morte sobrevive a sair do mundo.
 
 **Critério de aceite:** sair da base, andar 500 blocos, e voltar usando só o mapa e o marcador.
 O mapa não pode custar mais que 1 ms por segundo de jogo nem crescer o save de forma ilimitada.
+**Medido** (`tests/journal.test.ts`, terreno da seed 2): o caminho inteiro no mapa, a volta lendo
+só o marcador, **0,27 ms por segundo de jogo**, 16 regiões e ~135 KB comprimidos; teto de 64
+regiões (2 MB sem compressão).
 
 ---
 

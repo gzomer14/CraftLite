@@ -77,6 +77,8 @@ export interface ItemUseContext {
   holdTicks(): number;
   /** Zera a contagem: terminou de comer, recomeça a próxima mordida. */
   resetHold(): void;
+  /** Abre a tela do mapa explorado (M10). */
+  openMap(): void;
 }
 
 /** O contexto sem a parte de segurar, que é do `ItemUser`. */
@@ -392,6 +394,14 @@ const plant: ItemUseHandler = {
   },
 };
 
+/** Mapa (M10): abre a tela do mapa explorado. O mapa não se gasta. */
+const openMap: ItemUseHandler = {
+  use(ctx) {
+    ctx.openMap();
+    return true;
+  },
+};
+
 export const ITEM_USES: Record<ItemUse, ItemUseHandler> = {
   eat,
   charge,
@@ -408,6 +418,7 @@ export const ITEM_USES: Record<ItemUse, ItemUseHandler> = {
   throw_egg: thrower(FLAG_EGG),
   throw_snowball: thrower(0),
   dye_sheep: dyeSheep,
+  open_map: openMap,
 };
 
 /** Os usos do item na mão, em ordem de tentativa (vazio se nenhum). */

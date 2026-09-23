@@ -12,6 +12,7 @@
 import { ACHIEVEMENTS, isUnlocked, objectiveFor } from '../../data/achievements';
 import { ITEM_BY_NAME } from '../../data/items';
 import { MOB_BY_NAME } from '../../data/mobs';
+import { STATS, formatStat } from '../../data/stats';
 
 export interface PauseMenuCallbacks {
   onResume: () => void;
@@ -25,6 +26,11 @@ export interface PauseMenuCallbacks {
    */
   gameMode?: () => 'survival' | 'creative';
   onToggleMode?: () => void;
+  /** Estatísticas, na ordem de `data/stats.ts` (M10); sem elas o botão some. */
+  stats?: () => ArrayLike<number>;
+  /** Espectador do Criativo (M10): estado e troca. O botão só aparece no Criativo. */
+  spectator?: () => boolean;
+  onToggleSpectator?: () => void;
 }
 
 export class PauseMenu {
@@ -33,6 +39,8 @@ export class PauseMenu {
   private readonly status: HTMLParagraphElement;
   private readonly achievementList: HTMLDivElement;
   private readonly modeButton: HTMLButtonElement | null;
+  private readonly statsList: HTMLDivElement;
+  private readonly spectatorButton: HTMLButtonElement | null;
   private readonly callbacks: PauseMenuCallbacks;
 
   constructor(callbacks: PauseMenuCallbacks) {
@@ -52,6 +60,9 @@ export class PauseMenu {
     this.achievementList = document.createElement('div');
     this.achievementList.className = 'achievements';
     this.achievementList.hidden = true;
+    this.statsList = document.createElement('div');
+    this.statsList.className = 'achievements stats';
+    this.statsList.hidden = true;
 
     this.resumeButton = button('Voltar ao Jogo', callbacks.onResume);
     const options = button('Opções', callbacks.onOptions);
@@ -75,15 +86,47 @@ export class PauseMenu {
     if (callbacks.achievements !== undefined) {
       actions.appendChild(button('Conquistas', () => this.toggleAchievements()));
     }
+    if (callbacks.stats !== undefined) {
+      actions.appendChild(button('Estatísticas', () => this.toggleStats()));
+    }
     if (this.modeButton !== null) actions.appendChild(this.modeButton);
+    const spectate = callbacks.onToggleSpectator;
+    this.spectatorButton = spectate === undefined || callbacks.spectator === undefined
+      ? null
+      : button('Espectador', () => { spectate(); this.refreshMode(); });
+    if (this.spectatorButton !== null) actions.appendChild(this.spectatorButton);
     actions.append(options, quit);
 
-    this.root.append(title, this.status, actions, this.achievementList);
+    this.root.append(title, this.status, actions, this.achievementList, this.statsList);
     document.body.appendChild(this.root);
+  }
+
+  /** Abre e fecha a tela de estatísticas (M10). */
+  private toggleStats(): void {
+    this.achievementList.hidden = true;
+    if (!this.statsList.hidden) {
+      this.statsList.hidden = true;
+      return;
+    }
+    const values = this.callbacks.stats?.() ?? [];
+    this.statsList.textContent = '';
+    for (let i = 0; i < STATS.length; i++) {
+      const def = STATS[i];
+      const row = document.createElement('div');
+      row.className = 'row unlocked';
+      const name = document.createElement('strong');
+      name.textContent = def.display;
+      const value = document.createElement('span');
+      value.textContent = formatStat(def.unit, values[i] ?? 0);
+      row.append(name, value);
+      this.statsList.appendChild(row);
+    }
+    this.statsList.hidden = false;
   }
 
   /** Abre e fecha a lista de conquistas (doc 08 §5). */
   private toggleAchievements(): void {
+    this.statsList.hidden = true;
     if (!this.achievementList.hidden) {
       this.achievementList.hidden = true;
       return;
@@ -137,6 +180,13 @@ export class PauseMenu {
    * "Modo: Criativo" deixa.
    */
   private refreshMode(): void {
+    const spectator = this.spectatorButton;
+    if (spectator !== null) {
+      spectator.hidden = this.callbacks.gameMode?.() !== 'creative';
+      const on = this.callbacks.spectator?.() === true;
+      spectator.textContent = on ? 'Sair do Espectador' : 'Espectador';
+      spectator.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
     const button = this.modeButton;
     const mode = this.callbacks.gameMode?.();
     if (button === null || mode === undefined) return;
@@ -151,6 +201,7 @@ export class PauseMenu {
   hide(): void {
     this.root.hidden = true;
     this.achievementList.hidden = true;
+    this.statsList.hidden = true;
   }
 
   /** Mensagem de estado, como "salvando…". */

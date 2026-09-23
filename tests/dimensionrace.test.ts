@@ -459,11 +459,12 @@ describe('o save respondendo durante a troca de dimensão', () => {
     };
   }
 
-  /** `SaveGame` precisa de pouco da sessão: baús, placas e veículos. */
+  /** `SaveGame` precisa de pouco da sessão: baús, placas, veículos e itens no chão. */
   const stubSession = (): Session => ({
     tiles: { saved: [], restore: () => { /* nada */ } },
     signs: { records: () => [], restore: () => { /* nada */ } },
     vehicles: { snapshot: () => [], restore: () => { /* nada */ } },
+    items: { snapshot: () => [], restore: () => { /* nada */ } },
   }) as unknown as Session;
 
   it('a leitura espera a troca terminar, e sai na chave nova', async () => {

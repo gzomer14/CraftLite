@@ -135,6 +135,10 @@ export const RECIPES: readonly Recipe[] = [
     result: { item: 'cake', count: 1 },
   },
   { type: 'shaped', pattern: ['.I', 'I.'], key: { I: 'iron_ingot' }, result: { item: 'shears', count: 1 } },
+  // M10: bússola, relógio e mapa, nas receitas do original.
+  { type: 'shaped', pattern: ['.I.', 'IRI', '.I.'], key: { I: 'iron_ingot', R: 'redstone' }, result: { item: 'compass', count: 1 } },
+  { type: 'shaped', pattern: ['.G.', 'GRG', '.G.'], key: { G: 'gold_ingot', R: 'redstone' }, result: { item: 'clock', count: 1 } },
+  { type: 'shaped', pattern: ['PPP', 'PCP', 'PPP'], key: { P: 'paper', C: 'compass' }, result: { item: 'map', count: 1 } },
   // Bloco de carvão (doc 05 §5): nove carvões num bloco que queima dez vezes.
   { type: 'shaped', pattern: ['CCC', 'CCC', 'CCC'], key: { C: 'coal' }, result: { item: 'coal_block', count: 1 } },
   { type: 'shapeless', ingredients: ['coal_block'], result: { item: 'coal', count: 9 } },

@@ -60,6 +60,11 @@ export class ItemEntities {
   private readonly item: Uint16Array;
   private readonly count: Uint8Array;
   private readonly damage: Uint16Array;
+  /**
+   * Encantamentos da pilha (`ItemStack.ench`). Sem isto a espada encantada que
+   * caía na morte voltava comum ao ser recolhida (achado no M10).
+   */
+  private readonly ench: Int32Array;
   private readonly age: Int32Array;
   /** Ticks que cada item ainda precisa esperar para poder ser coletado. */
   private readonly pickupAt: Int32Array;
@@ -84,6 +89,7 @@ export class ItemEntities {
     this.item = new Uint16Array(capacity);
     this.count = new Uint8Array(capacity);
     this.damage = new Uint16Array(capacity);
+    this.ench = new Int32Array(capacity);
     this.age = new Int32Array(capacity);
     this.pickupAt = new Int32Array(capacity);
   }
@@ -134,6 +140,7 @@ export class ItemEntities {
     this.item[i] = stack.item;
     this.count[i] = Math.min(255, stack.count);
     this.damage[i] = stack.damage;
+    this.ench[i] = stack.ench ?? 0;
     this.age[i] = 0;
     return true;
   }
@@ -214,7 +221,7 @@ export class ItemEntities {
     if (this.onPickup === null) return false;
 
     const leftover = this.onPickup({
-      item: this.item[i], count: this.count[i], damage: this.damage[i],
+      item: this.item[i], count: this.count[i], damage: this.damage[i], ench: this.ench[i],
     });
     if (leftover >= this.count[i]) return false; // inventário cheio: fica no chão
     if (leftover > 0) {
@@ -232,7 +239,8 @@ export class ItemEntities {
   private mergeNearby(): void {
     for (let i = 0; i < this.activeCount; i++) {
       for (let j = i + 1; j < this.activeCount; j++) {
-        if (this.item[i] !== this.item[j] || this.damage[i] !== this.damage[j]) continue;
+        if (this.item[i] !== this.item[j] || this.damage[i] !== this.damage[j]
+          || this.ench[i] !== this.ench[j]) continue;
         const max = maxStackOf(this.item[i]);
         if (this.count[i] >= max) break;
 
@@ -275,6 +283,7 @@ export class ItemEntities {
     this.item[i] = this.item[last];
     this.count[i] = this.count[last];
     this.damage[i] = this.damage[last];
+    this.ench[i] = this.ench[last];
     this.age[i] = this.age[last];
     this.pickupAt[i] = this.pickupAt[last];
   }
@@ -297,4 +306,49 @@ export class ItemEntities {
   clear(): void {
     this.activeCount = 0;
   }
+
+  /**
+   * Os itens no chão para o save (M10), achatados em `ITEM_RECORD` números por
+   * item: posição, item, quantidade, dano, encantamento e idade. Sem isso
+   * sair do mundo apagava o inventário da morte que o jogador ia buscar.
+   * Velocidade não vai: o item volta parado, e a gravidade faz o resto.
+   */
+  snapshot(): number[] {
+    const out: number[] = [];
+    for (let i = 0; i < this.activeCount; i++) {
+      out.push(
+        round2(this.x[i]), round2(this.y[i]), round2(this.z[i]),
+        this.item[i], this.count[i], this.damage[i], this.ench[i], this.age[i],
+      );
+    }
+    return out;
+  }
+
+  /** Devolve ao mundo o que `snapshot` gravou. Substitui o que houver. */
+  restore(flat: readonly number[] | undefined): void {
+    this.activeCount = 0;
+    if (flat === undefined) return;
+    for (let k = 0; k + ITEM_RECORD <= flat.length && this.activeCount < this.capacity; k += ITEM_RECORD) {
+      const item = flat[k + 3];
+      const count = flat[k + 4];
+      if (!(item > 0) || !(count > 0)) continue;
+      const i = this.activeCount++;
+      this.x[i] = flat[k]; this.y[i] = flat[k + 1]; this.z[i] = flat[k + 2];
+      this.prevX[i] = this.x[i]; this.prevY[i] = this.y[i]; this.prevZ[i] = this.z[i];
+      this.vx[i] = 0; this.vy[i] = 0; this.vz[i] = 0;
+      this.item[i] = item;
+      this.count[i] = Math.min(255, count);
+      this.damage[i] = flat[k + 5];
+      this.ench[i] = flat[k + 6];
+      this.age[i] = flat[k + 7];
+      this.pickupAt[i] = 0;
+    }
+  }
+}
+
+/** Números por item em `snapshot`. */
+export const ITEM_RECORD = 8;
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
 }

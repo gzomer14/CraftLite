@@ -61,6 +61,8 @@ export function wireSurvival(s: Session, events: SessionEvents): void {
     s.combat.damageArmor(amount);
   };
   s.survival.onDeath = () => {
+    // Antes de o inventário cair: o marcador vai para onde ele cai (M10).
+    s.journal.onDeath(s.player, s.world.dimension);
     for (const stack of s.inventory.dropAll()) {
       // Morrendo, o inventário cai **em volta** do corpo e não numa direção:
       // não há olhar para arremessar, e o jogador volta andando até o monte.

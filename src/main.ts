@@ -71,6 +71,9 @@ import { SEA_LEVEL, type ChunkColumn } from './world/chunk';
 import { trySpawn } from './game/spawnplacement';
 import { ChunkPipeline, type MeshResult } from './world/pipeline';
 import { World } from './world/world';
+import { MapScreen } from './ui/screens/mapscreen';
+import { MarkerBar } from './ui/markerbar';
+import { buildMapPalette } from './render/mapcolors';
 
 /** Blocos que aparecem na hotbar inicial, até o inventário existir (M4). */
 /** Acima disto de cota usada, o doc 11 §4 manda avisar o jogador. */
@@ -232,6 +235,9 @@ async function boot(): Promise<void> {
   const hud = new Hud(settings);
   const effectsBar = new EffectsBar();
   hud.mount(effectsBar.el);
+  // Marcadores na borda de cima (M10).
+  const markerBar = new MarkerBar();
+  hud.mount(markerBar.element);
   /*
    * Avisos de armazenamento (doc 11 §4), agora que há HUD para mostrá-los.
    *
@@ -299,6 +305,8 @@ async function boot(): Promise<void> {
      * de texto é a UI. Solta o ponteiro pela mesma razão que um baú: com o
      * mouse capturado não há como clicar no campo nem ver o cursor.
      */
+    // Usou o mapa (M10).
+    onOpenMap: () => flow.openMap(),
     onSignEdit: (x, y, z, lines) => {
       controls.mouse.exitLock();
       signEditor.open(x, y, z, lines);
@@ -342,12 +350,13 @@ async function boot(): Promise<void> {
    * jogo de todo dia não expõe nada.
    */
   if (/[?&]smoke\b/.test(location.search)) {
-    (window as unknown as { __craftlite?: unknown }).__craftlite = { world, player, session };
+    (window as unknown as { __craftlite?: unknown }).__craftlite = { world, player, session, items: ITEM_BY_NAME };
   }
   renderer.blockLightAt = (x, y, z) => (world.getSkyLight(x, y, z) << 4) | world.getBlockLight(x, y, z);
   // Item na mão (doc 01 §191). O passe é uma draw call e limpa a profundidade,
   // então não disputa com nada — mas continua desligável em Opções.
   const handRenderer = new HandRenderer(ctx, atlas, itemSprites.raw);
+  handRenderer.tileOf = (item) => itemSprites.tileOf(item);
   handRenderer.enabled = settings.get('handItem');
   renderer.handRenderer = handRenderer;
 
@@ -443,6 +452,7 @@ async function boot(): Promise<void> {
     onToggleFly: () => flow.toggleFly(),
     onPause: () => flow.escape(),
     onInventory: () => flow.toggleInventory(),
+    onMap: () => flow.toggleMap(),
     // Largar o item da mão no chão (doc 08 §3.5). O `onDrop` do inventário já
     // vai parar na `Session`, que cria a entidade com o arremesso.
     onDropItem: (whole) => { inventory.dropSelected(whole); },
@@ -459,6 +469,21 @@ async function boot(): Promise<void> {
     saveAll: async () => { await save?.saveAll(); },
   });
   const pauseMenu = flow.pauseMenu;
+
+  /*
+   * Mapa (M10). As cores saem das texturas na primeira abertura, não no boot:
+   * quem nunca abre o mapa não paga a varredura do atlas.
+   */
+  let mapPalette: Uint8Array | null = null;
+  const mapScreen = new MapScreen({
+    journal: session.journal,
+    player,
+    dimension: () => world.dimension,
+    palette: () => (mapPalette ??= buildMapPalette(atlas)),
+    spawn: () => [meta.spawn[0] + 0.5, meta.spawn[2] + 0.5],
+    onClose: () => { controls.reset(); },
+  });
+  flow.mapScreen = mapScreen;
 
   const signEditor = new SignEditor({
     onDone: (x, y, z, lines) => {
@@ -505,7 +530,8 @@ async function boot(): Promise<void> {
 
   const hudFeed = new HudFeed({
     hud, effectsBar, touchUi: isTouchDevice ? touchUi : null, debug, session, controls, settings,
-    renderer, pipeline, audio,
+    renderer, pipeline, audio, itemSprites, markerBar,
+    compassTarget: () => [meta.spawn[0] + 0.5, meta.spawn[2] + 0.5],
   });
 
   const actions = new PlayerActions(controls, session, renderer.camera, handRenderer);
@@ -564,10 +590,11 @@ async function boot(): Promise<void> {
       }
 
       session.tick();
+      mapScreen.tick();
 
       // Com uma tela de contêiner aberta o mundo continua rodando, mas o
-      // jogador não interage com ele (doc 08 §4.2).
-      if (containerScreen.isOpen || creativeScreen.isOpen || deathScreen.isOpen) {
+      // jogador não interage com ele (doc 08 §4.2). O mapa (M10) também.
+      if (containerScreen.isOpen || creativeScreen.isOpen || deathScreen.isOpen || mapScreen.isOpen) {
         actions.idle();
         return;
       }

@@ -28,10 +28,61 @@ export interface ItemArt {
   color: Rgb;
   /** Cor do acento (cabo de ferramenta, detalhe). */
   accent?: Rgb;
+  /**
+   * Mostrador que gira (M10): a folha ganha `DIAL_FRAMES` quadros do item, com
+   * a agulha (bússola) ou o disco do céu (relógio) desenhados por cima da
+   * silhueta em cada ângulo. Quem escolhe o quadro é `ui/dials.ts`.
+   */
+  dial?: DialKind;
 }
+
+export type DialKind = 'needle' | 'sky';
+
+/** Quadros de um mostrador: 22,5° cada. */
+export const DIAL_FRAMES = 16;
 
 /** Máscaras. Toda linha tem exatamente 16 caracteres — há teste para isso. */
 export const SHAPES: Record<string, readonly string[]> = {
+  // --- mostradores (M10): caixa redonda em `m`, face em `a` ------------------
+  // A agulha e o disco não estão aqui: mudam por quadro, e quem os desenha é
+  // `render/itemsprites.ts`. O centro da face é (7,5; 7,5), com raio ~5.
+  dial: [
+    '................',
+    '.....xxxxxx.....',
+    '...xxMMMMMMxx...',
+    '..xMMaaaaaaMMx..',
+    '..xMaaaaaaaaMx..',
+    '.xMaaaaaaaaaaMx.',
+    '.xMaaaaaaaaaaMx.',
+    '.xmaaaaaaaaaamx.',
+    '.xmaaaaaaaaaamx.',
+    '.xmaaaaaaaaaamx.',
+    '.xmaaaaaaaaaamx.',
+    '..xmaaaaaaaamx..',
+    '..xdmaaaaaamdx..',
+    '...xxddddddxx...',
+    '.....xxxxxx.....',
+    '................',
+  ],
+  // Mapa: papel dobrado com um traço de terra e água.
+  map: [
+    '................',
+    '................',
+    '..xxxxxxxxxxxx..',
+    '..xMMMMMMMMMMx..',
+    '..xMmmaamMMmMx..',
+    '..xMmaaamMmmMx..',
+    '..xMmaamMMmmMx..',
+    '..xMMmMMaaMMMx..',
+    '..xMmmMaaamMMx..',
+    '..xMmmmaaAmmMx..',
+    '..xMMmmMaAMmMx..',
+    '..xMmMMMMaaMMx..',
+    '..xMMMMMMMMMdx..',
+    '..xxxxxxxxxxxx..',
+    '................',
+    '................',
+  ],
   // --- ferramentas: cabo em `a`, cabeça em `m` ---------------------------
   pickaxe: [
     '................',
@@ -947,6 +998,11 @@ function buildArt(): Record<string, ItemArt> {
   out.milk_bucket = { shape: 'filled_bucket', color: bucket, accent: [244, 244, 240] };
   out.mushroom_stew = { shape: 'stew', color: WOOD, accent: [168, 112, 70] };
   out.shears = { shape: 'shears', color: [214, 214, 220], accent: [160, 60, 50] };
+  // M10: a bússola em ferro com face clara, o relógio em ouro com o disco do
+  // céu; o mapa em papel, com a terra no principal e a água no acento.
+  out.compass = { shape: 'dial', color: [168, 168, 176], accent: [226, 222, 208], dial: 'needle' };
+  out.clock = { shape: 'dial', color: [232, 190, 60], accent: [96, 150, 220], dial: 'sky' };
+  out.map = { shape: 'map', color: [226, 214, 176], accent: [70, 120, 196] };
   /*
    * Corante e cama coloridos (M8). São a mesma silhueta em oito cores — o
    * caso que este módulo existe para resolver: o desenho é o papel, a cor é o

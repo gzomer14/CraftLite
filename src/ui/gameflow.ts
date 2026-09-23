@@ -13,6 +13,10 @@ import type { CreativeScreen } from './containers/creative';
 import type { ContainerScreen } from './containers/screen';
 import type { Hud } from './hud';
 import type { TouchUi } from './touchui';
+import type { MapScreen } from './screens/mapscreen';
+import { ITEM_BY_NAME } from '../data/items';
+
+const MAP_ITEM = ITEM_BY_NAME.get('map')?.id ?? -1;
 
 export interface GameFlowDeps {
   player: Player;
@@ -31,6 +35,8 @@ export interface GameFlowDeps {
 export class GameFlow {
   paused = false;
   readonly pauseMenu: PauseMenu;
+  /** A tela do mapa (M10); nasce depois do fluxo, no `main`. */
+  mapScreen: MapScreen | null = null;
   private readonly d: GameFlowDeps;
 
   constructor(deps: GameFlowDeps) {
@@ -45,6 +51,9 @@ export class GameFlow {
       achievements: () => session.achievements.mask,
       gameMode: () => player.mode,
       onToggleMode: () => this.setGameMode(player.mode === 'creative' ? 'survival' : 'creative'),
+      stats: () => session.journal.stats.values,
+      spectator: () => player.spectator,
+      onToggleSpectator: () => this.setSpectator(!player.spectator),
       onSaveAndQuit: () => {
         this.pauseMenu.setStatus('salvando…');
         void (async () => {
@@ -72,7 +81,8 @@ export class GameFlow {
   /** Esc fecha uma camada por vez (doc 08 §4.1). */
   escape(): void {
     const { creativeScreen, containerScreen, session } = this.d;
-    if (creativeScreen.isOpen) creativeScreen.close();
+    if (this.mapScreen?.isOpen === true) this.mapScreen.close();
+    else if (creativeScreen.isOpen) creativeScreen.close();
     else if (containerScreen.isOpen) session.workbench.closeScreen();
     else this.togglePause();
   }
@@ -89,10 +99,36 @@ export class GameFlow {
     creativeScreen.open(session.inventory);
   }
 
+  /**
+   * Tecla do mapa (M10): abre se houver um mapa no inventário (ou no
+   * Criativo), fecha se estiver aberto.
+   */
+  toggleMap(): void {
+    if (this.mapScreen?.isOpen === true) { this.mapScreen.close(); return; }
+    const { player, session, hud } = this.d;
+    if (player.mode !== 'creative' && session.inventory.countOf(MAP_ITEM) === 0) {
+      hud.showMessage('Você precisa de um mapa (papel e bússola)', 60);
+      return;
+    }
+    this.openMap();
+  }
+
+  /** Abre o mapa por cima de qualquer tela de contêiner. */
+  openMap(): void {
+    const { creativeScreen, containerScreen, session, controls } = this.d;
+    if (this.mapScreen === null || this.paused) return;
+    if (creativeScreen.isOpen) creativeScreen.close();
+    if (containerScreen.isOpen) session.workbench.closeScreen();
+    controls.reset();
+    controls.mouse.exitLock();
+    this.mapScreen.open();
+  }
+
   /** Duplo toque no pulo, ou o botão de voo do toque: só no criativo. */
   toggleFly(): void {
     const player = this.d.player;
-    if (player.mode !== 'creative') return;
+    // Espectador sempre voa: desligar o voo dentro de uma parede o prenderia.
+    if (player.mode !== 'creative' || player.spectator) return;
     player.flying = !player.flying;
     if (player.flying) player.vy = 0;
   }
@@ -115,11 +151,28 @@ export class GameFlow {
     if (player.mode === next) return;
     player.mode = next;
     player.flying = false;
+    player.spectator = false;
     if (creativeScreen.isOpen) creativeScreen.close();
     if (containerScreen.isOpen) session.workbench.closeScreen();
     this.applyGameMode();
     hud.showMessage(next === 'creative' ? 'Modo Criativo' : 'Modo Sobrevivência', 60);
     void this.d.saveAll();
+  }
+
+  /**
+   * Espectador (M10), só no Criativo: voa atravessando bloco, e o mundo não o
+   * vê. Sair devolve o voo normal no mesmo lugar — quem estiver dentro de uma
+   * parede sai andando por onde entrou, sem ser empurrado.
+   */
+  setSpectator(on: boolean): void {
+    const { player, hud } = this.d;
+    if (on && player.mode !== 'creative') return;
+    if (player.spectator === on) return;
+    player.spectator = on;
+    player.flying = true;
+    player.vy = 0;
+    this.applyGameMode();
+    hud.showMessage(on ? 'Espectador: atravessa blocos' : 'Espectador desligado', 60);
   }
 
   /** Põe a interface de acordo com o modo atual. */

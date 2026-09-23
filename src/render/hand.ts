@@ -268,6 +268,10 @@ export class HandRenderer {
 
   /** Item desenhado agora; `-1` é mão vazia. */
   private held = -2;
+  /** Tile do item na mão, para reconstruir quando só o quadro muda (M10). */
+  private heldTile = -2;
+  /** Tile atual de um item — a folha de `ItemSprites`, com o quadro do mostrador. */
+  tileOf: ((item: number) => number | undefined) | null = null;
   private mode = 2;
   /** Tint do bloco na mão (lã colorida); branco para o resto. */
   private readonly tint = new Float32Array([1, 1, 1]);
@@ -344,8 +348,11 @@ export class HandRenderer {
    * uma comparação de inteiros.
    */
   setHeld(item: number): void {
-    if (item === this.held) return;
+    // O tile muda sem o item mudar quando a agulha da bússola gira (M10).
+    const tile = item < 0 ? -1 : this.tileOf?.(item) ?? this.sheet.index.get(item) ?? -1;
+    if (item === this.held && tile === this.heldTile) return;
     this.held = item;
+    this.heldTile = tile;
 
     if (item < 0) {
       this.mode = 2;
@@ -362,10 +369,9 @@ export class HandRenderer {
         this.tint[2] = dye === null ? 1 : dye[2] / 255;
       } else {
         this.mode = 1;
-        const tile = this.sheet.index.get(item);
         // Item sem sprite (não deveria acontecer) cai na mão vazia, que é
         // melhor que um quad de textura faltando ocupando a tela.
-        if (tile === undefined) {
+        if (tile < 0) {
           this.mode = 2;
           this.vertexCount = buildBox(this.data, 0.32, 0.9, 0.32);
         } else {

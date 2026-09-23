@@ -9,11 +9,11 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-23 15:12 — **Aldeia validada em campo (aldeões, golem, reputação).
-Quatro correções do relato seguinte:** mob empurrava para sempre a parede que não conseguia pular
-(golem "preso no poço", aldeão "trancando" em árvore), o A* subia em cacto e cerca, item em coluna
-descarregada caía no vazio, e renascer longe punha o jogador dentro do tronco. O golem ganhou ronda
-(§4). Antes, 14:08: o pool de mobs cheio esvaziava a aldeia.
+**Última atualização:** 2026-09-23 16:05 — **M10 fechado: saber onde se está.** Bússola e
+relógio com o mostrador girando, mapa explorado com tela própria, marcadores na borda da tela (e
+"Última morte" sozinho), estatísticas na pausa, espectador no Criativo, e **itens no chão no save**.
+No caminho: item no chão perdia o encantamento, o F3 tinha os eixos de leste e oeste trocados, e
+apagar um mundo deixava baús e veículos no banco (§4).
 
 ---
 
@@ -42,7 +42,7 @@ descarregada caía no vazio, e renascer longe punha o jogador dentro do tronco. 
 | **Terreno** pós-M8 | blend 5×5 do `heightOffset` de bioma e teto macio: a parede de 29 blocos entre montanha e planície virou encosta, e o platô chapado em Y=124 virou cordilheira | ✅ **validado em campo** | muda o terreno gerado: **mundo antigo ganha costura** (ver §4) |
 | **Placa, 2ª passada** | tábua lisa e clara no lugar da tábua de carvalho com rabisco, e um campo de texto só com quebra de linha interpretada | ✅ concluído | — |
 | **M9** Gente no mundo | aldeão com rotina e troca, aldeia de verdade, golem, reputação | ✅ concluído em 2026-09-23 | **não visto em aparelho** (§6) |
-| **M10** Saber onde se está | bússola, relógio, mapa, marcador, estatísticas, espectador | ⬜ proposto (2026-09-16) | — |
+| **M10** Saber onde se está | bússola, relógio, mapa, marcador, estatísticas, espectador, itens no chão no save | ✅ concluído em 2026-09-23 | **não visto em aparelho** (§6) |
 | **M11** O que os documentos já pediam | areia que cai, pedregulho de lava, balde, tesoura, ovelha colorida, planta que cresce, efeitos de status, comidas e estruturas que faltavam, nascimento em terra firme, smoke test | ✅ **validado em campo em 2026-09-23** | — |
 | **M12** O mundo chega antes do jogador | culling por conectividade e por direção de face, cópia de vizinhança fora da thread principal, luz na borda do chunk | ✅ **validado em campo em 2026-09-23** | preset do T0 não revisto (sem T0 na mão) — §3 |
 | **M13** Casa em ordem | uso de item como dado, `session.ts` e `main.ts` abaixo de 700 linhas, lã e cama em 16 cores por tint | ✅ **validado em campo em 2026-09-23** | — |
@@ -62,16 +62,17 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-23 11:03, ao fechar o M9, com `npm test`, `npm run build`,
+Medidas em 2026-09-23 16:04, ao fechar o M10, com `npm test`, `npm run build`,
 `SIZE_BUDGET_KB=350 npm run size` e `npm run smoke`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **240,0 KB** (239,4 no M9; 229,0 no M12; 226,3 antes dele) | < 350 KB | `npm run size` |
-| Testes | **2036**, 101 arquivos (2023 no M9; 2003 no M12) | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **249,5 KB** (240,0 antes do M10; 239,4 no M9; 229,0 no M12; 226,3 antes dele) | < 350 KB | `npm run size` |
+| Testes | **2061**, 102 arquivos (2036 antes do M10; 2023 no M9) | manter verde | `npm test` |
 | Smoke test de navegador | **7 passos verdes**: carregar, criar, andar 10 s, quebrar, salvar, recarregar, conferir | verde | `npm run smoke` |
 | Camadas de atlas | **194** com 16 cores de lã e cama (222 no M11 com 8 cores; lã e cama viraram tint no M13) | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Memória de áudio | **3,33 MB** (era 3,26; +3 sons curtos de balde e arremesso) | < 3,5 MB | `tests/audio.test.ts` |
+| Mapa explorado (M10) | **0,27 ms por segundo de jogo**; 500 blocos = 16 regiões, ~135 KB | < 1 ms/s; ≤ 64 regiões | `tests/journal.test.ts` |
 | Geração de chunk | **6,2 ms** (mediana; os cogumelos não mexeram no número) | < 25 ms | `tests/perf.test.ts` |
 | Geração de chunk do Nether | 5,1 ms (mediana; 3,8 antes de a luz entrar) | < 25 ms | `tests/perf.test.ts` |
 | Meshing de section | 0,64 ms (mediana) | < 8 ms | `tests/perf.test.ts` |
@@ -1573,6 +1574,55 @@ Achados no caminho, corrigidos (§4): a tabela de mobs trocava três criaturas e
 subia um degrau de um bloco, e mob em coluna não carregada caía no vazio. E o A* passou a tratar
 porta como passagem (o zumbi para diante dela, onde o Difícil a arromba).
 
+### M10 — Saber onde se está ✅ — 2026-09-23
+
+Pedido: *"Pode seguir sim com o M10, já com os itens no chão para o save."* O que cada item virou:
+
+- **Bússola e relógio** (`data/items.ts`, apêndice no fim da fila de ids; receitas do original).
+  O desenho é a silhueta `dial` de `data/itemart.ts` com a agulha (ou o disco dia/noite) pintada
+  por cima em **16 quadros** na folha de sprites (`render/itemsprites.ts`); `ui/dials.ts` escolhe o
+  quadro a cada quadro de render, e hotbar, inventário e mão leem o sprite pelo mesmo
+  `ItemSprites.position/tileOf` — a agulha gira em todo lugar sem cada tela saber. A bússola
+  aponta para o **nascimento do mundo**, relativo ao olhar; o relógio põe o sol no alto ao
+  meio-dia. No Nether os dois enlouquecem.
+- **Mapa** (`game/worldmap.ts`): **um mapa por mundo, não por folha** — o item `map` (8 papéis e
+  uma bússola) é a forma de olhar para ele. A cada dois ticks um chunk do anel de 4 em volta do
+  jogador vira pixel (bloco do topo sem flor nem capim, sombra pelo vizinho do norte, água pela
+  profundidade); a cor sai da textura do bloco (`render/mapcolors.ts`), então segue o pacote de
+  texturas. Regiões de 128×128, **teto de 64** (a mais longe é esquecida), gravadas por região e só
+  quando mudam, comprimidas por carreira. Só na superfície: o Nether não tem céu.
+- **Tela do mapa** (`ui/screens/mapscreen.ts`, `ui/mapview.ts`): abre usando o mapa ou pela tecla
+  `M` (remapeável; precisa de um mapa no inventário, ou do Criativo). Norte (+Z) para cima e leste
+  (−X) à direita, zoom de 64 a 512 blocos, arrastar para mover, seta do jogador, nascimento em
+  branco, marcadores. O mundo continua rodando por baixo, como numa tela de contêiner.
+- **Marcadores** (`game/markers.ts`, `ui/markerbar.ts`): "Marcar aqui" ou dois toques num ponto do
+  mapa; nome editável, apagar, até 24. Na **borda de cima da tela**, cada marcador fica acima do
+  lugar marcado (a conta é a da perspectiva) ou encostado no lado para onde virar, com a distância;
+  perto do centro, o nome. A morte no Sobrevivência deixa sozinha a **"Última morte"** onde o
+  inventário caiu. Vão no registro do jogador, e viajam no `.clw`.
+- **Estatísticas** (`data/stats.ts`, `game/stats.ts`): tempo de jogo, distância a pé, nadando,
+  voando e de veículo, blocos quebrados e colocados, itens fabricados, criaturas derrotadas,
+  mortes e trocas — botão **Estatísticas** na pausa. Teletransporte (portal, renascer) não conta
+  como distância.
+- **Espectador** (`entity/player.ts`, pausa): só no Criativo. Voa **atravessando** blocos; não mira,
+  não quebra, não usa, não recolhe item nem orbe; mob já não via o jogador do Criativo. Vai para o
+  save.
+- **Itens no chão no save** (`entity/itementity.ts`, `game/savegame.ts`): por dimensão, como baús e
+  veículos, gravados no autosave e na troca de dimensão; o `.clw` passou à **versão 3**, com itens e
+  mapa no fim (v1 e v2 continuam abrindo). Com o congelamento em coluna descarregada (§4), o monte
+  da morte espera o jogador — inclusive entre uma sessão e outra.
+
+**Critério de aceite, medido** (`tests/journal.test.ts`): seed 2, marcador na base, 500 blocos na
+diagonal pelo terreno de verdade; o mapa tem o caminho inteiro (a cada 8 blocos), e a volta, lendo
+só rumo e distância do marcador, chega à base. **0,27 ms de caderno por segundo de jogo** (o doc
+pede < 1 ms; era 0,55 explorando todo tick, e passou a um chunk a cada dois para sobrar no celular);
+16 regiões, ~135 KB comprimidos. Visto no Chrome headless: bússola, relógio e mapa na hotbar, a
+bússola na mão com a agulha, a faixa com "144 m ▶" e a tela do mapa com água, praia, grama e o
+marcador "Base".
+
+**Débito:** `main.ts` voltou a 718 linhas e `session.ts` está em 793 — o M13 tinha deixado os dois
+abaixo de 700, e a `session.ts` já tinha passado disso no M9 (§5).
+
 ## 4. Correções fora de marco
 
 Bugs anteriores encontrados durante o M5 e já corrigidos — ficam registrados porque explicam
@@ -1580,6 +1630,9 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-23 | `entity/itementity.ts` | **Item no chão perdia o encantamento** (M6). As pilhas no chão guardavam item, quantidade e dano, não `ench`: a espada encantada que caía na morte (ou era jogada fora) voltava comum ao ser recolhida. Achado ao pôr os itens no save (M10). Regressão em `tests/savegame.test.ts`. |
+| 2026-09-23 | `ui/debug.ts` | **O F3 trocava os eixos de leste e oeste.** Olhando para +X ele dizia "oeste (-X)". Os nomes estavam certos para norte em +Z (o leste de quem olha para o norte é −X); os eixos entre parênteses, não. O mapa do M10 segue a mesma rosa. |
+| 2026-09-23 | `save/db.ts` | **Apagar um mundo deixava baús, veículos (e agora itens e mapa) no banco** (M4). `deleteWorld` limpava chunks, jogador e miniatura, mas não os registros de `settings`. Com o mapa, que chega a 2 MB, a sobra deixou de ser desprezível; agora sai tudo que começa com o id do mundo. |
 | 2026-09-23 | `entity/mobstore.ts` | **Mob empurrava para sempre a parede que não conseguia pular** (M5; campo: *"o iron golem ficou preso no poço"*, *"os aldeões também parecem trancar muito fácil em qualquer objeto (…) arvores, cactos"*). O destino de movimento só se cumpria ao chegar, e o `wander` não sorteia outro enquanto há um: contra tronco, mureta do poço ou parede de casa, o bicho empurrava a mesma parede — medido, até **105 s** o golem e 70 s um aldeão. Agora, um segundo batendo de frente sem sair do lugar larga o destino (`BLOCKED_GIVE_UP`); quem pede o destino a cada tick (A*, perseguição) nem sente. Com isso o golem passou de 6 para 85–97 blocos andados em 2 min. Regressão em `tests/mobs.test.ts`. |
 | 2026-09-23 | `entity/ai/pathfinder.ts` | **O A* subia em cacto e em cerca** (M5). `hazardPenalty` olhava o bloco dos pés, não o chão: o cacto, sólido, virava degrau, e a cerca (1,5 de altura) também, sem o pulo alcançar o topo. Chão de cacto, lava, magma, cerca e portão agora é intransitável. Regressão em `tests/pathfinding.test.ts`. |
 | 2026-09-23 | `entity/ai/villagegoals.ts`, `data/mobs.ts` | **O golem não fazia ronda** (M9). Tinha só o `wander` — 8 blocos em linha reta a partir do poço. Ganhou o goal `patrol`: ponto sorteado a 6–22 blocos do poço, caminho pelo A*, pausa, outro ponto; ponto inalcançável é largado em 30 s. Em 2 min, 129 blocos andados (antes, 35). Regressão em `tests/village.test.ts`. |
@@ -1731,10 +1784,13 @@ trocando de aba ao apertar os mesmos botões. Instalar como PWA não muda. A mit
 ar — **o direcional ←/→ troca o item** —, e agora a tela de Opções diz isso quando há controle
 ligado.
 
-**Pendência aberta em 2026-09-23: item no chão não vai para o save.** O inventário que cai na
-morte sobrevive a ir e voltar andando (a coluna descarregada congela o item, §4), mas não a sair do
-mundo: `game/savegame.ts` grava baús, veículos e placas, não `ItemEntities`. Mob também não vai
-(doc 11 §2), mas perder o próprio inventário ao fechar o jogo é outra coisa. Não depende de nada.
+~~**Pendência de 2026-09-23: item no chão não vai para o save.**~~ **Fechada no M10**: vai, por
+dimensão, e no `.clw` v3.
+
+**Pendência aberta em 2026-09-23: `main.ts` (718) e `session.ts` (793) acima das 700 linhas.** O M13
+tinha deixado os dois abaixo disso; o M9 passou a `Session` e o M10 o `main`. Candidatos a sair:
+a ligação das telas do M10 no `main` e a ligação de aldeia e caderno na `Session`. Não depende de
+nada.
 
 Fora ela, **não há pendência de funcionalidade em aberto.** O que resta é a dependência externa ao
 código:
@@ -1882,7 +1938,22 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
 
 ## 6. Próximo passo recomendado
 
-0. **Aldeia validada em campo em 2026-09-23** (*"apareceu os aldeões, e também o iron golem. Bati
+0. **Olhar o M10 num aparelho** e depois escolher o próximo marco (M14 água e paisagem, M15
+   oficina, M16 fim da jornada ou M17 alcance). O M10 só foi visto em testes e no Chrome headless.
+   Em ordem de quanto pode estar errado:
+   - **tela do mapa no celular**: abrir usando o mapa (8 papéis e uma bússola; no Criativo, pela
+     paleta), arrastar, zoom, dois toques para marcar, renomear e apagar um marcador. O canvas cabe
+     na tela em pé e deitada?
+   - **faixa de marcadores**: o losango fica em cima do lugar marcado ao olhar para ele, e na borda
+     com a seta quando está atrás; a faixa não briga com o objetivo no canto de cima;
+   - **bússola e relógio**: a agulha gira ao virar o corpo (na hotbar e na mão) e aponta para o
+     nascimento; o relógio anda com o dia; no Nether os dois enlouquecem;
+   - **morrer longe e sair do jogo**: o marcador "Última morte" aparece, e ao voltar ao mundo o
+     monte de itens continua no chão, com a espada encantada ainda encantada;
+   - **espectador**: pausa → Espectador (só no Criativo), atravessar uma montanha, e sair dele;
+   - **estatísticas**: pausa → Estatísticas, depois de minerar e andar um pouco.
+
+   **Aldeia validada em campo em 2026-09-23** (*"apareceu os aldeões, e também o iron golem. Bati
    no aldeão e o iron golem também veio me bater, tudo perfeito"*). Falta conferir depois das
    correções das 15:12: golem fazendo ronda, aldeão sem travar em árvore/cacto, e renascer longe
    (morrer longe do ponto de nascimento, sem cama). **Pendência nova:** item no chão não vai para o

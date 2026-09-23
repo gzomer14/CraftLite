@@ -37,6 +37,8 @@ export interface ControlsCallbacks {
   onToggleFly: () => void;
   onPause: () => void;
   onInventory: () => void;
+  /** Tecla do mapa (M10). */
+  onMap?: () => void;
   /** Largar o item da mão: 1 unidade, ou o stack inteiro com Ctrl (doc 08 §3.5). */
   onDropItem: (whole: boolean) => void;
 }
@@ -121,6 +123,7 @@ export class Controls {
 
     this.bindAction('debug', (down) => { if (down) callbacks.onToggleDebug(); });
     this.bindAction('inventory', (down) => { if (down) callbacks.onInventory(); });
+    this.bindAction('map', (down) => { if (down) callbacks.onMap?.(); });
     // Ctrl larga o stack inteiro; sozinho, larga um (doc 08 §3.5).
     this.bindAction('drop', (down) => {
       if (down) callbacks.onDropItem(this.keyboard.isDown(this.keybinds.codeFor('sprint')));

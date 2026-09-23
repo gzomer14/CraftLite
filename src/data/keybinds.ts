@@ -14,7 +14,7 @@
 export type ActionId =
   | 'forward' | 'back' | 'left' | 'right'
   | 'jump' | 'sneak' | 'sprint'
-  | 'inventory' | 'drop' | 'debug';
+  | 'inventory' | 'drop' | 'debug' | 'map';
 
 export interface KeybindDef {
   id: ActionId;
@@ -24,7 +24,7 @@ export interface KeybindDef {
 }
 
 /**
- * As dez ações remapeáveis, na ordem em que a tela de opções as mostra.
+ * As onze ações remapeáveis, na ordem em que a tela de opções as mostra.
  *
  * **`Escape` e os dígitos 1–9 ficam de fora, de propósito.** `Escape` é a saída
  * de emergência de toda camada de UI (doc 08 §4.1): remapeá-lo cria o estado em
@@ -43,6 +43,8 @@ export const KEYBINDS: readonly KeybindDef[] = [
   { id: 'inventory', label: 'Inventário', code: 'KeyE' },
   { id: 'drop', label: 'Largar item', code: 'KeyQ' },
   { id: 'debug', label: 'Tela de depuração', code: 'F3' },
+  // M10: o mapa explorado (precisa de um mapa no inventário, ou do Criativo).
+  { id: 'map', label: 'Mapa', code: 'KeyM' },
 ];
 
 /** Teclas que nenhuma ação pode tomar: elas são a saída de toda tela. */

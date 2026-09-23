@@ -17,7 +17,13 @@ const GRAPH_H = 40;
 const UPDATE_MS = 250;
 
 /** Nomes das direções, indexados por (yaw normalizado × 4). */
-const FACINGS = ['norte (+Z)', 'oeste (-X)', 'sul (-Z)', 'leste (+X)'] as const;
+/*
+ * Olhar com yaw π/2 é olhar para +X (frente = `(sin yaw, cos yaw)`). Os nomes
+ * sempre foram estes, mas os eixos entre parênteses estavam trocados — "oeste
+ * (-X)" olhando para +X. Com norte em +Z, quem olha para o norte tem o leste à
+ * direita, que é −X; o mapa do M10 segue esta rosa.
+ */
+const FACINGS = ['norte (+Z)', 'oeste (+X)', 'sul (-Z)', 'leste (-X)'] as const;
 
 export interface DebugSource {
   stats: LoopStats;

@@ -753,3 +753,92 @@ describe('renascer não enterra o jogador', () => {
     expect(trySpawn(world, player, false)).toBe(false);
   });
 });
+
+type ItemStackLike = Parameters<typeof levelOf>[0];
+
+describe('M10: o que o jogador deixou no mundo volta com o save', () => {
+  /*
+   * "Se eu perder meus itens, em teoria eles irão ficar no chão onde eu morri
+   * (…) esses itens ainda continuaram lá?" (campo, 2026-09-23). Até o M10 não:
+   * item no chão não ia para o save, e sair do mundo o apagava.
+   */
+  it('item no chão volta com posição, quantidade, dano e encantamento', async () => {
+    const db = fakeDb();
+    const first = harness(db);
+    const sword = ITEM_BY_NAME.get('iron_sword')!.id;
+    const stack = makeStack(sword);
+    stack.damage = 12;
+    applyEnchant(stack, SHARPNESS, 3);
+    first.session.items.spawn(4.5, GROUND_Y + 1, 5.5, stack);
+    first.session.items.spawn(-6.5, GROUND_Y + 1, 2.5, makeStack(ITEM_BY_NAME.get('diamond')!.id, 7));
+    await first.save.saveAll();
+
+    const second = harness(db, first.meta);
+    await second.save.load();
+    const found: number[][] = [];
+    second.session.items.forEach((x, y, z, item, count) => { found.push([x, y, z, item, count]); });
+    expect(found.length).toBe(2);
+    expect(found.some((f) => f[3] === sword && Math.abs(f[0] - 4.5) < 0.2)).toBe(true);
+    expect(found.some((f) => f[4] === 7)).toBe(true);
+
+    // Recolher a espada devolve o encantamento: antes o item no chão o perdia.
+    let picked: { item: number; ench?: number; damage: number } | null = null;
+    second.session.items.onPickup = (s) => { if (s.item === sword) picked = s; return 0; };
+    for (let t = 0; t < 20; t++) second.session.items.tick(second.world, 4.5, GROUND_Y + 1, 5.5);
+    expect(picked).not.toBeNull();
+    expect(levelOf(picked as unknown as ItemStackLike, SHARPNESS)).toBe(3);
+    expect(picked!.damage).toBe(12);
+  });
+
+  it('marcadores, estatísticas e espectador voltam do save', async () => {
+    const db = fakeDb();
+    const first = harness(db, newWorldMeta('T', 's', 'creative', 2));
+    first.player.mode = 'creative';
+    first.player.spectator = true;
+    first.session.journal.markers.add('Casa', 10, 70, -20, 0);
+    first.session.journal.stats.add('blocks_mined', 42);
+    first.session.journal.stats.add('walk', 1234.5);
+    await first.save.saveAll();
+
+    const second = harness(db, first.meta);
+    second.player.mode = 'creative';
+    await second.save.load();
+    const markers = second.session.journal.markers.list;
+    expect(markers.map((m) => [m.name, m.x, m.z])).toEqual([['Casa', 10, -20]]);
+    expect(second.session.journal.stats.get('blocks_mined')).toBe(42);
+    expect(second.session.journal.stats.get('walk')).toBeCloseTo(1234.5, 1);
+    expect(second.player.spectator).toBe(true);
+    expect(second.player.flying).toBe(true);
+  });
+
+  it('o mapa explorado volta do save, e só a região que mudou é regravada', async () => {
+    const db = fakeDb();
+    const first = harness(db);
+    const map = first.session.journal.map;
+    for (let n = 0; n < 9; n++) map.explore(first.world, 8, 8);
+    const before = map.pixel(3, 3);
+    expect(before).not.toBe(0);
+    await first.save.saveAll();
+    const writes = db.writes;
+    await first.save.saveAll();
+    // Sem mudança no mapa, o segundo save não regrava região nenhuma.
+    const mapWrites = db.writes - writes;
+    expect(mapWrites).toBeLessThan(8);
+
+    const second = harness(db, first.meta);
+    await second.save.load();
+    expect(second.session.journal.map.pixel(3, 3)).toBe(before);
+  });
+
+  it('morrer marca "Última morte" onde o inventário caiu e conta a morte', () => {
+    const { session, player } = harness(fakeDb());
+    session.inventory.give(ITEM_BY_NAME.get('diamond')!.id, 3);
+    player.setPosition(-5.5, GROUND_Y + 1, 6.5);
+    session.survival.damage(1000, 'fall', true);
+    const death = session.journal.markers.list.find((m) => m.kind === 'death');
+    expect(death).toBeDefined();
+    expect([death!.x, death!.z]).toEqual([-6, 6]);
+    expect(session.journal.stats.get('deaths')).toBe(1);
+    expect(session.items.active).toBeGreaterThan(0);
+  });
+});

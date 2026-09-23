@@ -6,6 +6,9 @@
  */
 
 import { MAX_AIR } from '../game/survival';
+import { ITEM_BY_NAME } from '../data/items';
+import { dimensionOf } from '../data/dimensions';
+import { clockFrame, compassFrame, spinFrame } from './dials';
 import { updateDebugSource } from './debugsource';
 import type { AudioEngine } from '../audio/engine';
 import type { GameLoop } from '../core/loop';
@@ -18,6 +21,8 @@ import type { DebugOverlay, DebugSource } from './debug';
 import type { EffectsBar } from './effectsbar';
 import type { Hud } from './hud';
 import type { TouchUi } from './touchui';
+import type { ItemSprites } from '../render/itemsprites';
+import type { MarkerBar } from './markerbar';
 
 export interface HudFeedDeps {
   hud: Hud;
@@ -30,7 +35,16 @@ export interface HudFeedDeps {
   renderer: Renderer;
   pipeline: ChunkPipeline;
   audio: AudioEngine;
+  /** A folha de sprites, para girar bússola e relógio (M10). */
+  itemSprites?: ItemSprites;
+  /** Para onde a bússola aponta: o nascimento do mundo, `[x, z]`. */
+  compassTarget?: () => readonly [number, number];
+  /** Marcadores na borda de cima (M10). */
+  markerBar?: MarkerBar;
 }
+
+const COMPASS = ITEM_BY_NAME.get('compass')?.id ?? -1;
+const CLOCK = ITEM_BY_NAME.get('clock')?.id ?? -1;
 
 export class HudFeed {
   private readonly d: HudFeedDeps;
@@ -58,9 +72,34 @@ export class HudFeed {
     };
   }
 
+  /**
+   * Bússola e relógio no quadro certo (M10). Antes da hotbar: é ela que lê a
+   * posição do sprite, e a mão lê o tile no tick seguinte.
+   */
+  private turnDials(tick: number): void {
+    const sprites = this.d.itemSprites;
+    if (sprites === undefined) return;
+    const { player, world, dayNight } = this.d.session;
+    if (!dimensionOf(world.dimension).hasSky) {
+      sprites.setFrame(COMPASS, spinFrame(tick, 0));
+      sprites.setFrame(CLOCK, spinFrame(tick, 5));
+      return;
+    }
+    const target = this.d.compassTarget?.();
+    if (target !== undefined) {
+      sprites.setFrame(COMPASS, compassFrame(player.x, player.z, player.yaw, target[0], target[1]));
+    }
+    sprites.setFrame(CLOCK, clockFrame(dayNight.time));
+  }
+
   frame(loop: GameLoop): void {
     const { hud, effectsBar, touchUi, session, controls, settings, debug } = this.d;
     const { inventory, survival } = session;
+    this.turnDials(loop.stats.tick);
+    this.d.markerBar?.update(
+      session.journal.markers, session.player, session.world.dimension,
+      this.d.renderer.camera.fovDeg, window.innerWidth / Math.max(1, window.innerHeight),
+    );
     hud.setSelected(inventory.selected);
     hud.render(inventory.slots);
     hud.setStats(survival.health, survival.hunger, survival.air, MAX_AIR, session.armorPoints);

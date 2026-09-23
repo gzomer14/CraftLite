@@ -8,6 +8,7 @@
  * aberta — e o dever de devolver ao inventário o que ficou na grade.
  */
 
+import type { Stats } from './stats';
 import { BLOCK_BY_NAME, blockIdOf, defOf } from '../data/blocks';
 import { ITEM_BY_NAME, type ItemStack } from '../data/items';
 import {
@@ -40,6 +41,8 @@ export interface WorkbenchHost {
   readonly tiles: Tiles;
   readonly xp: Experience;
   readonly achievements: Achievements;
+  /** Contadores do jogador (M10). */
+  readonly stats?: Stats;
   onOpenScreen(screen: OpenScreen, container: ContainerView | null): void;
   sound(name: string, x: number, y: number, z: number): void;
   /** Solta um item que não coube, na frente do jogador. */
@@ -138,7 +141,10 @@ export class Workbench {
   consumeCraft(): void {
     const inv = this.host.inventory;
     const crafted = inv.get(CRAFT_RESULT);
-    if (crafted !== null) this.host.noteObtained(crafted.item);
+    if (crafted !== null) {
+      this.host.noteObtained(crafted.item);
+      this.host.stats?.add('items_crafted', crafted.count);
+    }
     const grid = this.currentGrid();
     consumeGrid(grid);
     if (this.openScreen === 'crafting') {

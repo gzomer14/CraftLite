@@ -12,6 +12,34 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-23 · 13:30 → 13:55 · A aldeia nascia pela metade
+
+**Pedido:** *"ao chegar em uma aldeia tinha somente 1 aldeão, travado na casa dele. Não tinha
+movimentação, não tinha mais de um aldeão, nao tinha iron golem, nada disso."*
+
+**Resultado:** dois defeitos do M9. **Geração:** cada peça da aldeia conferia o bioma do próprio
+ponto, e na divisa da planície nasciam casas soltas sem poço, com os moradores sorteados para casas
+que não existiam (em 24 seeds, 4 de 11 aldeias assim, com 1 morador; a seed `2` dos testes é toda
+planície). Agora o bioma do poço decide a aldeia inteira; e a fila de moradores deixou de contar
+casas da região vizinha. **Rotina:** "no posto" valia a 2,6 blocos dele — a soleira da porta —, e o
+aldeão ficava ali a manhã toda; agora chega ao posto e trabalha em turnos, indo ao poço entre eles.
+Os dois testes novos falham no código anterior. No Chrome, a aba ficou oculta (sem
+`requestAnimationFrame`): a reprodução foi com a sessão tocada à mão — seis aldeões e o golem
+nascendo, e os seis parados na porta às 1000–1400.
+
+Portões: **2024 testes** em 101 arquivos, lint limpo, build ok, **239,4 KB** de 350.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/world/gen/village.ts` | `villageStands` (bioma do poço decide a aldeia); casa só não nasce sobre a água; `occupantRank` só conta casas da própria região |
+| `~` | `src/entity/ai/villagegoals.ts` | `work` chega a 1,6 do posto e trabalha em turnos (`WORK_CYCLE`, `WORK_SHIFT`, `WORK_SHIFT_SPREAD`) |
+| `~` | `tests/village.test.ts` | plano em 24 seeds (poço ⇔ casas, morador com cama); manhã com aldeão chegando ao posto e andando; mínimo de 3 moradores |
+| `~` | `docs/15-status.md` | §2 testes, §4 duas correções, §6 roteiro de campo refeito |
+| `~` | `docs/16-auditoria.md` | esta sessão |
+| `~` | `README.md` | contagem de testes |
+
+---
+
 ## 2026-09-23 · 10:05 → 11:03 · M9: gente no mundo
 
 **Pedido:** *"M12 testado com sucesso, qual o próximo ponto?"* — recomendado o M9 — e *"Pode

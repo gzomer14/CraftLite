@@ -110,12 +110,17 @@ function villagersOf(seed: number, ax: number, az: number): number {
  */
 function occupantRank(seed: number, cx: number, cz: number, ax: number, az: number): number {
   const mine = hash2(seed, cx, cz, SALT_OCCUPANT);
+  const regionX = Math.floor(ax / VILLAGE_REGION);
+  const regionZ = Math.floor(az / VILLAGE_REGION);
   let rank = 0;
   for (let dz = -VILLAGE_RADIUS; dz <= VILLAGE_RADIUS; dz++) {
     for (let dx = -VILLAGE_RADIUS; dx <= VILLAGE_RADIUS; dx++) {
       const hx = ax + dx;
       const hz = az + dz;
       if ((dx === 0 && dz === 0) || (hx === cx && hz === cz) || !plannedHouse(seed, hx, hz)) continue;
+      // Poço na beira da região: o chunk do outro lado é de outra aldeia, e
+      // contá-lo aqui empurrava moradores para casas que esta aldeia não tem.
+      if (Math.floor(hx / VILLAGE_REGION) !== regionX || Math.floor(hz / VILLAGE_REGION) !== regionZ) continue;
       if (hash2(seed, hx, hz, SALT_OCCUPANT) < mine) rank++;
     }
   }
@@ -133,9 +138,26 @@ function biomeAllows(def: StructureDef, field: HeightField, ox: number, oz: numb
   return allowed.indexOf(BIOMES[field.sample(ox, oz).biome].name) >= 0;
 }
 
-/** Altura do piso de uma peça de aldeia em `(ox, oz)`, ou −1 se não se constrói ali. */
-function floorAt(def: StructureDef, field: HeightField, ox: number, oz: number): number {
-  if (!biomeAllows(def, field, ox, oz)) return -1;
+/**
+ * A aldeia da âncora `(ax, az)` existe? Decide **uma vez, pelo bioma do poço**.
+ *
+ * Antes cada peça conferia o bioma do próprio ponto: numa aldeia na divisa da
+ * planície com a floresta nasciam duas casas soltas, sem poço — sem golem, sem
+ * sino —, e os moradores sorteados caíam em casas que não existiam. No campo
+ * isso era "uma aldeia com um aldeão só". O bioma sai do ruído lento, que não
+ * depende da janela do chunk (`HeightField.sample`), então o worker responde o
+ * mesmo gerando o poço ou uma casa a dois chunks dele.
+ */
+function villageStands(field: HeightField, seed: number, ax: number, az: number): boolean {
+  wellDef ??= structureByName('village_well');
+  if (wellDef === undefined) return false;
+  slotOrigin(seed, ax, az, SITE);
+  return biomeAllows(wellDef, field, SITE[0], SITE[1]);
+}
+const SITE = new Int32Array(2);
+
+/** Altura do piso de uma peça de aldeia em `(ox, oz)`, ou −1 se ali é água. */
+function floorAt(field: HeightField, ox: number, oz: number): number {
   const height = field.heightAt(ox, oz);
   if (height < 62) return -1;
   return height + 1;
@@ -145,24 +167,24 @@ const SLOT: HouseSlot = { ox: 0, oz: 0, profession: 0, occupied: false, anchorX:
 
 /**
  * A peça de aldeia que nasce no chunk de origem `(ocx, ocz)`: o poço, se ele
- * for a âncora, ou a casa do ofício sorteado.
+ * for a âncora, ou a casa do ofício sorteado. Com a aldeia de pé, a casa nasce
+ * em qualquer bioma (menos na água): é casa de quem o plano pôs morando nela.
  */
 export function placeVillage(
   seed: number, field: HeightField, ocx: number, ocz: number,
   stamp: (def: StructureDef, ox: number, oy: number, oz: number) => void,
 ): void {
   if (isVillageAnchor(seed, ocx, ocz)) {
-    wellDef ??= structureByName('village_well');
-    if (wellDef === undefined) return;
+    if (!villageStands(field, seed, ocx, ocz) || wellDef === undefined) return;
     slotOrigin(seed, ocx, ocz, ORIGIN);
-    const oy = floorAt(wellDef, field, ORIGIN[0], ORIGIN[1]);
+    const oy = floorAt(field, ORIGIN[0], ORIGIN[1]);
     if (oy >= 0) stamp(wellDef, ORIGIN[0], oy, ORIGIN[1]);
     return;
   }
   if (!houseSlot(seed, ocx, ocz, SLOT)) return;
-  const def = VILLAGE_HOUSES[SLOT.profession].structure;
-  const oy = floorAt(def, field, SLOT.ox, SLOT.oz);
-  if (oy >= 0) stamp(def, SLOT.ox, oy, SLOT.oz);
+  if (!villageStands(field, seed, SLOT.anchorX, SLOT.anchorZ)) return;
+  const oy = floorAt(field, SLOT.ox, SLOT.oz);
+  if (oy >= 0) stamp(VILLAGE_HOUSES[SLOT.profession].structure, SLOT.ox, oy, SLOT.oz);
 }
 
 /**
@@ -182,12 +204,10 @@ export function placeVillagePaths(chunk: ChunkColumn, seed: number, field: Heigh
   const az = ANCHOR[1];
   // Longe demais de qualquer casa: nada a fazer aqui.
   if (Math.abs(chunk.cx - ax) > VILLAGE_RADIUS + 1 || Math.abs(chunk.cz - az) > VILLAGE_RADIUS + 1) return;
-  wellDef ??= structureByName('village_well');
-  if (wellDef === undefined) return;
+  if (!villageStands(field, seed, ax, az)) return; // sem aldeia, sem caminho
   slotOrigin(seed, ax, az, ORIGIN);
   const wellX = ORIGIN[0];
   const wellZ = ORIGIN[1];
-  if (floorAt(wellDef, field, wellX, wellZ) < 0) return; // sem poço, sem aldeia
   if (pathBlock < 0) pathBlock = BLOCK_BY_NAME.get('dirt_path')?.id ?? AIR;
 
   // Anel em volta do poço.
@@ -201,8 +221,7 @@ export function placeVillagePaths(chunk: ChunkColumn, seed: number, field: Heigh
   for (let dz = -VILLAGE_RADIUS; dz <= VILLAGE_RADIUS; dz++) {
     for (let dx = -VILLAGE_RADIUS; dx <= VILLAGE_RADIUS; dx++) {
       if (!houseSlot(seed, ax + dx, az + dz, SLOT)) continue;
-      const def = VILLAGE_HOUSES[SLOT.profession].structure;
-      if (floorAt(def, field, SLOT.ox, SLOT.oz) < 0) continue;
+      if (floorAt(field, SLOT.ox, SLOT.oz) < 0) continue;
       const startX = SLOT.ox + 3;
       const startZ = SLOT.oz - 4;
       const ringX = clamp(startX, wellX - 1, wellX + 5);

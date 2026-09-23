@@ -16,6 +16,7 @@ import { Player } from '../src/entity/player';
 import { TerrainNoise, generateChunk } from '../src/world/gen/terrain';
 import { houseSlot, slotOrigin, villageAnchorOf, type HouseSlot } from '../src/world/gen/village';
 import { BLOCK_BY_NAME, blockIdOf, stateBitsOf } from '../src/data/blocks';
+import { VILLAGE_HOUSES } from '../src/data/structures';
 import { ITEM_BY_NAME } from '../src/data/items';
 import { MOB_BY_NAME } from '../src/data/mobs';
 import { HOME_START, TRADE_BAN_TICKS } from '../src/data/villagers';
@@ -150,7 +151,7 @@ describe('a aldeia gerada', () => {
     const { session } = villageSession();
     const s = session.mobs.store;
     const people = residents(session);
-    expect(people.length).toBeGreaterThanOrEqual(1);
+    expect(people.length).toBeGreaterThanOrEqual(3);
     expect(people.length).toBeLessThanOrEqual(8);
     for (const i of people) {
       const v = s.village;
@@ -161,6 +162,57 @@ describe('a aldeia gerada', () => {
     for (let i = 0; i < s.active; i++) if (s.type[i] === GOLEM) golems++;
     expect(golems).toBe(1);
   });
+});
+
+describe('plano da aldeia em várias seeds', () => {
+  /*
+   * No campo: "uma aldeia com um aldeão só, sem golem". Cada peça conferia o
+   * bioma do próprio ponto, e na divisa da planície nasciam casas soltas sem
+   * poço, com os moradores sorteados para casas que não existiam. E o poço na
+   * beira da região contava casas da aldeia vizinha na fila de moradores.
+   */
+  it('aldeia com poço tem todas as casas com morador; sem poço, nenhuma casa', () => {
+    const anchor = new Int32Array(2);
+    const origin = new Int32Array(2);
+    const slot: HouseSlot = { ox: 0, oz: 0, profession: 0, occupied: false, anchorX: 0, anchorZ: 0 };
+    const hasBlock = (chunk: ReturnType<typeof generateChunk>, x: number, z: number, id: number): boolean => {
+      for (let y = 120; y > 40; y--) {
+        if (blockIdOf(chunk.getBlock(x - chunk.cx * 16, y, z - chunk.cz * 16)) === id) return true;
+      }
+      return false;
+    };
+    let villages = 0;
+    for (let seed = 1; seed <= 24; seed++) {
+      villageAnchorOf(seed, 0, 0, anchor);
+      const noise = new TerrainNoise(seed);
+      slotOrigin(seed, anchor[0], anchor[1], origin);
+      const well = hasBlock(generateChunk(seed, noise, anchor[0], anchor[1]), origin[0] + 2, origin[1] + 2, BELL);
+      let occupied = 0;
+      let housed = 0;
+      let built = 0;
+      for (let dz = -2; dz <= 2; dz++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          if (!houseSlot(seed, anchor[0] + dx, anchor[1] + dz, slot)) continue;
+          const bed = VILLAGE_HOUSES[slot.profession].bed;
+          const chunk = generateChunk(seed, noise, anchor[0] + dx, anchor[1] + dz);
+          const hasBed = hasBlock(chunk, slot.ox + bed[0], slot.oz + bed[2], BED);
+          if (hasBed) built++;
+          if (!slot.occupied) continue;
+          occupied++;
+          if (hasBed) housed++;
+        }
+      }
+      if (!well) {
+        expect(built, `seed ${seed}: casa sem poço`).toBe(0);
+        continue;
+      }
+      villages++;
+      expect(occupied, `seed ${seed}: moradores planejados`).toBeGreaterThanOrEqual(Math.min(3, built));
+      // Casa sobre a água não nasce; fora isso, todo morador tem cama.
+      expect(housed / occupied, `seed ${seed}: moradores com casa`).toBeGreaterThanOrEqual(0.75);
+    }
+    expect(villages).toBeGreaterThanOrEqual(3);
+  }, 120_000);
 });
 
 describe('rotina', () => {
@@ -200,21 +252,40 @@ describe('rotina', () => {
     expect(asleep / people.length).toBeGreaterThanOrEqual(0.8);
   }, 60_000);
 
-  it('de manhã, levanta e vai trabalhar', () => {
+  /*
+   * No campo o aldeão "trabalhava" parado na soleira da porta, a 2,5 blocos do
+   * posto, a manhã inteira: parecia travado em casa. Agora ele chega ao posto
+   * de verdade e, entre um turno e outro, anda pela aldeia.
+   */
+  it('de manhã, levanta, chega ao posto de trabalho e não fica plantado nele', () => {
     const { session } = villageSession();
     const s = session.mobs.store;
     session.dayNight.setTimeOfDay(HOME_START + 1000);
     for (let t = 0; t < 1600; t++) session.tick();
     session.dayNight.setTimeOfDay(1500);
-    for (let t = 0; t < 1600; t++) session.tick();
-    let atWork = 0;
     const people = residents(session);
-    for (const i of people) {
-      const v = s.village;
-      expect(s.hasFlag(i, FLAG_SLEEPING)).toBe(false);
-      if (Math.hypot(s.x[i] - v.workX[i] - 0.5, s.z[i] - v.workZ[i] - 0.5) < 3.5) atWork++;
+    const closest = new Map<number, number>();
+    const walked = new Map<number, number>();
+    for (let t = 0; t < 2400; t++) {
+      for (const i of people) {
+        const v = s.village;
+        const d = Math.hypot(s.x[i] - v.workX[i] - 0.5, s.z[i] - v.workZ[i] - 0.5);
+        closest.set(i, Math.min(closest.get(i) ?? Infinity, d));
+      }
+      const before = people.map((i) => [s.x[i], s.z[i]]);
+      session.tick();
+      people.forEach((i, k) => {
+        walked.set(i, (walked.get(i) ?? 0) + Math.hypot(s.x[i] - before[k][0], s.z[i] - before[k][1]));
+      });
     }
-    expect(atWork / people.length).toBeGreaterThanOrEqual(0.7);
+    let reached = 0;
+    for (const i of people) {
+      expect(s.hasFlag(i, FLAG_SLEEPING)).toBe(false);
+      if ((closest.get(i) ?? Infinity) < 2) reached++;
+      // Dois minutos de manhã: posto, poço, posto — dezenas de blocos andados.
+      expect(walked.get(i), `aldeão ${i} andou`).toBeGreaterThan(20);
+    }
+    expect(reached / people.length).toBeGreaterThanOrEqual(0.7);
   }, 60_000);
 
   it('o sino manda todo mundo para casa, mesmo de dia', () => {

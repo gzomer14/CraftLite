@@ -40,6 +40,11 @@ const ARRIVED = 1.6;
 /** Distância da porta a partir da qual ela pode ser fechada atrás de quem passou. */
 const DOOR_CLOSE_MIN = 1.8;
 const DOOR_CLOSE_MAX = 6;
+/** Ciclo de trabalho: `WORK_SHIFT` ticks no posto a cada `WORK_CYCLE` (40 s em 60 s). */
+const WORK_CYCLE = 1200;
+const WORK_SHIFT = 800;
+/** Defasagem do turno por índice: aldeões vizinhos não saem juntos. */
+const WORK_SHIFT_SPREAD = 397;
 /** Chance por tick de soar o trabalho (bigorna do ferreiro): ~1 vez a cada 10 s. */
 const WORK_SOUND_CHANCE = 0.005;
 /** Ticks sem chegar mais perto do destino que contam como "preso". */
@@ -129,16 +134,25 @@ export const VILLAGE_GOALS: Pick<Record<GoalName, Goal>,
     return true;
   },
 
-  /** Hora de trabalho: vai até o posto e fica por lá. */
+  /**
+   * Hora de trabalho: turnos no posto intercalados com voltas pela aldeia.
+   *
+   * O turno sai da idade e do índice, sem estado novo: cada aldeão tem o seu
+   * relógio, e a rua nunca esvazia de uma vez. Fora do turno o goal larga, e o
+   * `stayInVillage`/`wander` levam o aldeão para perto do poço. Antes ele
+   * ficava plantado no posto a manhã inteira — e "no posto" valia a 2,6 blocos
+   * dele, que é a soleira da porta: visto de fora, um aldeão travado em casa.
+   */
   work(ctx, i) {
     const s = ctx.store;
     const v = s.village;
     if (v.hasWork[i] === 0 || !isWorkTime(ctx.dayTime)) return false;
+    if ((s.age[i] + i * WORK_SHIFT_SPREAD) % WORK_CYCLE >= WORK_SHIFT) return false;
     tendDoor(ctx, i);
     const wx = v.workX[i] + 0.5;
     const wz = v.workZ[i] + 0.5;
     const distance = Math.hypot(s.x[i] - wx, s.z[i] - wz);
-    if (distance > ARRIVED + 1) {
+    if (distance > ARRIVED) {
       goTo(ctx, i, wx, v.workY[i], wz, 0.8);
       return true;
     }

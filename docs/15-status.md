@@ -9,10 +9,10 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-23 11:03 — **M9 fechado: aldeões com ofício, rotina de dia e
-noite, porta e cama; troca por esmeralda; aldeia com caminhos, hortas cercadas e sino; golem de
-ferro e reputação. M12 validado em campo. No caminho, três defeitos antigos de mob: a tabela
-trocava morcego, porco zumbi e ghast; nenhum mob subia um degrau; e mob longe caía no vazio.**
+**Última atualização:** 2026-09-23 13:55 — **Aldeia no campo: "um aldeão só, travado em casa, sem
+golem".** A aldeia nascia pela metade na divisa de bioma (casas soltas, sem poço, moradores
+sorteados para casas que não existiam) e o aldeão "trabalhava" parado na soleira da porta a manhã
+inteira. Corrigido na geração e na rotina (§4). Antes disso, 11:03: M9 fechado.
 
 ---
 
@@ -67,7 +67,7 @@ Medidas em 2026-09-23 11:03, ao fechar o M9, com `npm test`, `npm run build`,
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
 | Bundle (gzip, tudo) | **239,4 KB** (229,0 no M12; 226,3 antes dele) | < 350 KB | `npm run size` |
-| Testes | **2023**, 101 arquivos (2003 no M12; 1981 antes dele) | manter verde | `npm test` |
+| Testes | **2024**, 101 arquivos (2023 no M9; 2003 no M12) | manter verde | `npm test` |
 | Smoke test de navegador | **7 passos verdes**: carregar, criar, andar 10 s, quebrar, salvar, recarregar, conferir | verde | `npm run smoke` |
 | Camadas de atlas | **194** com 16 cores de lã e cama (222 no M11 com 8 cores; lã e cama viraram tint no M13) | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Memória de áudio | **3,33 MB** (era 3,26; +3 sons curtos de balde e arremesso) | < 3,5 MB | `tests/audio.test.ts` |
@@ -1579,6 +1579,8 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-23 | `world/gen/village.ts` | **Aldeia pela metade: um aldeão só, sem golem** (M9; relato de campo: *"tinha somente 1 aldeão, travado na casa dele (…) não tinha iron golem"*). Cada peça da aldeia conferia o bioma do **próprio** ponto: na divisa da planície nasciam duas ou três casas soltas, sem poço — sem golem e sem sino —, e os moradores eram sorteados entre as casas **do plano**, que não tinham nascido. Em 24 seeds, 4 das 11 aldeias estavam assim, com 1 morador. A seed `2`, usada nos testes do M9, é toda planície. Agora a aldeia existe ou não pelo bioma do poço (que não depende da janela do chunk), e de pé ela constrói todas as casas, menos sobre a água. E o poço na beira da região de 32 chunks contava casas da aldeia vizinha na fila de moradores (`occupantRank`). Regressão em `tests/village.test.ts` ("plano da aldeia em várias seeds"). **Mundos já criados:** chunk gerado antes continua como estava; a aldeia certa aparece em terreno novo. |
+| 2026-09-23 | `entity/ai/villagegoals.ts` | **O aldeão passava a manhã plantado na soleira da porta** (M9). "Chegou ao posto" valia a 2,6 blocos dele, que é a porta de casa, e ele ficava ali de 1000 a 9000 — visto de fora, travado. Agora ele chega ao posto (1,6) e trabalha em turnos de 40 s a cada minuto, defasados por aldeão; entre um e outro vai para perto do poço. Regressão: cada aldeão anda mais de 20 blocos numa manhã de 2 min (antes, 7,8). |
 | 2026-09-23 | `data/mobs.ts` | **Morcego, porco zumbi e ghast trocavam de corpo e de IA** (desde 2026-09-14). `mobDef(id)` lê `MOBS[id]`, e a lista estava na ordem de declaração: o morcego (id 15) entrou antes do porco zumbi (13) e do ghast (14). O morcego das cavernas era um ghast, o porco zumbi do Nether um morcego, e o ghast um porco zumbi. A lista passou a ser ordenada pelo id, e buraco na numeração vira erro no boot. Regressão em `tests/mobs.test.ts`. |
 | 2026-09-23 | `entity/mobstore.ts` | **Nenhum mob subia um degrau de bloco inteiro** (M5). O pulo é decidido depois de mover, e o tick seguinte aplica gravidade antes de mover: o pico ficava em 0,83 bloco. Todo caminho do A* que subia um bloco deixava o bicho pulando no pé da parede — parte, talvez, do "os monstros não me seguem" de 2026-09-12. O impulso passou a descontar o que o próximo tick tira. Achado com o aldeão voltando para casa. |
 | 2026-09-23 | `entity/mobs.ts` | **Mob em coluna não carregada caía no vazio.** O mundo fora do anel responde ar; todo bicho que ficava para trás despencava e morria de "void". Agora fica parado até a coluna voltar. |
@@ -1868,9 +1870,12 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
 
 ## 6. Próximo passo recomendado
 
-0. **Olhar o M9 num aparelho** e depois seguir o roteiro: **M10** (saber onde se está — bússola,
-   relógio, mapa). O M9 só foi visto em testes e no Chrome sem janela. Em ordem de quanto pode
-   estar errado:
+0. **Olhar o M9 num aparelho, de novo, num mundo novo** e depois seguir o roteiro: **M10** (saber
+   onde se está — bússola, relógio, mapa). A primeira volta de campo achou a aldeia pela metade e
+   o aldeão parado na porta (§4, 2026-09-23 13:55); a aldeia certa só nasce em terreno gerado
+   depois da correção. Em ordem de quanto pode estar errado:
+   - **aldeia inteira**: poço com sino, golem, 3 a 8 aldeões, e de manhã eles alternando entre o
+     posto de trabalho e o poço — nenhum parado na porta;
    - **entardecer**: achar uma aldeia (a semente `2` tem uma com o poço em x 282, z 340), esperar o
      fim da tarde e ver os aldeões entrarem, fecharem a porta e deitarem. Se algum travar num canto,
      o número é `STUCK_TICKS` em `entity/ai/villagegoals.ts`;

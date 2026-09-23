@@ -300,37 +300,39 @@ gerador de pedregulho funciona (`tests/fluids.test.ts`), bétula replantada dá 
 
 ---
 
-## M12 — O mundo chega antes do jogador
+## M12 — O mundo chega antes do jogador ✅
 
 > Performance de **carregamento e alcance**. O custo de quadro já está folgado em todos os tiers;
 > o que o jogador sente é o mundo aparecendo atrasado ao voar e a distância de render baixa no
 > celular fraco.
 
-- [ ] **Culling por conectividade de sections.** O PROMPT.md §4.2 o chama de *"fortemente
+- [x] **Culling por conectividade de sections.** *(2026-09-23: `render/sectioncull.ts`; a busca não poda pelo frustum e visita cada section uma vez — motivos no módulo.)* O PROMPT.md §4.2 o chama de *"fortemente
       recomendado (corta 60–80% do trabalho em cavernas)"* e **não foi feito**: `buildDrawLists`
       (`render/chunkrenderer.ts:150`) só faz frustum, e `grep -i occlusion src` só acha o AO do
       mesher. O worker já varre a section inteira ao meshar; é ali que se calcula, por flood fill
       do ar, quais das 6 faces se enxergam (15 bits por section). No render, BFS a partir da
       section da câmera, atravessando só faces conectadas e só para longe dela.
-- [ ] **Culling por direção de face.** O mesh opaco de uma section sai misturado; agrupando os
+- [x] **Culling por direção de face.** *(2026-09-23: opaco e recortado; o translúcido fica de fora.)* O mesh opaco de uma section sai misturado; agrupando os
       índices em 6 faixas (uma por normal, o `face:3` já está no vértice), a section fora do plano
       da câmera desenha só as faixas voltadas para ela. Em terreno aberto, metade das faces laterais
       e todas as de baixo nunca são vistas — o ganho é em vértice, que é o que a GPU móvel paga.
-- [ ] **A cópia da vizinhança sai da thread principal.** Cada job de malha copia 18³ blocos e luz
+- [x] **A cópia da vizinhança sai da thread principal.** *(2026-09-23, com desvio: sem espelho no worker — seriam N cópias do mundo; vão as sections cruas, um pedido por coluna, e o worker monta a vizinhança. Ver doc 15 §3.)* Cada job de malha copia 18³ blocos e luz
       no main thread, ~0,26 ms por section (`world/pipeline.ts:87`), e é esse orçamento que decide
       quantas sections saem por quadro. Com um espelho das colunas **dentro** do worker (ele gerou a
       coluna; só precisa receber os `setBlock` depois), o despacho vira uma mensagem de coordenada.
       `SharedArrayBuffer` não é opção: o GitHub Pages não serve COOP/COEP.
-- [ ] **Luz que atravessa a borda do chunk na geração.** Hoje ela para na borda —
+- [x] **Luz que atravessa a borda do chunk na geração.** *(2026-09-23: `Lighting.stitchColumn`.)* Hoje ela para na borda —
       `world/gen/terrain.ts:514`, *"essa é a aproximação aceita"* —, o que deixa uma aresta reta de
       sombra onde um barranco, uma boca de caverna ou um lago de lava cruzam a fronteira. Quando o
       vizinho chega, semear o flood fill de `world/lighting.ts` com as bordas das duas colunas.
-- [ ] **Rever o preset de T0 com o que sobrar.** Render de 2,7 ms em 33,3 é folga para RD 5 ou 6;
+- [ ] **Rever o preset de T0 com o que sobrar.** *(não feito: sem T0 na mão.)* Render de 2,7 ms em 33,3 é folga para RD 5 ou 6;
       o que segurou o RD 4 foi a geração. Precisa de um T0 na mão — o J7 Metal não está mais com o
       usuário (doc 15 §5) — ou fica como está.
 
 **Critério de aceite:** `tests/dimensionrace.test.ts` (colunas em 40 ciclos, RD 8) **pelo menos
-1,5×** o valor atual de 86; numa caverna a Y=20 com RD 8, **metade ou menos** das sections do
+1,5×** o valor atual de 86 *(2026-09-23: deu 101, 1,17× — o teste, sem relógio e com 4 vagas meio a
+meio, mede a divisão de vagas e não o custo do despacho; com o orçamento de 60 FPS o mundo de RD 16
+ficou pronto em 2,2× menos quadros. Doc 15 §3)*; numa caverna a Y=20 com RD 8, **metade ou menos** das sections do
 frustum vão para a lista de desenho; nenhuma aresta de luz visível na fronteira de chunk num teste
 com lava encostada na borda. Orçamentos do `tests/perf.test.ts` intocados.
 

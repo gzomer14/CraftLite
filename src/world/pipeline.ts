@@ -11,10 +11,10 @@
 
 import { DIM_OVERWORLD } from '../data/dimensions';
 import { ChunkColumn, ChunkState, SECTIONS_PER_COLUMN, chunkKey } from './chunk';
-import { extractNeighborhood, NB_VOLUME } from './neighborhood';
+import { gatherSections, type SectionView } from './neighborhood';
 import type { World } from './world';
 import type {
-  GenResponse, MeshResponse, SerializedSection, WorkerRequest, WorkerResponse,
+  GenResponse, MeshResponse, SectionMeshResult, SerializedSection, WorkerRequest, WorkerResponse,
 } from '../workers/protocol';
 
 /** Resultado de `dispatchMesh`. Números, não string, para não alocar no pump. */
@@ -28,16 +28,20 @@ const MESH_DROPPED = 2;
 interface PendingJob {
   cx: number;
   cz: number;
-  /** −1 = geração da coluna; 0..7 = meshing daquela section. */
-  sy: number;
+  /**
+   * Na fila de malha, as sections da coluna a meshar (bit `sy`). Um pedido por
+   * coluna desde o M12; na fila de geração não é usado.
+   */
+  mask: number;
   priority: number;
 }
 
+/** Uma section pronta para subir para a GPU. */
 export interface MeshResult {
   cx: number;
   cz: number;
   sy: number;
-  response: MeshResponse;
+  section: SectionMeshResult;
 }
 
 export interface PipelineStats {
@@ -83,10 +87,12 @@ export interface PipelineOptions {
 /**
  * Quanto do frame o `pump` pode gastar **despachando**.
  *
- * Despachar não é de graça: cada job de malha copia a vizinhança 18³ da coluna
- * (blocos e luz) na thread principal, ~0,26 ms por section. É este orçamento —
- * e não uma contagem fixa — que decide quantos cabem, porque num aparelho
- * lento cada cópia custa mais e a conta se ajusta sozinha.
+ * Despachar não é de graça: cada pedido de malha leva as sections cruas das
+ * 3×3 colunas em volta, e o `postMessage` as copia na thread principal. Desde o
+ * M12 a cópia é nativa — ~0,36 ms por coluna inteira, contra os ~2 ms que a
+ * vizinhança 18³ montada em JS custava para as oito sections (0,26 cada). É
+ * este orçamento, e não uma contagem fixa, que decide quantos cabem: num
+ * aparelho lento cada cópia custa mais e a conta se ajusta sozinha.
  */
 const DISPATCH_FRAME_SHARE = 0.2;
 
@@ -107,10 +113,6 @@ export class ChunkPipeline {
   private readonly queuedKeys = new Set<number>();
   private readonly generating = new Set<number>();
   private readonly meshing = new Set<number>();
-
-  /** Buffers de vizinhança reciclados (buffer ring do doc 02 §5.5). */
-  private readonly blockPool: Uint16Array[] = [];
-  private readonly lightPool: Uint8Array[] = [];
 
   /** Resultados prontos, aguardando upload dentro do orçamento do frame. */
   private readonly readyMeshes: MeshResult[] = [];
@@ -158,7 +160,7 @@ export class ChunkPipeline {
     const create = options.createWorker ?? defaultWorkerFactory;
     for (let i = 0; i < options.workers; i++) {
       const worker = create(i);
-      worker.onmessage = (event) => this.onWorkerMessage(event.data);
+      worker.onmessage = (event) => this.onWorkerMessage(i, event.data);
       worker.postMessage({
         type: 'init', seed: world.seed, packed: this.packed,
         smoothLighting: this.smoothLighting,
@@ -234,7 +236,7 @@ export class ChunkPipeline {
         if (this.world.getChunk(cx, cz) !== undefined) continue;
         if (this.generating.has(key) || this.queuedKeys.has(key)) continue;
         this.queuedKeys.add(key);
-        this.genQueue.push({ cx, cz, sy: -1, priority: dx * dx + dz * dz });
+        this.genQueue.push({ cx, cz, mask: 0, priority: dx * dx + dz * dz });
       }
     }
     // Mais perto primeiro. Ordenar aqui é barato: só acontece ao trocar de chunk.
@@ -314,8 +316,9 @@ export class ChunkPipeline {
      * Quando os dois lados têm trabalho, metade das vagas fica reservada para
      * a geração. Gerar e meshar uma coluna custam a mesma ordem de grandeza
      * (6–14 ms contra 8 × 0,6–1,5 ms), então meio a meio é o ponto em que
-     * nenhum dos dois espera pelo outro. Sem fila de geração, o meshing
-     * continua levando tudo.
+     * nenhum dos dois espera pelo outro — e desde o M12 as duas filas contam
+     * por coluna, então a conta fecha em unidades iguais. Sem fila de geração,
+     * o meshing continua levando tudo.
      */
     const reserved = this.genQueue.length > 0 ? Math.max(1, this.maxInFlight >> 1) : 0;
     const meshLimit = this.maxInFlight - reserved;
@@ -394,6 +397,9 @@ export class ChunkPipeline {
   /**
    * Só despacha se os 8 vizinhos existem — senão a borda sai errada.
    *
+   * O pedido leva, de cada uma das 3×3 colunas, só a faixa de sections que as
+   * pedidas precisam: elas mesmas e uma acima e uma abaixo, que é o padding.
+   *
    * Nunca mexe na fila: quem decide o destino do job é o `pump`.
    */
   private dispatchMesh(job: PendingJob): number {
@@ -401,21 +407,22 @@ export class ChunkPipeline {
     // já não ter coluna nenhuma. Insistir nele seria esperar para sempre; se a
     // coluna voltar, `acceptChunk` reenfileira o meshing dela.
     if (this.world.getChunk(job.cx, job.cz) === undefined) return MESH_DROPPED;
-    // Checagem barata (9 consultas) antes de tomar buffer do pool.
-    if (!this.hasAllNeighbors(job.cx, job.cz)) return MESH_DEFERRED;
 
-    const blocks = this.blockPool.pop() ?? new Uint16Array(NB_VOLUME);
-    const light = this.lightPool.pop() ?? new Uint8Array(NB_VOLUME);
-
-    if (!extractNeighborhood(this.world, job.cx, job.cz, job.sy, blocks, light)) {
-      this.blockPool.push(blocks);
-      this.lightPool.push(light);
+    const lowest = 31 - Math.clz32(job.mask & -job.mask);
+    const highest = 31 - Math.clz32(job.mask);
+    const syMin = Math.max(0, lowest - 1);
+    const span = Math.min(SECTIONS_PER_COLUMN - 1, highest + 1) - syMin + 1;
+    if (!gatherSections(this.world, job.cx, job.cz, syMin, span, SECTION_SCRATCH)) {
       return MESH_DEFERRED;
     }
 
-    this.meshing.add(meshKey(job.cx, job.cz, job.sy));
-    this.send({ type: 'mesh', cx: job.cx, cz: job.cz, sy: job.sy, blocks, light },
-      [blocks.buffer, light.buffer]);
+    this.meshing.add(chunkKey(job.cx, job.cz));
+    // O `postMessage` copia as sections na hora; a lista de referências pode
+    // ser reusada no despacho seguinte.
+    this.send({
+      type: 'mesh', cx: job.cx, cz: job.cz, mask: job.mask, syMin, span,
+      sections: SECTION_SCRATCH,
+    });
     return MESH_SENT;
   }
 
@@ -429,14 +436,14 @@ export class ChunkPipeline {
     this.pool[best].postMessage(message, transfer);
   }
 
-  private onWorkerMessage(response: WorkerResponse): void {
-    // Descobre de qual worker veio pelo contador — a contagem exata não importa,
-    // só o balanceamento, então decrementa o maior.
-    let best = 0;
-    for (let i = 1; i < this.inFlight.length; i++) {
-      if (this.inFlight[i] > this.inFlight[best]) best = i;
-    }
-    if (this.inFlight[best] > 0) this.inFlight[best]--;
+  private onWorkerMessage(worker: number, response: WorkerResponse): void {
+    /*
+     * O crédito volta para **quem respondeu**. Antes, sem saber a origem, o
+     * pipeline descontava do worker mais ocupado: a soma batia, mas a conta
+     * por worker derivava, e com os pedidos de coluna do M12 um worker de três
+     * ficava sem receber nada.
+     */
+    if (this.inFlight[worker] > 0) this.inFlight[worker]--;
 
     if (response.type === 'gen') this.onGenerated(response);
     else if (response.type === 'mesh') this.onMeshed(response);
@@ -500,12 +507,16 @@ export class ChunkPipeline {
         const column = this.world.getChunk(cx + dx, cz + dz);
         if (column === undefined || column.state !== ChunkState.Generated) continue;
         if (!this.hasAllNeighbors(cx + dx, cz + dz)) continue;
-        column.state = ChunkState.Meshing;
-        const priority = (cx + dx - this.centerX) ** 2 + (cz + dz - this.centerZ) ** 2;
+        let mask = 0;
         for (let sy = 0; sy < SECTIONS_PER_COLUMN; sy++) {
           if (column.sections[sy].isEmpty && !this.sectionBordersSolid(column, sy)) continue;
-          this.meshQueue.push({ cx: cx + dx, cz: cz + dz, sy, priority });
+          mask |= 1 << sy;
         }
+        // Coluna só de ar: não há o que meshar, e ela já está pronta.
+        if (mask === 0) { column.state = ChunkState.Ready; continue; }
+        column.state = ChunkState.Meshing;
+        const priority = (cx + dx - this.centerX) ** 2 + (cz + dz - this.centerZ) ** 2;
+        this.meshQueue.push({ cx: cx + dx, cz: cz + dz, mask, priority });
       }
     }
     this.meshQueue.sort(byPriority);
@@ -528,20 +539,18 @@ export class ChunkPipeline {
   }
 
   private onMeshed(response: MeshResponse): void {
-    this.meshing.delete(meshKey(response.cx, response.cz, response.sy));
-    this.stats.meshMs += (response.ms - this.stats.meshMs) * 0.1;
-
-    // Recicla os buffers de vizinhança que o worker devolveu.
-    this.blockPool.push(response.blocks);
-    this.lightPool.push(response.light);
+    this.meshing.delete(chunkKey(response.cx, response.cz));
+    const count = response.sections.length;
+    if (count > 0) this.stats.meshMs += (response.ms / count - this.stats.meshMs) * 0.1;
 
     const column = this.world.getChunk(response.cx, response.cz);
     if (column === undefined) return; // descarregou enquanto meshava
     column.state = ChunkState.Ready;
 
-    this.readyMeshes.push({
-      cx: response.cx, cz: response.cz, sy: response.sy, response,
-    });
+    for (let i = 0; i < count; i++) {
+      const section = response.sections[i];
+      this.readyMeshes.push({ cx: response.cx, cz: response.cz, sy: section.sy, section });
+    }
   }
 
   /**
@@ -561,19 +570,31 @@ export class ChunkPipeline {
     return applied;
   }
 
-  /** Reenfileira sections marcadas como sujas por `world.setBlock`. */
+  /**
+   * Reenfileira sections marcadas como sujas por `world.setBlock` — **uma
+   * entrada por coluna**, com as sections dela numa máscara. As chaves sujas
+   * são `coluna × 8 + sy`, então ordenadas as da mesma coluna ficam juntas.
+   */
   enqueueDirty(): void {
     if (this.world.dirtyCount === 0) return;
     const n = this.world.takeDirtySections(DIRTY_SCRATCH);
-    for (let i = 0; i < n; i++) {
+    DIRTY_SCRATCH.length = n;
+    DIRTY_SCRATCH.sort(byNumber);
+    let i = 0;
+    while (i < n) {
       const packedKey = DIRTY_SCRATCH[i];
       const sy = packedKey % SECTIONS_PER_COLUMN;
       const columnKey = (packedKey - sy) / SECTIONS_PER_COLUMN;
+      let mask = 0;
+      while (i < n && Math.floor(DIRTY_SCRATCH[i] / SECTIONS_PER_COLUMN) === columnKey) {
+        mask |= 1 << (DIRTY_SCRATCH[i] % SECTIONS_PER_COLUMN);
+        i++;
+      }
       const cz = signed22(columnKey % 0x400000);
       const cx = signed22((columnKey - (columnKey % 0x400000)) / 0x400000);
       if (this.world.getChunk(cx, cz) === undefined) continue;
       this.meshQueue.push({
-        cx, cz, sy,
+        cx, cz, mask,
         priority: (cx - this.centerX) ** 2 + (cz - this.centerZ) ** 2,
       });
     }
@@ -597,8 +618,8 @@ function byPriority(a: PendingJob, b: PendingJob): number {
   return a.priority - b.priority;
 }
 
-function meshKey(cx: number, cz: number, sy: number): number {
-  return chunkKey(cx, cz) * SECTIONS_PER_COLUMN + sy;
+function byNumber(a: number, b: number): number {
+  return a - b;
 }
 
 /** Desfaz o empacotamento de 22 bits com sinal usado por `chunkKey`. */
@@ -618,3 +639,5 @@ function applySection(chunk: ChunkColumn, index: number, data: SerializedSection
 }
 
 const DIRTY_SCRATCH: number[] = [];
+/** Referências das sections do pedido de malha em montagem. */
+const SECTION_SCRATCH: SectionView[] = [];

@@ -12,6 +12,58 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-23 · 09:10 → 09:58 · M12: o mundo chega antes do jogador
+
+**Pedido:** *"Deu tudo certo nos testes do M11 e M13. Qual seria o próximo marco para atacarmos?"* —
+recomendado o M12 — e *"Pode seguir com o M12"*.
+
+**Resultado:** M12 fechado, com dois desvios conscientes e um critério não batido, todos escritos
+no doc 15 §3. **Culling por conectividade:** numa caverna a Y≈21 com RD 8, 29% das sections com
+malha no frustum vão para a lista (pede ≤ 50%); um teste de 8000 raios prova que nenhum bloco
+visível fica de fora, e pega três mutações do algoritmo. A busca não poda pelo frustum e visita
+cada section uma vez — as alternativas foram medidas e custavam o dobro ou mais por quadro.
+**Faces viradas para a câmera** no opaco e no recortado. **Vizinhança montada no worker**, sem o
+espelho de colunas que o doc 14 pedia (seriam N cópias do mundo): o pedido de malha leva as
+sections cruas, um por coluna — 0,32 ms na thread principal contra 2 ms, e o mundo de RD 16 pronto
+em 2,2× menos quadros com o orçamento real. O critério de "1,5× colunas em 40 ciclos" deu 1,17×:
+o teste mede a divisão de vagas, não o custo do despacho. **Luz costurada** entre colunas.
+
+Dois defeitos antigos apareceram e foram corrigidos: o **BFS de luz explodia na borda do mundo
+carregado** (achado pelo smoke — a aba congelava ao criar o mundo) e o **crédito de pedido em voo
+voltava para o worker errado**. O preset do T0 não foi revisto (sem aparelho). A correção das
+texturas de pé foi vista em captura do Chrome: flor com a pétala em cima.
+
+Portões: **2003 testes** em 100 arquivos, lint limpo, build ok, **229,0 KB** de 350, smoke verde.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| **Pipeline e worker** | | |
+| `~` | `src/world/pipeline.ts` | um pedido de malha por coluna (máscara de sections); sections cruas no lugar da vizinhança; sem pool de buffers; sujas agrupadas por coluna; crédito de voo por worker |
+| `~` | `src/world/neighborhood.ts` | `fillNeighborhood` sobre sections cruas e `gatherSections`; `extractNeighborhood` usa o mesmo núcleo |
+| `~` | `src/workers/protocol.ts` | `MeshRequest` e `MeshResponse` por coluna; `SectionMeshResult` com a conectividade; `faceStarts` no mesh |
+| `+` | `src/workers/meshjob.ts` | o trabalho do pedido de malha, usado pelo worker e pelos duplos de teste |
+| `~` | `src/workers/chunk.worker.ts` | delega ao `MeshJobRunner` |
+| `+` | `src/world/mesh/visibility.ts` | conectividade entre as faces da section (15 bits) |
+| `~` | `src/world/mesh/greedy.ts` | anota o início de cada face no buffer de índices; laço de passes sem alocar |
+| **Render** | | |
+| `+` | `src/render/sectioncull.ts` | busca a partir da câmera, corte por frustum por quadro, `facingFaces` |
+| `~` | `src/render/chunkrenderer.ts` | lista de desenho pelo culling; faces por section |
+| `~` | `src/render/mesh.ts` | `MeshData.faceStarts`, `GpuMesh.drawFaces` |
+| `~` | `src/render/renderer.ts` | a distância de render dimensiona a grade do culling |
+| **Luz** | | |
+| `~` | `src/world/lighting.ts` | `stitchColumn`; os dois BFS pulam coluna não carregada |
+| `~` | `src/game/session.ts` | costura a luz na chegada da coluna |
+| **Testes** | | |
+| `+` | `tests/sectioncull.test.ts` | 13 testes: conectividade, busca, faces, critério da caverna, prova por raios |
+| `+` | `tests/lightstitch.test.ts` | 6 testes: lava e céu através da borda, nos dois sentidos, o que re-mesha, borda do mundo carregado |
+| `~` | `tests/pipeline.test.ts` | duplo que trabalha no `flush`; pedido por coluna; teto de voo real |
+| `~` | `tests/dimensionrace.test.ts`, `tests/savegame.test.ts` | duplos no protocolo novo; pisos 51 pumps e 101 colunas |
+| `~` | `tests/perf.test.ts` | orçamentos do pedido de malha, do culling e da costura de luz |
+| **Docs** | | |
+| `~` | `docs/15-status.md`, `docs/14-roadmap.md`, `README.md` | M12 fechado, M11 e M13 validados, §4 com os dois defeitos, métricas |
+
+---
+
 ## 2026-09-23 · 08:40 → 09:05 · As plantas estavam de ponta-cabeça, e não eram só elas
 
 **Pedido:** *"vários itens ao colocar no chão estão ficando de cabeça para baixo. Notei isso na

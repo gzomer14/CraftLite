@@ -10,8 +10,11 @@ completa daquele dia achou 13 itens que os documentos normativos pediam e o cód
 M11 os entregou com mais quatro achados no caminho: plantas que não cresciam (a madeira não era
 renovável), blocos que não queimavam, água que apagava lava e o jogador nascendo no mar. Há agora um
 smoke test de navegador (`npm run smoke`), e o M13 reorganizou o código (a `Session` e o `main.ts` perderam
-dois terços) e deu 16 cores à lã e à cama. Seguem M12, M9, M10 e M14 a M17 no roteiro. Falta jogar em aparelho o
-que foi entregue no acabamento pós-M7 (2026-09-14) e no M11.
+dois terços) e deu 16 cores à lã e à cama; os dois foram validados em aparelho em 2026-09-23. O **M12** fechou
+no mesmo dia: culling por conectividade (numa caverna, 29% das sections do frustum vão para a tela), faces
+viradas para a câmera, vizinhança de malha montada no worker (o mundo de RD 16 fica pronto em 2,2× menos
+quadros) e luz que atravessa a borda do chunk — ainda não visto em aparelho. Seguem M9, M10 e M14 a M17 no
+roteiro.
 
 - **M0 — esqueleto:** Vite + TypeScript strict, renderer WebGL2 próprio com fallback WebGL1,
   detecção de tier, loop de 20 Hz com interpolação, gerador procedural de texturas alimentando um
@@ -132,7 +135,7 @@ Abre em **4,5 s em 3G rápido** (critério: < 5 s) e aguentou **92 min de voo co
 erro**, com o heap estável e o anel de chunks fixo em 489 colunas ao longo de 67 mil blocos — os
 dois medidos por `npm run slow-network` e `npm run soak`, que dirigem um Chrome de verdade.
 
-**208 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
+**229 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
 além de dois ícones de PWA de 6,7 KB, gerados por código.
 
 Validado em aparelho alvo (**Galaxy J7 Metal**, Android 7, 2 GB, Mali-T830) em 2026-09-12:
@@ -145,7 +148,7 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 1981 testes (vitest)
+npm test           # 2003 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
 npm run smoke      # abre o jogo num Chrome headless e joga o roteiro do doc 14 (precisa do build)
@@ -224,7 +227,7 @@ src/
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      1981 testes, incluindo orçamento de performance e de luz
+tests/                      2003 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios

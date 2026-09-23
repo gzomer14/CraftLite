@@ -180,6 +180,8 @@ export class Renderer {
     // que apague o terreno visível: ~85% da distância de render.
     this.baseFogDensity = 1.0 / (blocks * 0.85);
     this.applyFog();
+    // A grade do culling por conectividade cobre o anel carregado (M12).
+    this.chunks.setRenderDistance(Math.max(1, distance));
   }
 
   /**

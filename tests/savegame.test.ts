@@ -383,14 +383,8 @@ describe('viajar longe e voltar', () => {
       if (request.type === 'init') return;
       if (request.type === 'mesh') {
         // Meshing não interessa aqui; devolve vazio para o pipeline seguir.
-        const empty = {
-          vertices: new ArrayBuffer(0), indices: new ArrayBuffer(0),
-          vertexCount: 0, indexCount: 0, wideIndices: false,
-        };
         this.outbox.push({
-          type: 'mesh', cx: request.cx, cz: request.cz, sy: request.sy,
-          opaque: empty, cutout: empty, translucent: empty, quads: 0, ms: 0,
-          blocks: request.blocks, light: request.light,
+          type: 'mesh', cx: request.cx, cz: request.cz, sections: [], quads: 0, ms: 0,
         });
         return;
       }

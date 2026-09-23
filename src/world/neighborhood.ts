@@ -1,42 +1,56 @@
 /**
- * Extração da vizinhança 18×18×18 que o worker de meshing consome.
+ * Extração da vizinhança 18×18×18 que o mesher consome.
  *
- * Roda no main thread a cada re-mesh, então é caminho quente: resolve as 9
- * colunas vizinhas **uma vez** em um cache 3×3 e depois indexa por array. A
- * versão ingênua (um `Map.get` por voxel) custa 5832 lookups por section e
- * estoura o orçamento de 2 ms sozinha.
+ * **M12 (2026-09-23): a extração saiu da thread principal.** Ela roda no worker,
+ * sobre as sections cruas (paleta, dados empacotados e luz) que chegam na
+ * mensagem de malha — a thread principal só junta as referências e o
+ * `postMessage` copia os arrays com `memcpy`. Medido em Node: 0,24 ms por
+ * section decodificando voxel a voxel aqui, contra 0,045 ms de cópia crua. O
+ * doc 14 pedia um espelho das colunas **dentro** do worker; ficou de fora de
+ * propósito: com N workers seriam N cópias do mundo carregado (RD 16 no T2 dá
+ * ~50 MB por worker), e o `SharedArrayBuffer` que evitaria isso não existe no
+ * GitHub Pages, que não serve COOP/COEP.
+ *
+ * `fillNeighborhood` é o núcleo e não conhece `World`: recebe as 3×3 colunas
+ * como uma lista de sections. `extractNeighborhood` é o mesmo núcleo alimentado
+ * pelo `World` — os testes de mesher e de perf usam por ele.
  */
 
 import { AIR } from '../data/blocks';
-import { SECTION_SIZE, SECTIONS_PER_COLUMN, WORLD_HEIGHT, type ChunkColumn } from './chunk';
+import {
+  SECTION_SIZE, SECTIONS_PER_COLUMN, WORLD_HEIGHT, readPacked, type BitsPerBlock,
+} from './chunk';
 import type { World } from './world';
 
 export const NB_SIDE = 18;
 export const NB_PLANE = NB_SIDE * NB_SIDE;
 export const NB_VOLUME = NB_SIDE * NB_PLANE;
 
-/** Cache das 9 colunas ao redor, reusado entre chamadas. */
-const columns: (ChunkColumn | undefined)[] = new Array(9);
+/**
+ * O que o mesher precisa de uma section. Uma `ChunkSection` já é isto; do outro
+ * lado do `postMessage` chega como objeto simples, com os mesmos campos.
+ */
+export interface SectionView {
+  bits: BitsPerBlock;
+  palette: Uint16Array;
+  data: Uint8Array | Uint16Array | null;
+  skyLight: Uint8Array | null;
+  blockLight: Uint8Array | null;
+}
 
 /**
- * Preenche `blocks` e `light` (ambos de 5832 elementos) com a section
- * `(cx, cz, sy)` mais uma camada de padding de cada lado.
+ * Preenche `blocks` e `light` (5832 elementos cada) com a section `sy` e uma
+ * camada de padding de cada lado.
  *
- * Devolve `false` se algum vizinho ainda não carregou — meshar antes disso
- * criaria paredes falsas na borda do chunk que teriam de ser refeitas.
+ * `sections` traz as 3×3 colunas em volta, na ordem `(dz+1)*3 + (dx+1)`, e em
+ * cada coluna as sections `syMin .. syMin+span-1`:
+ * `sections[coluna * span + (sy - syMin)]`. Section fora dessa faixa (abaixo do
+ * mundo, acima do topo) não é consultada.
  */
-export function extractNeighborhood(
-  world: World, cx: number, cz: number, sy: number,
+export function fillNeighborhood(
+  sections: readonly SectionView[], syMin: number, span: number, sy: number,
   blocks: Uint16Array, light: Uint8Array,
-): boolean {
-  for (let dz = -1; dz <= 1; dz++) {
-    for (let dx = -1; dx <= 1; dx++) {
-      const column = world.getChunk(cx + dx, cz + dz);
-      if (column === undefined) return false;
-      columns[(dz + 1) * 3 + (dx + 1)] = column;
-    }
-  }
-
+): void {
   const baseY = sy * SECTION_SIZE - 1;
 
   for (let y = 0; y < NB_SIDE; y++) {
@@ -50,7 +64,7 @@ export function extractNeighborhood(
       continue;
     }
 
-    const sectionY = wy >> 4;
+    const slot = (wy >> 4) - syMin;
     const localY = wy & 15;
 
     for (let z = 0; z < NB_SIDE; z++) {
@@ -65,20 +79,50 @@ export function extractNeighborhood(
         const dx = lx < 0 ? -1 : lx >= SECTION_SIZE ? 1 : 0;
         const cxLocal = lx - dx * SECTION_SIZE;
 
-        const column = columns[(dz + 1) * 3 + (dx + 1)];
-        if (column === undefined) {
-          blocks[rowOffset + x] = AIR;
-          light[rowOffset + x] = 0xf0;
-          continue;
-        }
-        const section = column.sections[sectionY];
-        blocks[rowOffset + x] = section.get(cxLocal, localY, czLocal);
-
+        const section = sections[((dz + 1) * 3 + (dx + 1)) * span + slot];
         const index = (localY << 8) | (czLocal << 4) | cxLocal;
+        const data = section.data;
+        blocks[rowOffset + x] = data === null ? AIR : section.palette[readPacked(data, section.bits, index)];
+
         const block = section.blockLight === null ? 0 : readNibble(section.blockLight, index);
         const sky = section.skyLight === null ? 15 : readNibble(section.skyLight, index);
         light[rowOffset + x] = block | (sky << 4);
       }
+    }
+  }
+}
+
+/** Referências das 9 colunas × 8 sections, reusadas entre chamadas. */
+const VIEWS: SectionView[] = [];
+
+/**
+ * A mesma extração, a partir do `World`. Devolve `false` se algum vizinho
+ * ainda não carregou — meshar antes disso criaria paredes falsas na borda.
+ */
+export function extractNeighborhood(
+  world: World, cx: number, cz: number, sy: number,
+  blocks: Uint16Array, light: Uint8Array,
+): boolean {
+  if (!gatherSections(world, cx, cz, 0, SECTIONS_PER_COLUMN, VIEWS)) return false;
+  fillNeighborhood(VIEWS, 0, SECTIONS_PER_COLUMN, sy, blocks, light);
+  return true;
+}
+
+/**
+ * Junta em `out` as sections `syMin .. syMin+span-1` das 3×3 colunas em volta
+ * de `(cx, cz)`, na ordem que `fillNeighborhood` espera. São referências, não
+ * cópias: quem manda para o worker deixa o `postMessage` copiar.
+ */
+export function gatherSections(
+  world: World, cx: number, cz: number, syMin: number, span: number, out: SectionView[],
+): boolean {
+  out.length = 9 * span;
+  for (let dz = -1; dz <= 1; dz++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const column = world.getChunk(cx + dx, cz + dz);
+      if (column === undefined) return false;
+      const base = ((dz + 1) * 3 + (dx + 1)) * span;
+      for (let i = 0; i < span; i++) out[base + i] = column.sections[syMin + i];
     }
   }
   return true;
@@ -87,13 +131,4 @@ export function extractNeighborhood(
 function readNibble(data: Uint8Array, index: number): number {
   const byte = data[index >> 1];
   return (index & 1) === 0 ? byte & 0xf : (byte >> 4) & 0xf;
-}
-
-/** true se a section tem algo para meshar (nem ela nem o vizinho de cima/baixo vazios). */
-export function sectionHasWork(column: ChunkColumn, sy: number): boolean {
-  if (sy < 0 || sy >= SECTIONS_PER_COLUMN) return false;
-  if (!column.sections[sy].isEmpty) return true;
-  // Uma section vazia ainda pode precisar de mesh se a de baixo tem topo exposto —
-  // mas essa face pertence à section de baixo, não a esta.
-  return false;
 }

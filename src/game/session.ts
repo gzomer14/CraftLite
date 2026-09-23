@@ -673,6 +673,8 @@ export class Session {
     this.spawner.populateChunk(chunk);
     this.systems.scanChunk(chunk);
     applyStructures(this, chunk);
+    // Por último: a costura tem que ver o que as estruturas acabaram de pôr.
+    this.lighting.stitchColumn(chunk.cx, chunk.cz);
   }
 
   /** Chunk saindo de alcance: para de crescer o que estava registrado nele. */

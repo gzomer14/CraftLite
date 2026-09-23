@@ -56,6 +56,9 @@ const FACE_AXES: readonly (readonly [number, number, number])[] = [
 /** +1 se a face olha para o lado positivo do seu eixo. */
 const FACE_SIGN = [1, -1, 1, -1, 1, -1] as const;
 
+/** Passes na ordem em que o mesher os monta. */
+const LAYERS = [LAYER_OPAQUE, LAYER_CUTOUT, LAYER_TRANSLUCENT] as const;
+
 export interface SectionMesh {
   opaque: MeshData | null;
   cutout: MeshData | null;
@@ -84,6 +87,8 @@ export class GreedyMesher {
   /** Grade de chaves de merge: 16 fatias × 16 × 16. */
   private readonly keys = new Uint32Array(S * S * S);
   private readonly ao = new Uint8Array(4);
+  /** Início de cada faixa de face, por passe (ver `MeshData.faceStarts`). */
+  private readonly faceStarts = [new Uint32Array(7), new Uint32Array(7), new Uint32Array(7)];
 
   quads = 0;
 
@@ -118,23 +123,41 @@ export class GreedyMesher {
     this.translucent.reset();
     this.quads = 0;
 
-    for (const layer of [LAYER_OPAQUE, LAYER_CUTOUT, LAYER_TRANSLUCENT]) {
+    for (let l = 0; l < LAYERS.length; l++) {
+      const layer = LAYERS[l];
+      const out = this.builderFor(layer);
+      const starts = this.faceStarts[l];
       this.buildBitmasks(blocks, layer);
       for (let face = 0; face < 6; face++) {
-        this.meshFace(blocks, light, face, this.builderFor(layer));
+        starts[face] = out.indices;
+        this.meshFace(blocks, light, face, out);
       }
+      starts[6] = out.indices;
     }
 
     // Blocos que não são cubo (planta, tocha, laje) entram no mesmo buffer
-    // recortado, com geometria própria — ver `mesh/complex.ts`.
+    // recortado, com geometria própria — ver `mesh/complex.ts`. Ficam depois
+    // da faixa 6, que é a que o render desenha sempre.
     this.quads += meshComplex(blocks, light, this.tables, this.cutout);
 
     return {
-      opaque: this.opaque.isEmpty ? null : this.opaque.build(),
-      cutout: this.cutout.isEmpty ? null : this.cutout.build(),
-      translucent: this.translucent.isEmpty ? null : this.translucent.build(),
+      opaque: this.finish(this.opaque, 0),
+      cutout: this.finish(this.cutout, 1),
+      translucent: this.finish(this.translucent, 2),
       quads: this.quads,
     };
+  }
+
+  /**
+   * Fecha o mesh do passe com as faixas de face (M12). O translúcido fica sem:
+   * água vista de baixo e de cima é o caso comum, e o ganho não paga a
+   * complexidade do passe ordenado.
+   */
+  private finish(builder: MeshBuilder, layerIndex: number): MeshData | null {
+    if (builder.isEmpty) return null;
+    const data = builder.build();
+    if (layerIndex < 2) data.faceStarts = this.faceStarts[layerIndex].slice();
+    return data;
   }
 
   private builderFor(layer: number): MeshBuilder {

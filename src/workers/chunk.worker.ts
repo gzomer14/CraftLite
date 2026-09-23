@@ -16,10 +16,9 @@ import { DIM_NETHER } from '../data/dimensions';
 import type { ChunkSection } from '../world/chunk';
 import {
   collectTransfers,
-  type GenResponse, type MeshResponse, type SerializedMesh,
-  type SerializedSection, type WorkerRequest, type WorkerResponse,
+  type GenResponse, type SerializedSection, type WorkerRequest, type WorkerResponse,
 } from './protocol';
-import type { MeshData } from '../render/mesh';
+import { MeshJobRunner } from './meshjob';
 
 let seed = 0;
 let noise: TerrainNoise | null = null;
@@ -28,7 +27,7 @@ let noise: TerrainNoise | null = null;
  * não paga as três tabelas de permutação no boot.
  */
 let netherNoise: NetherNoise | null = null;
-let mesher: GreedyMesher | null = null;
+let meshJobs: MeshJobRunner | null = null;
 
 const layerIndex = buildLayerIndex();
 const tables = buildBlockTables(layerIndex);
@@ -40,13 +39,16 @@ self.onmessage = (event: MessageEvent<WorkerRequest>): void => {
       seed = message.seed;
       noise = new TerrainNoise(seed);
       netherNoise = null;
-      mesher = new GreedyMesher(tables, message.packed, message.smoothLighting !== false);
+      meshJobs = new MeshJobRunner(
+        new GreedyMesher(tables, message.packed, message.smoothLighting !== false), tables.occludes,
+      );
       break;
     case 'gen':
       reply(handleGen(message.cx, message.cz, message.dim));
       break;
     case 'mesh':
-      reply(handleMesh(message.cx, message.cz, message.sy, message.blocks, message.light));
+      if (meshJobs === null) meshJobs = new MeshJobRunner(new GreedyMesher(tables, true), tables.occludes);
+      reply(meshJobs.run(message));
       break;
     case 'spawn': {
       if (noise === null) noise = new TerrainNoise(seed);
@@ -89,37 +91,6 @@ function handleGen(cx: number, cz: number, dim: number): GenResponse {
     heightMap: chunk.heightMap,
     biomeMap: chunk.biomeMap,
     ms: performance.now() - t0,
-  };
-}
-
-function handleMesh(
-  cx: number, cz: number, sy: number, blocks: Uint16Array, light: Uint8Array,
-): MeshResponse {
-  const t0 = performance.now();
-  if (mesher === null) mesher = new GreedyMesher(tables, true);
-  const result = mesher.mesh(blocks, light);
-  return {
-    type: 'mesh',
-    cx, cz, sy,
-    opaque: toSerialized(result.opaque),
-    cutout: toSerialized(result.cutout),
-    translucent: toSerialized(result.translucent),
-    quads: result.quads,
-    ms: performance.now() - t0,
-    // Devolve os buffers para o main thread reciclar em vez de realocar.
-    blocks,
-    light,
-  };
-}
-
-function toSerialized(data: MeshData | null): SerializedMesh | null {
-  if (data === null) return null;
-  return {
-    vertices: data.vertices,
-    indices: data.indices,
-    vertexCount: data.vertexCount,
-    indexCount: data.indexCount,
-    wideIndices: data.wideIndices,
   };
 }
 

@@ -9,8 +9,10 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-23 09:05 — **correção: todo desenho em face de pé saía de
-ponta-cabeça no mundo (flor, muda, grama alta, plantação, tocha, fornalha, porta, bancada, baú)**
+**Última atualização:** 2026-09-23 09:58 — **M12 fechado: culling por conectividade (29% das
+sections do frustum numa caverna), faces viradas para a câmera, vizinhança montada no worker com um
+pedido de malha por coluna (RD 16 pronto em 2,2× menos quadros), e luz que atravessa a borda do
+chunk. M11, M13 e a correção das texturas de pé validados em campo.**
 
 ---
 
@@ -40,9 +42,9 @@ ponta-cabeça no mundo (flor, muda, grama alta, plantação, tocha, fornalha, po
 | **Placa, 2ª passada** | tábua lisa e clara no lugar da tábua de carvalho com rabisco, e um campo de texto só com quebra de linha interpretada | ✅ concluído | — |
 | **M9** Gente no mundo | aldeão com rotina e troca, aldeia de verdade, golem, reputação | ⬜ proposto (2026-09-16) | — |
 | **M10** Saber onde se está | bússola, relógio, mapa, marcador, estatísticas, espectador | ⬜ proposto (2026-09-16) | — |
-| **M11** O que os documentos já pediam | areia que cai, pedregulho de lava, balde, tesoura, ovelha colorida, planta que cresce, efeitos de status, comidas e estruturas que faltavam, nascimento em terra firme, smoke test | ✅ concluído em 2026-09-22 | **nada visto em aparelho ainda** (§6) |
-| **M12** O mundo chega antes do jogador | culling por conectividade e por direção de face, cópia de vizinhança fora da thread principal, luz na borda do chunk | ⬜ proposto (2026-09-22) | — |
-| **M13** Casa em ordem | uso de item como dado, `session.ts` e `main.ts` abaixo de 700 linhas, lã e cama em 16 cores por tint | ✅ concluído em 2026-09-22 | **cores novas não vistas em aparelho** (§6) |
+| **M11** O que os documentos já pediam | areia que cai, pedregulho de lava, balde, tesoura, ovelha colorida, planta que cresce, efeitos de status, comidas e estruturas que faltavam, nascimento em terra firme, smoke test | ✅ **validado em campo em 2026-09-23** | — |
+| **M12** O mundo chega antes do jogador | culling por conectividade e por direção de face, cópia de vizinhança fora da thread principal, luz na borda do chunk | ✅ concluído em 2026-09-23 | **não visto em aparelho**; preset do T0 não revisto (sem T0 na mão) — §3 |
+| **M13** Casa em ordem | uso de item como dado, `session.ts` e `main.ts` abaixo de 700 linhas, lã e cama em 16 cores por tint | ✅ **validado em campo em 2026-09-23** | — |
 | **M14** Água e paisagem | visão submersa, rios, pesca, afogado, lua com fases, biomas por tint, selva | ⬜ proposto (2026-09-22) | — |
 | **M15** Oficina | bigorna, reparo na grade, funil, dispensador, comparador, observador | ⬜ proposto (2026-09-22) | — |
 | **M16** Um fim para a jornada | fortaleza do Nether, blaze, poções, olho do ender, End, dragão, créditos | ⬜ proposto (2026-09-22) | depende de M11 (efeitos) e M13 (atlas) |
@@ -59,13 +61,13 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-22 19:28, ao fechar o M13, com `npm test`, `npm run build`,
+Medidas em 2026-09-23 09:58, ao fechar o M12, com `npm test`, `npm run build`,
 `SIZE_BUDGET_KB=350 npm run size` e `npm run smoke`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **226,3 KB** (226,1 no M13; 221,3 no M11) | < 350 KB | `npm run size` |
-| Testes | **1981**, 98 arquivos (1975 no M13; 1930 no M11) | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **229,0 KB** (226,3 antes do M12; 226,1 no M13) | < 350 KB | `npm run size` |
+| Testes | **2003**, 100 arquivos (1981 antes do M12; 1975 no M13) | manter verde | `npm test` |
 | Smoke test de navegador | **7 passos verdes**: carregar, criar, andar 10 s, quebrar, salvar, recarregar, conferir | verde | `npm run smoke` |
 | Camadas de atlas | **194** com 16 cores de lã e cama (222 no M11 com 8 cores; lã e cama viraram tint no M13) | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Memória de áudio | **3,33 MB** (era 3,26; +3 sons curtos de balde e arremesso) | < 3,5 MB | `tests/audio.test.ts` |
@@ -80,8 +82,13 @@ Medidas em 2026-09-22 19:28, ao fechar o M13, com `npm test`, `npm run build`,
 | Folha de sprites em volume (32 px) | **36,6 ms**, uma vez no boot (eram 33,9 antes dos corantes e das camas coloridas) | < 200 ms | `tests/perf.test.ts` |
 | Maior degrau entre colunas vizinhas | **6 blocos** (eram 37: a parede de bioma) | sem parede vertical | `tests/heightfield.test.ts` |
 | Colunas chapadas no teto do mundo | **0%** (eram 10,3% da região, 54,3% das de montanha) | zero | `tests/heightfield.test.ts` |
-| Mundo de RD 16 pronto | **165 pumps** (eram 1315) | — | `tests/dimensionrace.test.ts` |
-| Colunas em 40 ciclos com 4 vagas (RD 8) | **86** (eram 44) | — | `tests/dimensionrace.test.ts` |
+| Mundo de RD 16 pronto, sem relógio | **51 pumps** (165 antes do M12; eram 1315) | — | `tests/dimensionrace.test.ts` |
+| Mundo de RD 16 pronto, orçamento de despacho real (60 FPS) | **183–196 pumps** (415–437 antes do M12) | — | medido à mão, depende do relógio |
+| Colunas em 40 ciclos com 4 vagas (RD 8) | **101** (86 antes do M12; eram 44) | — | `tests/dimensionrace.test.ts` |
+| Pedido de malha na thread principal | **0,32 ms por coluna** (eram 8 × 0,26 ms de vizinhança em JS) | < 2 ms | `tests/perf.test.ts` |
+| Culling por conectividade (RD 8) | busca **0,98 ms** (ao trocar de section), quadro **0,10 ms** | < 8 ms / < 1 ms | `tests/perf.test.ts` |
+| Sections desenhadas numa caverna (Y≈21, RD 8) | **29%** das que têm malha no frustum | ≤ 50% (aceite do M12) | `tests/sectioncull.test.ts` |
+| Costura de luz de uma coluna nova | **0,55 ms** | < 4 ms | `tests/perf.test.ts` |
 | FPS em T0 real (2017) | **60**, RD 4, escala 1,00 (Galaxy J7 Metal) | 30 estáveis | teste manual |
 | Render em T0 | **2,7 ms** de 33,3 ms de orçamento | ≤ 8 ms (soma do doc 02 §2) | overlay F3 no aparelho |
 | Heap em T0 | **20 MB**, estável na sessão | sem crescimento | overlay F3 no aparelho |
@@ -1467,6 +1474,51 @@ Refatoração sem mudança de jogo, exceto as cores. O que vale registrar:
   mistura de corante (o marrom é vermelho + verde: não há cacau). Os ids de item das cores novas
   entraram no fim da fila; os de bloco, depois dos 200–220 das antigas.
 
+### M12 — O mundo chega antes do jogador ✅ — 2026-09-23
+
+Pedido: *"Pode seguir com o M12"*. Os cinco itens do doc 14, com o que cada um virou:
+
+- **Culling por conectividade** (`render/sectioncull.ts`, `world/mesh/visibility.ts`). O worker
+  calcula, junto da malha, quais pares de faces da section se enxergam por ar (15 bits, flood fill
+  de 4096 voxels). No render, uma busca em largura parte da section da câmera, só anda para longe
+  dela e só atravessa por faces ligadas. **Dois desvios conscientes**, escritos no módulo: a busca
+  **não poda pelo frustum** — ela é refeita só quando a câmera troca de section ou algo muda perto,
+  e o frustum corta por quadro o que ela alcançou (a versão que podava custava 0,4–0,8 ms todo
+  quadro no desktop); e cada section é visitada **uma vez** — a reentrada por outra face custava o
+  dobro e alcançava menos de 1% a mais, sem nenhum caso em que a entrada única escondesse um bloco
+  visível. Malha nova longe da câmera espera 15 quadros e sai numa busca só; perto, na hora.
+  **Critério de aceite:** numa caverna a Y≈21 com RD 8, **29%** das sections com malha dentro do
+  frustum vão para a lista (pede ≤ 50%). **Prova de correção:** 16 câmeras (caverna reta e para
+  cima, chão, alto) disparam 500 raios cada; todo bloco atingido tem que estar numa section da
+  lista, e o teste falha com qualquer uma de três mutações que proíbem uma direção.
+- **Culling por direção de face** (`MeshData.faceStarts`, `GpuMesh.drawFaces`, `facingFaces`). O
+  mesher já emitia face por face; agora anota onde cada uma começa, e o render desenha só as faixas
+  viradas para a câmera (as vizinhas acesas saem numa chamada). Vale para o opaco e o recortado; a
+  geometria livre (planta, tocha, laje) fica numa faixa final, sempre desenhada. O translúcido fica
+  de fora de propósito.
+- **Cópia da vizinhança fora da thread principal** — com desvio. O doc 14 pedia um **espelho das
+  colunas dentro do worker**; ficou de fora porque com N workers seriam N cópias do mundo (RD 16 no
+  T2 dá ~50 MB por worker) e o `SharedArrayBuffer` não existe no GitHub Pages. O que foi feito: o
+  pedido de malha leva as **sections cruas** das 3×3 colunas, e o `postMessage` as copia (cópia
+  nativa); quem monta a vizinhança 18³ é o worker (`workers/meshjob.ts`). E o pedido passou a ser
+  **um por coluna**, com as sections numa máscara: uma vaga em voo em vez de até oito. Medido:
+  0,32 ms por coluna na thread principal contra 8 × 0,26 ms antes; mundo de RD 16 pronto em 51
+  pumps sem relógio (eram 165) e em 183–196 com o orçamento real de 60 FPS (eram 415–437).
+  **O critério "colunas em 40 ciclos ≥ 1,5 × 86" não foi batido: deu 101 (1,17×).** Não é falta
+  de ganho, é o que o teste mede: sem relógio e com 4 vagas meio a meio, a geração leva duas vagas
+  por ciclo em qualquer versão. O ganho do item está no custo de cada despacho, que só aparece com
+  relógio — e com relógio foi de 2,2×.
+- **Luz que atravessa a borda do chunk** (`Lighting.stitchColumn`). Na chegada da coluna, cada par
+  de voxels que se toca através das quatro bordas é comparado, e a diferença propaga pelo BFS de
+  sempre, nos dois sentidos. Só vai para re-meshar a section de coluna já meshada. **O smoke test
+  achou um travamento no caminho** — ver §4, BFS de luz.
+- **Rever o preset de T0 — não feito.** Precisa de um T0 na mão, e o J7 Metal não está mais com o
+  usuário (§5). O RD 4 continua. Os números acima são de desktop; a leitura em aparelho é a
+  pendência do marco (§6).
+
+Achados no caminho, fora do escopo mas corrigidos porque o M12 os expôs (§4): o crédito de pedido
+em voo voltava para o worker errado, e o BFS de luz explodia na borda do mundo carregado.
+
 ## 4. Correções fora de marco
 
 Bugs anteriores encontrados durante o M5 e já corrigidos — ficam registrados porque explicam
@@ -1474,6 +1526,9 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-23 | `world/lighting.ts` | **O BFS de luz explodia na borda do mundo carregado** (M2). Coluna não carregada responde "luz de bloco 0" e ignora a escrita, então todo voxel lá fora parecia sempre mais escuro e voltava para a fila com seus 6 vizinhos — até 6¹⁴ caminhos. Uma tocha ou lava rente à borda já travava a aba; a costura de luz do M12, que roda justamente na fronteira, passou a acioná-lo em toda coluna nova, e o smoke test pegou (a página congelava ao criar o mundo). Vizinho em coluna não carregada agora é pulado nos dois BFS. Regressão em `tests/lightstitch.test.ts`. |
+| 2026-09-23 | `world/pipeline.ts` | **O crédito de pedido em voo voltava para o worker errado** (M1). Sem saber de quem era a resposta, o pipeline descontava do worker mais ocupado: a soma batia, mas o balanceamento derivava. Com os pedidos de coluna do M12, um worker de três ficava sem receber nada. Cada worker agora tem o próprio `onmessage` com o índice. |
+| 2026-09-23 | `tests/pipeline.test.ts` | **O duplo de worker trabalhava dentro do `postMessage`** e cobrava a geração no orçamento de despacho da thread principal. Dois testes passavam por isso e não pelo que diziam medir: "respeita o limite de requisições em voo" afirmava um teto de 2 × 2 que é 16 × 2 desde 2026-09-13. O duplo passou a trabalhar no `flush`, como o navegador. |
 | 2026-09-23 | `render/mesh.ts`, `world/mesh/complex.ts`, `render/hand.ts` | **Todo desenho em face de pé saía de ponta-cabeça** (M1). O ladrilho é desenhado com a linha 0 em cima e o WebGL entrega a linha 0 em `v = 0`, mas os quads de pé punham `v = 0` na **base**. Em pedra, terra e tronco não aparece; em flor, muda, grama alta e plantação aparece de cara — e também estavam invertidas a brasa da tocha, a boca da fornalha, o tampo da bancada, a tampa do baú, a maçaneta da porta e o glacê do bolo. No inventário tudo estava certo, porque o sprite lê o ladrilho como o canvas. Relato: *"ao colocar no chão fica invertido"*. Faces de pé (±X, ±Z, a cruz de planta e o item na mão) passaram a descer o `v`; **faces de cima e de baixo não mudaram** — trilho, cama e repetidor foram acertados contra o `v` antigo. Regressão em `tests/texorientation.test.ts`. |
 | 2026-09-22 | `game/itemuse.ts` | **Balde, ovo e arco miravam o centro da câmera** mesmo no Modo A de toque, em que a mira é o dedo. Achado ao migrar os usos de item (M13): passaram a usar a mira da `Interaction`. |
 | 2026-09-22 | `world/growth.ts`, `world/gen/decorate.ts` → `world/trees.ts` | **Nenhuma planta crescia fora da roça** (M5/M6). A muda era decoração: a única receita de árvore do jogo escrevia direto no chunk durante a geração. Cana e cacto não subiam, a grama não se espalhava, e três das quatro folhas davam muda de carvalho. Madeira não era renovável. |
@@ -1756,11 +1811,22 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
 
 ## 6. Próximo passo recomendado
 
-0. **Continuar o roteiro: M12** (o mundo chega antes do jogador) — culling por conectividade de
-   sections, culling por direção de face, cópia de vizinhança fora da thread principal e luz na borda
-   do chunk. M11 e M13 fecharam em 2026-09-22.
+0. **Olhar o M12 num aparelho** e depois seguir o roteiro: **M9** (gente no mundo). O M12 mexeu no
+   caminho de todo triângulo e de todo chunk, e só foi visto em testes e no Chrome sem janela. Em
+   ordem de quanto pode estar errado:
+   - **buraco no mundo**: voar por cima de montanha, entrar numa caverna, sair dela, cavar uma
+     parede de uma caverna para outra. Nenhuma section pode sumir e reaparecer. Se sumir perto,
+     o número é `NEAR_COLUMNS` em `render/sectioncull.ts`; se o anel distante demorar a aparecer,
+     `FAR_REFRESH_FRAMES`;
+   - **face faltando**: andar em volta de um morro e olhar de baixo de uma ponte — o culling por
+     face só deveria cortar o que está de costas;
+   - **luz na divisa**: lava ou boca de caverna cruzando a borda de um chunk (F3 mostra a grade);
+   - **velocidade**: com o F3 aberto, criar um mundo e voar reto; comparar o "na fila" e quanto o
+     anel demora a fechar com o que se lembrava. Num T0, conferir se o RD 5 cabe (§5).
 
-   **E olhar M11 e M13 num aparelho**, que nada disso viu. Em ordem de quanto pode estar errado:
+   ~~**E olhar M11 e M13 num aparelho**~~ — **feito em 2026-09-23**: *"Deu tudo certo nos testes
+   do M11 e M13"*, junto com a correção das texturas de pé (flor, muda, grama alta). O roteiro que
+   foi seguido, para referência:
    - **a correção de 2026-09-23 (textura de pé)**: flor, muda, grama alta e trigo de pé; e, como a
      mesma regra vale para todo bloco, conferir **tocha** (brasa em cima), **fornalha** (boca na
      metade de baixo), **bancada** (tampo em cima), **baú** (tampa em cima), **porta** (maçaneta

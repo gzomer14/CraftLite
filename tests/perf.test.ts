@@ -9,7 +9,13 @@
 import { describe, expect, it } from 'vitest';
 import { TerrainNoise, generateChunk } from '../src/world/gen/terrain';
 import { World } from '../src/world/world';
-import { extractNeighborhood, NB_VOLUME } from '../src/world/neighborhood';
+import {
+  extractNeighborhood, gatherSections, NB_VOLUME, type SectionView,
+} from '../src/world/neighborhood';
+import { MeshJobRunner } from '../src/workers/meshjob';
+import { SectionCulling } from '../src/render/sectioncull';
+import { Lighting } from '../src/world/lighting';
+import { Frustum, createMat4, lookYawPitch, multiply, perspective } from '../src/core/math';
 import { GreedyMesher } from '../src/world/mesh/greedy';
 import { buildBlockTables } from '../src/world/mesh/blockinfo';
 import { buildLayerIndex } from '../src/render/layers';
@@ -143,8 +149,110 @@ describe('orçamento de performance', () => {
     }
     const ms = median(samples);
     console.log(`  vizinhança: ${ms.toFixed(3)} ms/section (mediana de 50)`);
-    // Roda no main thread a cada re-mesh: o orçamento do frame são 2 ms inteiros.
+    // Roda no worker desde o M12, uma vez por section meshada: continua sendo
+    // parte do custo de cada malha, só que fora do quadro.
     expect(ms).toBeLessThan(2);
+  });
+
+  /*
+   * O que sobrou na thread principal do despacho de malha (M12): juntar as
+   * referências das sections e o `postMessage` copiá-las. Medido com
+   * `structuredClone`, que é o mesmo algoritmo de cópia.
+   */
+  it('o pedido de malha de uma coluna inteira custa menos de 2 ms na thread principal', () => {
+    const noise = new TerrainNoise(SEED);
+    const world = new World(SEED);
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dx = -1; dx <= 1; dx++) world.addChunk(generateChunk(SEED, noise, dx, dz));
+    }
+    const views: SectionView[] = [];
+    const dispatch = (): void => {
+      gatherSections(world, 0, 0, 0, 8, views);
+      structuredClone({ type: 'mesh', cx: 0, cz: 0, mask: 0xff, syMin: 0, span: 8, sections: views });
+    };
+    for (let i = 0; i < 10; i++) dispatch();
+    const samples: number[] = [];
+    for (let i = 0; i < 30; i++) {
+      const t0 = performance.now();
+      dispatch();
+      samples.push(performance.now() - t0);
+    }
+    const ms = median(samples);
+    console.log(`  pedido de malha: ${ms.toFixed(3)} ms/coluna (mediana de 30)`);
+    // Antes eram 8 × 0,26 ms de vizinhança montada em JS para a mesma coluna.
+    expect(ms).toBeLessThan(2);
+  });
+
+  /*
+   * Culling por conectividade (M12). A busca roda quando a câmera troca de
+   * section ou algo muda perto dela; o que roda **todo quadro** é o corte pelo
+   * frustum do que ela alcançou.
+   */
+  it('culling por conectividade: busca em menos de 8 ms, quadro em menos de 1 ms', () => {
+    const noise = new TerrainNoise(SEED);
+    const world = new World(SEED);
+    const RD = 8;
+    for (let cz = -RD - 1; cz <= RD + 1; cz++) {
+      for (let cx = -RD - 1; cx <= RD + 1; cx++) world.addChunk(generateChunk(SEED, noise, cx, cz));
+    }
+    const runner = new MeshJobRunner(new GreedyMesher(tables, true), tables.occludes);
+    const culling = new SectionCulling();
+    culling.setRadius(RD);
+    const views: SectionView[] = [];
+    for (let cz = -RD; cz <= RD; cz++) {
+      for (let cx = -RD; cx <= RD; cx++) {
+        gatherSections(world, cx, cz, 0, 8, views);
+        const r = runner.run({ type: 'mesh', cx, cz, mask: 0xff, syMin: 0, span: 8, sections: views });
+        for (const sec of r.sections) {
+          culling.set(cx, cz, sec.sy, sec.visibility, sec.opaque !== null || sec.cutout !== null);
+        }
+      }
+    }
+    const proj = createMat4();
+    const view = createMat4();
+    const vp = createMat4();
+    perspective(proj, (70 * Math.PI) / 180, 16 / 9, 0.05, RD * 16 + 64);
+    lookYawPitch(view, 8, 90, 8, 0.3, 0.2);
+    multiply(vp, proj, view);
+    const frustum = new Frustum();
+    frustum.fromMatrix(vp);
+
+    const search: number[] = [];
+    const frame: number[] = [];
+    for (let i = 0; i < 30; i++) {
+      // Alterna entre duas sections: cada `run` refaz a busca.
+      const x = i % 2 === 0 ? 8 : 24;
+      let t0 = performance.now();
+      culling.run(frustum, x, 90, 8);
+      search.push(performance.now() - t0);
+      t0 = performance.now();
+      culling.run(frustum, x, 90, 8);
+      frame.push(performance.now() - t0);
+    }
+    const searchMs = median(search);
+    const frameMs = median(frame);
+    console.log(`  culling: busca ${searchMs.toFixed(3)} ms, quadro ${frameMs.toFixed(3)} ms (RD ${RD})`);
+    expect(searchMs).toBeLessThan(8);
+    expect(frameMs).toBeLessThan(1);
+  }, 30_000);
+
+  it('a costura de luz de uma coluna nova custa menos de 4 ms', () => {
+    const noise = new TerrainNoise(SEED);
+    const world = new World(SEED);
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dx = -1; dx <= 1; dx++) world.addChunk(generateChunk(SEED, noise, dx, dz));
+    }
+    const lighting = new Lighting(world);
+    for (let i = 0; i < 5; i++) lighting.stitchColumn(0, 0);
+    const samples: number[] = [];
+    for (let i = 0; i < 20; i++) {
+      const t0 = performance.now();
+      lighting.stitchColumn(0, 0);
+      samples.push(performance.now() - t0);
+    }
+    const ms = median(samples);
+    console.log(`  costura de luz: ${ms.toFixed(3)} ms/coluna (mediana de 20)`);
+    expect(ms).toBeLessThan(4);
   });
 
   /**

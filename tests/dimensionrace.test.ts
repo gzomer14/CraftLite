@@ -16,6 +16,7 @@ import { dimensionIdFor, type SaveDatabase } from '../src/save/db';
 import { DIM_NETHER, DIM_OVERWORLD } from '../src/data/dimensions';
 import { BLOCK_BY_NAME, defOf, makeState } from '../src/data/blocks';
 import { GreedyMesher } from '../src/world/mesh/greedy';
+import { MeshJobRunner } from '../src/workers/meshjob';
 import { buildBlockTables } from '../src/world/mesh/blockinfo';
 import { buildLayerIndex } from '../src/render/layers';
 import { detectTier, type DeviceInfo } from '../src/core/tier';
@@ -172,22 +173,17 @@ describe('geração não morre de fome', () => {
   class RealWorker implements WorkerLike {
     onmessage: ((event: { data: WorkerResponse }) => void) | null = null;
     private readonly outbox: WorkerResponse[] = [];
-    private mesher: GreedyMesher | null = null;
+    private meshJobs: MeshJobRunner | null = null;
 
     postMessage(message: unknown): void {
       const request = message as WorkerRequest;
       if (request.type === 'init') {
-        this.mesher = new GreedyMesher(tables, request.packed);
+        this.meshJobs = new MeshJobRunner(new GreedyMesher(tables, request.packed), tables.occludes);
         return;
       }
       if (request.type === 'spawn') return;
       if (request.type === 'mesh') {
-        const out = (this.mesher as GreedyMesher).mesh(request.blocks, request.light);
-        this.outbox.push({
-          type: 'mesh', cx: request.cx, cz: request.cz, sy: request.sy,
-          opaque: out.opaque, cutout: out.cutout, translucent: out.translucent,
-          quads: out.quads, ms: 1, blocks: request.blocks, light: request.light,
-        });
+        this.outbox.push((this.meshJobs as MeshJobRunner).run(request));
         return;
       }
       this.outbox.push(genResponse(request.cx, request.cz, request.dim));
@@ -215,7 +211,9 @@ describe('geração não morre de fome', () => {
 
     override postMessage(message: unknown): void {
       const request = message as WorkerRequest;
-      if (request.type === 'mesh') { this.queued.push(request); return; }
+      // O `postMessage` real copia na hora: a lista de sections do pipeline é
+      // reusada no despacho seguinte.
+      if (request.type === 'mesh') { this.queued.push(structuredClone(request)); return; }
       super.postMessage(message);
     }
 
@@ -249,10 +247,15 @@ describe('geração não morre de fome', () => {
     /*
      * Com o teto de `workers * 2` eram **1314** pumps — 22 s a 60 FPS, que é o
      * que o jogador viu no aparelho. Com o teto alto mais o orçamento de tempo
-     * são ~460. O piso protege a ordem de grandeza, não o número exato: ele
-     * depende de quanto a máquina do teste gasta por `extractNeighborhood`.
+     * eram ~460. Sem relógio, como aqui, eram **165**; com o pedido de malha
+     * por coluna do M12 (uma vaga por coluna, não até oito) são **51**. O piso
+     * protege a ordem de grandeza, não o número exato.
+     *
+     * Com o orçamento de tempo real ligado (60 FPS) a mesma conta foi de
+     * 415–437 para 183–196 pumps: a vizinhança deixou de ser montada na thread
+     * principal. Não é teste porque depende do relógio da máquina.
      */
-    expect(pumps).toBeLessThan(400);
+    expect(pumps).toBeLessThan(100);
     // Meshar 4.400 sections de verdade leva alguns segundos numa máquina
     // carregada, e o padrão de 5 s do vitest não cobre a suíte inteira em
     // paralelo. É o teste de vazão mais importante do projeto: vale o tempo.
@@ -283,10 +286,13 @@ describe('geração não morre de fome', () => {
 
     /*
      * Com a prioridade absoluta do meshing eram **44** colunas em 40 ciclos;
-     * com metade das vagas reservada são **86**. O piso está entre os dois e
-     * longe dos dois: o que ele protege é a ordem de grandeza, não o número.
+     * com metade das vagas reservada, **86**; com o pedido de malha por coluna
+     * (M12), **101**. O teto de 4 vagas meio a meio é quem limita este caso — a
+     * geração leva duas por ciclo —, então o ganho aqui é pequeno de propósito:
+     * o que o M12 mudou foi o custo de cada despacho, que este teste, sem
+     * relógio, não mede. O piso protege a ordem de grandeza.
      */
-    expect(world.chunkCount).toBeGreaterThan(65);
+    expect(world.chunkCount).toBeGreaterThan(90);
   });
 });
 

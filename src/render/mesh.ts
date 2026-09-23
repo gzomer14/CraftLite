@@ -69,6 +69,13 @@ export interface MeshData {
   /** true = índices `UNSIGNED_INT`. */
   wideIndices: boolean;
   packed: boolean;
+  /**
+   * Onde cada face começa no buffer de índices (M12): as 6 faces greedy, na
+   * ordem `FACE_*`, e depois o resto (geometria de forma livre, que não tem
+   * face única). `null` quando o mesh não foi montado face a face. Ver
+   * `FaceBands` em `render/chunkrenderer.ts`.
+   */
+  faceStarts: Uint32Array | null;
 }
 
 export class MeshBuilder {
@@ -246,6 +253,7 @@ export class MeshBuilder {
       indexCount: this.indexCount,
       wideIndices: wide,
       packed: this.packed,
+      faceStarts: null,
     };
   }
 }
@@ -264,6 +272,8 @@ export class GpuMesh {
   indexCount = 0;
   vertexCount = 0;
   indexType = 0;
+  /** Faixas de face do último upload (`MeshData.faceStarts`). */
+  faceStarts: Uint32Array | null = null;
 
   constructor(ctx: GlContext) {
     this.ctx = ctx;
@@ -302,6 +312,7 @@ export class GpuMesh {
 
     this.indexCount = data.indexCount;
     this.vertexCount = data.vertexCount;
+    this.faceStarts = data.faceStarts;
     this.indexType = data.wideIndices ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT;
 
     if (this.vao === null) this.vao = this.createVao(data.packed);
@@ -342,6 +353,44 @@ export class GpuMesh {
     this.bindVao(this.vao);
     gl.drawElements(gl.TRIANGLES, this.indexCount, this.indexType, 0);
     this.bindVao(null);
+  }
+
+  /**
+   * Desenha só as faces de `faces` (bit por `FACE_*`), mais a faixa final de
+   * geometria livre (M12, culling por direção de face). Faixas vizinhas que
+   * ficam acesas saem numa chamada só; devolve quantas chamadas fez.
+   */
+  drawFaces(faces: number): number {
+    if (this.indexCount === 0) return 0;
+    const starts = this.faceStarts;
+    if (starts === null || (faces & 0x3f) === 0x3f) {
+      this.draw();
+      return 1;
+    }
+    const gl = this.ctx.gl;
+    const bytes = this.indexType === gl.UNSIGNED_INT ? 4 : 2;
+    this.bindVao(this.vao);
+    let calls = 0;
+    let run = -1;
+    for (let band = 0; band <= 6; band++) {
+      const first = starts[band];
+      const end = band < 6 ? starts[band + 1] : this.indexCount;
+      // Faixa vazia não abre nem fecha corrida.
+      if (end === first) continue;
+      if (band === 6 || (faces & (1 << band)) !== 0) {
+        if (run < 0) run = first;
+      } else if (run >= 0) {
+        gl.drawElements(gl.TRIANGLES, first - run, this.indexType, run * bytes);
+        calls++;
+        run = -1;
+      }
+    }
+    if (run >= 0) {
+      gl.drawElements(gl.TRIANGLES, this.indexCount - run, this.indexType, run * bytes);
+      calls++;
+    }
+    this.bindVao(null);
+    return calls;
   }
 
   dispose(): void {

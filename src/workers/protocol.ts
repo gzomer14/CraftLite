@@ -6,8 +6,13 @@
  * mesmo worker — e é o T0 que manda. Um worker só evita duplicar o código de
  * ruído em dois bundles e simplifica o balanceamento da fila.
  *
- * **Toda transferência usa transferables.** Nenhuma mensagem copia buffer.
+ * **Toda resposta usa transferables.** Nenhuma resposta copia buffer. A única
+ * mensagem que copia de propósito é o pedido de malha (M12): as sections que
+ * ela leva continuam vivas e mutáveis no `World`, e transferi-las esvaziaria o
+ * mundo. A cópia é o `memcpy` do `postMessage`, não um laço em JS.
  */
+
+import type { SectionView } from '../world/neighborhood';
 
 /** Section serializada: exatamente os campos que a paleta precisa. */
 export interface SerializedSection {
@@ -28,6 +33,8 @@ export interface SerializedMesh {
   vertexCount: number;
   indexCount: number;
   wideIndices: boolean;
+  /** Faixas de índice por face (`MeshData.faceStarts`), ou `null`. */
+  faceStarts: Uint32Array | null;
 }
 
 export interface InitRequest {
@@ -56,15 +63,29 @@ export interface GenRequest {
   dim: number;
 }
 
+/**
+ * Malha de uma ou mais sections da mesma coluna (M12).
+ *
+ * Vai **uma mensagem por coluna**, não uma por section: é uma vaga de
+ * `maxInFlight` em vez de até oito, e as sections de cima e de baixo, que as
+ * vizinhas dividem, são copiadas uma vez só.
+ *
+ * O que vai são as sections **cruas** das 3×3 colunas em volta, e não a
+ * vizinhança 18³ já montada: a thread principal só junta referências e o
+ * `postMessage` as copia (cópia nativa, sem laço em JS); quem decodifica é o
+ * worker (`world/neighborhood.ts`).
+ */
 export interface MeshRequest {
   type: 'mesh';
   cx: number;
   cz: number;
-  sy: number;
-  /** Vizinhança 18³ de blockStates. */
-  blocks: Uint16Array;
-  /** Vizinhança 18³ de luz: nibble baixo = bloco, alto = céu. */
-  light: Uint8Array;
+  /** Bit `sy` ligado = meshar a section `sy`. */
+  mask: number;
+  /** Primeira section enviada de cada coluna, e quantas. */
+  syMin: number;
+  span: number;
+  /** `9 × span` sections: coluna `(dz+1)*3 + (dx+1)`, depois `sy − syMin`. */
+  sections: SectionView[];
 }
 
 /** Onde nasce o jogador num mundo novo (`world/gen/spawnsearch.ts`). */
@@ -87,19 +108,26 @@ export interface GenResponse {
   ms: number;
 }
 
-export interface MeshResponse {
-  type: 'mesh';
-  cx: number;
-  cz: number;
+/** Resultado de uma section dentro de uma `MeshResponse`. */
+export interface SectionMeshResult {
   sy: number;
   opaque: SerializedMesh | null;
   cutout: SerializedMesh | null;
   translucent: SerializedMesh | null;
+  /**
+   * Pares de faces que se enxergam através da section, 15 bits
+   * (`world/mesh/visibility.ts`). É o que o culling por conectividade usa.
+   */
+  visibility: number;
+}
+
+export interface MeshResponse {
+  type: 'mesh';
+  cx: number;
+  cz: number;
+  sections: SectionMeshResult[];
   quads: number;
   ms: number;
-  /** Buffers devolvidos para reciclagem (buffer ring do doc 02 §5.5). */
-  blocks: Uint16Array;
-  light: Uint8Array;
 }
 
 export interface SpawnResponse {
@@ -121,10 +149,11 @@ export function collectTransfers(response: WorkerResponse): Transferable[] {
     }
     out.push(response.heightMap.buffer, response.biomeMap.buffer);
   } else if (response.type === 'mesh') {
-    for (const mesh of [response.opaque, response.cutout, response.translucent]) {
-      if (mesh !== null) out.push(mesh.vertices, mesh.indices);
+    for (const section of response.sections) {
+      for (const mesh of [section.opaque, section.cutout, section.translucent]) {
+        if (mesh !== null) out.push(mesh.vertices, mesh.indices);
+      }
     }
-    out.push(response.blocks.buffer, response.light.buffer);
   }
   return out;
 }

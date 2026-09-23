@@ -3,7 +3,7 @@
  * de verdade (o mesmo código do worker real), só que síncrono.
  *
  * É o teste que pega erro de fiação: chunk que nunca sai de GENERATING, mesh
- * despachado sem os 8 vizinhos, buffer não reciclado, chunk descarregado sem
+ * despachado sem os 8 vizinhos, pedido de malha que não é por coluna, chunk descarregado sem
  * liberar o VBO.
  */
 import { findSpawnColumn } from '../src/world/gen/spawnsearch';
@@ -13,19 +13,28 @@ import { World } from '../src/world/world';
 import { ChunkState } from '../src/world/chunk';
 import { TerrainNoise, generateChunk } from '../src/world/gen/terrain';
 import { GreedyMesher } from '../src/world/mesh/greedy';
+import { MeshJobRunner } from '../src/workers/meshjob';
 import { buildBlockTables } from '../src/world/mesh/blockinfo';
 import { buildLayerIndex } from '../src/render/layers';
 import type { WorkerRequest, WorkerResponse } from '../src/workers/protocol';
 
 const tables = buildBlockTables(buildLayerIndex());
 
-/** Enfileira as respostas e só entrega quando `flush()` é chamado. */
+/**
+ * Guarda os pedidos e só trabalha no `flush()`.
+ *
+ * O trabalho **não** roda dentro do `postMessage`: no navegador ele volta na
+ * hora e o worker trabalha em outra thread. Gerar terreno aqui dentro cobrava
+ * o custo do worker no orçamento de despacho da thread principal, e o pipeline
+ * parava de despachar depois de um ou dois pedidos por ciclo — num pool de
+ * três, o terceiro worker nunca recebia nada.
+ */
 class FakeWorker implements WorkerLike {
   onmessage: ((event: { data: WorkerResponse }) => void) | null = null;
   private seed = 0;
   private noise: TerrainNoise | null = null;
-  private mesher: GreedyMesher | null = null;
-  private readonly outbox: WorkerResponse[] = [];
+  private meshJobs: MeshJobRunner | null = null;
+  private readonly inbox: WorkerRequest[] = [];
 
   /** Contadores para asserções. */
   genCount = 0;
@@ -36,47 +45,44 @@ class FakeWorker implements WorkerLike {
     if (request.type === 'init') {
       this.seed = request.seed;
       this.noise = new TerrainNoise(this.seed);
-      this.mesher = new GreedyMesher(tables, request.packed);
+      this.meshJobs = new MeshJobRunner(new GreedyMesher(tables, request.packed), tables.occludes);
       return;
     }
-    if (request.type === 'spawn') {
-      this.outbox.push({ type: 'spawn', ...spawnOf(this.noise!) });
-      return;
-    }
-    if (request.type === 'gen') {
-      this.genCount++;
-      const chunk = generateChunk(this.seed, this.noise!, request.cx, request.cz);
-      this.outbox.push({
-        type: 'gen',
-        cx: request.cx, cz: request.cz, dim: request.dim,
-        sections: chunk.sections.map((s) => ({
-          bits: s.bits, paletteLen: s.paletteLen, palette: s.palette, data: s.data,
-          nonAirCount: s.nonAirCount,
-          skyLight: s.skyLight ?? new Uint8Array(2048),
-          blockLight: s.blockLight ?? new Uint8Array(2048),
-        })),
-        heightMap: chunk.heightMap,
-        biomeMap: chunk.biomeMap,
-        ms: 1,
-      });
-      return;
-    }
-    this.meshCount++;
-    const result = this.mesher!.mesh(request.blocks, request.light);
-    this.outbox.push({
-      type: 'mesh',
-      cx: request.cx, cz: request.cz, sy: request.sy,
-      opaque: result.opaque, cutout: result.cutout, translucent: result.translucent,
-      quads: result.quads, ms: 1,
-      blocks: request.blocks, light: request.light,
-    });
+    if (request.type === 'gen') this.genCount++;
+    if (request.type === 'mesh') this.meshCount++;
+    // O `postMessage` de verdade copia o pedido na hora; o duplo também, senão
+    // uma edição no mundo depois do despacho vazaria para dentro do job.
+    this.inbox.push(structuredClone(request));
   }
 
-  /** Entrega tudo que está na caixa de saída. */
+  private work(request: WorkerRequest): WorkerResponse | null {
+    if (request.type === 'spawn') return { type: 'spawn', ...spawnOf(this.noise!) };
+    if (request.type === 'mesh') return this.meshJobs!.run(request);
+    if (request.type !== 'gen') return null;
+    const chunk = generateChunk(this.seed, this.noise!, request.cx, request.cz);
+    return {
+      type: 'gen',
+      cx: request.cx, cz: request.cz, dim: request.dim,
+      sections: chunk.sections.map((s) => ({
+        bits: s.bits, paletteLen: s.paletteLen, palette: s.palette, data: s.data,
+        nonAirCount: s.nonAirCount,
+        skyLight: s.skyLight ?? new Uint8Array(2048),
+        blockLight: s.blockLight ?? new Uint8Array(2048),
+      })),
+      heightMap: chunk.heightMap,
+      biomeMap: chunk.biomeMap,
+      ms: 1,
+    };
+  }
+
+  /** Trabalha tudo que chegou e entrega as respostas. */
   flush(): number {
-    const n = this.outbox.length;
-    while (this.outbox.length > 0) {
-      this.onmessage?.({ data: this.outbox.shift() as WorkerResponse });
+    let n = 0;
+    while (this.inbox.length > 0) {
+      const response = this.work(this.inbox.shift() as WorkerRequest);
+      if (response === null) continue;
+      n++;
+      this.onmessage?.({ data: response });
     }
     return n;
   }
@@ -259,13 +265,30 @@ describe('ChunkPipeline', () => {
     expect(progress.total).toBe(9); // raio 1: dx²+dz² ≤ 2 pega as 9 colunas
   });
 
+  /*
+   * O teto é `workers × 16` desde 2026-09-13. Este teste dizia "2 × 2" e só
+   * passava porque o duplo gerava terreno dentro do `postMessage` e esgotava o
+   * orçamento de tempo do despacho — media o relógio, não o teto.
+   */
   it('respeita o limite de requisições em voo', () => {
     const h = harness(4, 2);
     h.pipeline.setCenter(0, 0);
-    // Um pump sem flush: nada pode passar de 2 × 2 workers.
+    // Um pump sem flush: nada pode passar de 16 por worker.
     h.pipeline.pump();
     const dispatched = h.workers.reduce((s, w) => s + w.genCount + w.meshCount, 0);
-    expect(dispatched).toBeLessThanOrEqual(4);
+    expect(dispatched).toBe(32);
+
+    // Com teto explícito, é ele que manda.
+    const world = new World(777);
+    const workers: FakeWorker[] = [];
+    const tight = new ChunkPipeline(world, {
+      workers: 2, renderDistance: 4, packed: true, maxInFlight: 4,
+      createWorker: () => { const w = new FakeWorker(); workers.push(w); return w; },
+    });
+    tight.setCenter(0, 0);
+    tight.pump();
+    tight.pump();
+    expect(workers.reduce((s, w) => s + w.genCount + w.meshCount, 0)).toBe(4);
   });
 
   it('descarrega o que sai do alcance e avisa quem escuta', () => {
@@ -304,21 +327,54 @@ describe('ChunkPipeline', () => {
     expect(applied).toBe(1);
   });
 
-  it('recicla os buffers de vizinhança em vez de realocar', () => {
-    const h = harness(2);
-    h.pipeline.setCenter(0, 0);
-    h.run(80);
-    const seen = new Set<ArrayBufferLike>();
-    // Após muitos ciclos, o pool deve reusar poucos buffers distintos.
-    for (let i = 0; i < 5; i++) {
-      h.world.setBlock(0, h.world.getChunk(0, 0)!.heightMap[0], 0, 0, 'player');
-      h.pipeline.enqueueDirty();
-      h.pipeline.pump();
-      for (const w of h.workers) w.flush();
-      h.pipeline.drainReady(1000, (r) => seen.add(r.response.blocks.buffer));
+  /*
+   * M12: a vizinhança 18³ deixou de ser montada na thread principal. O pedido
+   * leva as sections cruas, uma mensagem por coluna, e só a faixa de sections
+   * que as pedidas precisam (elas, uma acima e uma abaixo).
+   */
+  it('um pedido de malha por coluna, com as sections cruas das 3×3 vizinhas', () => {
+    const world = new World(777);
+    const sent: WorkerRequest[] = [];
+    const worker = new FakeWorker();
+    const original = worker.postMessage.bind(worker);
+    worker.postMessage = (message: unknown) => {
+      const request = message as WorkerRequest;
+      if (request.type === 'mesh') sent.push(structuredClone(request));
+      original(message);
+    };
+    const pipeline = new ChunkPipeline(world, {
+      workers: 1, renderDistance: 2, packed: true, createWorker: () => worker,
+    });
+    pipeline.setCenter(0, 0);
+    for (let i = 0; i < 60; i++) {
+      pipeline.pump();
+      worker.flush();
+      pipeline.drainReady(1000, () => { /* descarta */ });
     }
-    // Com 1 worker e 2 em voo, o pool não deve crescer sem limite.
-    expect(seen.size).toBeLessThanOrEqual(4);
+
+    expect(sent.length).toBeGreaterThan(0);
+    const columns = new Set(sent.map((r) => r.type === 'mesh' ? `${r.cx},${r.cz}` : ''));
+    // Carregando do zero, cada coluna pede malha uma vez só, com tudo junto.
+    expect(columns.size).toBe(sent.length);
+    for (const request of sent) {
+      if (request.type !== 'mesh') continue;
+      expect(request.sections.length).toBe(9 * request.span);
+      expect('blocks' in request).toBe(false);
+    }
+
+    // Uma edição suja uma section só: o pedido leva ela e as duas em volta.
+    sent.length = 0;
+    const chunk = world.getChunk(0, 0)!;
+    world.setBlock(8, 40, 8, 0, 'player'); // section 2
+    expect(chunk.sections[2].isEmpty).toBe(false);
+    pipeline.enqueueDirty();
+    pipeline.pump();
+    const edit = sent.find((r) => r.type === 'mesh' && r.cx === 0 && r.cz === 0);
+    expect(edit).toBeDefined();
+    if (edit?.type === 'mesh') {
+      expect(edit.mask).toBe(1 << 2);
+      expect([edit.syMin, edit.span]).toEqual([1, 3]);
+    }
   });
 
   it('re-mesha a section quando um bloco muda', () => {

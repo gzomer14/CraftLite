@@ -9,9 +9,8 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-22 19:28 — **M13 fechado: `session.ts` 2042 → 697 e `main.ts`
-1411 → 682 linhas, uso de item como dado, e lã e cama em 16 cores por tint (atlas de 222 para 194
-camadas)**
+**Última atualização:** 2026-09-23 09:05 — **correção: todo desenho em face de pé saía de
+ponta-cabeça no mundo (flor, muda, grama alta, plantação, tocha, fornalha, porta, bancada, baú)**
 
 ---
 
@@ -65,8 +64,8 @@ Medidas em 2026-09-22 19:28, ao fechar o M13, com `npm test`, `npm run build`,
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **226,1 KB** (221,3 no M11; 208,8 antes dele) | < 350 KB | `npm run size` |
-| Testes | **1975**, 97 arquivos (1930 no M11; 1823 antes dele) | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **226,3 KB** (226,1 no M13; 221,3 no M11) | < 350 KB | `npm run size` |
+| Testes | **1981**, 98 arquivos (1975 no M13; 1930 no M11) | manter verde | `npm test` |
 | Smoke test de navegador | **7 passos verdes**: carregar, criar, andar 10 s, quebrar, salvar, recarregar, conferir | verde | `npm run smoke` |
 | Camadas de atlas | **194** com 16 cores de lã e cama (222 no M11 com 8 cores; lã e cama viraram tint no M13) | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Memória de áudio | **3,33 MB** (era 3,26; +3 sons curtos de balde e arremesso) | < 3,5 MB | `tests/audio.test.ts` |
@@ -1475,6 +1474,7 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-23 | `render/mesh.ts`, `world/mesh/complex.ts`, `render/hand.ts` | **Todo desenho em face de pé saía de ponta-cabeça** (M1). O ladrilho é desenhado com a linha 0 em cima e o WebGL entrega a linha 0 em `v = 0`, mas os quads de pé punham `v = 0` na **base**. Em pedra, terra e tronco não aparece; em flor, muda, grama alta e plantação aparece de cara — e também estavam invertidas a brasa da tocha, a boca da fornalha, o tampo da bancada, a tampa do baú, a maçaneta da porta e o glacê do bolo. No inventário tudo estava certo, porque o sprite lê o ladrilho como o canvas. Relato: *"ao colocar no chão fica invertido"*. Faces de pé (±X, ±Z, a cruz de planta e o item na mão) passaram a descer o `v`; **faces de cima e de baixo não mudaram** — trilho, cama e repetidor foram acertados contra o `v` antigo. Regressão em `tests/texorientation.test.ts`. |
 | 2026-09-22 | `game/itemuse.ts` | **Balde, ovo e arco miravam o centro da câmera** mesmo no Modo A de toque, em que a mira é o dedo. Achado ao migrar os usos de item (M13): passaram a usar a mira da `Interaction`. |
 | 2026-09-22 | `world/growth.ts`, `world/gen/decorate.ts` → `world/trees.ts` | **Nenhuma planta crescia fora da roça** (M5/M6). A muda era decoração: a única receita de árvore do jogo escrevia direto no chunk durante a geração. Cana e cacto não subiam, a grama não se espalhava, e três das quatro folhas davam muda de carvalho. Madeira não era renovável. |
 | 2026-09-22 | `data/blocks.ts`, `world/redstone.ts`, `game/interaction.ts` | **Flor, muda e grama alta boiavam sem chão** (doc 03 §9, "Suporte"). Só redstone e tocha declaravam apoio. Planta ganhou `support: 'below'`, e cana e cacto o campo `stackable`, para a coluna se segurar em si mesma. |
@@ -1761,6 +1761,11 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
    do chunk. M11 e M13 fecharam em 2026-09-22.
 
    **E olhar M11 e M13 num aparelho**, que nada disso viu. Em ordem de quanto pode estar errado:
+   - **a correção de 2026-09-23 (textura de pé)**: flor, muda, grama alta e trigo de pé; e, como a
+     mesma regra vale para todo bloco, conferir **tocha** (brasa em cima), **fornalha** (boca na
+     metade de baixo), **bancada** (tampo em cima), **baú** (tampa em cima), **porta** (maçaneta
+     no meio) e o bloco na mão. Nenhum deles foi visto depois da troca — o navegador headless do
+     smoke não redesenhou a cena editada;
    - **lã e cama coloridas**: o tint é novo no shader. Colocar as 16 lãs lado a lado e uma cama de
      cada cor; na cama, a madeira e o travesseiro **não** podem sair coloridos. Se a cor sair
      lavada ou escura demais, o número é o `DYE_BASE` de `data/tints.ts`;

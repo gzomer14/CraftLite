@@ -41,6 +41,25 @@ const FACE_AXES: readonly (readonly [number, number])[] = [
   [2, 1], [2, 1], [0, 2], [0, 2], [0, 1], [0, 1],
 ];
 
+/**
+ * true nas quatro faces laterais (±X, ±Z) — as que ficam **de pé**.
+ *
+ * **Correção de 2026-09-23.** O ladrilho é desenhado com a linha 0 **em cima**
+ * (`texgen.ts`, `pattern`, a franja da grama, a brasa da tocha, a boca da
+ * fornalha no terço inferior), e o WebGL entrega a linha 0 do upload em `v = 0`.
+ * Os quads de pé punham `v = 0` na **base**: todo desenho lateral saía de ponta-
+ * cabeça. Em textura simétrica (pedra, terra, tronco) isso não aparece; em flor,
+ * muda, grama alta e plantação aparece de cara — relato do jogador em
+ * 2026-09-23: *"ao colocar no chão fica invertido"*. O inventário não tinha o
+ * erro porque o sprite lê o ladrilho de cima para baixo, como o canvas.
+ *
+ * Faces de cima e de baixo não mudam: a orientação delas (trilho, cama,
+ * repetidor) já foi acertada à mão contra o `v` atual.
+ */
+export function isUprightFace(face: number): boolean {
+  return face !== 2 && face !== 3;
+}
+
 export interface MeshData {
   /** `Uint32Array` (2/vértice) em WebGL2 ou `Float32Array` (8/vértice) em WebGL1. */
   vertices: ArrayBuffer;
@@ -106,12 +125,16 @@ export class MeshBuilder {
     const e1x = c[3] * ext[0], e1y = c[4] * ext[1], e1z = c[5] * ext[2];
     const e2x = c[6] * ext[0], e2y = c[7] * ext[1], e2z = c[8] * ext[2];
 
-    // Cantos na ordem 0,1,2,3 (CCW visto de fora) e suas UVs em tiles.
+    // Cantos na ordem 0,1,2,3 (CCW visto de fora) e suas UVs em tiles. Nas
+    // faces de pé `e2` sobe, e o `v` desce: linha 0 do desenho no alto.
+    const upright = isUprightFace(face);
+    const v0 = upright ? h : 0;
+    const v1 = upright ? 0 : h;
     const base = this.vertexCount;
-    this.vertex(ox, oy, oz, face, 0, 0, texLayer, blockLight, skyLight, ao[0], tint);
-    this.vertex(ox + e1x, oy + e1y, oz + e1z, face, w, 0, texLayer, blockLight, skyLight, ao[1], tint);
-    this.vertex(ox + e1x + e2x, oy + e1y + e2y, oz + e1z + e2z, face, w, h, texLayer, blockLight, skyLight, ao[2], tint);
-    this.vertex(ox + e2x, oy + e2y, oz + e2z, face, 0, h, texLayer, blockLight, skyLight, ao[3], tint);
+    this.vertex(ox, oy, oz, face, 0, v0, texLayer, blockLight, skyLight, ao[0], tint);
+    this.vertex(ox + e1x, oy + e1y, oz + e1z, face, w, v0, texLayer, blockLight, skyLight, ao[1], tint);
+    this.vertex(ox + e1x + e2x, oy + e1y + e2y, oz + e1z + e2z, face, w, v1, texLayer, blockLight, skyLight, ao[2], tint);
+    this.vertex(ox + e2x, oy + e2y, oz + e2z, face, 0, v1, texLayer, blockLight, skyLight, ao[3], tint);
 
     // Flip do quad quando a diagonal errada criaria artefato de AO (doc 02 §5.2).
     const i = this.idx;
@@ -135,17 +158,25 @@ export class MeshBuilder {
    *
    * Não participa do greedy nem carrega AO: são poucos quads e o custo de
    * calcular oclusão neles não se paga.
+   *
+   * `upright` diz que o quad está de pé, com os cantos 0 e 1 embaixo: aí o `v`
+   * desce, como em `addQuad` (ver `isUprightFace`). O padrão sai da face; a
+   * cruz de planta passa `true` explícito porque está de pé mas usa a face +Y
+   * para ter a sombra de quem recebe o sol de cima.
    */
   addPolyQuad(
     corners: ArrayLike<number>, face: number, texLayer: number,
     blockLight: number, skyLight: number, tint: number, doubleSided: boolean,
+    upright = isUprightFace(face),
   ): void {
     this.ensure(4, doubleSided ? 12 : 6);
+    const v0 = upright ? 1 : 0;
+    const v1 = 1 - v0;
     const base = this.vertexCount;
-    this.vertex(corners[0], corners[1], corners[2], face, 0, 0, texLayer, blockLight, skyLight, 3, tint);
-    this.vertex(corners[3], corners[4], corners[5], face, 1, 0, texLayer, blockLight, skyLight, 3, tint);
-    this.vertex(corners[6], corners[7], corners[8], face, 1, 1, texLayer, blockLight, skyLight, 3, tint);
-    this.vertex(corners[9], corners[10], corners[11], face, 0, 1, texLayer, blockLight, skyLight, 3, tint);
+    this.vertex(corners[0], corners[1], corners[2], face, 0, v0, texLayer, blockLight, skyLight, 3, tint);
+    this.vertex(corners[3], corners[4], corners[5], face, 1, v0, texLayer, blockLight, skyLight, 3, tint);
+    this.vertex(corners[6], corners[7], corners[8], face, 1, v1, texLayer, blockLight, skyLight, 3, tint);
+    this.vertex(corners[9], corners[10], corners[11], face, 0, v1, texLayer, blockLight, skyLight, 3, tint);
 
     const i = this.idx;
     let o = this.indexCount;

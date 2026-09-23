@@ -36,6 +36,7 @@ import {
 } from './itemmodel';
 import { createProgram, uniformLocations, type GlContext } from './gl';
 import type { Atlas } from './atlas';
+import { isUprightFace } from './mesh';
 import type { ItemSheet } from './itemsprites';
 
 /** FOV da mão, menor que o do mundo (doc 01 §191). Exportado para o teste
@@ -535,7 +536,8 @@ function buildBlockCube(out: Float32Array, atlas: Atlas, blockId: number): numbe
       out[o + 1] = corners[v * 3 + 1] - 0.5;
       out[o + 2] = corners[v * 3 + 2] - 0.5;
       out[o + 3] = FACE_UVS[v * 2];
-      out[o + 4] = FACE_UVS[v * 2 + 1];
+      // Face de pé: linha 0 do desenho no alto, como no terreno (`mesh.ts`).
+      out[o + 4] = isUprightFace(face) ? 1 - FACE_UVS[v * 2 + 1] : FACE_UVS[v * 2 + 1];
       out[o + 5] = layers[face];
       out[o + 6] = FACE_SHADE[face];
       n++;

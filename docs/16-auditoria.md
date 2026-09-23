@@ -12,6 +12,32 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-23 · 08:40 → 09:05 · As plantas estavam de ponta-cabeça, e não eram só elas
+
+**Pedido:** *"vários itens ao colocar no chão estão ficando de cabeça para baixo. Notei isso na
+grama, flores, sementes, arvorês (Ainda antes de crescer)"* — no inventário apareciam certos.
+
+**Resultado:** a causa não era do M11 nem do M13: vinha do M1. Todo quad de pé punha `v = 0` na
+base, e o WebGL entrega a linha 0 do ladrilho (o topo do desenho) em `v = 0`. Confirmado por
+captura em Chrome headless — dente-de-leão e papoula com a flor embaixo e o caule para cima. Em
+textura simétrica não aparece, mas tocha, fornalha, bancada, baú, porta e bolo também estavam
+invertidos. Faces de pé passaram a descer o `v` (terreno, cruz de planta, bloco que cai, item na
+mão); topo e base ficaram como estavam. **Não visto em aparelho** — o headless não redesenhou a
+cena depois de editada, então a verificação visual pós-correção fica para o campo (doc 15 §6).
+
+Portões: **1981 testes** em 98 arquivos, lint limpo, build ok, **226,3 KB** de 350.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/render/mesh.ts` | `isUprightFace`; `addQuad` e `addPolyQuad` descem o `v` em face de pé (parâmetro `upright`) |
+| `~` | `src/world/mesh/complex.ts` | a cruz de planta passa `upright` explícito (a face é +Y só pela sombra) |
+| `~` | `src/render/hand.ts` | bloco na mão com o mesmo sentido de `v` nas laterais |
+| `+` | `tests/texorientation.test.ts` | 6 testes: canto de cima com `v = 0` em greedy, cruz, tocha, porta e fornalha; topo inalterado |
+| `~` | `tests/mesh.test.ts` | UV da corrida greedy em face +Z com o `v` novo |
+| `~` | `docs/15-status.md`, `README.md` | §4 com a correção, §2 e §6, contagem de testes |
+
+---
+
 ## 2026-09-22 · 18:33 → 19:28 · O M13 fechou: a sessão perdeu dois terços, e a lã ganhou cores
 
 **Pedido:** a mesma sessão (*"seguindo sua ordem recomendada"*); no meio, *"Somente o M11 está sendo

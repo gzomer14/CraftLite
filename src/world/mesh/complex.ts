@@ -176,15 +176,21 @@ function connectionsAt(
   return mask;
 }
 
-/** Duas diagonais do bloco, visíveis dos dois lados. */
+/**
+ * Duas diagonais do bloco, visíveis dos dois lados.
+ *
+ * A face é +Y só pela sombra (planta recebe o sol de cima); o quad está de pé,
+ * e `upright` põe a linha 0 do desenho no alto — sem isso flor, muda, grama
+ * alta e plantação nasciam de ponta-cabeça (correção de 2026-09-23).
+ */
 function emitCross(
   out: MeshBuilder, x: number, y: number, z: number,
   tex: number, blockLight: number, skyLight: number, tint: number,
 ): number {
   setCorners(x, y, z, 0, 0, 1, 1);
-  out.addPolyQuad(CORNERS, FACE_POS_Y, tex, blockLight, skyLight, tint, true);
+  out.addPolyQuad(CORNERS, FACE_POS_Y, tex, blockLight, skyLight, tint, true, true);
   setCorners(x, y, z, 1, 0, 0, 1);
-  out.addPolyQuad(CORNERS, FACE_POS_Y, tex, blockLight, skyLight, tint, true);
+  out.addPolyQuad(CORNERS, FACE_POS_Y, tex, blockLight, skyLight, tint, true, true);
   return 2;
 }
 

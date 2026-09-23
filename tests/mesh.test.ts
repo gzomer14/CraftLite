@@ -126,7 +126,9 @@ describe('MeshBuilder', () => {
     const b = new MeshBuilder(true);
     b.addQuad(0, 0, 0, FACE_POS_Z, 7, 4, 0, 0, 15, AO_FLAT, 0);
     const verts = readVertices(b.build().vertices, 4);
-    expect(verts.map((v) => `${v.u},${v.v}`)).toEqual(['0,0', '7,0', '7,4', '0,4']);
+    // Face de pé: o `v` desce, linha 0 do ladrilho no alto (2026-09-23,
+    // `tests/texorientation.test.ts`). A corrida continua valendo inteira.
+    expect(verts.map((v) => `${v.u},${v.v}`)).toEqual(['0,4', '7,4', '7,0', '0,0']);
   });
 
   it('faz o flip do quad quando a diagonal do AO está errada', () => {

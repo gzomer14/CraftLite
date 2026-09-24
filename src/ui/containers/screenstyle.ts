@@ -116,21 +116,40 @@ export function injectStyle(): void {
 #container-screen .slot.enchanted{box-shadow:inset 0 0 calc(4 * var(--px,3px)) #b46ee8}
 #container-screen .offers{display:flex;flex-direction:column;gap:calc(1 * var(--px,3px));
   margin-bottom:calc(2 * var(--px,3px))}
-#container-screen .offer{min-height:36px;padding:4px 8px;text-align:left;white-space:pre-line;
+#container-screen .offer{min-height:32px;padding:2px 8px;text-align:left;white-space:pre-line;
   background:#4a3a5e;color:#cfcfcf;border:2px solid #000;cursor:pointer;
-  font:calc(4 * var(--px,3px))/1.25 ui-monospace,monospace}
+  font:max(11px,calc(4 * var(--px,3px)))/1.25 ui-monospace,monospace}
 #container-screen .offer.affordable{background:#5b2a8a;color:#fff}
+#container-screen .offer.short{color:#f0b8b8}
 #container-screen .offer:disabled{cursor:not-allowed;opacity:.6}
 #container-screen .offer:focus-visible{outline:2px solid #fff}
-/* Bigorna (M15): o campo do nome e o custo, entre os slots e o resultado. */
-#container-screen .anvil{display:flex;flex-direction:column;gap:calc(1 * var(--px,3px));
-  justify-content:center}
-#container-screen .anvil input{width:calc(40 * var(--px,3px));min-height:36px;padding:2px 6px;
-  background:#1d1d24;color:#fff;border:2px solid #000;
-  font:calc(4 * var(--px,3px))/1.25 ui-monospace,monospace}
+/*
+ * Estação de trabalho (mesa, bigorna; relato de campo 2026-09-24): cada slot
+ * com o nome embaixo e sinais entre eles, "Item + Material → Resultado", e
+ * uma frase com o próximo passo. Os textos têm piso em pixel: na escala de um
+ * celular deitado, 4 unidades davam 7 px, ilegível — e o rótulo que não se lê
+ * é o mesmo que rótulo nenhum.
+ */
+#container-screen .station{display:flex;align-items:flex-start;gap:calc(2 * var(--px,3px));
+  margin-bottom:calc(2 * var(--px,3px))}
+#container-screen .station-cell{display:flex;flex-direction:column;align-items:center}
+/* Dentro do slot o nome só vale para o leitor de tela: embaixo ele é legível. */
+#container-screen .station .slot.ghost span{display:none}
+#container-screen .station-sign{display:flex;align-items:center;color:#555;
+  height:max(34px,calc(20 * var(--px,3px)));font:700 max(16px,calc(6 * var(--px,3px)))/1 ui-monospace,monospace}
+#container-screen .slot-caption{margin-top:2px;color:#3f3f3f;white-space:nowrap;text-align:center;
+  font:max(10px,calc(3.2 * var(--px,3px)))/1.2 ui-monospace,monospace}
+#container-screen .section .slots + .slot-caption{text-align:left;margin:-2px 0 calc(1 * var(--px,3px))}
+#container-screen .station-help{color:#262626;max-width:max(190px,calc(84 * var(--px,3px)));
+  margin-bottom:calc(2 * var(--px,3px));font:max(11px,calc(3.6 * var(--px,3px)))/1.3 ui-monospace,monospace}
+#container-screen .station-help.blocked{color:#b3261e}
+#container-screen .station-note{color:#555;font:max(10px,calc(3.2 * var(--px,3px)))/1.3 ui-monospace,monospace}
+#container-screen .enchant,#container-screen .anvil{display:flex;flex-direction:column;
+  gap:calc(1 * var(--px,3px))}
+#container-screen .anvil input{width:max(170px,calc(60 * var(--px,3px)));min-height:32px;
+  padding:2px 6px;background:#1d1d24;color:#fff;border:2px solid #000;
+  font:max(14px,calc(4 * var(--px,3px)))/1.25 ui-monospace,monospace}
 #container-screen .anvil input:disabled{opacity:.5}
-#container-screen .anvil-cost{color:#8fd76a;font:calc(4 * var(--px,3px))/1.25 ui-monospace,monospace}
-#container-screen .anvil-cost.blocked{color:#ff7b6b}
 /* Troca com aldeão (M9): o item que ele quer, a seta e o que ele dá. */
 #container-screen .offer.trade{display:flex;align-items:center;gap:calc(2 * var(--px,3px))}
 #container-screen .trade-icon{width:calc(14 * var(--px,3px));height:calc(14 * var(--px,3px));
@@ -138,7 +157,7 @@ export function injectStyle(): void {
 #container-screen .trade-arrow{font-size:calc(5 * var(--px,3px))}
 #container-screen .trade-left{margin-left:auto;font-size:calc(3.5 * var(--px,3px))}
 #container-screen .offer-hint{margin-bottom:calc(2 * var(--px,3px));color:#3f3f3f;
-  font-size:calc(4 * var(--px,3px))}
+  font-size:max(11px,calc(4 * var(--px,3px)))}
 /* Sprite: a folha inteira é o fundo e o background-position escolhe o tile. */
 #container-screen .slot.sprite,#container-screen .cursor.sprite{
   background-image:var(--item-sheet);background-size:var(--item-sheet-size);

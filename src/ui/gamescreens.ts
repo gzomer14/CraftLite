@@ -8,6 +8,8 @@
 import { professionOf } from '../data/villagers';
 import { itemDef, maxStackOf } from '../data/items';
 import { ContainerScreen } from './containers/screen';
+import { ANVIL_LEFT, ANVIL_RIGHT, ENCHANT_ITEM } from '../game/container';
+import { anvilHelp, enchantHelp } from '../game/stationhelp';
 import { CreativeScreen } from './containers/creative';
 import type { Atlas } from '../render/atlas';
 import type { ItemSprites } from '../render/itemsprites';
@@ -47,7 +49,20 @@ export function createGameScreens(deps: GameScreensDeps): {
     enchantOffers: () => session().workbench.enchantOffers,
     onEnchantRefresh: () => session().workbench.refreshEnchantOffers(),
     onBuyEnchant: (slot) => session().workbench.buyEnchant(slot),
-    xpLevel: () => session().xp.level,
+    enchantStatus: () => {
+      const s = session();
+      const table = s.workbench.enchantTable;
+      const creative = s.player.mode === 'creative';
+      let valid = 0;
+      for (const offer of table.offers) if (offer.enchant >= 0) valid++;
+      return {
+        help: enchantHelp(table.get(ENCHANT_ITEM), table.lapis, valid, s.xp.level, creative),
+        level: s.xp.level,
+        lapis: table.lapis,
+        shelves: table.shelves,
+        creative,
+      };
+    },
     tradeOffers: () => session().tradeOffers,
     onBuyTrade: (slot) => session().buyTrade(slot),
     tradeTitle: () => {
@@ -64,11 +79,16 @@ export function createGameScreens(deps: GameScreensDeps): {
     },
     onAnvilTake: () => session().workbench.takeAnvilResult(),
     anvilStatus: () => {
-      const bench = session().workbench;
-      const left = bench.anvil.get(0);
+      const s = session();
+      const bench = s.workbench;
+      const left = bench.anvil.get(ANVIL_LEFT);
+      const blocker = bench.anvilBlocker();
       return {
-        cost: bench.anvilOutcome.cost,
-        blocker: bench.anvilBlocker(),
+        help: anvilHelp(
+          left, bench.anvil.get(ANVIL_RIGHT), bench.anvilOutcome, blocker, s.xp.level,
+          s.player.mode === 'creative',
+        ),
+        blocked: blocker === 'expensive' || blocker === 'no-level',
         currentName: left?.name ?? '',
         nameable: left !== null && maxStackOf(left.item) === 1,
       };

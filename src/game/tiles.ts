@@ -63,6 +63,25 @@ function containerFor(id: number, x: number, y: number, z: number): Container {
   return new Container('chest', CHEST_SLOTS, x, y, z);
 }
 
+/**
+ * true se, com o bloco `heldBlock` na mão, tocar no contêiner `targetBlock`
+ * deve **colocar** o bloco em vez de abrir a tela (relato de campo
+ * 2026-09-24: o funil não entrava em cima do baú, porque o toque abria o
+ * baú).
+ *
+ * O gênero pede agachar para isso, e agachado continua valendo (ver
+ * `Session.useHeld`). Mas no toque, agachar e mirar pedem dois dedos ao mesmo
+ * tempo, e a automação é feita justamente de contêiner colado em contêiner:
+ * funil sob o baú, fornalha sobre o funil, liberador apontado para o baú. Por
+ * isso a regra: os dois blocos são contêineres e pelo menos um deles é de
+ * automação (funil, dispensador, liberador). Baú em baú e fornalha em baú
+ * continuam abrindo, que é o que a mão quer quase sempre.
+ */
+export function placesOnContainer(heldBlock: number, targetBlock: number): boolean {
+  if (!isContainerBlock(heldBlock) || !isContainerBlock(targetBlock)) return false;
+  return isGridContainer(heldBlock) || isGridContainer(targetBlock);
+}
+
 export function isFurnaceBlock(id: number): boolean {
   return id === FURNACE || id === FURNACE_LIT;
 }

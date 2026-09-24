@@ -15,7 +15,9 @@ import { BLOCK_BY_NAME, STONE, blockIdOf, makeState, stateBitsOf } from '../src/
 import { ITEM_BY_NAME, itemId, makeStack, type ItemStack } from '../src/data/items';
 import { ENCHANT_BY_NAME, EFFICIENCY, FORTUNE, SILK_TOUCH, UNBREAKING } from '../src/data/enchants';
 import { TOO_EXPENSIVE } from '../src/data/anvil';
-import { anvilResult, repairsWith, type AnvilOutcome } from '../src/game/anvil';
+import { anvilResult, repairMaterialName, repairsWith, type AnvilOutcome } from '../src/game/anvil';
+import { anvilHelp, enchantHelp } from '../src/game/stationhelp';
+import { placesOnContainer } from '../src/game/tiles';
 import { levelIn, withEnchant } from '../src/game/enchanting';
 import { matchRepair } from '../src/game/crafting';
 import {
@@ -559,5 +561,124 @@ describe('forma e face da frente', () => {
     }
     // Bloco sem frente continua com topo, lado e fundo.
     expect(cubeFaceTex(tables, STONE, 0, 0)).toBe(tables.texSide[STONE]);
+  });
+});
+
+// --- relato de campo 2026-09-24 ----------------------------------------------------
+
+describe('a mesa e a bigorna dizem o que fazer', () => {
+  const PICK = item('diamond_pickaxe');
+
+  it('a mesa pede o item, depois o lápis, depois o toque', () => {
+    expect(enchantHelp(null, 0, 0, 0, false)).toContain('Item');
+    const pick: ItemStack = { item: PICK, count: 1, damage: 0 };
+    expect(enchantHelp(pick, 0, 3, 5, false)).toContain('lápis-lazúli em Lápis');
+    expect(enchantHelp(pick, 3, 3, 5, false)).toContain('Você tem 5 níveis');
+    expect(enchantHelp(pick, 0, 3, 0, true)).toContain('Criativo');
+    expect(enchantHelp({ item: item('cobblestone'), count: 1, damage: 0 }, 3, 0, 5, false))
+      .toBe('Este item não pode ser encantado.');
+  });
+
+  it('o material de conserto tem nome, e a madeira aceita tábuas', () => {
+    expect(repairMaterialName(PICK)).toBe('diamante');
+    expect(repairMaterialName(item('iron_sword'))).toBe('barra de ferro');
+    expect(repairMaterialName(item('wooden_axe'))).toBe('tábuas');
+    expect(repairMaterialName(item('bow'))).toBeNull();
+    // Maçã dourada tem o prefixo, mas não tem durabilidade.
+    expect(repairMaterialName(item('golden_apple'))).toBeNull();
+  });
+
+  it('a bigorna diz o próximo passo em cada situação', () => {
+    const worn: ItemStack = { item: PICK, count: 1, damage: 900 };
+    const help = (left: ItemStack | null, right: ItemStack | null, level = 30, creative = false): string => {
+      const out = anvilResult(left, right, null, outcome());
+      const blocker = out.result === null ? 'nothing' : level < out.cost && !creative ? 'no-level' : 'ok';
+      return anvilHelp(left, right, out, blocker, level, creative);
+    };
+    expect(help(null, null)).toContain('Ponha em Item');
+    expect(help(worn, null)).toContain('diamante para consertar');
+    expect(help(worn, { item: item('diamond'), count: 2, damage: 0 })).toBe('Custa 2 níveis. Pegue o resultado.');
+    expect(help(worn, { item: item('diamond'), count: 2, damage: 0 }, 1)).toBe('Custa 2 níveis e você tem 1.');
+    expect(help(worn, { item: item('iron_ingot'), count: 2, damage: 0 }))
+      .toBe('Barra de Ferro não serve aqui. Este item conserta com diamante.');
+    expect(help({ ...worn, damage: 0 }, { item: item('diamond'), count: 2, damage: 0 }))
+      .toBe('Este item não está gasto.');
+    expect(help({ item: item('cobblestone'), count: 5, damage: 0 }, null)).toContain('ferramentas');
+    expect(help({ item: item('enchanted_book'), count: 1, damage: 0, ench: 1 }, null))
+      .toContain('outro livro encantado');
+  });
+});
+
+describe('funil colado em contêiner: o toque coloca em vez de abrir', () => {
+  it('a regra: dois contêineres, pelo menos um de automação', () => {
+    expect(placesOnContainer(block('hopper'), block('chest'))).toBe(true);
+    expect(placesOnContainer(block('chest'), block('hopper'))).toBe(true);
+    expect(placesOnContainer(block('furnace'), block('hopper'))).toBe(true);
+    expect(placesOnContainer(block('dropper'), block('chest'))).toBe(true);
+    expect(placesOnContainer(block('chest'), block('chest'))).toBe(false);
+    expect(placesOnContainer(block('furnace'), block('chest'))).toBe(false);
+    expect(placesOnContainer(block('hopper'), block('stone'))).toBe(false);
+  });
+
+  /** Jogador em cima e atrás, mirando o topo do bloco em (0, GROUND + 1, −4). */
+  function aimAtTop(session: Session, player: Player): void {
+    player.setPosition(0.5, GROUND + 3, -2.5);
+    const eyeY = player.y + player.eyeHeight;
+    const dx = 0;
+    const dy = GROUND + 1.5 - eyeY;
+    const dz = -3.5 - player.z;
+    const length = Math.hypot(dx, dy, dz);
+    session.interaction.updateTargetAlong(dx / length, dy / length, dz / length);
+  }
+
+  it('com o funil na mão, tocar no baú põe o funil em cima, virado para baixo', () => {
+    const { world, session, player } = rig();
+    put(session, 0, GROUND + 1, -4, 'chest');
+    session.inventory.set(0, makeStack(item('hopper'), 4));
+    session.inventory.selected = 0;
+    aimAtTop(session, player);
+    expect(session.interaction.state.target?.y).toBe(GROUND + 1);
+    expect(session.useHeld()).toBe(true);
+    expect(session.workbench.openScreen).toBe('none');
+    const placed = world.getBlock(0, GROUND + 2, -4);
+    expect(blockIdOf(placed)).toBe(block('hopper'));
+    expect(stateBitsOf(placed) & 7).toBe(5);
+  });
+
+  it('com o baú na mão, tocar no funil põe o baú em cima', () => {
+    const { world, session, player } = rig();
+    put(session, 0, GROUND + 1, -4, 'hopper', 5);
+    session.inventory.set(0, makeStack(item('chest'), 1));
+    session.inventory.selected = 0;
+    aimAtTop(session, player);
+    session.useHeld();
+    expect(session.workbench.openScreen).toBe('none');
+    expect(blockIdOf(world.getBlock(0, GROUND + 2, -4))).toBe(block('chest'));
+  });
+
+  it('com pedra na mão o baú abre; agachado, a pedra vai em cima', () => {
+    const { world, session, player } = rig();
+    put(session, 0, GROUND + 1, -4, 'chest');
+    session.inventory.set(0, makeStack(item('cobblestone'), 8));
+    session.inventory.selected = 0;
+    aimAtTop(session, player);
+    session.useHeld();
+    expect(session.workbench.openScreen).toBe('chest');
+    session.workbench.closeScreen();
+
+    player.sneaking = true;
+    aimAtTop(session, player);
+    session.useHeld();
+    expect(session.workbench.openScreen).toBe('none');
+    expect(blockIdOf(world.getBlock(0, GROUND + 2, -4))).toBe(block('cobblestone'));
+  });
+
+  it('de mão vazia, agachado ou não, o baú abre', () => {
+    const { session, player } = rig();
+    put(session, 0, GROUND + 1, -4, 'chest');
+    player.sneaking = true;
+    aimAtTop(session, player);
+    session.useHeld();
+    expect(session.workbench.openScreen).toBe('chest');
   });
 });

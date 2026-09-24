@@ -17,6 +17,11 @@ export const REPAIR_MATERIAL: Readonly<Record<string, string>> = {
   leather: 'leather',
 };
 
+/** Como a tela chama o material que é uma tag (a madeira conserta com qualquer tábua). */
+export const REPAIR_TAG_DISPLAY: Readonly<Record<string, string>> = {
+  planks: 'tábuas',
+};
+
 /** Cada unidade de material devolve um quarto da durabilidade (o do gênero). */
 export const REPAIR_PER_UNIT = 0.25;
 /** Juntar duas peças soma as durabilidades e ganha mais 12% do máximo. */

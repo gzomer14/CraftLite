@@ -145,7 +145,7 @@ Abre em **4,5 s em 3G rápido** (critério: < 5 s) e aguentou **92 min de voo co
 erro**, com o heap estável e o anel de chunks fixo em 489 colunas ao longo de 67 mil blocos — os
 dois medidos por `npm run slow-network` e `npm run soak`, que dirigem um Chrome de verdade.
 
-**266 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
+**267 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
 além de dois ícones de PWA de 6,7 KB, gerados por código.
 
 Validado em aparelho alvo (**Galaxy J7 Metal**, Android 7, 2 GB, Mali-T830) em 2026-09-12:
@@ -158,7 +158,7 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 2156 testes (vitest)
+npm test           # 2164 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
 npm run smoke      # abre o jogo num Chrome headless e joga o roteiro do doc 14 (precisa do build)
@@ -237,7 +237,7 @@ src/
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      2156 testes, incluindo orçamento de performance e de luz
+tests/                      2164 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios

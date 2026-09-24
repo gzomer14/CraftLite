@@ -454,7 +454,7 @@ function aabbOverlap(a: Float32Array, b: Float32Array): boolean {
  * mas `placesBlock` existe para os casos em que não é: o pó de redstone é um
  * item de material que coloca `redstone_wire`.
  */
-function blockIdForItem(itemId: number): number | undefined {
+export function blockIdForItem(itemId: number): number | undefined {
   const places = itemDef(itemId)?.placesBlock;
   return places !== undefined && places !== AIR ? places : undefined;
 }

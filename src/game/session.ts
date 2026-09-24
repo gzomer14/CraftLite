@@ -10,7 +10,7 @@ import { freeStandY } from './spawnplacement';
 import { AIR, BLOCK_BY_NAME, blockIdOf, defOf } from '../data/blocks';
 import { ITEM_BY_NAME, itemDef, stackTool, type ItemStack } from '../data/items';
 import type { ContainerView } from './container';
-import { Tiles } from './tiles';
+import { placesOnContainer, Tiles } from './tiles';
 import { Workbench, type OpenScreen } from './workbench';
 import { SignStore, emptySignText } from './signs';
 import { PlayerCombat } from './playercombat';
@@ -29,7 +29,7 @@ import { rollDrops, rollXp } from './drops';
 import { skipDurability } from './enchanting';
 import { Experience } from './xp';
 import { Achievements } from './achievements';
-import { Interaction } from './interaction';
+import { blockIdForItem, Interaction } from './interaction';
 import { Inventory } from './inventory';
 import { EXHAUSTION, Survival } from './survival';
 import { ItemEntities } from '../entity/itementity';
@@ -585,14 +585,8 @@ export class Session {
     // bloco debaixo dele.
     if (this.vehicles.tryRide()) return true;
     const target = this.interaction.state.target;
-    if (target !== null && this.blockUse.bed(target.x, target.y, target.z)) return true;
-    if (target !== null && this.villages.ringBell(target.x, target.y, target.z)) return true;
-    // Alavanca, botão e repetidor respondem antes da porta: os três são
-    // mecanismos de clique, e a porta é a única que também abre na mão.
-    if (target !== null && this.redstone.use(target.x, target.y, target.z)) return true;
-    if (target !== null && this.blockUse.toggle(target.x, target.y, target.z)) return true;
-    if (target !== null && this.openContainerAt(target.x, target.y, target.z)) return true;
-    if (target !== null && this.blockUse.cake(target.x, target.y, target.z)) return true;
+    if (target !== null && !this.placesFirst(target.x, target.y, target.z)
+      && this.useBlock(target.x, target.y, target.z)) return true;
     if (this.itemUser.use(this.inventory.held)) return true;
 
     if (this.interaction.tryPlace(this.inventory.held)) {
@@ -600,6 +594,34 @@ export class Session {
       return true;
     }
     return false;
+  }
+
+  /** O bloco mirado responde ao clique: cama, sino, mecanismo, porta, tela, bolo. */
+  private useBlock(x: number, y: number, z: number): boolean {
+    if (this.blockUse.bed(x, y, z)) return true;
+    if (this.villages.ringBell(x, y, z)) return true;
+    // Alavanca, botão e repetidor respondem antes da porta: os três são
+    // mecanismos de clique, e a porta é a única que também abre na mão.
+    if (this.redstone.use(x, y, z)) return true;
+    if (this.blockUse.toggle(x, y, z)) return true;
+    if (this.openContainerAt(x, y, z)) return true;
+    return this.blockUse.cake(x, y, z);
+  }
+
+  /**
+   * true se o clique deve pular o bloco mirado e ir direto para o item da mão.
+   *
+   * Agachado com algo na mão é a regra do gênero (colocar ao lado do baú sem
+   * abri-lo). A outra é para o toque, onde agachar e mirar pedem dois dedos:
+   * funil e contêiner colados — ver `placesOnContainer`.
+   */
+  private placesFirst(x: number, y: number, z: number): boolean {
+    const held = this.inventory.held;
+    if (held === null) return false;
+    if (this.player.sneaking) return true;
+    const heldBlock = blockIdForItem(held.item);
+    return heldBlock !== undefined
+      && placesOnContainer(heldBlock, blockIdOf(this.world.getBlock(x, y, z)));
   }
 
   /** Quantos hostis existem num raio de 8 blocos (dormir exige abrigo). */

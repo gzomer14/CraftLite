@@ -12,6 +12,42 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-24 · 15:05 → 15:28 · M15 no campo: telas que dizem o que fazer, funil sobre o baú
+
+**Pedido:** *"Não consegui utilizar a mesa de encantamento. Não entendi muito bem o que cada campo
+faz, inclusive na bigorna (…) Para o funil também não consegui utilizá-lo, pois ao tentar colocar
+em cima de um baú por exemplo o baú se abre, não me deixa colocar."*
+
+**Resultado:** três causas achadas e corrigidas. (1) Os rótulos dos slots de mesa, bigorna e
+fornalha iam para um `data-hint` que nenhum CSS mostrava; agora mesa e bigorna têm fileira com o
+nome embaixo de cada slot e sinais (`Item + Material → Resultado`), e a fornalha escreve o rótulo
+sob o slot. (2) Nada dizia o que faltava: uma frase com o próximo passo (`game/stationhelp.ts`) —
+o material de conserto pelo nome, o material errado, o custo e o nível do jogador; as ofertas da
+mesa que não cabem no bolso dizem "falta nível" ou "falta lápis" e respondem ao toque. (3) O
+clique num contêiner sempre abria a tela: agachado com item na mão agora coloca (a regra do gênero,
+que não existia), e funil com contêiner colado coloca sem agachar. Vistas no Chrome headless a
+780×360.
+
+Portões: **2164 testes** em 109 arquivos, lint limpo, build ok, **267,3 KB** de 350, smoke 7/7.
+Numa das cinco rodadas da suíte um teste falhou e não se repetiu; a saída não foi guardada.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| `+` | `src/game/stationhelp.ts` | frase do próximo passo da mesa e da bigorna, sem DOM |
+| `+` | `src/ui/containers/enchantpanel.ts` | ofertas, frase e estantes da mesa (saíram de `screen.ts`); oferta cara continua tocável |
+| `~` | `src/ui/containers/anvilpanel.ts` | frase no lugar do custo; rótulo "Novo nome" |
+| `~` | `src/ui/containers/screen.ts` | `addStation` (slots com nome embaixo e sinais); rótulo do slot único escrito embaixo; 949 → 930 linhas |
+| `~` | `src/ui/containers/screenstyle.ts` | estilos da estação, pisos em px nos textos da mesa e da bigorna |
+| `~` | `src/ui/gamescreens.ts` | `enchantStatus` no lugar de `xpLevel`; `anvilStatus` com a frase |
+| `~` | `src/game/anvil.ts` | `repairMaterialName` |
+| `~` | `src/data/anvil.ts` | `REPAIR_TAG_DISPLAY` (tábuas) |
+| `~` | `src/game/session.ts` | `useHeld`: `placesFirst` (agachado ou funil com contêiner) e `useBlock` |
+| `~` | `src/game/tiles.ts` | `placesOnContainer` |
+| `~` | `src/game/interaction.ts` | `blockIdForItem` exportada |
+| `~` | `tests/workshop.test.ts` | frases da mesa e da bigorna, nome do material, colocação pelo caminho do clique |
+| `~` | `docs/15-status.md` | §1, §2, §3 (M15, volta de campo), §4 (dois bugs antigos), §5, §6 |
+| `~` | `README.md` | testes e bundle |
+
 ## 2026-09-24 · 11:05 → 11:45 · M15: oficina
 
 **Pedido:** *"Pode seguir com o M15 então, incluindo essa pequena tarefa citada"* — a memória de

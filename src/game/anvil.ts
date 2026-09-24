@@ -15,7 +15,7 @@
 
 import {
   COMBINE_BONUS, COMBINE_COST, ENCHANT_COST_BOOK, ENCHANT_COST_ITEM, MAX_NAME_LENGTH,
-  RENAME_COST, REPAIR_MATERIAL, REPAIR_PER_UNIT,
+  RENAME_COST, REPAIR_MATERIAL, REPAIR_PER_UNIT, REPAIR_TAG_DISPLAY,
 } from '../data/anvil';
 import { CONFLICTS, ENCHANTS, fitsItem } from '../data/enchants';
 import { ITEM_BY_NAME, itemDef, maxStackOf, type ItemStack } from '../data/items';
@@ -49,6 +49,20 @@ function repairItemsOf(item: number): readonly number[] {
 }
 
 const NONE: readonly number[] = [];
+
+/**
+ * Nome do material que conserta `item`, em minúsculas para caber no meio da
+ * frase ("conserta com diamante"). `null` se nada conserta.
+ */
+export function repairMaterialName(item: number): string | null {
+  const def = itemDef(item);
+  if (def === undefined || (def.durability ?? 0) <= 0) return null;
+  const material = REPAIR_MATERIAL[def.name.slice(0, def.name.indexOf('_'))];
+  if (material === undefined) return null;
+  if (material.startsWith('#')) return REPAIR_TAG_DISPLAY[material.slice(1)] ?? null;
+  const display = ITEM_BY_NAME.get(material)?.display;
+  return display === undefined ? null : display.toLowerCase();
+}
 
 /** true se `material` conserta `item` (a madeira aceita qualquer tábua). */
 export function repairsWith(item: number, material: number): boolean {

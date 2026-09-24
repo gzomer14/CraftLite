@@ -10,7 +10,6 @@
 
 import { itemDef, type ItemStack } from '../../data/items';
 import { describeEnchants, type EnchantOffer } from '../../game/enchanting';
-import { enchantDef } from '../../data/enchants';
 import {
   ARMOR_START, CRAFT_RESULT, CRAFT_START, HOTBAR_END, HOTBAR_START, MAIN_END, MAIN_START,
   OFFHAND, type ClickButton, type Inventory,
@@ -23,6 +22,7 @@ import { clickContainer } from './containerclick';
 import { injectStyle } from './screenstyle';
 import { TradePanel } from './tradepanel';
 import { AnvilPanel, type AnvilStatus } from './anvilpanel';
+import { EnchantPanel, type EnchantResult, type EnchantStatus } from './enchantpanel';
 import type { TradeOfferView, TradeResult } from '../../game/trading';
 import type { RecipeEntry } from '../../game/crafting';
 
@@ -31,8 +31,7 @@ export type ScreenKind =
   | 'none' | 'inventory' | 'crafting' | 'furnace' | 'chest' | 'enchanting' | 'trading'
   | 'anvil';
 
-/** Por que uma oferta de encantamento não pôde ser comprada. */
-export type EnchantResult = 'ok' | 'no-offer' | 'no-level' | 'no-lapis';
+export type { EnchantResult } from './enchantpanel';
 
 /** Um slot desenhado: de onde vem o item e para onde vai o clique. */
 interface SlotView {
@@ -68,8 +67,8 @@ export interface ContainerScreenCallbacks {
   onEnchantRefresh?: () => void;
   /** Compra a oferta; a mensagem de erro vem do retorno. */
   onBuyEnchant?: (slot: number) => EnchantResult;
-  /** Nível de experiência do jogador, para pintar a oferta cara de vermelho. */
-  xpLevel?: () => number;
+  /** Frase, nível, lápis e estantes da mesa aberta, para o painel. */
+  enchantStatus?: () => EnchantStatus;
   /**
    * O jogador tirou o item da fornalha: hora de entregar o XP guardado e de
    * contar o item como obtido (conquistas).
@@ -90,7 +89,7 @@ export interface ContainerScreenCallbacks {
   onAnvilChange?: (name?: string) => void;
   /** Tira o resultado: cobra e devolve a peça, ou `null` se não pode. */
   onAnvilTake?: () => ItemStack | null;
-  /** Custo e bloqueio atuais, para o painel. */
+  /** Frase do próximo passo e nome atual, para o painel. */
   anvilStatus?: () => AnvilStatus;
 }
 
@@ -162,9 +161,8 @@ export class ContainerScreen {
   private sideColumn!: HTMLDivElement;
   private mainColumn!: HTMLDivElement;
   private column!: HTMLDivElement;
-  /** Botões das três ofertas da mesa; criados junto com a tela. */
-  private readonly offerButtons: HTMLButtonElement[] = [];
-  private readonly offerHint: HTMLDivElement;
+  /** Ofertas e frase da mesa de encantamento, criadas na primeira abertura. */
+  private enchantPanel: EnchantPanel | null = null;
 
   private inventory: Inventory | null = null;
   private container: ContainerView | null = null;
@@ -238,13 +236,6 @@ export class ContainerScreen {
       this.refresh();
     });
     this.bookToggle = bookToggle;
-
-    // Dica sob as ofertas: "faltam níveis", "faltou lápis". Um botão que não
-    // funciona sem explicar por quê é o pior retorno possível.
-    this.offerHint = document.createElement('div');
-    this.offerHint.className = 'offer-hint';
-    this.offerHint.setAttribute('role', 'status');
-    this.offerHint.hidden = true;
 
     /*
      * Botão de fechar.
@@ -411,9 +402,19 @@ export class ContainerScreen {
       this.addSection('', 1, [2], 'cont', 'Saída');
       this.addFurnaceProgress();
     } else if (this.kind === 'enchanting') {
-      this.addSection('Item', 1, [ENCHANT_ITEM], 'cont', 'Item a encantar');
-      this.addSection('', 1, [ENCHANT_LAPIS], 'cont', 'Lápis-lazúli');
-      this.addOffers();
+      this.addStation([[ENCHANT_ITEM, 'Item'], [ENCHANT_LAPIS, 'Lápis']]);
+      this.enchantPanel ??= new EnchantPanel({
+        offers: () => this.callbacks.enchantOffers?.() ?? [],
+        status: () => this.callbacks.enchantStatus?.()
+          ?? { help: '', level: 0, lapis: 0, shelves: 0, creative: false },
+        buy: (slot) => {
+          const result = this.callbacks.onBuyEnchant?.(slot) ?? 'no-offer';
+          this.refresh();
+          return result;
+        },
+      });
+      this.enchantPanel.reset();
+      this.column.appendChild(this.enchantPanel.element);
     } else if (this.kind === 'trading') {
       this.trades ??= new TradePanel({
         offers: () => this.callbacks.tradeOffers?.() ?? [],
@@ -428,14 +429,12 @@ export class ContainerScreen {
       this.trades.reset();
       this.column.appendChild(this.trades.element);
     } else if (this.kind === 'anvil') {
-      this.addSection('Bigorna', 1, [0], 'cont', 'Peça');
-      this.addSection('', 1, [1], 'cont', 'Material, peça ou livro');
+      this.addStation([[0, 'Item'], '+', [1, 'Material'], '→', [2, 'Resultado']]);
       this.anvilPanel ??= new AnvilPanel({
         onName: (name) => { this.callbacks.onAnvilChange?.(name); this.refresh(); },
       });
       this.anvilPanel.reset();
       this.column.appendChild(this.anvilPanel.element);
-      this.addSection('', 1, [2], 'cont', 'Resultado');
     } else if (this.kind === 'chest') {
       // Baú, e desde o M15 também funil, dispensador e liberador: a mesma
       // grade, com a largura e o título do contêiner.
@@ -483,13 +482,54 @@ export class ContainerScreen {
     const row = document.createElement('div');
     row.className = 'slots';
     row.style.setProperty('--cols', String(columns));
-    if (hint !== undefined) row.dataset.hint = hint;
 
     for (let i = 0; i < indices.length; i++) {
       row.appendChild(this.makeSlot(source, indices[i], placeholders?.[i]));
     }
     section.appendChild(row);
+    /*
+     * O rótulo do slot único ("Entrada", "Combustível") vai escrito embaixo.
+     * Até 2026-09-24 ele ia para um `data-hint` que nenhum CSS lia: existia no
+     * DOM e não aparecia na tela (relato de campo da mesa de encantamento).
+     */
+    if (hint !== undefined) {
+      const caption = document.createElement('div');
+      caption.className = 'slot-caption';
+      caption.textContent = hint;
+      section.appendChild(caption);
+    }
     this.column.appendChild(section);
+  }
+
+  /**
+   * Os slots de uma estação de trabalho numa fileira, cada um com o rótulo
+   * embaixo, e sinais entre eles: `Item + Material → Resultado`.
+   *
+   * O slot vazio não serve de rótulo para si mesmo — com 18 unidades de
+   * largura, "Material" não cabe dentro dele num celular. Por isso o nome
+   * fica embaixo, legível, e dentro do slot só vale para o leitor de tela.
+   */
+  private addStation(parts: readonly (readonly [number, string] | string)[]): void {
+    const row = document.createElement('div');
+    row.className = 'section station';
+    for (const part of parts) {
+      if (typeof part === 'string') {
+        const sign = document.createElement('span');
+        sign.className = 'station-sign';
+        sign.textContent = part;
+        sign.setAttribute('aria-hidden', 'true');
+        row.appendChild(sign);
+        continue;
+      }
+      const cell = document.createElement('div');
+      cell.className = 'station-cell';
+      const caption = document.createElement('div');
+      caption.className = 'slot-caption';
+      caption.textContent = part[1];
+      cell.append(this.makeSlot('cont', part[0], part[1]), caption);
+      row.appendChild(cell);
+    }
+    this.column.appendChild(row);
   }
 
   /**
@@ -532,36 +572,6 @@ export class ContainerScreen {
     row.append(arrow, this.makeSlot('inv', CRAFT_RESULT));
     section.appendChild(row);
     this.column.appendChild(section);
-  }
-
-  /** Os três botões de oferta da mesa. */
-  private addOffers(): void {
-    this.offerButtons.length = 0;
-    const list = document.createElement('div');
-    list.className = 'offers';
-    for (let slot = 0; slot < 3; slot++) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'offer';
-      button.disabled = true;
-      button.addEventListener('click', () => this.buyOffer(slot));
-      list.appendChild(button);
-      this.offerButtons.push(button);
-    }
-    this.grid.append(list, this.offerHint);
-  }
-
-  private buyOffer(slot: number): void {
-    const result = this.callbacks.onBuyEnchant?.(slot) ?? 'no-offer';
-    const messages: Record<EnchantResult, string> = {
-      ok: 'Encantado!',
-      'no-offer': 'Nada para encantar',
-      'no-level': 'Faltam níveis de experiência',
-      'no-lapis': 'Falta lápis-lazúli',
-    };
-    this.offerHint.textContent = messages[result];
-    this.offerHint.hidden = false;
-    this.refresh();
   }
 
   private addFurnaceProgress(): void {
@@ -814,44 +824,15 @@ export class ContainerScreen {
     }
 
     if (this.kind === 'furnace') this.refreshFurnace();
-    if (this.kind === 'enchanting') this.refreshOffers();
+    if (this.kind === 'enchanting') {
+      // As ofertas dependem do item no slot: três hashes por redesenho.
+      this.callbacks.onEnchantRefresh?.();
+      this.enchantPanel?.refresh();
+    }
     if (this.kind === 'trading') this.trades?.refresh();
     if (this.kind === 'anvil') {
       const status = this.callbacks.anvilStatus?.();
       if (status !== undefined) this.anvilPanel?.refresh(status);
-    }
-  }
-
-  /**
-   * Redesenha as três ofertas. As ofertas dependem do item no slot, então o
-   * recálculo acontece a cada redesenho — são três hashes, não custa nada.
-   */
-  private refreshOffers(): void {
-    this.callbacks.onEnchantRefresh?.();
-    const offers = this.callbacks.enchantOffers?.() ?? [];
-    const level = this.callbacks.xpLevel?.() ?? 0;
-    const lapis = this.container?.get(ENCHANT_LAPIS)?.count ?? 0;
-
-    for (let slot = 0; slot < this.offerButtons.length; slot++) {
-      const button = this.offerButtons[slot];
-      const offer = offers[slot];
-      if (offer === undefined || offer.enchant < 0) {
-        button.disabled = true;
-        button.textContent = '—';
-        button.classList.remove('affordable');
-        button.setAttribute('aria-label', `Oferta ${slot + 1}: indisponível`);
-        continue;
-      }
-      const def = enchantDef(offer.enchant);
-      const name = def?.display ?? '?';
-      const affordable = level >= offer.cost && lapis >= offer.lapis;
-      button.disabled = !affordable;
-      button.classList.toggle('affordable', affordable);
-      button.textContent = `${name} ${offer.level}\n${offer.cost} níveis · ${offer.lapis} lápis`;
-      button.setAttribute(
-        'aria-label',
-        `${name} nível ${offer.level}, custa ${offer.cost} níveis e ${offer.lapis} lápis-lazúli`,
-      );
     }
   }
 

@@ -9,7 +9,11 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-24 11:45 — **M15 fechado: oficina.** Bigorna (consertar,
+**Última atualização:** 2026-09-24 15:28 — **M15 no campo, primeira volta.** A mesa de
+encantamento e a bigorna não diziam qual slot recebia o quê (os rótulos existiam no DOM e nenhum
+CSS os mostrava), e o funil não entrava em cima do baú porque o toque abria o baú. Slots com nome
+embaixo, uma frase com o próximo passo e a regra de colocar funil colado em contêiner (§3, M15).
+Antes, 11:45: **M15 fechado: oficina.** Bigorna (consertar,
 juntar, livro encantado, nome), reparo na grade, livro encantado saído da mesa, funil,
 dispensador, liberador, comparador e observador — o circuito passou a mexer em item. Os dois
 critérios do doc 14 medidos. A memória de áudio saiu do teto (3,497 → 3,140 MB) sem tirar som, e
@@ -46,7 +50,7 @@ três perdas de encantamento antigas foram corrigidas (§4). Antes, 11:03: M14 v
 | **M12** O mundo chega antes do jogador | culling por conectividade e por direção de face, cópia de vizinhança fora da thread principal, luz na borda do chunk | ✅ **validado em campo em 2026-09-23** | preset do T0 não revisto (sem T0 na mão) — §3 |
 | **M13** Casa em ordem | uso de item como dado, `session.ts` e `main.ts` abaixo de 700 linhas, lã e cama em 16 cores por tint | ✅ **validado em campo em 2026-09-23** | — |
 | **M14** Água e paisagem | visão submersa, rios, pesca, afogado, lua com fases, biomas por tint, selva | ✅ **validado em campo em 2026-09-24** | muda o terreno gerado: **mundo antigo ganha costura** (§3) |
-| **M15** Oficina | bigorna, reparo na grade, funil, dispensador, comparador, observador | ✅ concluído em 2026-09-24 | **não visto em aparelho** (§6) |
+| **M15** Oficina | bigorna, reparo na grade, funil, dispensador, comparador, observador | ✅ concluído em 2026-09-24; **1ª volta de campo corrigida** (telas e funil) | reteste no aparelho (§6) |
 | **M16** Um fim para a jornada | fortaleza do Nether, blaze, poções, olho do ender, End, dragão, créditos | ⬜ proposto (2026-09-22) | depende de M11 (efeitos) e M13 (atlas); a bruxa veio para cá (§5) |
 | **M17** Alcance | menu Idioma (doc 08 §3.11) com `en`, primeira hora guiada, seed compartilhável | ⬜ proposto (2026-09-22) | — |
 
@@ -61,13 +65,13 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-24 11:40, ao fechar o M15, com `npm test`, `npm run build`,
+Medidas em 2026-09-24 15:28, na primeira volta de campo do M15, com `npm test`, `npm run build`,
 `SIZE_BUDGET_KB=350 npm run size` e `npm run smoke`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **265,7 KB** (257,9 antes do M15; 249,5 antes do M14; 240,0 antes do M10) | < 350 KB | `npm run size` |
-| Testes | **2156**, 109 arquivos (2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **267,3 KB** (265,7 ao fechar o M15; 257,9 antes do M15; 249,5 antes do M14; 240,0 antes do M10) | < 350 KB | `npm run size` |
+| Testes | **2164**, 109 arquivos (2156 ao fechar o M15; 2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
 | Smoke test de navegador | **7 passos verdes**: carregar, criar, andar 10 s, quebrar, salvar, recarregar, conferir | verde | `npm run smoke` |
 | Camadas de atlas | **212** com a oficina (+11: bigorna, funil, dispensador, liberador, comparador, observador); 201 com a selva; 194 antes do M14 | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Memória de áudio | **3,140 MB** (3,497 no M14, colado no teto): degrau de ¼ da taxa para som grave, sem tirar nenhum (§4) | < 3,5 MB | `tests/audio.test.ts` |
@@ -1744,6 +1748,36 @@ tick (teto 5).
 do funil dentro do baú, a boca do dispensador, a fenda do liberador e a cara do observador para
 quem os colocou) e a tela da bigorna com o nome digitado, o custo e a picareta consertada.
 
+**Primeira volta de campo (2026-09-24 15:28).** Relato: *"Não consegui utilizar a mesa de
+encantamento. Não entendi muito bem o que cada campo faz, inclusive na bigorna (…) Para o funil
+também não consegui utilizá-lo, pois ao tentar colocar em cima de um baú por exemplo o baú se
+abre."* Três causas, três correções:
+
+- **Os rótulos dos slots nunca apareceram.** "Item a encantar", "Lápis-lazúli", "Peça" e
+  "Resultado" iam para um `data-hint` que nenhum CSS lia — e o da fornalha ("Entrada",
+  "Combustível", "Saída") também, desde o primeiro commit. Agora a mesa e a bigorna montam a fileira com o nome
+  **embaixo** de cada slot e os sinais entre eles (`Item + Material → Resultado`,
+  `addStation` em `ui/containers/screen.ts`), e a fornalha escreve o rótulo sob o slot. Textos com
+  piso de 10–11 px: na escala do celular deitado, 4 unidades davam 7 px.
+- **Nada dizia o que faltava.** Uma frase embaixo dos slots diz o próximo passo, calculada sem DOM
+  em `game/stationhelp.ts`: na mesa, pôr o item, depois o lápis, depois tocar (com o nível que o
+  jogador tem); na bigorna, o material de conserto **pelo nome** ("diamante para consertar"), "X não
+  serve aqui. Este item conserta com Y", "não está gasto", o custo e "você tem N". A oferta da mesa
+  que existe mas não cabe no bolso deixou de ficar apagada: mostra "falta nível" ou "falta lápis",
+  e o toque responde. As ofertas saíram de `screen.ts` para `ui/containers/enchantpanel.ts`.
+- **O toque no baú abria o baú mesmo com o funil na mão.** O gênero pede agachar, e isso **não
+  existia**: `useHeld` nem olhava o agachar. Agora, agachado e com algo na mão, o clique vai direto
+  para o item. E como no toque agachar e mirar pedem dois dedos, uma segunda regra
+  (`placesOnContainer` em `game/tiles.ts`): quando o bloco na mão e o mirado são contêineres e um
+  deles é de automação (funil, dispensador, liberador), o toque **coloca**. Baú em baú e fornalha em
+  baú continuam abrindo. Desvio consciente, no comentário da função.
+
+Vistas no Chrome headless a 780×360: mesa vazia, sem lápis e com ofertas; bigorna vazia, com item,
+com material certo e com material errado; fornalha. Testes em `tests/workshop.test.ts` (frases e
+colocação pelo caminho do clique). Numa das cinco rodadas da suíte **um teste falhou e não se
+repetiu** nas quatro seguintes; a saída daquela rodada não foi guardada, então não se sabe qual —
+provável orçamento de tempo com a máquina ocupada.
+
 **Desvios conscientes, no comentário do módulo:** sem custo de trabalho anterior, a bigorna não se
 desgasta nem cai (`game/anvil.ts`) — por isso o "Caro demais" (40 níveis) não é alcançável com
 os 8 encantamentos de hoje, que somam no máximo ~25; nome só em item que não empilha; o
@@ -1758,6 +1792,8 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-24 | `ui/containers/screen.ts` | **Os rótulos dos slots de slot único nunca apareceram** (M4). A fornalha passava "Entrada", "Combustível" e "Saída" para `addSection`, que os guardava num `data-hint` sem CSS nenhum desde o primeiro commit: estavam no DOM e não na tela. Achado no relato de campo da mesa de encantamento (§3, M15); agora vão escritos embaixo do slot. |
+| 2026-09-24 | `game/session.ts` | **Agachar não mudava o clique** (desde o primeiro commit). O gênero coloca o bloco ao lado do baú quando se está agachado; aqui o clique num contêiner, porta ou alavanca sempre respondia ao bloco. Agora, agachado com algo na mão, o clique vai para o item. Regressão em `tests/workshop.test.ts`. |
 | 2026-09-24 | `game/inventory.ts`, `ui/containers/containerclick.ts`, `game/workbench.ts` | **Três cópias de pilha perdiam o encantamento** (M6). Tirar metade com clique direito (numa espada, "metade" é ela inteira), soltar uma unidade com clique direito e **jogar fora com Q** montavam a pilha nova campo a campo, sem o `ench`: a espada encantada saía comum. Agora a cópia é da pilha inteira, e `giveStack` guarda com encantamento e nome. Regressões em `tests/workshop.test.ts` ("pilhas inteiras"). |
 | 2026-09-24 | `audio/synth.ts` | **A memória de áudio estava a 3 KB do teto** (M14: 3,497 de 3,5 MB). Degrau de ¼ da taxa para som grave: 3,140 MB sem tirar som, com nova tentativa em 8 kHz se o navegador recusar (§3, M15). |
 | 2026-09-24 | `render/sky.ts` | **Sol e lua trocados** (M1). O ciclo põe o meio-dia em 6000, mas o céu calculava `sunDir.y = −cos`: o disco do sol ficava **debaixo do chão ao meio-dia e a pino à meia-noite**, e a lua, sempre oposta, nunca subia à noite. Achado ao pôr as fases da lua (M14): as capturas da meia-noite mostravam o mesmo disco brilhante nas quatro fases. A conta saiu para `sunDirection`, com o sinal certo. Regressão em `tests/moon.test.ts`. |
@@ -1932,7 +1968,7 @@ ligação de aldeia, caderno e pesca na `Session`. Não depende de nada.
 **Pendência aberta em 2026-09-24 (M15): três módulos cresceram acima do teto.** `world/redstone.ts`
 tem **1116** linhas (981 antes; as contas novas foram para `redstoneparts.ts`, ficaram os ganchos),
 `ui/containers/screen.ts` **949** (916; a bigorna foi para `anvilpanel.ts`, ficaram a grade e os
-callbacks) e `session.ts` 816. O corte natural do circuito é por papel — pó e energia, componentes,
+callbacks; **930** depois que as ofertas da mesa foram para `enchantpanel.ts`, na volta de campo) e `session.ts` 816. O corte natural do circuito é por papel — pó e energia, componentes,
 pistão —, e o da tela, a grade de slots de um lado e os painéis do outro. Não depende de nada.
 
 **Pendências abertas em 2026-09-24 (M14):**
@@ -2095,10 +2131,15 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
 
 ## 6. Próximo passo recomendado
 
-0. **Olhar o M15 num aparelho**, e depois escolher entre M16 (fim da jornada) e M17 (alcance).
-   O M15 só foi visto em testes e no Chrome headless. Em ordem de quanto pode estar errado:
-   - **tela da bigorna no celular**: peça, material, o campo do nome (o teclado do celular abre e
-     não fecha a tela?), o custo em verde ou "faltam níveis" em vermelho, e tirar o resultado com
+0. **Olhar o M15 num aparelho de novo**, e depois escolher entre M16 (fim da jornada) e M17
+   (alcance). A primeira volta (2026-09-24) achou as telas confusas e o funil que não entrava em
+   cima do baú — corrigidos (§3, M15). Em ordem de quanto pode estar errado:
+   - **mesa de encantamento**: os rótulos Item e Lápis, a frase de cima mudando a cada passo, e
+     uma oferta encantando de verdade com lápis e nível. Os textos são legíveis no aparelho?
+   - **funil em cima do baú, com o funil na mão**: o toque coloca, não abre. E baú em cima do funil.
+     Agachado (botão ▼) com qualquer bloco na mão, o toque no baú coloca ao lado;
+   - **tela da bigorna no celular**: Item + Material → Resultado, a frase dizendo o material certo,
+     o campo do nome (o teclado do celular abre e não fecha a tela?), e tirar o resultado com
      toque. Depois um livro encantado numa ferramenta;
    - **funil e fornalha**: baú em cima de um funil em cima de uma fornalha, carvão por um funil de
      lado, e um funil embaixo levando a saída para um baú — deixar a fornalha trabalhar sozinha;

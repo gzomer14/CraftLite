@@ -9,12 +9,9 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-24 10:45 — **M14 fechado: água e paisagem.** Visão de dentro da
-água e da lava, rios, pesca, afogado, lua com fases, tint de grama/folha/água por bioma (com
-floresta de bétula, planície florida e pântano escuro) e selva. No caminho, três achados antigos
-(§4): **sol e lua trocados desde o M1**, **o tint de bioma do doc 03 nunca existiu** e **o clima
-não chegava às pontas** — floresta 0,3% da terra, savana e pântano zero. M9 e M10 validados em
-campo. Antes, 2026-09-23 17:53: M10 no campo.
+**Última atualização:** 2026-09-24 11:03 — **M14 validado em campo**: *"Tudo testado e funcionando
+perfeitamente."* Próximo: escolher entre M15, M16 e M17 (§6). Antes, 2026-09-24 10:45: M14
+fechado — água e paisagem, com sol e lua corrigidos, tint de bioma e clima espalhado (§3, §4).
 ---
 
 ## 1. Panorama
@@ -46,7 +43,7 @@ campo. Antes, 2026-09-23 17:53: M10 no campo.
 | **M11** O que os documentos já pediam | areia que cai, pedregulho de lava, balde, tesoura, ovelha colorida, planta que cresce, efeitos de status, comidas e estruturas que faltavam, nascimento em terra firme, smoke test | ✅ **validado em campo em 2026-09-23** | — |
 | **M12** O mundo chega antes do jogador | culling por conectividade e por direção de face, cópia de vizinhança fora da thread principal, luz na borda do chunk | ✅ **validado em campo em 2026-09-23** | preset do T0 não revisto (sem T0 na mão) — §3 |
 | **M13** Casa em ordem | uso de item como dado, `session.ts` e `main.ts` abaixo de 700 linhas, lã e cama em 16 cores por tint | ✅ **validado em campo em 2026-09-23** | — |
-| **M14** Água e paisagem | visão submersa, rios, pesca, afogado, lua com fases, biomas por tint, selva | ✅ concluído em 2026-09-24 | **não visto em aparelho** (§6); muda o terreno gerado: **mundo antigo ganha costura** (§3) |
+| **M14** Água e paisagem | visão submersa, rios, pesca, afogado, lua com fases, biomas por tint, selva | ✅ **validado em campo em 2026-09-24** | muda o terreno gerado: **mundo antigo ganha costura** (§3) |
 | **M15** Oficina | bigorna, reparo na grade, funil, dispensador, comparador, observador | ⬜ proposto (2026-09-22) | — |
 | **M16** Um fim para a jornada | fortaleza do Nether, blaze, poções, olho do ender, End, dragão, créditos | ⬜ proposto (2026-09-22) | depende de M11 (efeitos) e M13 (atlas); a bruxa veio para cá (§5) |
 | **M17** Alcance | menu Idioma (doc 08 §3.11) com `en`, primeira hora guiada, seed compartilhável | ⬜ proposto (2026-09-22) | — |
@@ -2035,10 +2032,11 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
 
 ## 6. Próximo passo recomendado
 
-0. **Olhar o M14 num aparelho, num mundo novo** (o rio e o clima só existem em terreno gerado
-   depois do M14), e depois escolher o próximo marco (M15 oficina, M16 fim da jornada ou M17
-   alcance). O M14 só foi visto em testes e no Chrome headless. Em ordem de quanto pode estar
-   errado:
+0. **Escolher o próximo marco**: M15 oficina, M16 fim da jornada ou M17 alcance (doc 14). Antes
+   do M15 ou do M16, resolver a memória de áudio no teto (§5).
+
+   ~~**Olhar o M14 num aparelho, num mundo novo**~~ — **feito em 2026-09-24**: *"Tudo testado e
+   funcionando perfeitamente."* O roteiro que foi seguido, para referência:
    - **cor da grama por bioma**: andar da planície para a floresta, o deserto e a neve; a cor tem que
      mudar em degradê, sem costura quadrada de chunk. Se aparecer um chunk com a cor errada por um
      instante ao chegar, é o anel de clima (`FILLS_PER_FRAME` em `render/biometint.ts`). **E o FPS

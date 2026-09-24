@@ -12,6 +12,24 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-24 11:03 · M14 validado em campo
+
+**Pedido:** *"Tudo testado e funcionando perfeitamente. Me relembre o que são cada um dos marcos
+restantes"*.
+
+**Resultado:** M14 registrado como validado em aparelho; o §6 passa a pedir a escolha entre M15,
+M16 e M17. Só documentação.
+
+Portões: **2116 testes** em 108 arquivos, lint limpo, build ok, **257,9 KB** de 350.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `docs/15-status.md` | topo, §1 (M14 validado), §6 |
+| `~` | `docs/16-auditoria.md` | esta sessão |
+| `~` | `README.md` | M14 validado em aparelho |
+
+---
+
 ## 2026-09-24 · 09:20 → 10:50 · M14: água e paisagem
 
 **Pedido:** *"Já havia feito os testes no celular, tudo funcionando perfeitamente. Vamos seguir com

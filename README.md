@@ -21,7 +21,7 @@ itens no chão passaram a ir para o save — validado em aparelho. O **M14** (20
 e na paisagem: ver de dentro da água e da lava, rios que descem até o mar, pesca, o afogado, a lua
 com oito fases, a cor da grama, da folha e da água por bioma (com floresta de bétula, planície
 florida e pântano) e a selva — e no caminho pôs o sol no céu de dia, que desde o M1 passava a
-meia-noite a pino. Ainda não visto em aparelho. Seguem M15 a M17 no roteiro.
+meia-noite a pino — validado em aparelho. Seguem M15 a M17 no roteiro.
 
 - **M0 — esqueleto:** Vite + TypeScript strict, renderer WebGL2 próprio com fallback WebGL1,
   detecção de tier, loop de 20 Hz com interpolação, gerador procedural de texturas alimentando um

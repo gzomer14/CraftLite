@@ -28,18 +28,40 @@
  * duas rotas leem os mesmos nós de uma rede ancorada em coordenada de mundo.
  */
 
-import { BIOMES, pickBiome } from '../../data/biomes';
+import { BIOMES, BIOME_BEACH, BIOME_OCEAN, BIOME_RIVER, pickBiome } from '../../data/biomes';
 import { Noise } from '../../core/noise';
+import { CLIMATE_STEP, humidityNode, temperatureNode } from './climate';
 import { clamp, spline } from '../../core/math';
 import { SEA_LEVEL, SECTION_SIZE, WORLD_HEIGHT } from '../chunk';
 
 /** Frequências do doc 03 §4.1, em 1/blocos. */
 const FREQ_CONTINENT = 1 / 2000;
 const FREQ_EROSION = 1 / 1500;
-const FREQ_TEMPERATURE = 1 / 1200;
-const FREQ_HUMIDITY = 1 / 1000;
 const FREQ_WEIRDNESS = 1 / 800;
 const FREQ_DETAIL = 1 / 60;
+
+/**
+ * Rios (M14). O leito é onde `|ruído|` passa perto de zero: uma linha fina e
+ * sinuosa, sem começo nem fim, que o warp entorta para não sair reta.
+ *
+ * O perfil é um vale, não uma vala. A margem (`RIVER_BANK`) **alarga com o
+ * desnível** até o leito, e é isso que impede a parede: descer 20 blocos até
+ * a água leva 20 blocos de margem, não um. E o rio some no terreno alto
+ * (`RIVER_FADE_*`) — nasce no pé do morro em vez de rasgar a montanha num
+ * cânion de paredes verticais.
+ */
+const FREQ_RIVER = 1 / 420;
+const RIVER_WARP = 40;
+/** `|ruído|` abaixo disto é leito. Com o gradiente do ruído, ~6 a 10 blocos de largura. */
+const RIVER_CORE = 0.017;
+/** Margem mínima e quanto ela cresce por bloco de desnível, em unidades de ruído. */
+const RIVER_BANK = 0.03;
+const RIVER_BANK_PER_BLOCK = 0.01;
+/** Cota do leito: três blocos de água no meio do rio. */
+export const RIVER_BED = SEA_LEVEL - 3;
+/** Faixa de altura em que o rio perde força, até sumir. */
+const RIVER_FADE_LOW = SEA_LEVEL + 12;
+const RIVER_FADE_HIGH = SEA_LEVEL + 26;
 
 /** Spline de continentalidade do doc 03 §4.2 — oceano em −1, planalto em +1. */
 const CONT_X = [-1.0, -0.4, -0.15, 0.0, 0.3, 0.6, 1.0];
@@ -57,7 +79,7 @@ const MAP_COUNT = 5;
  * Passo da rede dos mapas lentos. Eles variam entre 1/800 e 1/2000 — 8 blocos
  * entre amostras é fino demais para o olho e grosso o bastante para o custo.
  */
-const SLOW_STEP = 8;
+const SLOW_STEP = CLIMATE_STEP;
 
 /** Passo da rede de bioma, e raio do kernel: 5×5 a cada 4 blocos (doc 03 §4.3). */
 const BIOME_STEP = 4;
@@ -90,6 +112,8 @@ export interface HeightNoise {
   readonly humidity: Noise;
   readonly weirdness: Noise;
   readonly detail: Noise;
+  /** Canal dos rios (M14). */
+  readonly river: Noise;
 }
 
 /** Amostra de coluna: o que os mapas dizem sobre um `(x, z)`. */
@@ -119,8 +143,8 @@ function slowNode(noise: HeightNoise, map: number, nx: number, nz: number): numb
   switch (map) {
     case MAP_CONTINENT: return noise.continent.fbm2(nx, nz, 4, FREQ_CONTINENT);
     case MAP_EROSION: return noise.erosion.fbm2(nx, nz, 4, FREQ_EROSION);
-    case MAP_TEMPERATURE: return noise.temperature.fbm2(nx, nz, 3, FREQ_TEMPERATURE);
-    case MAP_HUMIDITY: return noise.humidity.fbm2(nx, nz, 3, FREQ_HUMIDITY);
+    case MAP_TEMPERATURE: return temperatureNode(noise.temperature, nx, nz);
+    case MAP_HUMIDITY: return humidityNode(noise.humidity, nx, nz);
     default: return noise.weirdness.fbm2(nx, nz, 3, FREQ_WEIRDNESS);
   }
 }
@@ -257,15 +281,40 @@ export class HeightField {
       scale = this.blendedFar(wx, wz, false);
     }
 
-    const h = softCeiling(h0 + offset + detail * amp * (scale - 1) * 0.5);
+    const land = softCeiling(h0 + offset + detail * amp * (scale - 1) * 0.5);
+    // A força do rio lê a altura **lisa** (sem o ruído de detalhe): lida da
+    // altura final, a faixa em que o rio perde força copiava cada lombada do
+    // detalhe e a multiplicava pela profundidade do vale — parede de 13.
+    const h = this.carveRiver(wx, wz, land, spline(CONT_X, CONT_Y, cont) + offset);
     const out = this.sample_;
     out.height = Math.round(clamp(h, 4, MAX_HEIGHT));
-    out.biome = biome;
+    // Rio é a água que só existe por causa do canal: o mar e a praia continuam
+    // sendo mar e praia onde o rio desemboca.
+    out.biome = out.height < SEA_LEVEL && land >= SEA_LEVEL
+      && biome !== BIOME_OCEAN && biome !== BIOME_BEACH ? BIOME_RIVER : biome;
     out.temperature = temp;
     out.humidity = humid;
     out.erosion = ero;
     out.continent = cont;
     return out;
+  }
+
+  /**
+   * Altura depois do rio. `smooth` é a altura sem o detalhe, que decide onde
+   * o rio tem força. Fora do vale devolve `land` intacto; no leito,
+   * `RIVER_BED`; entre os dois, uma curva suave cuja largura cresce com o
+   * desnível — ver `FREQ_RIVER`.
+   */
+  private carveRiver(wx: number, wz: number, land: number, smooth: number): number {
+    if (land <= RIVER_BED || smooth >= RIVER_FADE_HIGH) return land;
+    const strength = 1 - smooth01((smooth - RIVER_FADE_LOW) / (RIVER_FADE_HIGH - RIVER_FADE_LOW));
+    if (strength <= 0) return land;
+    const drop = land - RIVER_BED;
+    const bank = RIVER_BANK + drop * RIVER_BANK_PER_BLOCK;
+    const r = Math.abs(this.noise.river.warpedFbm2(wx, wz, 2, FREQ_RIVER, RIVER_WARP));
+    if (r >= RIVER_CORE + bank) return land;
+    const valley = RIVER_BED + drop * smooth01((r - RIVER_CORE) / bank);
+    return land + (valley - land) * strength;
   }
 
   /** Os cinco mapas lentos em `(wx, wz)`, por bilinear entre nós da rede. */
@@ -354,6 +403,12 @@ export class HeightField {
     }
     return sum / KERNEL_SUM;
   }
+}
+
+/** Smoothstep em 0..1, com a entrada já presa. */
+function smooth01(t: number): number {
+  const c = t < 0 ? 0 : t > 1 ? 1 : t;
+  return c * c * (3 - 2 * c);
 }
 
 /** Bilinear numa rede quadrada, com coordenada já em passos de rede. */

@@ -15,8 +15,17 @@ import { mobDef } from '../data/mobs';
 import { modelOf } from '../data/mobmodels';
 import { SHAPE_BY_NAME, boundsFor } from '../world/mesh/shapes';
 import { FLAG_SLEEPING } from '../entity/mobstore';
-import { ARROW_LAYER, BOAT_LAYER, MINECART_LAYER, type EntityAtlas } from './entityatlas';
+import {
+  ARROW_LAYER, BOAT_LAYER, BOBBER_LAYER, FISHING_LINE_LAYER, MINECART_LAYER, type EntityAtlas,
+} from './entityatlas';
 import { SIGN_TEXT_DISTANCE, type SignTextPass } from './signtext';
+import { LINE_FLYING } from '../game/fishing';
+
+/** Teto de trechos da linha de pesca: o batcher de entidades é finito. */
+const LINE_SEGMENTS = 32;
+/** Onde a ponta da vara aparece na tela, em NDC (medido na captura, M14). */
+const ROD_TIP_NDC: readonly [number, number] = [0.76, -0.26];
+import { mediumOfBlock } from './medium';
 import type { Atlas } from './atlas';
 import type { ItemRenderer } from './itemrender';
 import type { MobRenderer } from './mobrender';
@@ -48,6 +57,11 @@ export class SceneFeed {
 
   constructor(deps: SceneFeedDeps) {
     this.d = deps;
+    // Visão de dentro da água e da lava (M14): o bloco do olho, lido no quadro.
+    const world = deps.world;
+    // E o clima do tint de bioma sai da seed deste mundo.
+    deps.renderer.setSeed(world.seed);
+    deps.renderer.mediumAt = (x, y, z) => mediumOfBlock(defOf(world.getBlock(x, y, z)).name);
   }
 
   /** Um quadro. `paused` apaga o contorno do bloco mirado. */
@@ -147,6 +161,7 @@ export class SceneFeed {
     session.vehicles.carts.forEach(this.addCart, alpha);
     session.vehicles.boats.forEach(this.addBoat, alpha);
     session.projectiles.forEach(this.addArrow, alpha);
+    this.fishingLine(alpha);
 
     // Sombras por último: elas fecham o buffer para poderem ser desenhadas com
     // blending numa segunda chamada.
@@ -157,6 +172,78 @@ export class SceneFeed {
       const groundY = Math.floor(store.y[i]);
       const light = world.getSkyLight(Math.floor(x), groundY, Math.floor(z)) * dayFactor;
       mobRenderer.addShadow(x, groundY, z, store.width(i) * 0.8, Math.max(4, light));
+    }
+  }
+
+  /**
+   * Boia e linha de pesca (M14). A linha sai da ponta da vara — à direita e
+   * acima do olho, na frente — e cai numa barriga até a boia, em trechos
+   * girados na direção de cada pedaço (ver `fishing_line` em `mobmodels.ts`).
+   */
+  private fishingLine(alpha: number): void {
+    const line = this.d.session.fishing;
+    if (!line.active) return;
+    const { mobRenderer, entityAtlas, player } = this.d;
+    const bx = line.renderX(alpha);
+    const by = line.renderY(alpha);
+    const bz = line.renderZ(alpha);
+    const light = Math.max(4, this.skyAt(bx, by + 0.3, bz));
+    mobRenderer.addModel(
+      modelOf(BOBBER_LAYER), entityAtlas.layerOf(BOBBER_LAYER), bx, by, bz,
+      0, 0, 0, 0, 0, 0, 0, light, 0, 1, 0,
+    );
+
+    /*
+     * A ponta da vara: onde o item da mão a desenha na tela (canto de baixo à
+     * direita, `ROD_TIP_NDC`), levada de volta ao mundo a um bloco do olho.
+     * Pela tela, e não por um deslocamento fixo, porque a mão é presa ao canto:
+     * com o celular em pé ou deitado, a ponta muda de lugar no mundo.
+     */
+    const { renderer } = this.d;
+    const yaw = player.yaw;
+    const pitch = player.pitch;
+    const sy = Math.sin(yaw);
+    const cy = Math.cos(yaw);
+    const sp = Math.sin(pitch);
+    const cp = Math.cos(pitch);
+    const half = Math.tan((renderer.camera.fovDeg * Math.PI) / 360);
+    const right = ROD_TIP_NDC[0] * half * (renderer.width / renderer.height);
+    const up = ROD_TIP_NDC[1] * half;
+    // Frente (sy·cp, −sp, cy·cp), direita (−cy, 0, sy), cima (sy·sp, cp, cy·sp).
+    const tipX = player.eyeX(alpha) + sy * cp - cy * right + sy * sp * up;
+    const tipY = player.eyeY(alpha) - sp + cp * up;
+    const tipZ = player.eyeZ(alpha) + cy * cp + sy * right + cy * sp * up;
+    const endY = by + 0.25;
+    const dx = bx - tipX;
+    const dy = endY - tipY;
+    const dz = bz - tipZ;
+    const length = Math.hypot(dx, dy, dz);
+    // A linha esticada no voo, frouxa na água.
+    const sag = line.state === LINE_FLYING ? 0.05 : 0.08 * length;
+    const segments = Math.min(LINE_SEGMENTS, Math.max(4, Math.ceil(length / 0.4)));
+    const model = modelOf(FISHING_LINE_LAYER);
+    const layer = entityAtlas.layerOf(FISHING_LINE_LAYER);
+    let px = tipX;
+    let py = tipY;
+    let pz = tipZ;
+    for (let s = 1; s <= segments; s++) {
+      const t = s / segments;
+      const nx = tipX + dx * t;
+      const ny = tipY + dy * t - sag * 4 * t * (1 - t);
+      const nz = tipZ + dz * t;
+      const sx = nx - px;
+      const sy = ny - py;
+      const sz = nz - pz;
+      const segYaw = Math.atan2(sx, sz);
+      const segPitch = -Math.atan2(sy, Math.hypot(sx, sz) || 0.001);
+      const segLength = Math.hypot(sx, sy, sz);
+      // O modelo tem a origem no pé: a caixa de 16 unidades é centrada no pivô,
+      // então o meio do trecho vai no meio do pedaço.
+      mobRenderer.addModel(
+        model, layer, (px + nx) * 0.5, (py + ny) * 0.5, (pz + nz) * 0.5,
+        segYaw, segPitch, segYaw, 0, 0, 0, 0, light, 0, segLength, 0,
+      );
+      px = nx; py = ny; pz = nz;
     }
   }
 

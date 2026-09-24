@@ -38,6 +38,8 @@ import { isRail } from '../world/rails';
 import { ignitePortal } from './portal';
 import { plantSeed, tillSoil } from './farming';
 import { applyFoodEffects } from './food';
+import { FISHING_XP } from '../data/fishing';
+import type { FishingLine } from './fishing';
 import type { Fire } from '../world/fire';
 import type { Vehicles } from './vehicles';
 import type { Inventory } from './inventory';
@@ -79,6 +81,12 @@ export interface ItemUseContext {
   resetHold(): void;
   /** Abre a tela do mapa explorado (M10). */
   openMap(): void;
+  /** A linha de pesca do jogador (M14). */
+  readonly fishing: FishingLine;
+  /** Solta orbes de XP na posição (M14: o peixe dá XP, doc 06 §8). */
+  spawnXp(x: number, y: number, z: number, amount: number): void;
+  /** Conta um peixe nas estatísticas (M14). */
+  caughtFish(): void;
 }
 
 /** O contexto sem a parte de segurar, que é do `ItemUser`. */
@@ -394,6 +402,38 @@ const plant: ItemUseHandler = {
   },
 };
 
+/**
+ * Vara de pesca (M14): o primeiro clique arremessa a boia; o segundo puxa.
+ * Puxar na fisgada traz o que o anzol pegou (`data/fishing.ts`) direto para
+ * os pés do jogador, com XP, e gasta a vara; puxar fora dela só recolhe.
+ */
+const fish: ItemUseHandler = {
+  use(ctx) {
+    const p = ctx.player;
+    const line = ctx.fishing;
+    if (line.active) {
+      const bobberX = line.x;
+      const bobberY = line.y;
+      const bobberZ = line.z;
+      const caught = line.reel(() => ctx.random());
+      ctx.sound('player/throw', p.x, p.y + p.eyeHeight, p.z);
+      if (caught === null) return true;
+      const id = itemIdOf(caught);
+      if (id >= 0) ctx.drop({ item: id, count: 1, damage: 0 }, p.x, p.y + 0.5, p.z);
+      const [min, max] = FISHING_XP;
+      ctx.spawnXp(p.x, p.y + 0.5, p.z, min + Math.floor(ctx.random() * (max - min + 1)));
+      ctx.sound('fishing/splash', bobberX, bobberY, bobberZ);
+      ctx.caughtFish();
+      ctx.wearHeld();
+      return true;
+    }
+    const aim = ctx.aim;
+    line.cast(p.x, p.y + p.eyeHeight - 0.1, p.z, aim[0], aim[1], aim[2]);
+    ctx.sound('player/throw', p.x, p.y + p.eyeHeight, p.z);
+    return true;
+  },
+};
+
 /** Mapa (M10): abre a tela do mapa explorado. O mapa não se gasta. */
 const openMap: ItemUseHandler = {
   use(ctx) {
@@ -419,6 +459,7 @@ export const ITEM_USES: Record<ItemUse, ItemUseHandler> = {
   throw_snowball: thrower(0),
   dye_sheep: dyeSheep,
   open_map: openMap,
+  fish,
 };
 
 /** Os usos do item na mão, em ordem de tentativa (vazio se nenhum). */

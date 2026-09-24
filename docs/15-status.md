@@ -9,12 +9,12 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-23 17:53 — **M10 no campo: três correções.** Bússola e mapa na
-mão ficavam de perfil (agora de frente, pose de leitura); o menu de pausa passava da altura do
-celular deitado e não rolava (agora rola, e em tela baixa vai em duas colunas); e o mapa saía em
-xadrez voando (agora lê primeiro o chunk mais perto ainda não mapeado). §4. Antes, 16:05: M10
-fechado.
-
+**Última atualização:** 2026-09-24 10:45 — **M14 fechado: água e paisagem.** Visão de dentro da
+água e da lava, rios, pesca, afogado, lua com fases, tint de grama/folha/água por bioma (com
+floresta de bétula, planície florida e pântano escuro) e selva. No caminho, três achados antigos
+(§4): **sol e lua trocados desde o M1**, **o tint de bioma do doc 03 nunca existiu** e **o clima
+não chegava às pontas** — floresta 0,3% da terra, savana e pântano zero. M9 e M10 validados em
+campo. Antes, 2026-09-23 17:53: M10 no campo.
 ---
 
 ## 1. Panorama
@@ -41,14 +41,14 @@ fechado.
 | **M8** Presença dos objetos | vértice em 1/16 de bloco, tocha de verdade, porta e cama de duas células, item na mão com volume, contorno do tamanho da forma, vidro visível, escada que escala, baú e fornalha acesa, placa com texto, quadro com arte, oito cores de lã e cama, tampa de baú que abre | ✅ **validado em campo em 2026-09-17** | — |
 | **Terreno** pós-M8 | blend 5×5 do `heightOffset` de bioma e teto macio: a parede de 29 blocos entre montanha e planície virou encosta, e o platô chapado em Y=124 virou cordilheira | ✅ **validado em campo** | muda o terreno gerado: **mundo antigo ganha costura** (ver §4) |
 | **Placa, 2ª passada** | tábua lisa e clara no lugar da tábua de carvalho com rabisco, e um campo de texto só com quebra de linha interpretada | ✅ concluído | — |
-| **M9** Gente no mundo | aldeão com rotina e troca, aldeia de verdade, golem, reputação | ✅ concluído em 2026-09-23 | **não visto em aparelho** (§6) |
-| **M10** Saber onde se está | bússola, relógio, mapa, marcador, estatísticas, espectador, itens no chão no save | ✅ concluído em 2026-09-23 | **não visto em aparelho** (§6) |
+| **M9** Gente no mundo | aldeão com rotina e troca, aldeia de verdade, golem, reputação | ✅ **validado em campo em 2026-09-24** | — |
+| **M10** Saber onde se está | bússola, relógio, mapa, marcador, estatísticas, espectador, itens no chão no save | ✅ **validado em campo em 2026-09-24** | — |
 | **M11** O que os documentos já pediam | areia que cai, pedregulho de lava, balde, tesoura, ovelha colorida, planta que cresce, efeitos de status, comidas e estruturas que faltavam, nascimento em terra firme, smoke test | ✅ **validado em campo em 2026-09-23** | — |
 | **M12** O mundo chega antes do jogador | culling por conectividade e por direção de face, cópia de vizinhança fora da thread principal, luz na borda do chunk | ✅ **validado em campo em 2026-09-23** | preset do T0 não revisto (sem T0 na mão) — §3 |
 | **M13** Casa em ordem | uso de item como dado, `session.ts` e `main.ts` abaixo de 700 linhas, lã e cama em 16 cores por tint | ✅ **validado em campo em 2026-09-23** | — |
-| **M14** Água e paisagem | visão submersa, rios, pesca, afogado, lua com fases, biomas por tint, selva | ⬜ proposto (2026-09-22) | — |
+| **M14** Água e paisagem | visão submersa, rios, pesca, afogado, lua com fases, biomas por tint, selva | ✅ concluído em 2026-09-24 | **não visto em aparelho** (§6); muda o terreno gerado: **mundo antigo ganha costura** (§3) |
 | **M15** Oficina | bigorna, reparo na grade, funil, dispensador, comparador, observador | ⬜ proposto (2026-09-22) | — |
-| **M16** Um fim para a jornada | fortaleza do Nether, blaze, poções, olho do ender, End, dragão, créditos | ⬜ proposto (2026-09-22) | depende de M11 (efeitos) e M13 (atlas) |
+| **M16** Um fim para a jornada | fortaleza do Nether, blaze, poções, olho do ender, End, dragão, créditos | ⬜ proposto (2026-09-22) | depende de M11 (efeitos) e M13 (atlas); a bruxa veio para cá (§5) |
 | **M17** Alcance | menu Idioma (doc 08 §3.11) com `en`, primeira hora guiada, seed compartilhável | ⬜ proposto (2026-09-22) | — |
 
 **O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
@@ -62,18 +62,21 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-23 16:04, ao fechar o M10, com `npm test`, `npm run build`,
+Medidas em 2026-09-24 10:30, ao fechar o M14, com `npm test`, `npm run build`,
 `SIZE_BUDGET_KB=350 npm run size` e `npm run smoke`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **249,5 KB** (240,0 antes do M10; 239,4 no M9; 229,0 no M12; 226,3 antes dele) | < 350 KB | `npm run size` |
-| Testes | **2064**, 102 arquivos (2036 antes do M10; 2023 no M9) | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **257,9 KB** (249,5 antes do M14; 240,0 antes do M10; 229,0 no M12) | < 350 KB | `npm run size` |
+| Testes | **2116**, 108 arquivos (2064 antes do M14; 2036 antes do M10) | manter verde | `npm test` |
 | Smoke test de navegador | **7 passos verdes**: carregar, criar, andar 10 s, quebrar, salvar, recarregar, conferir | verde | `npm run smoke` |
-| Camadas de atlas | **194** com 16 cores de lã e cama (222 no M11 com 8 cores; lã e cama viraram tint no M13) | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
-| Memória de áudio | **3,33 MB** (era 3,26; +3 sons curtos de balde e arremesso) | < 3,5 MB | `tests/audio.test.ts` |
+| Camadas de atlas | **201** com a selva (+5: tronco lado/topo, tábua, folha, muda); 194 antes do M14 | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
+| Memória de áudio | **3,497 MB** — no teto (§5). O 3,33 que estava aqui era velho: o respingo da pesca, único som novo do M14, custa 0,018 | < 3,5 MB | `tests/audio.test.ts` |
 | Mapa explorado (M10) | **0,23 ms por segundo de jogo**; 500 blocos = 16 regiões, ~146 KB; voando a 20 blocos/s, zero buraco | < 1 ms/s; ≤ 64 regiões | `tests/journal.test.ts` |
-| Geração de chunk | **6,2 ms** (mediana; os cogumelos não mexeram no número) | < 25 ms | `tests/perf.test.ts` |
+| Geração de chunk | **6,4 ms** (mediana; 6,2 antes do rio) | < 25 ms | `tests/perf.test.ts` |
+| Clima do tint de bioma, thread principal | **8–9 µs por chunk** (até 32 por quadro) | < 60 µs | `tests/perf.test.ts` |
+| Rio (seed 2, 768×768 blocos) | atravessa deserto e planície; maior degrau **≤ 8** | sem parede | `tests/rivers.test.ts` |
+| Pesca | **≥ 10 peixes em 5 min** de jogo, reagindo em 0,3 s | 10 em 5 min (aceite do M14) | `tests/fishing.test.ts` |
 | Geração de chunk do Nether | 5,1 ms (mediana; 3,8 antes de a luz entrar) | < 25 ms | `tests/perf.test.ts` |
 | Meshing de section | 0,64 ms (mediana) | < 8 ms | `tests/perf.test.ts` |
 | Meshing de um piso de 256 tochas | **1,10 ms** (o pior caso construível da forma nova) | < 2 ms | `tests/perf.test.ts` |
@@ -1449,7 +1452,8 @@ Os 13 itens da tabela do §5, todos com teste. O que vale registrar além do che
 - **leite** se bebe no clique, sem os 1,6 s do gênero (`game/itemuse.ts`);
 - **folha de acácia** é um id novo com o desenho da de carvalho: as duas são cinza tingido pelo
   bioma, e o id só existe para dar a muda certa — zero camada de atlas;
-- **cabana de bruxa** sem bruxa (a bruxa é do M14).
+- **cabana de bruxa** sem bruxa (a bruxa era do M14; foi para o M16, porque sem poção ela não tem o
+  que arremessar — §5).
 
 **O que o M11 adiantou do M13:** o registro de uso de item (`game/itemuse.ts`) nasceu aqui, porque
 balde, tesoura, ovo, leite e corante precisavam dele. Os onze `try*` antigos da `Session` ainda não
@@ -1623,6 +1627,75 @@ marcador "Base".
 **Débito:** `main.ts` voltou a 718 linhas e `session.ts` está em 793 — o M13 tinha deixado os dois
 abaixo de 700, e a `session.ts` já tinha passado disso no M9 (§5).
 
+### M14 — Água e paisagem ✅ — 2026-09-24
+
+Pedido: *"Já havia feito os testes no celular, tudo funcionando perfeitamente. Vamos seguir com o
+marco M14"*. O que cada item virou:
+
+- **Ver de dentro da água e da lava** (`render/medium.ts`, `render/renderer.ts`). O meio sai do
+  bloco do olho **no próprio quadro**, com a câmera já interpolada — a tela muda no quadro em que o
+  olho cruza a superfície. Água: névoa azul que apaga tudo a ~20 blocos e escurece com a luz que
+  chega ao olho (a mesma da mão); lava: laranja quase opaca a 1,6 bloco. É a névoa do passe de
+  terreno com outros valores e **um uniform a mais**, `uMediumTint`, no terreno e nas entidades;
+  céu e nuvens não são desenhados (o `clear` já é a cor da névoa). Sem passe novo.
+- **Rios** (`world/gen/heightfield.ts`). Um ruído de canal (`|ruído| < 0,017`, com warp) puxa a
+  altura para `SEA_LEVEL − 3`. O perfil é um **vale**: a margem alarga com o desnível até o leito
+  (`RIVER_BANK_PER_BLOCK`), e o rio perde força no terreno alto — pela altura **lisa** (continente
+  + offset de bioma), porque pela altura final a faixa de transição copiava as lombadas do
+  detalhe e dava parede de 13. O bioma **rio** (id 10) é a água que só existe pelo canal: onde ele
+  deságua, mar e praia continuam mar e praia. Só tint e decoração (cana nas margens): zero camada.
+- **Pesca** (`game/fishing.ts`, `data/fishing.ts`, uso `fish` em `game/itemuse.ts`). Vara (graveto
+  e linha), boia com voo, superfície, espera sorteada (4–15 s, 25% menos na chuva) e fisgada de
+  1,2 s com respingo; puxar nela traz o que o anzol pegou (85% bacalhau, o resto lixo) para os pés,
+  1–6 de XP (doc 06 §8), gasta a vara e conta em **Peixes pescados**. A linha arrebenta a 32 blocos
+  ou largando a vara. Boia e linha são **modelos do batcher de entidades**, como a flecha: a linha
+  é uma fila de trechos girados na direção de cada pedaço, com barriga, saindo da ponta da vara na
+  tela (vale em pé e deitado). Bacalhau cru e assado (doc 05 §4), conquista **Pescador**.
+- **Afogado** (doc 07 §1; `data/mobs.ts`, id 17). O zumbi da água: nasce no escuro, dentro d'água,
+  só em rio e mar; nada atrás do jogador **em três dimensões** — quem nada agora persegue também o
+  Y do destino dentro d'água (`entity/mobstore.ts`), o que também solta a lula do plano em que
+  nasceu. Na terra anda e queima como o zumbi. Cai carne podre e, 11%, barra de cobre; o tridente
+  ficou de fora (não há arma de arremesso).
+- **Lua com fases** (`render/shaders/sky.glsl.ts`, `render/sky.ts`). O disco é uma esfera vista de
+  frente, acesa pela direção do sol no referencial dela; oito fases, com os mares desenhados. A
+  fase é a do clima (`Weather.moonPhase`, a do slime). Para a lua aparecer foi preciso corrigir o
+  céu inteiro (§4): **sol e lua estavam trocados desde o M1**.
+- **Tint por bioma** (`render/biometint.ts`, `world/gen/climate.ts`). As cores de grama, folha e
+  água de `data/biomes.ts` **não eram lidas por ninguém** (§4). O vértice não tem bit livre para
+  cor, então o tint sai do **clima**: temperatura e umidade de cada coluna perto da câmera numa
+  textura RG8 toroidal (2 bytes por coluna, 32 chunks por quadro, 8 µs cada, calculados da seed na
+  thread principal — worker, protocolo e save não mudaram), e uma tabela `clima → cor` pintada
+  com o bioma que cada clima escolhe e borrada. O vertex shader lê o clima no canto do bloco, e a
+  filtragem linear faz a média das quatro colunas: **o blend do doc 03 §4.3 sai de graça**. Só
+  WebGL2 (textura no vertex shader); no WebGL1 e no Nether, a cor fixa de antes. Variações que só
+  custam tint e uma linha de decoração: **floresta de bétula** (a bétula já existia e nenhum bioma a
+  plantava), **planície florida** e o **pântano** mais escuro. Uma "variação" é uma caixa pequena
+  dentro da caixa do pai, que ganha dentro dela e não disputa a fronteira (`pickClimateBiome`).
+- **Selva** (`data/blocks.ts` 144–147, `world/trees.ts`). Tronco, tábua, folha e muda — **5 camadas
+  de atlas** (194 → 201) —, árvore alta de copa larga com tufos no tronco, bioma quente e úmido
+  (`[0,8; 1] × [0,55; 1]`, o canto que era do pântano e da savana por falta de dono). O **cacau cai
+  da folha da selva** (6%), e o biscoito voltou à receita do doc.
+
+**Critério de aceite, medido.** A tela muda no quadro: o meio é lido no `render()`, depois da
+câmera (`tests/medium.test.ts` prova névoa e tom; no Chrome headless, visto mergulhado no mar de
+dia). O rio da seed 2 atravessa deserto e planície, e o maior degrau da região é ≤ 8
+(`tests/rivers.test.ts`; os 6 de antes no teste de montanha continuam). Pesca: ≥ 10 peixes em
+5 minutos simulados, reagindo à fisgada em 0,3 s (`tests/fishing.test.ts`). Geração de chunk
+em 6,4 ms (era 6,2; teto 25).
+
+**Visto no Chrome headless (seed 2):** o rio cruzando da planície para a neve; mergulhado no mar,
+névoa azul e fundo escuro, sem céu; a selva fechada; a boia e a linha saindo da vara; o sol a pino
+ao meio-dia e a lua à meia-noite, cheia, em quarto (as duas metades) e nova.
+
+**Desvios conscientes, no comentário do módulo:** o cacau cai da folha em vez de nascer em vagem no
+tronco (`data/loot.ts`); a espera da pesca é mais curta que a do gênero (`data/fishing.ts`); o
+bioma de altura (montanha, praia, rio) pinta com o clima em que está (`render/biometint.ts`); o
+afogado não tem tridente.
+
+**Muda o terreno gerado.** O rio e o clima espalhado (§4) mudam **todo chunk ainda não gerado**. Num
+mundo antigo, o que já foi salvo fica como está e o terreno novo encosta nele com costura — como
+no ajuste de terreno do M8.
+
 ## 4. Correções fora de marco
 
 Bugs anteriores encontrados durante o M5 e já corrigidos — ficam registrados porque explicam
@@ -1630,6 +1703,10 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-24 | `render/sky.ts` | **Sol e lua trocados** (M1). O ciclo põe o meio-dia em 6000, mas o céu calculava `sunDir.y = −cos`: o disco do sol ficava **debaixo do chão ao meio-dia e a pino à meia-noite**, e a lua, sempre oposta, nunca subia à noite. Achado ao pôr as fases da lua (M14): as capturas da meia-noite mostravam o mesmo disco brilhante nas quatro fases. A conta saiu para `sunDirection`, com o sinal certo. Regressão em `tests/moon.test.ts`. |
+| 2026-09-24 | `world/gen/climate.ts` | **O clima não chegava às pontas da tabela de biomas** (M1). O doc 03 §4.3 escreve as faixas em −1..1, mas o FBM de três oitavas fica em ±0,7, com os quartis em ±0,22: floresta cobria **0,3%** do mundo e savana e pântano **0,0%**, medidos em três seeds numa grade de 12 000 blocos — a cabana de pântano do M11 praticamente não tinha onde nascer. O valor agora é espalhado para −1..1 no nó da rede (1% e 99% nas pontas): floresta ~1%, deserto 5–7%, savana 0,2–0,4%, pântano 0,2% do mundo (com o mar contando); a tabela do doc não mudou. **Muda o terreno gerado** (§3, M14). Regressão em `tests/biometint.test.ts`. |
+| 2026-09-24 | `render/biometint.ts`, `render/shaders/terrain.glsl.ts` | **O tint por bioma do doc 03 §4.3 nunca existiu** (M1). `data/biomes.ts` tinha as cores de grama, folha e água de cada bioma, e nada as lia: toda grama do mundo era de uma cor só (`TINT_COLORS`). Virou o tint por clima do M14 (§3). |
+| 2026-09-24 | `tests/village.test.ts` | **O teste do plano da aldeia tolerava 25% de morador sem cama** para cobrir a casa sobre a água. Com os rios, uma aldeia da seed 16 perdeu uma casa para o rio e caiu para 67%. A casa sobre a água saiu da conta; o resto continua em 75%. Com isso apareceu uma casa **em terra** sem cama na seed 1 — já escondida pela tolerância antes do M14, não investigada (§5). |
 | 2026-09-23 | `game/worldmap.ts`, `game/journal.ts` | **O mapa saía em xadrez voando** (M10; campo: *"onde eu já passei estava tudo mal carregado, e o local atual (…) carregando bem devagar"*). O mapa lia um chunk do anel a cada dois ticks em rodízio fixo, e o chunk ainda não carregado na sua vez era pulado; voando, o anel andava mais rápido que a volta. Agora cada tick lê o chunk carregado **mais perto ainda não mapeado**, e o rodízio de releitura só roda (a cada quatro ticks) com o anel inteiro mapeado. Voando a 20 blocos/s: 49 buracos antes, zero agora (`tests/journal.test.ts`); custo caiu para 0,23 ms/s. |
 | 2026-09-23 | `render/hand.ts`, `data/itemart.ts` | **Bússola, relógio e mapa na mão ficavam de perfil** (M10; campo: *"fica horrível de enxergar para onde ela realmente está apontando"*). Todo item plano usava a pose de ferramenta, 35° de lado. A arte ganhou `hold: 'face'`, e esses itens ficam de frente, mais baixos e mais perto do meio. Regressão em `tests/hand.test.ts`. |
 | 2026-09-23 | `ui/screens/pause.ts`, `ui/screens/menu.ts` | **O menu de pausa passava da altura do celular deitado e não rolava** (campo: *"quase não consegui chegar na opção de salvar e sair"*). A página tem `touch-action:none` (doc 09 §2.3) e o menu não era contêiner de rolagem. Agora rola (`pan-y`), e com menos de 600 px de altura os botões vão em duas colunas. As telas de menu (mapa, opções, mundos) centralizavam com `place-items:center`, que escondia o topo de um painel mais alto que a tela; agora é `margin:auto`. |
@@ -1790,10 +1867,27 @@ ligado.
 ~~**Pendência de 2026-09-23: item no chão não vai para o save.**~~ **Fechada no M10**: vai, por
 dimensão, e no `.clw` v3.
 
-**Pendência aberta em 2026-09-23: `main.ts` (718) e `session.ts` (793) acima das 700 linhas.** O M13
-tinha deixado os dois abaixo disso; o M9 passou a `Session` e o M10 o `main`. Candidatos a sair:
-a ligação das telas do M10 no `main` e a ligação de aldeia e caderno na `Session`. Não depende de
-nada.
+**Pendência aberta em 2026-09-23: `main.ts` (720) e `session.ts` (808) acima das 700 linhas.** O M13
+tinha deixado os dois abaixo disso; o M9 passou a `Session` e o M10 o `main`, e o M14 somou 2 e
+15 linhas (a lua e a linha de pesca). Candidatos a sair: a ligação das telas do M10 no `main` e a
+ligação de aldeia, caderno e pesca na `Session`. Não depende de nada.
+
+**Pendências abertas em 2026-09-24 (M14):**
+
+- **Memória de áudio em 3,497 MB, com teto de 3,5.** O próximo som estoura `tests/audio.test.ts`.
+  O M15 e o M16 vão pedir som (bigorna, funil, poção, dragão): antes disso, ou se baixa a taxa de
+  algum som longo (`weather/rain` é o maior, 0,17 MB; as mortes de mob, 0,09 cada) ou se revê o
+  teto com o doc 10 §2.
+- **A bruxa foi para o M16.** O doc 15 dizia "a bruxa é do M14", mas o checklist do M14 no doc 14
+  não a lista, e ela sem poção não tem o que arremessar. A cabana continua vazia.
+- **Custo do tint de bioma em T0 não medido.** São duas leituras de textura por vértice no terreno
+  (clima e tabela), só em WebGL2. No S24 não deve aparecer; num Mali-T830 o F3 dirá. Se pesar, o
+  tint pode virar opção de Vídeo, e a cor volta à fixa.
+- **WebGL1 continua com uma cor de grama só**, porque textura no vertex shader não é garantida lá.
+- **Casa de aldeia em terra sem cama** (seed 1, uma casa): apareceu quando o teste deixou de
+  tolerar 25% de falha (§4). Anterior ao M14, não investigada.
+
+
 
 Fora ela, **não há pendência de funcionalidade em aberto.** O que resta é a dependência externa ao
 código:
@@ -1941,10 +2035,30 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
 
 ## 6. Próximo passo recomendado
 
-0. **Olhar o M10 num aparelho de novo** (a primeira volta, em 2026-09-23, rendeu as três correções
-   das 17:53 — mão, pausa e mapa voando; §4) e depois escolher o próximo marco (M14 água e paisagem, M15
-   oficina, M16 fim da jornada ou M17 alcance). O M10 só foi visto em testes e no Chrome headless.
-   Em ordem de quanto pode estar errado:
+0. **Olhar o M14 num aparelho, num mundo novo** (o rio e o clima só existem em terreno gerado
+   depois do M14), e depois escolher o próximo marco (M15 oficina, M16 fim da jornada ou M17
+   alcance). O M14 só foi visto em testes e no Chrome headless. Em ordem de quanto pode estar
+   errado:
+   - **cor da grama por bioma**: andar da planície para a floresta, o deserto e a neve; a cor tem que
+     mudar em degradê, sem costura quadrada de chunk. Se aparecer um chunk com a cor errada por um
+     instante ao chegar, é o anel de clima (`FILLS_PER_FRAME` em `render/biometint.ts`). **E o FPS
+     no T0**, se der: o tint lê duas texturas por vértice (§5);
+   - **mergulhar**: a tela fica azul e curta no quadro em que a cabeça entra, e volta ao sair; de
+     noite e fundo, escura; na lava, laranja. Se a água parecer rala ou densa demais, o número é
+     `sight` em `render/medium.ts`;
+   - **rio**: seguir um da nascente ao mar; margem em rampa, sem parede. A seed `2` tem um logo no
+     nascimento, em x −8, z 24;
+   - **pesca**: fabricar a vara (três gravetos na diagonal e duas linhas), jogar no rio, esperar o
+     respingo e puxar. A linha sai da ponta da vara com o celular **em pé e deitado**? Se não sair,
+     o número é `ROD_TIP_NDC` em `render/scenefeed.ts`;
+   - **lua**: numa noite limpa, olhar para cima; noite após noite ela míngua e cresce. E o sol tem
+     que estar no céu de dia (§4);
+   - **selva e afogado**: a selva da seed `2` fica em x −696, z −2616; o afogado nasce de noite no
+     rio e vem nadando.
+
+   ~~**Olhar o M10 num aparelho de novo**~~ — **feito em 2026-09-24**: *"Já havia feito os testes no
+   celular, tudo funcionando perfeitamente"* (com o M9 junto). O roteiro que foi seguido, para
+   referência:
    - **tela do mapa no celular**: abrir usando o mapa (8 papéis e uma bússola; no Criativo, pela
      paleta), arrastar, zoom, dois toques para marcar, renomear e apagar um marcador. O canvas cabe
      na tela em pé e deitada?

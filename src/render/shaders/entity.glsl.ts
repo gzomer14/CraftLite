@@ -56,6 +56,7 @@ uniform sampler2DArray uAtlas;
 uniform vec3 uFogColor;
 uniform float uFogDensity;
 uniform float uOpacity;
+uniform vec3 uMediumTint;
 
 out vec4 fragColor;
 
@@ -64,7 +65,7 @@ void main() {
 #ifdef ALPHA_TEST
   if (texel.a < 0.5) discard;
 #endif
-  vec3 color = texel.rgb * vLight;
+  vec3 color = texel.rgb * vLight * uMediumTint;
   // Piscada de dano: mistura com vermelho em vez de somar, para não estourar.
   color = mix(color, vec3(1.0, 0.25, 0.2), vFlash * 0.7);
 
@@ -119,6 +120,7 @@ uniform highp vec2 uAtlasTiles;
 uniform vec3 uFogColor;
 uniform float uFogDensity;
 uniform float uOpacity;
+uniform vec3 uMediumTint;
 
 void main() {
   highp vec2 uv = (vTileOrigin + clamp(vUv, 0.001, 0.999)) * uAtlasTiles.y;
@@ -126,7 +128,7 @@ void main() {
 #ifdef ALPHA_TEST
   if (texel.a < 0.5) discard;
 #endif
-  vec3 color = texel.rgb * vLight;
+  vec3 color = texel.rgb * vLight * uMediumTint;
   color = mix(color, vec3(1.0, 0.25, 0.2), vFlash * 0.7);
 
   float f = vFogDepth * uFogDensity;

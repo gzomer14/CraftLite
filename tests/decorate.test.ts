@@ -17,7 +17,7 @@ import { AIR, BLOCK_BY_NAME, blockIdOf } from '../src/data/blocks';
 import { SECTION_SIZE, WORLD_HEIGHT, type ChunkColumn } from '../src/world/chunk';
 
 const SEED = 20260909;
-const LOGS = new Set(['oak_log', 'birch_log', 'spruce_log', 'acacia_log']
+const LOGS = new Set(['oak_log', 'birch_log', 'spruce_log', 'acacia_log', 'jungle_log']
   .map((name) => BLOCK_BY_NAME.get(name)!.id));
 const LEAVES = new Set(['oak_leaves', 'birch_leaves', 'spruce_leaves']
   .map((name) => BLOCK_BY_NAME.get(name)!.id));

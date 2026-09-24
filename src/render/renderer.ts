@@ -15,6 +15,8 @@ import { SelectionPass } from './selection';
 import { SkyPass } from './sky';
 import { dimensionOf } from '../data/dimensions';
 import { TerrainPass, type SkyParams } from './terrain';
+import { MEDIUM_AIR, applyMedium, type Medium } from './medium';
+import { createBiomeTint, type BiomeTint } from './biometint';
 import type { Atlas } from './atlas';
 import type { GlContext } from './gl';
 import type { Preset } from '../core/tier';
@@ -52,6 +54,8 @@ export class Renderer {
   readonly chunks: ChunkRenderer;
 
   private readonly terrain: TerrainPass;
+  /** Tint de grama, folha e água por bioma (M14); `null` no WebGL1. */
+  readonly biomeTint: BiomeTint | null;
   private readonly sky: SkyPass;
   private readonly selection: SelectionPass;
   readonly particles: Particles;
@@ -83,6 +87,14 @@ export class Renderer {
   } | null = null;
   /** Luz empacotada `céu << 4 | bloco` numa posição de mundo. */
   blockLightAt: ((x: number, y: number, z: number) => number) | null = null;
+  /**
+   * Meio do bloco onde está o olho (M14). Consultado **no quadro**, com a
+   * posição já interpolada da câmera: a tela muda no quadro em que o olho
+   * cruza a superfície, não no tick seguinte.
+   */
+  mediumAt: ((x: number, y: number, z: number) => Medium) | null = null;
+  /** Meio do último quadro desenhado — lido pelo debug e pelos testes. */
+  medium: Medium = MEDIUM_AIR;
   private readonly fallingMeshes: FallingBlockMeshes;
   private fallingCalls = 0;
 
@@ -129,6 +141,15 @@ export class Renderer {
     fogDensity: 0.006,
     dayFactor: 1,
     minSkyLight: 0.06,
+    tint: new Float32Array([1, 1, 1]),
+  };
+  /** Parâmetros do quadro dentro d'água ou da lava; o `skyParams` fica intacto. */
+  private readonly mediumParams: SkyParams = {
+    fogColor: new Float32Array(3),
+    fogDensity: 0.006,
+    dayFactor: 1,
+    minSkyLight: 0.06,
+    tint: new Float32Array([1, 1, 1]),
   };
 
   /** Escala de resolução, mexida pela escala dinâmica (doc 02 §5.7). */
@@ -142,7 +163,8 @@ export class Renderer {
 
   constructor(ctx: GlContext, atlas: Atlas, preset: Preset) {
     this.ctx = ctx;
-    this.terrain = new TerrainPass(ctx, atlas);
+    this.biomeTint = createBiomeTint(ctx);
+    this.terrain = new TerrainPass(ctx, atlas, this.biomeTint);
     this.sky = new SkyPass(ctx);
     this.selection = new SelectionPass(ctx, atlas);
     this.particles = new Particles(ctx, preset);
@@ -182,6 +204,8 @@ export class Renderer {
     this.applyFog();
     // A grade do culling por conectividade cobre o anel carregado (M12).
     this.chunks.setRenderDistance(Math.max(1, distance));
+    // O clima do tint de bioma também (M14).
+    this.biomeTint?.setRenderDistance(Math.max(1, distance));
   }
 
   /**
@@ -228,16 +252,23 @@ export class Renderer {
     this.fogOverride = def.fog;
     this.ambient = def.ambientLight / 15;
     this.hasSky = def.hasSky;
+    // Sem céu, sem clima: o Nether volta à tabela fixa de tint.
+    if (this.biomeTint !== null) this.biomeTint.enabled = def.hasSky;
   }
 
-  /** `dayTime` em ticks do dia (0..23999). */
+  /** Seed do mundo, de onde sai o clima do tint de bioma (M14). */
+  setSeed(seed: number): void {
+    this.biomeTint?.setSeed(seed);
+  }
+
   /**
+   * `dayTime` em ticks do dia (0..23999); `moonPhase` 0..7, do `Weather`.
    * `rain` é 0..1 (doc 03 §8). Ele acinzenta o céu e o fog no mesmo passo:
    * escurecer só o céu deixaria o terreno distante brilhando na tempestade.
    */
-  setDayTime(dayTime: number, dayFactor: number, rain = 0): void {
+  setDayTime(dayTime: number, dayFactor: number, rain = 0, moonPhase = 0): void {
     this.dayTime = dayTime;
-    this.sky.update(dayTime);
+    this.sky.update(dayTime, moonPhase);
     this.sky.applyRain(rain);
     this.skyParams.minSkyLight = Math.max(this.minSkyLight, this.ambient);
 
@@ -275,16 +306,25 @@ export class Renderer {
     this.resize();
     this.camera.update(alpha, this.width / this.height);
 
+    const cam = this.camera;
+    this.biomeTint?.update(cam.renderX, cam.renderZ);
+    this.medium = this.mediumAt !== null
+      ? this.mediumAt(Math.floor(cam.renderX), Math.floor(cam.renderY), Math.floor(cam.renderZ))
+      : MEDIUM_AIR;
+    const submerged = applyMedium(this.medium, this.handLight, this.skyParams, this.mediumParams);
+    const sky = submerged ? this.mediumParams : this.skyParams;
+
     gl.viewport(0, 0, this.width, this.height);
     // Limpa na cor do horizonte, não em preto: se um frame chegar antes do
     // passe de céu (troca de resolução, contexto recriado), o jogador vê o céu
-    // por um instante em vez de um flash preto.
-    const fog = this.skyParams.fogColor;
+    // por um instante em vez de um flash preto. Debaixo d'água, a cor limpa
+    // **é** o fundo: o céu não é desenhado.
+    const fog = sky.fogColor;
     gl.clearColor(fog[0], fog[1], fog[2], 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     // 1. céu
-    this.sky.render(this.camera.viewProj, this.skyParams.dayFactor);
+    if (!submerged) this.sky.render(this.camera.viewProj, sky.dayFactor);
 
     // Culling + montagem da lista de desenho.
     this.chunks.buildDrawLists(
@@ -294,7 +334,7 @@ export class Renderer {
     let calls = 0;
 
     // 2. terreno opaco, front-to-back (early-Z ajuda muito em GPU mobile)
-    this.terrain.begin(this.camera.viewProj, this.skyParams, false);
+    this.terrain.begin(this.camera.viewProj, sky, false);
     calls += this.chunks.draw('opaque', this.setOriginOpaque);
     if (this.fallingBlocks !== null && this.fallingBlocks.active > 0) {
       this.fallingCalls = 0;
@@ -304,22 +344,22 @@ export class Renderer {
     this.terrain.end();
 
     // 2b. cutout (folhas, vidro): mesmo passe, com alpha test
-    this.terrain.begin(this.camera.viewProj, this.skyParams, true);
+    this.terrain.begin(this.camera.viewProj, sky, true);
     calls += this.chunks.draw('cutout', this.setOriginCutout);
     this.terrain.end();
 
     // 2c. nuvens: depois do terreno opaco, para a montanha na frente escondê-las
     // e o chão sumir por baixo de quem voa acima delas. Sem céu, sem nuvem.
-    if (this.hasSky) {
+    if (this.hasSky && !submerged) {
       calls += this.clouds.render(
         this.camera.viewProj, this.camera.renderX, this.camera.renderZ,
-        this.dayTime, this.skyParams.dayFactor,
+        this.dayTime, sky.dayFactor,
       );
     }
 
     // 3. entidades: mobs, flechas e itens no chão
     if (this.mobRenderer !== null && this.mobRenderer.pending > 0) {
-      calls += this.mobRenderer.render(this.camera.viewProj, this.skyParams);
+      calls += this.mobRenderer.render(this.camera.viewProj, sky);
     }
     if (this.itemRenderer !== null && this.itemRenderer.pending > 0) {
       calls += this.itemRenderer.render(this.camera.viewProj, this.camera.view);
@@ -347,7 +387,7 @@ export class Renderer {
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.depthMask(false);
     gl.disable(gl.CULL_FACE);
-    this.terrain.begin(this.camera.viewProj, this.skyParams, false);
+    this.terrain.begin(this.camera.viewProj, sky, false);
     calls += this.chunks.draw('translucent', this.setOriginOpaque);
     this.terrain.end();
     gl.enable(gl.CULL_FACE);
@@ -391,6 +431,7 @@ export class Renderer {
 
   dispose(): void {
     this.chunks.dispose();
+    this.biomeTint?.dispose();
     this.fallingMeshes.dispose();
     this.clouds.dispose();
     this.sky.dispose();

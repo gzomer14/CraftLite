@@ -376,27 +376,28 @@ o balde, a tesoura e o ovo entraram sem tocar na cadeia da `Session`; 16 cores c
 
 ---
 
-## M14 — Água e paisagem
+## M14 — Água e paisagem ✅
 
 > O mundo é bonito de cima e igual de dentro. Mergulhar não muda nada na tela, e não há rio.
+> **Fechado em 2026-09-24** — detalhe no doc 15 §3.
 
-- [ ] **Ver de dentro da água e da lava.** Hoje a névoa e a cor não mudam ao mergulhar (`grep -i
-      underwater src` volta vazio). Névoa azul curta e escurecimento debaixo d'água, névoa laranja
-      quase opaca na lava — é um uniform a mais no passe de terreno, nada de passe novo.
-- [ ] **Rios.** Não há rio: a água do mundo é oceano, pântano e lago. Um ruído de canal que cava
-      abaixo do nível do mar nas faixas estreitas, com bioma de rio só por tint — zero camadas de
-      atlas.
-- [ ] **Pesca**: vara (linha + graveto), boia na água, bacalhau e bacalhau assado (doc 05 §4) e XP
-      de pesca (doc 06 §8). É a comida renovável que não depende de fazenda.
-- [ ] **Afogado** (doc 07 §1, *"pós-MVP"*): o zumbi que nasce na água e no rio.
-- [ ] **Lua com fases visível** (doc 03 §8: *"Lua com 8 fases"*). A fase já existe para o spawn
-      de slime (`game/weather.ts`); no céu, a lua é sempre cheia.
-- [ ] **Biomas de variação que só custam tint:** floresta de bétula, planície florida, pântano
-      mais escuro. E **selva**, que custa camadas (tronco, folha, tábua) e depende da folga do M13.
+- [x] **Ver de dentro da água e da lava.** `render/medium.ts`: névoa azul curta e escura com a luz,
+      laranja quase opaca na lava, lidas do bloco do olho no próprio quadro; um uniform a mais
+      (`uMediumTint`) no terreno e nas entidades, sem passe novo.
+- [x] **Rios.** Ruído de canal em `world/gen/heightfield.ts`, com vale de margem que alarga com o
+      desnível e some no terreno alto; bioma de rio só por tint e decoração — zero camadas.
+- [x] **Pesca**: vara, boia, bacalhau cru e assado, XP de 1 a 6, estatística e conquista
+      (`game/fishing.ts`, `data/fishing.ts`).
+- [x] **Afogado**: nasce no escuro em rio e mar e nada atrás do jogador em três dimensões.
+- [x] **Lua com fases visível**, com os mares desenhados. Para ela aparecer, o céu foi corrigido:
+      sol e lua estavam trocados desde o M1 (doc 15 §4).
+- [x] **Biomas de variação que só custam tint:** floresta de bétula, planície florida, pântano mais
+      escuro — e o próprio tint por bioma, que o doc 03 §4.3 pedia e não existia
+      (`render/biometint.ts`). **Selva** com as cinco camadas da madeira nova; o cacau cai da folha.
 
 **Critério de aceite:** mergulhar e emergir muda a tela em menos de um quadro; um rio atravessa
 pelo menos dois biomas numa seed de teste sem degrau de parede; pescar 10 peixes em 5 minutos de
-jogo. Geração de chunk continua abaixo de 25 ms (hoje 6,2).
+jogo. Geração de chunk continua abaixo de 25 ms (hoje 6,4). **Os quatro medidos** — ver doc 15 §3.
 
 ---
 

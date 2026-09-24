@@ -17,7 +17,11 @@ gente ao mundo: aldeões com ofício que trabalham de dia, entram em casa ao ent
 cama; troca por esmeralda; aldeia com caminhos, hortas e sino; golem de ferro e reputação —
 validado em aparelho. O **M10** deu ao jogador como se localizar: bússola e relógio com o mostrador
 girando, mapa explorado, marcadores na borda da tela, estatísticas, espectador no Criativo, e os
-itens no chão passaram a ir para o save — ainda não visto em aparelho. Seguem M14 a M17 no roteiro.
+itens no chão passaram a ir para o save — validado em aparelho. O **M14** (2026-09-24) mexeu na água
+e na paisagem: ver de dentro da água e da lava, rios que descem até o mar, pesca, o afogado, a lua
+com oito fases, a cor da grama, da folha e da água por bioma (com floresta de bétula, planície
+florida e pântano) e a selva — e no caminho pôs o sol no céu de dia, que desde o M1 passava a
+meia-noite a pino. Ainda não visto em aparelho. Seguem M15 a M17 no roteiro.
 
 - **M0 — esqueleto:** Vite + TypeScript strict, renderer WebGL2 próprio com fallback WebGL1,
   detecção de tier, loop de 20 Hz com interpolação, gerador procedural de texturas alimentando um
@@ -138,7 +142,7 @@ Abre em **4,5 s em 3G rápido** (critério: < 5 s) e aguentou **92 min de voo co
 erro**, com o heap estável e o anel de chunks fixo em 489 colunas ao longo de 67 mil blocos — os
 dois medidos por `npm run slow-network` e `npm run soak`, que dirigem um Chrome de verdade.
 
-**239 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
+**258 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
 além de dois ícones de PWA de 6,7 KB, gerados por código.
 
 Validado em aparelho alvo (**Galaxy J7 Metal**, Android 7, 2 GB, Mali-T830) em 2026-09-12:
@@ -151,7 +155,7 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 2064 testes (vitest)
+npm test           # 2116 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
 npm run smoke      # abre o jogo num Chrome headless e joga o roteiro do doc 14 (precisa do build)
@@ -230,7 +234,7 @@ src/
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      2064 testes, incluindo orçamento de performance e de luz
+tests/                      2116 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios
@@ -247,7 +251,7 @@ docs/
   11-persistencia-e-saves.md IndexedDB, formato de save, PWA
   12-multiplayer.md         ganchos de arquitetura, protocolo P2P
   13-assets-e-arte.md       texturas procedurais, sprites, fonte, licença
-  14-roadmap.md             marcos com checklist e critérios de aceite (M0–M13 feitos; M14–M17 propostos)
+  14-roadmap.md             marcos com checklist e critérios de aceite (M0–M14 feitos; M15–M17 propostos)
   15-status.md              estado real: status por marco, pendências, próximo passo
   16-auditoria.md           histórico por sessão, com grid de arquivos
   mockups/                  14 wireframes SVG + generate.py

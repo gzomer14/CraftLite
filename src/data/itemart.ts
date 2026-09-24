@@ -401,6 +401,45 @@ export const SHAPES: Record<string, readonly string[]> = {
     '................',
     '................',
   ],
+  // --- M14: pesca ------------------------------------------------------------
+  // A vara na diagonal, com a linha (acento) caindo da ponta até a boia.
+  fishing_rod: [
+    '................',
+    '............Mm..',
+    '...........Mmd.a',
+    '..........Mmd..a',
+    '.........Mmd...a',
+    '........Mmd....a',
+    '.......Mmd.....a',
+    '......Mmd......a',
+    '.....Mmd.......a',
+    '....Mmd........a',
+    '...Mmd.........a',
+    '..Mmd.........AA',
+    '.Mmd..........AA',
+    '.dd.............',
+    '................',
+    '................',
+  ],
+  // Peixe de perfil, olho em `x`, rabo aberto à direita.
+  fish: [
+    '................',
+    '................',
+    '................',
+    '................',
+    '..........d.....',
+    '.....MMMMMmd....',
+    '...MMmmmmmmmd.dd',
+    '..MxMmmmmmmmmdmd',
+    '..MMmmmmmmmmmmd.',
+    '...mmmddmmmmd.dd',
+    '....dmmmmmmd..dd',
+    '......dddd......',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
   bone: [
     '................',
     '................',
@@ -960,6 +999,11 @@ const SIMPLE: Record<string, [string, Rgb]> = {
   cookie: ['round', [196, 140, 80]],
   sugar: ['dust', [244, 244, 240]],
   egg: ['egg', [236, 220, 184]],
+
+  // M14: selva e pesca.
+  cocoa_beans: ['seeds', [118, 70, 38]],
+  cod: ['fish', [190, 164, 116]],
+  cooked_cod: ['fish', [206, 140, 74]],
 };
 
 /** Arte por nome de item, montada uma vez no boot. */
@@ -1004,6 +1048,8 @@ function buildArt(): Record<string, ItemArt> {
   out.milk_bucket = { shape: 'filled_bucket', color: bucket, accent: [244, 244, 240] };
   out.mushroom_stew = { shape: 'stew', color: WOOD, accent: [168, 112, 70] };
   out.shears = { shape: 'shears', color: [214, 214, 220], accent: [160, 60, 50] };
+  // M14: a vara é o cabo de madeira, e a linha, o acento.
+  out.fishing_rod = { shape: 'fishing_rod', color: WOOD, accent: [226, 226, 222] };
   // M10: a bússola em ferro com face clara, o relógio em ouro com o disco do
   // céu; o mapa em papel, com a terra no principal e a água no acento.
   out.compass = {

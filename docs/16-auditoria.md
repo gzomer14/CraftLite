@@ -12,6 +12,73 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-24 · 09:20 → 10:50 · M14: água e paisagem
+
+**Pedido:** *"Já havia feito os testes no celular, tudo funcionando perfeitamente. Vamos seguir com
+o marco M14"*.
+
+**Resultado:** M14 fechado, os seis itens do doc 14 com o critério medido. Visão submersa e na lava
+por névoa e um uniform a mais; rios cavados no campo de altura com vale que alarga com o desnível;
+pesca (vara, boia, espera, fisgada, bacalhau, XP, estatística e conquista), com boia e linha no
+batcher de entidades; afogado nadando em 3D; lua com oito fases; tint de grama/folha/água por
+clima, com floresta de bétula, planície florida e pântano escuro; selva (5 camadas de atlas) com
+cacau na folha e o biscoito de volta à receita do doc. Três achados antigos corrigidos: **sol e lua
+trocados desde o M1**, **o tint de bioma do doc 03 nunca existiu** e **o clima não chegava às
+pontas** (floresta 0,3%, savana e pântano zero). M9 e M10 registrados como validados em campo. Visto
+no Chrome headless com a seed 2: rio, mergulho, selva, linha de pesca, sol e as fases da lua.
+**Muda o terreno gerado:** mundo antigo ganha costura.
+
+Portões: **2116 testes** em 108 arquivos, lint limpo, build ok, **257,9 KB** de 350, smoke 7/7.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| **Render** | | |
+| `+` | `src/render/medium.ts` | meio do olho (ar, água, lava) → névoa, densidade e tom do quadro |
+| `+` | `src/render/biometint.ts` | tabela clima → cor, anel de clima RG8 toroidal em volta da câmera |
+| `~` | `src/render/renderer.ts` | meio lido no quadro; sem céu e nuvem submerso; `setSeed`; tint no anel |
+| `~` | `src/render/terrain.ts` | `uMediumTint`, texturas e uniforms do tint de bioma |
+| `~` | `src/render/shaders/terrain.glsl.ts` | tint por clima no vertex shader (`BIOME_TINT`); `uMediumTint` |
+| `~` | `src/render/shaders/entity.glsl.ts`, `src/render/mobrender.ts` | `uMediumTint` nas entidades |
+| `~` | `src/render/shaders/sky.glsl.ts` | lua com fases e mares, nos dois GLSL |
+| `~` | `src/render/sky.ts` | `sunDirection` com o sinal certo; `moonPhaseVector` |
+| `~` | `src/render/scenefeed.ts` | meio e seed ao renderizador; boia e linha de pesca |
+| `~` | `src/render/entityatlas.ts` | camadas da boia e da linha |
+| **Mundo** | | |
+| `+` | `src/world/gen/climate.ts` | temperatura e umidade sem o gerador; clima espalhado em −1..1 |
+| `~` | `src/world/gen/heightfield.ts` | rio: canal, vale e bioma; mapas de clima de `climate.ts` |
+| `~` | `src/world/gen/terrain.ts` | ruído do rio; salts do clima de `climate.ts` |
+| `~` | `src/world/gen/decorate.ts` | rio, floresta de bétula, planície florida e selva |
+| `~` | `src/world/trees.ts` | árvore da selva |
+| **Dado** | | |
+| `+` | `src/data/fishing.ts` | espera, fisgada, linha e o que vem no anzol |
+| `~` | `src/data/biomes.ts` | rio, floresta de bétula, planície florida, selva; `variant`; `pickClimateBiome`; pântano mais escuro |
+| `~` | `src/data/blocks.ts`, `src/data/textures.ts` | tronco, tábua, folha e muda da selva |
+| `~` | `src/data/items.ts` | apêndice do M14: cacau, bacalhau, bacalhau assado, vara (uso `fish`) |
+| `~` | `src/data/itemart.ts` | silhuetas da vara de pesca e do peixe |
+| `~` | `src/data/recipes.ts`, `src/data/smelting.ts`, `src/data/loot.ts` | vara, biscoito com cacau, `#logs`/`#planks`, bacalhau assado, folha da selva |
+| `~` | `src/data/plants.ts` | muda da selva |
+| `~` | `src/data/mobs.ts`, `src/data/mobskins.ts`, `src/data/mobmodels.ts` | afogado; biomas novos nas regras de spawn; modelos e peles da boia e da linha |
+| `~` | `src/data/stats.ts`, `src/data/achievements.ts` | Peixes pescados; Pescador |
+| `~` | `src/data/structures.ts` | aldeia também na planície florida |
+| **Jogo e entidades** | | |
+| `+` | `src/game/fishing.ts` | a linha: voo, água, espera, fisgada, puxar |
+| `~` | `src/game/itemuse.ts` | uso `fish`; contexto com linha, XP e estatística |
+| `~` | `src/game/session.ts` | a linha de pesca no tick e no contexto de uso |
+| `~` | `src/entity/mobstore.ts`, `src/entity/ai/goals.ts` | quem nada persegue e passeia também no Y |
+| `~` | `src/audio/synth.ts` | `fishing/splash` |
+| `~` | `src/main.ts` | a fase da lua vai para o céu |
+| **Testes** | | |
+| `+` | `tests/medium.test.ts`, `tests/moon.test.ts`, `tests/rivers.test.ts` | meio do olho; sol, lua e fases; rio atravessa biomas sem parede |
+| `+` | `tests/biometint.test.ts`, `tests/fishing.test.ts`, `tests/jungle.test.ts` | tabela e anel de clima; pesca e o critério de 10 em 5 min; selva e afogado |
+| `~` | `tests/perf.test.ts` | orçamento do clima por chunk |
+| `~` | `tests/village.test.ts` | casa sobre a água (e rio) fora da conta de moradores |
+| `~` | `tests/mobs.test.ts`, `tests/plants.test.ts`, `tests/fuel.test.ts`, `tests/decorate.test.ts` | afogado na contagem; selva nas listas de madeira |
+| **Docs** | | |
+| `~` | `docs/14-roadmap.md` | checklist do M14 fechado |
+| `~` | `docs/15-status.md`, `docs/16-auditoria.md`, `README.md` | §1, §2, §3 M14, §4, §5, §6, esta sessão, contagem |
+
+---
+
 ## 2026-09-23 · 17:10 → 17:53 · M10 no campo: mão, pausa e mapa voando
 
 **Pedido:** *"Os itens na minha mão estão com uma posição bem estranha (…) Para bússola fica horrível

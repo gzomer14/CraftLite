@@ -14,7 +14,7 @@
 
 import { BLOCK_BY_NAME, blockIdOf } from './blocks';
 
-export type TreeKind = 'oak' | 'birch' | 'spruce' | 'acacia';
+export type TreeKind = 'oak' | 'birch' | 'spruce' | 'acacia' | 'jungle';
 
 export interface PlantDef {
   block: string;
@@ -43,6 +43,7 @@ export const PLANTS: readonly PlantDef[] = [
   { block: 'birch_sapling', kind: 'tree', tree: 'birch', chance: 0.015 },
   { block: 'spruce_sapling', kind: 'tree', tree: 'spruce', chance: 0.015 },
   { block: 'acacia_sapling', kind: 'tree', tree: 'acacia', chance: 0.015 },
+  { block: 'jungle_sapling', kind: 'tree', tree: 'jungle', chance: 0.015 },
   { block: 'sugar_cane', kind: 'column', maxHeight: 3, chance: 0.03, needsWater: true },
   { block: 'cactus', kind: 'column', maxHeight: 3, chance: 0.03, needsClearSides: true },
 ];

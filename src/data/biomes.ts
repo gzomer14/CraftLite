@@ -26,6 +26,13 @@ export interface BiomeDef {
   /** Faixas de seleção; `undefined` = não participa do lookup normal. */
   temperature?: [number, number];
   humidity?: [number, number];
+  /**
+   * Variação de outro bioma (M14): uma caixa pequena dentro da caixa do pai.
+   * Dentro dela, a variação ganha; fora, ela nem concorre. É o que deixa a
+   * floresta de bétula aparecer **no meio** da floresta, e não disputar a
+   * fronteira com ela.
+   */
+  variant?: boolean;
 }
 
 export const BIOMES: readonly BiomeDef[] = [
@@ -71,16 +78,44 @@ export const BIOMES: readonly BiomeDef[] = [
     heightOffset: 26, heightScale: 2.2,
     grassTint: 0x8ab689, foliageTint: 0x6da36b, waterTint: 0x3f76e4 },
 
+  // M14: mais escuro que o do gênero, para o pântano se ler de longe agora
+  // que o tint de bioma existe.
   { id: 9, name: 'swamp', display: 'Pântano', surface: GRASS_BLOCK, filler: DIRT,
     heightOffset: -2, heightScale: 0.3,
-    grassTint: 0x6a7039, foliageTint: 0x6a7039, waterTint: 0x617b64,
+    grassTint: 0x5a6232, foliageTint: 0x4f5a2c, waterTint: 0x4c6a55,
     temperature: [0.5, 0.8], humidity: [0.8, 1.0] },
+
+  // M14: o rio não entra no lookup — quem o marca é o canal, em
+  // `world/gen/heightfield.ts`. O leito sai de areia pela regra de "debaixo
+  // d'água" do terreno; o bioma existe para o afogado e para o tint.
+  { id: 10, name: 'river', display: 'Rio', surface: SAND, filler: SAND,
+    heightOffset: 0, heightScale: 0.4,
+    grassTint: 0x91bd59, foliageTint: 0x77ab2f, waterTint: 0x3f76e4 },
+
+  // M14: variações que só custam tint (e uma linha de decoração).
+  { id: 11, name: 'birch_forest', display: 'Floresta de Bétula', surface: GRASS_BLOCK, filler: DIRT,
+    heightOffset: 4, heightScale: 0.8,
+    grassTint: 0x88bb67, foliageTint: 0x6ba941, waterTint: 0x3f76e4,
+    temperature: [0.25, 0.45], humidity: [0.6, 0.85], variant: true },
+
+  { id: 12, name: 'flower_plains', display: 'Planície Florida', surface: GRASS_BLOCK, filler: DIRT,
+    heightOffset: 2, heightScale: 0.5,
+    grassTint: 0x9ccb5b, foliageTint: 0x7fb335, waterTint: 0x3f76e4,
+    temperature: [0.4, 0.6], humidity: [0.25, 0.4], variant: true },
+
+  // M14: a selva, quente e úmida — o canto da tabela que era do pântano e da
+  // savana por falta de dono. Custa as cinco camadas da madeira nova.
+  { id: 13, name: 'jungle', display: 'Selva', surface: GRASS_BLOCK, filler: DIRT,
+    heightOffset: 5, heightScale: 1.0,
+    grassTint: 0x59c93c, foliageTint: 0x30bb0b, waterTint: 0x3f76e4,
+    temperature: [0.8, 1.0], humidity: [0.55, 1.0] },
 ];
 
 export const BIOME_OCEAN = 0;
 export const BIOME_BEACH = 1;
 export const BIOME_PLAINS = 2;
 export const BIOME_MOUNTAINS = 8;
+export const BIOME_RIVER = 10;
 
 /** Tabela achatada de tints, para o shader consultar por índice sem branch. */
 export function biomeTintTable(): Float32Array {
@@ -113,11 +148,28 @@ export function pickBiome(
   // Erosão baixa = relevo acentuado; acima de certa altura vira montanha.
   if (erosion < -0.35 && height > seaLevel + 26) return BIOME_MOUNTAINS;
 
+  return pickClimateBiome(temperature, humidity);
+}
+
+/**
+ * A parte do lookup que só olha o clima: o bioma que a temperatura e a
+ * umidade pedem, sem as regras de altura. É também o que pinta a tabela de
+ * cores do tint (`render/biometint.ts`).
+ */
+export function pickClimateBiome(temperature: number, humidity: number): number {
+  // Variação primeiro: dentro da caixa dela, ela ganha do pai.
+  for (let i = 0; i < BIOMES.length; i++) {
+    const b = BIOMES[i];
+    if (b.variant !== true || b.temperature === undefined || b.humidity === undefined) continue;
+    if (axisDistance(temperature, b.temperature) === 0 && axisDistance(humidity, b.humidity) === 0) {
+      return b.id;
+    }
+  }
   let best = BIOME_PLAINS;
   let bestScore = Infinity;
   for (let i = 0; i < BIOMES.length; i++) {
     const b = BIOMES[i];
-    if (b.temperature === undefined || b.humidity === undefined) continue;
+    if (b.variant === true || b.temperature === undefined || b.humidity === undefined) continue;
     // Distância até a caixa de seleção: 0 dentro dela, cresce para fora.
     const dt = axisDistance(temperature, b.temperature);
     const dh = axisDistance(humidity, b.humidity);

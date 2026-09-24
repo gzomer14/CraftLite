@@ -12,23 +12,32 @@ import {
   TERRAIN_FS_100, TERRAIN_FS_300, TERRAIN_VS_100, TERRAIN_VS_300, withDefines,
 } from './shaders/terrain.glsl';
 import type { Atlas } from './atlas';
+import type { BiomeTint } from './biometint';
 import type { Mat4 } from '../core/math';
 
 const UNIFORMS = [
   'uViewProj', 'uChunkOrigin', 'uDayFactor', 'uMinSkyLight',
-  'uAtlas', 'uAtlasTiles', 'uFogColor', 'uFogDensity', 'uTints',
+  'uAtlas', 'uAtlasTiles', 'uFogColor', 'uFogDensity', 'uTints', 'uMediumTint',
+  'uClimate', 'uColormap', 'uClimateInv', 'uBiomeTint',
 ] as const;
+
+/** Unidades de textura do tint de bioma; o atlas fica na 0. */
+const CLIMATE_UNIT = 1;
+const COLORMAP_UNIT = 2;
 
 export interface SkyParams {
   fogColor: Float32Array;
   fogDensity: number;
   dayFactor: number;
   minSkyLight: number;
+  /** Tom multiplicado na cor antes da névoa: branco no ar, azul na água (M14). */
+  tint: Float32Array;
 }
 
 export class TerrainPass {
   private readonly ctx: GlContext;
   private readonly atlas: Atlas;
+  private readonly biomeTint: BiomeTint | null;
   private readonly opaque: WebGLProgram;
   private readonly cutout: WebGLProgram;
   private readonly uOpaque: Record<(typeof UNIFORMS)[number], WebGLUniformLocation | null>;
@@ -39,11 +48,14 @@ export class TerrainPass {
   drawCalls = 0;
   vertices = 0;
 
-  constructor(ctx: GlContext, atlas: Atlas) {
+  constructor(ctx: GlContext, atlas: Atlas, biomeTint: BiomeTint | null = null) {
     this.ctx = ctx;
     this.atlas = atlas;
+    this.biomeTint = biomeTint;
     const use300 = ctx.gl2 !== null;
-    const vs = use300 ? TERRAIN_VS_300 : TERRAIN_VS_100;
+    const vs = use300
+      ? withDefines(TERRAIN_VS_300, biomeTint !== null ? ['BIOME_TINT'] : [])
+      : TERRAIN_VS_100;
     const fs = use300 ? TERRAIN_FS_300 : TERRAIN_FS_100;
 
     this.opaque = createProgram(ctx.gl, vs, fs, 'terrain');
@@ -71,9 +83,18 @@ export class TerrainPass {
     gl.uniform1f(u.uMinSkyLight, sky.minSkyLight);
     gl.uniform3fv(u.uFogColor, sky.fogColor);
     gl.uniform1f(u.uFogDensity, sky.fogDensity);
+    gl.uniform3fv(u.uMediumTint, sky.tint);
     // A tabela de tints é fixa; subir a cada `begin` custa 60 floats, três vezes
     // por quadro — mais barato que guardar estado por programa.
     gl.uniform3fv(u.uTints, TINT_COLORS);
+    const tint = this.biomeTint;
+    if (tint !== null) {
+      tint.bind(CLIMATE_UNIT, COLORMAP_UNIT);
+      gl.uniform1i(u.uClimate, CLIMATE_UNIT);
+      gl.uniform1i(u.uColormap, COLORMAP_UNIT);
+      gl.uniform1f(u.uClimateInv, tint.inverseSide);
+      gl.uniform1f(u.uBiomeTint, tint.enabled ? 1 : 0);
+    }
   }
 
   /** Define a origem da section atual (posições no vértice são locais). */

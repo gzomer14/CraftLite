@@ -34,6 +34,7 @@ export const SMELTING: readonly SmeltingRecipe[] = [
   { input: 'chicken', output: 'cooked_chicken', xp: 0.35 },
   { input: 'mutton', output: 'cooked_mutton', xp: 0.35 },
   { input: 'potato', output: 'baked_potato', xp: 0.35 },
+  { input: 'cod', output: 'cooked_cod', xp: 0.35 },
   // Nether (M7): a linha de netherrack → tijolo é do doc 05 §5.
   { input: 'netherrack', output: 'nether_brick', xp: 0.1 },
   // Corante verde (M8): é o único que sai da fornalha, como no gênero.

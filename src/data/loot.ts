@@ -66,6 +66,15 @@ export const BLOCK_LOOT: Record<string, LootEntry> = {
   birch_leaves: { drops: [{ item: 'birch_sapling', count: 1, chance: 0.05 }] },
   spruce_leaves: { drops: [{ item: 'spruce_sapling', count: 1, chance: 0.05 }] },
   acacia_leaves: { drops: [{ item: 'acacia_sapling', count: 1, chance: 0.05 }] },
+  // Selva (M14): a muda e o cacau. O cacau do gênero nasce em vagem presa ao
+  // tronco; aqui cai da folha, como a maçã do carvalho — uma forma de bloco e
+  // três estágios de crescimento a menos, e o biscoito volta à receita do doc.
+  jungle_leaves: {
+    drops: [
+      { item: 'jungle_sapling', count: 1, chance: 0.025 },
+      { item: 'cocoa_beans', count: 1, chance: 0.06 },
+    ],
+  },
   tall_grass: { drops: [{ item: 'wheat_seeds', count: 1, chance: 0.125 }] },
   fern: { drops: [{ item: 'wheat_seeds', count: 1, chance: 0.125 }] },
   dead_bush: { drops: [{ item: 'stick', count: [0, 2] }] },

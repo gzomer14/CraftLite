@@ -46,6 +46,7 @@ export const TREE_BLOCKS: Record<TreeKind, { log: number; leaves: number }> = {
   birch: { log: stateOf('birch_log'), leaves: stateOf('birch_leaves') },
   spruce: { log: stateOf('spruce_log'), leaves: stateOf('spruce_leaves') },
   acacia: { log: stateOf('acacia_log'), leaves: stateOf('acacia_leaves') },
+  jungle: { log: stateOf('jungle_log'), leaves: stateOf('jungle_leaves') },
 };
 
 /**
@@ -53,7 +54,7 @@ export const TREE_BLOCKS: Record<TreeKind, { log: number; leaves: number }> = {
  * a muda confere antes de crescer: árvore que não cabe não cresce.
  */
 export const TREE_MAX_HEIGHT: Record<TreeKind, number> = {
-  oak: 8, birch: 9, spruce: 11, acacia: 7,
+  oak: 8, birch: 9, spruce: 11, acacia: 7, jungle: 14,
 };
 
 /** Escreve a árvore com a base do tronco em `(x, base, z)`. */
@@ -62,6 +63,7 @@ export function growTree(
 ): void {
   if (kind === 'spruce') growSpruce(writer, rng, x, base, z);
   else if (kind === 'acacia') growAcacia(writer, rng, x, base, z);
+  else if (kind === 'jungle') growJungle(writer, rng, x, base, z);
   else growRound(writer, rng, x, base, z, kind);
 }
 
@@ -124,5 +126,40 @@ function growAcacia(w: TreeWriter, rng: TreeRng, wx: number, base: number, wz: n
       w.leaf(wx + dx, top, wz + dz, leaves);
       if (Math.abs(dx) <= 1 && Math.abs(dz) <= 1) w.leaf(wx + dx, top + 1, wz + dz, leaves);
     }
+  }
+}
+
+/**
+ * Selva (M14): tronco alto, copa larga e cheia no topo e dois tufos pendurados
+ * no tronco — é o que faz a mata fechar por cima, com sombra embaixo.
+ */
+function growJungle(w: TreeWriter, rng: TreeRng, wx: number, base: number, wz: number): void {
+  const { log, leaves } = TREE_BLOCKS.jungle;
+  const height = 8 + rng.nextInt(4);
+  for (let y = 0; y < height; y++) w.trunk(wx, base + y, wz, log);
+
+  const top = base + height;
+  for (let dy = -2; dy <= 1; dy++) {
+    const radius = dy === 1 ? 1 : dy === 0 ? 2 : 3;
+    for (let dz = -radius; dz <= radius; dz++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        if (dx * dx + dz * dz > radius * radius + 1) continue;
+        if (dx === 0 && dz === 0 && dy < 1) continue;
+        w.leaf(wx + dx, top + dy, wz + dz, leaves);
+      }
+    }
+  }
+  // Tufos no meio do tronco, de um lado sorteado.
+  for (let i = 0; i < 2; i++) {
+    const y = base + 3 + rng.nextInt(Math.max(1, height - 6));
+    const side = rng.nextInt(4);
+    const sx = side === 0 ? 1 : side === 1 ? -1 : 0;
+    const sz = side === 2 ? 1 : side === 3 ? -1 : 0;
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        w.leaf(wx + sx * 2 + dx, y, wz + sz * 2 + dz, leaves);
+      }
+    }
+    w.leaf(wx + sx * 2, y + 1, wz + sz * 2, leaves);
   }
 }

@@ -80,6 +80,12 @@ export const DECOR: Record<string, DecorSpec> = {
   snowy_plains: { tree: { kind: 'spruce', perChunk: 1 }, grass: 2 },
   mountains: { tree: { kind: 'spruce', perChunk: 0.5 }, grass: 2 },
   swamp: { tree: { kind: 'oak', perChunk: 2 }, grass: 10, sugarCane: 4 },
+  // M14: o chunk cujo centro cai no rio é um corredor aberto — sem árvore,
+  // com cana nas margens.
+  river: { grass: 6, sugarCane: 5 },
+  birch_forest: { tree: { kind: 'birch', perChunk: 6 }, grass: 8, flowers: 3 },
+  flower_plains: { tree: { kind: 'oak', perChunk: 0.2 }, grass: 8, flowers: 24 },
+  jungle: { tree: { kind: 'jungle', perChunk: 8 }, grass: 14, flowers: 1 },
 };
 
 /** Superfícies em que planta e árvore pegam. */

@@ -376,8 +376,10 @@ export const GOALS: Record<BaseGoalName, Goal> = {
 
     const angle = ctx.random() * Math.PI * 2;
     const radius = ctx.random() * WANDER_RADIUS;
-    // Quem voa também escolhe altura; quem anda mantém a sua e sobe degrau.
-    const flying = mobDef(s.type[i]).traits.flies === true;
+    // Quem voa (e quem nada, M14) também escolhe altura; quem anda mantém a
+    // sua e sobe degrau.
+    const traits = mobDef(s.type[i]).traits;
+    const flying = traits.flies === true || traits.swims === true;
     const dy = flying ? (ctx.random() - 0.5) * FLIGHT_WANDER_HEIGHT : 0;
     s.setMoveTarget(
       i,

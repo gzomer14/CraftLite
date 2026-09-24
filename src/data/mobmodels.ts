@@ -267,6 +267,25 @@ export const MODELS: Record<string, ModelDef> = {
     ],
   },
 
+  /**
+   * Pesca (M14): a boia e um trecho da linha. A linha é desenhada como uma
+   * fila de trechos girados na direção dela, no mesmo batcher da flecha —
+   * nenhum passe de linha novo por causa de um fio. O trecho tem 16 unidades
+   * de comprimento: com `scale = L`, ele mede L blocos e tem L/16 de espessura.
+   */
+  fishing_bobber: {
+    skinSize: 64, height: 4,
+    parts: [
+      { name: 'float', pivot: [0, 0, 0], box: [-2, 0, -2, 4, 4, 4], uv: [0, 0] },
+    ],
+  },
+  fishing_line: {
+    skinSize: 64, height: 1,
+    parts: [
+      { name: 'thread', pivot: [0, 0, 0], box: [-0.5, -0.5, -8, 1, 1, 16], uv: [0, 0] },
+    ],
+  },
+
   squid: {
     skinSize: 64, height: 13,
     parts: [

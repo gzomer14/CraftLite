@@ -103,7 +103,7 @@ export interface ItemDef {
 export type ItemUse =
   | 'fill_bucket' | 'pour_water' | 'pour_lava' | 'drink_milk' | 'shears' | 'throw_egg'
   | 'throw_snowball' | 'dye_sheep' | 'eat' | 'charge' | 'place_boat' | 'place_minecart'
-  | 'ignite' | 'till' | 'plant' | 'open_map';
+  | 'ignite' | 'till' | 'plant' | 'open_map' | 'fish';
 
 /**
  * Materiais de ferramenta (doc 05 §2).
@@ -544,6 +544,34 @@ for (const item of [
     ...(item.use !== undefined ? { use: item.use } : {}),
   });
 }
+
+// --- apêndice do M14: selva e pesca, no fim da fila de ids -------------------
+// O cacau cai da folha da selva e volta o biscoito à receita do doc. O
+// bacalhau é o do doc 05 §4 (cozido 5 / 6,0; cru, a linha do gênero), e a
+// vara (`game/fishing.ts`) é a comida renovável que não depende de fazenda.
+for (const item of [
+  { name: 'cocoa_beans', display: 'Sementes de Cacau' },
+  { name: 'cod', display: 'Bacalhau Cru', food: { hunger: 2, saturation: 0.4, eatTicks: 32 } },
+  { name: 'cooked_cod', display: 'Bacalhau Assado', food: { hunger: 5, saturation: 6, eatTicks: 32 } },
+] satisfies AppendixItem[]) {
+  register({
+    id: nextId++,
+    name: item.name,
+    display: item.display,
+    tex: `item/${item.name}`,
+    maxStack: 64,
+    ...(item.food !== undefined ? { food: item.food } : {}),
+  });
+}
+register({
+  id: nextId++,
+  name: 'fishing_rod',
+  display: 'Vara de Pesca',
+  tex: 'item/fishing_rod',
+  maxStack: 1,
+  durability: 64,
+  use: 'fish',
+});
 
 /**
  * Usos de cada item, em ordem de tentativa (ver `ItemDef.uses`).

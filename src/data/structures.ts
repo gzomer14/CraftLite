@@ -249,7 +249,7 @@ const HOUSE_PIECES: readonly Piece[] = [
 
 const VILLAGE_PLACEMENT: Placement = {
   attempts: 1, minY: 0, maxY: 0, surface: true,
-  biomes: ['plains', 'savanna', 'desert'],
+  biomes: ['plains', 'savanna', 'desert', 'flower_plains'],
 };
 
 /**

@@ -466,9 +466,11 @@ export class MobStore {
     const dx = this.moveX[i] - this.x[i];
     const dz = this.moveZ[i] - this.z[i];
     const distance = Math.hypot(dx, dz);
-    const flying = mobDef(this.type[i]).traits.flies === true;
-    // Quem voa também persegue o Y do destino; quem anda ignora, e confia no
-    // pulo automático para subir degrau.
+    const traits = mobDef(this.type[i]).traits;
+    // Quem voa também persegue o Y do destino, e quem nada também, dentro
+    // d'água (o afogado vem atrás do jogador no fundo do rio, M14). Quem anda
+    // ignora, e confia no pulo automático para subir degrau.
+    const flying = traits.flies === true || (traits.swims === true && inWater);
     if (flying) {
       const dy = this.moveY[i] - this.y[i];
       const perTickY = (speed / 20) * this.moveSpeed[i];

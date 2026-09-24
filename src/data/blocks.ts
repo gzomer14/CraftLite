@@ -744,6 +744,22 @@ SPECS.push(
   { id: 143, name: 'dirt_path', display: 'Caminho de Terra', ...soil(), itemless: true,
     tex: { top: 'block/dirt_path_top', side: 'block/dirt', bottom: 'block/dirt' } },
 );
+
+/*
+ * Selva (M14): a quinta madeira. Custa cinco camadas de atlas — tronco (lado
+ * e topo), tábua, folha e muda —, que é a folga que o M13 abriu.
+ */
+SPECS.push(
+  { id: 144, name: 'jungle_log', display: 'Tronco da Selva', hardness: 2, ...wood(), fuel: 300,
+    tex: { top: 'block/jungle_log_top', side: 'block/jungle_log_side', bottom: 'block/jungle_log_top' } },
+  { id: 145, name: 'jungle_planks', display: 'Tábuas da Selva', tex: 'block/jungle_planks',
+    hardness: 2, ...wood(), fuel: 300 },
+  { id: 146, name: 'jungle_leaves', display: 'Folhas da Selva', tex: 'block/jungle_leaves',
+    hardness: 0.2, opaque: false, lightAttenuation: 1, tint: 'foliage', tool: 'shears',
+    flammable: 30, sound: 'grass' },
+  { id: 147, name: 'jungle_sapling', display: 'Muda da Selva', tex: 'block/jungle_sapling',
+    ...plant(), fuel: 100 },
+);
 SPECS.push(...dyedSpecs());
 
 /**

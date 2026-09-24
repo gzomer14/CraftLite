@@ -165,12 +165,12 @@ type MobSpec = Omit<MobDef, 'traits' | 'spawn'> & { traits?: MobTraits };
 
 /** Regra de spawn por mob, separada da definição para caber na tela. */
 export const SPAWN_RULES: Record<string, SpawnRule> = {
-  cow: { light: 'bright', ground: ['grass_block'], minY: 60, maxY: 110, biomes: ['plains', 'forest', 'taiga', 'savanna'], packMin: 2, packMax: 4, weight: 8 },
-  pig: { light: 'bright', ground: ['grass_block'], minY: 60, maxY: 110, biomes: ['plains', 'forest', 'swamp'], packMin: 2, packMax: 4, weight: 8 },
-  sheep: { light: 'bright', ground: ['grass_block'], minY: 60, maxY: 120, biomes: ['plains', 'forest', 'mountains', 'snowy_plains'], packMin: 2, packMax: 3, weight: 8 },
-  chicken: { light: 'bright', ground: ['grass_block'], minY: 60, maxY: 110, biomes: ['plains', 'forest', 'swamp', 'savanna'], packMin: 4, packMax: 4, weight: 6 },
+  cow: { light: 'bright', ground: ['grass_block'], minY: 60, maxY: 110, biomes: ['plains', 'forest', 'taiga', 'savanna', 'birch_forest', 'flower_plains'], packMin: 2, packMax: 4, weight: 8 },
+  pig: { light: 'bright', ground: ['grass_block'], minY: 60, maxY: 110, biomes: ['plains', 'forest', 'swamp', 'birch_forest', 'flower_plains', 'jungle'], packMin: 2, packMax: 4, weight: 8 },
+  sheep: { light: 'bright', ground: ['grass_block'], minY: 60, maxY: 120, biomes: ['plains', 'forest', 'mountains', 'snowy_plains', 'birch_forest', 'flower_plains'], packMin: 2, packMax: 3, weight: 8 },
+  chicken: { light: 'bright', ground: ['grass_block'], minY: 60, maxY: 110, biomes: ['plains', 'forest', 'swamp', 'savanna', 'birch_forest', 'flower_plains', 'jungle'], packMin: 4, packMax: 4, weight: 6 },
   squid: { light: 'any', ground: [], inWater: true, minY: 45, maxY: 62, biomes: [], packMin: 1, packMax: 3, weight: 6 },
-  wolf: { light: 'bright', ground: ['grass_block', 'podzol', 'snow_block'], minY: 60, maxY: 120, biomes: ['taiga', 'forest'], packMin: 2, packMax: 4, weight: 4 },
+  wolf: { light: 'bright', ground: ['grass_block', 'podzol', 'snow_block'], minY: 60, maxY: 120, biomes: ['taiga', 'forest', 'birch_forest'], packMin: 2, packMax: 4, weight: 4 },
   enderman: { light: 'dark', ground: [], minY: 0, maxY: 127, biomes: [], packMin: 1, packMax: 1, weight: 2 },
   spider: { light: 'dark', ground: [], minY: 0, maxY: 127, biomes: [], packMin: 1, packMax: 2, weight: 8 },
   zombie: { light: 'dark', ground: [], minY: 0, maxY: 127, biomes: [], packMin: 3, packMax: 4, weight: 12 },
@@ -183,6 +183,8 @@ export const SPAWN_RULES: Record<string, SpawnRule> = {
    * mar — ele é o que diz "você está numa caverna" antes de o zumbi dizer.
    */
   bat: { light: 'dark', ground: [], minY: 0, maxY: 58, biomes: [], packMin: 1, packMax: 2, weight: 10 },
+  // Afogado (M14): no escuro, dentro d'água, só no rio e no mar.
+  drowned: { light: 'dark', ground: [], inWater: true, minY: 40, maxY: 62, biomes: ['river', 'ocean'], packMin: 1, packMax: 2, weight: 6 },
 
   // --- Nether (M7): luz não filtra nada aqui, porque lá tudo é escuro ------
   zombified_piglin: { light: 'any', ground: ['netherrack', 'soul_sand', 'nether_bricks'], minY: 32, maxY: 120, biomes: [], packMin: 2, packMax: 4, weight: 12, dimension: 1 },
@@ -447,6 +449,27 @@ const SPECS: MobSpec[] = [
     model: 'humanoid', skin: 'iron_golem', sound: 'iron_golem',
     despawnable: false,
     traits: { neutralUntilProvoked: true, modelScale: 1.4 },
+  },
+
+  // --- água (M14) -----------------------------------------------------------
+  /*
+   * Afogado (doc 07 §1, "pós-MVP"): o zumbi que nasce na água. Nada atrás do
+   * alvo em três dimensões (`swims`) em vez de boiar — por isso não tem
+   * `floatInWater` — e na terra anda e queima como o zumbi. O tridente do
+   * gênero ficou de fora (não há arma de arremesso); o cobre, não.
+   */
+  {
+    id: 17, name: 'drowned', display: 'Afogado', category: 'hostile',
+    health: 20, width: 0.6, height: 1.95, speed: 3.2,
+    attack: { damage: [2, 3, 4], reach: 1.6, cooldownTicks: 20 },
+    followRange: 16, xp: [5, 5],
+    drops: [
+      { item: 'rotten_flesh', count: [0, 2] },
+      { item: 'copper_ingot', count: 1, chance: 0.11 },
+    ],
+    goals: ['attackMelee', 'moveToTarget', 'avoidSunlight', 'wander', 'lookAtPlayer'],
+    model: 'humanoid', skin: 'drowned', sound: 'zombie',
+    despawnable: true, traits: { burnsInSunlight: true, swims: true },
   },
 ];
 

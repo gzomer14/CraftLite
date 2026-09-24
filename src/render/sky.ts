@@ -13,7 +13,9 @@ import { SKY_FS_100, SKY_FS_300, SKY_VS_100, SKY_VS_300 } from './shaders/sky.gl
 import { TICKS_PER_DAY } from '../game/daynight';
 import { createMat4, invert, multiply, type Mat4 } from '../core/math';
 
-const UNIFORMS = ['uInvViewProj', 'uZenith', 'uHorizon', 'uSunDir', 'uDayFactor'] as const;
+const UNIFORMS = [
+  'uInvViewProj', 'uZenith', 'uHorizon', 'uSunDir', 'uDayFactor', 'uMoonPhase',
+] as const;
 
 /** Marcos de cor: [fração do dia, zênite, horizonte]. */
 const KEYS: readonly (readonly [number, number, number, number, number, number, number])[] = [
@@ -27,6 +29,39 @@ const KEYS: readonly (readonly [number, number, number, number, number, number, 
   [0.97, 0.18, 0.24, 0.55, 0.92, 0.55, 0.40], // aurora
   [1.00, 0.22, 0.44, 0.90, 0.47, 0.65, 1.00],
 ];
+
+/** Fases da lua (doc 03 §8); a contagem mora em `game/weather.ts`. */
+const MOON_PHASES = 8;
+
+/**
+ * Direção da luz do sol no referencial do disco da lua, `(sen θ, cos θ)`, com
+ * θ = fase · 45° (M14). Fase 0 é a cheia (cos = 1, disco todo aceso), 4 é a
+ * nova (cos = −1, disco apagado), 2 e 6 são as metades, de lados opostos.
+ */
+export function moonPhaseVector(phase: number, out: Float32Array): Float32Array {
+  const theta = (((phase % MOON_PHASES) + MOON_PHASES) % MOON_PHASES) * (Math.PI * 2 / MOON_PHASES);
+  out[0] = Math.sin(theta);
+  out[1] = Math.cos(theta);
+  return out;
+}
+
+/**
+ * Direção do sol no tick do dia, orbitando o eixo X do mundo: nasce no
+ * horizonte em 0, a pino ao meio-dia (6000), se põe em 12000 e passa por
+ * baixo à meia-noite — que é quando a lua, do lado oposto, está a pino.
+ *
+ * **Correção do M14:** o Y saía com o sinal trocado desde o M1 — o disco do
+ * sol ficava debaixo do chão ao meio-dia e a pino à meia-noite, e a lua, sempre
+ * oposta, nunca subia à noite. Ninguém via a fase porque não se via a lua.
+ */
+export function sunDirection(dayTime: number, out: Float32Array): Float32Array {
+  const t = (dayTime / TICKS_PER_DAY) % 1;
+  const angle = (t - 0.25) * Math.PI * 2;
+  out[0] = 0;
+  out[1] = Math.cos(angle);
+  out[2] = Math.sin(angle);
+  return out;
+}
 
 /** Cinza-chumbo para onde o céu e o fog puxam na chuva (doc 03 §8). */
 const RAIN_COLOR: readonly [number, number, number] = [0.28, 0.30, 0.34];
@@ -42,6 +77,8 @@ export class SkyPass {
   readonly zenith = new Float32Array(3);
   readonly horizon = new Float32Array(3);
   readonly sunDir = new Float32Array(3);
+  /** Fase da lua do quadro, já como vetor de luz (`moonPhaseVector`). */
+  readonly moonPhase = new Float32Array([0, 1]);
 
   constructor(ctx: GlContext) {
     this.ctx = ctx;
@@ -62,8 +99,9 @@ export class SkyPass {
     );
   }
 
-  /** Atualiza as cores para o tick do dia atual. */
-  update(dayTime: number): void {
+  /** Atualiza as cores para o tick do dia atual e a fase da lua (0..7). */
+  update(dayTime: number, moonPhase = 0): void {
+    moonPhaseVector(moonPhase, this.moonPhase);
     const t = (dayTime / TICKS_PER_DAY) % 1;
     let i = 0;
     while (i < KEYS.length - 1 && KEYS[i + 1][0] < t) i++;
@@ -77,13 +115,7 @@ export class SkyPass {
       this.horizon[c] = a[4 + c] + (b[4 + c] - a[4 + c]) * f;
     }
 
-    // O sol nasce no leste e se põe no oeste, orbitando o eixo X do mundo.
-    const angle = (t - 0.25) * Math.PI * 2;
-    this.sunDir[0] = 0;
-    this.sunDir[1] = -Math.cos(angle);
-    this.sunDir[2] = Math.sin(angle);
-    const len = Math.hypot(this.sunDir[0], this.sunDir[1], this.sunDir[2]) || 1;
-    this.sunDir[0] /= len; this.sunDir[1] /= len; this.sunDir[2] /= len;
+    sunDirection(dayTime, this.sunDir);
   }
 
   /**
@@ -131,6 +163,7 @@ export class SkyPass {
     gl.uniform3fv(this.uniforms.uHorizon, this.horizon);
     gl.uniform3fv(this.uniforms.uSunDir, this.sunDir);
     gl.uniform1f(this.uniforms.uDayFactor, dayFactor);
+    gl.uniform2fv(this.uniforms.uMoonPhase, this.moonPhase);
 
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 

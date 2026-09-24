@@ -8,7 +8,7 @@
 import { Journal } from './journal';
 import { freeStandY } from './spawnplacement';
 import { AIR, BLOCK_BY_NAME, blockIdOf, defOf } from '../data/blocks';
-import { itemDef, stackTool, type ItemStack } from '../data/items';
+import { ITEM_BY_NAME, itemDef, stackTool, type ItemStack } from '../data/items';
 import type { ContainerView } from './container';
 import { Tiles } from './tiles';
 import { Workbench, type OpenScreen } from './workbench';
@@ -17,6 +17,7 @@ import { PlayerCombat } from './playercombat';
 import { RecipeBook } from './crafting';
 import type { ItemUseContext } from './itemuse';
 import { ItemUser } from './itemuser';
+import { FishingLine } from './fishing';
 import {
   applyStructures, mobEvents, wireInventory, wireProjectiles, wireSurvival,
 } from './sessionwiring';
@@ -56,6 +57,9 @@ import { DIM_OVERWORLD, dimensionOf } from '../data/dimensions';
 import { Lighting } from '../world/lighting';
 import { WORLD_HEIGHT, type ChunkColumn } from '../world/chunk';
 import type { World } from '../world/world';
+
+/** A vara de pesca (M14): a linha só vive com ela na mão. */
+const FISHING_ROD = ITEM_BY_NAME.get('fishing_rod')?.id ?? -1;
 
 const OAK_SIGN = BLOCK_BY_NAME.get('oak_sign')?.id ?? -1;
 
@@ -105,6 +109,8 @@ export class Session {
   /** Mapa explorado, marcadores e estatísticas (M10). */
   readonly journal = new Journal();
   readonly orbs = new XpOrbs();
+  /** A linha de pesca (M14): uma boia só, a do jogador. */
+  readonly fishing = new FishingLine();
   readonly xp = new Experience();
   readonly mobs: Mobs;
   readonly spawner: MobSpawner;
@@ -293,7 +299,12 @@ export class Session {
       fire: this.fire,
       achievement: (name) => { this.achievements.event(name); },
       openMap: () => { this.events.onOpenMap?.(); },
+      fishing: this.fishing,
+      spawnXp: (x, y, z, amount) => { this.orbs.spawn(x, y, z, amount); },
+      caughtFish: () => { this.journal.stats.add('fish_caught'); },
     });
+    this.fishing.onBite = (x, y, z) => { this.events.onSound?.('fishing/splash', x, y, z); };
+    this.fishing.onSplash = this.fishing.onBite;
     wireInventory(this, events, (stack) => this.dropItem(stack));
     this.wireInteraction();
     wireSurvival(this, events);
@@ -338,6 +349,10 @@ export class Session {
     this.journal.tick(this.world, this.player, this.vehicles.isRiding);
     this.combat.tick();
     this.itemUser.tick();
+    this.fishing.tick(
+      this.world, this.player.x, this.player.y + this.player.eyeHeight, this.player.z,
+      this.inventory.held?.item === FISHING_ROD, this.weather.intensity, this.random,
+    );
 
     const head = Math.floor(this.player.y + this.player.eyeHeight);
     const bx = Math.floor(this.player.x);

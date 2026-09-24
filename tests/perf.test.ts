@@ -31,6 +31,7 @@ import { applyFinish } from '../src/render/texfinish';
 import { TEX_SIZE } from '../src/render/texgen';
 import { HD_SPRITE_SIZE } from '../src/render/itemart3d';
 import { buildItemSheet } from '../src/render/itemsprites';
+import { ClimateSampler } from '../src/world/gen/climate';
 
 const SEED = 4242;
 const tables = buildBlockTables(buildLayerIndex());
@@ -253,6 +254,26 @@ describe('orçamento de performance', () => {
     const ms = median(samples);
     console.log(`  costura de luz: ${ms.toFixed(3)} ms/coluna (mediana de 20)`);
     expect(ms).toBeLessThan(4);
+  });
+
+  /**
+   * Tint de bioma (M14): o clima de um chunk é calculado na thread principal,
+   * até 32 chunks num quadro (`render/biometint.ts`). O teto é o do quadro
+   * inteiro: 32 chunks abaixo de 2 ms, ou seja, ~60 µs por chunk.
+   */
+  it('o clima de um chunk para o tint custa menos de 60 µs', () => {
+    const sampler = new ClimateSampler(SEED);
+    const out = new Uint8Array(512);
+    for (let i = 0; i < 50; i++) sampler.fillChunk(i, -i, out, 0, 32);
+    const samples: number[] = [];
+    for (let r = 0; r < 20; r++) {
+      const t0 = performance.now();
+      for (let i = 0; i < 32; i++) sampler.fillChunk(r * 40 + i, i - r, out, 0, 32);
+      samples.push((performance.now() - t0) / 32);
+    }
+    const ms = median(samples);
+    console.log(`  clima do tint: ${(ms * 1000).toFixed(1)} µs/chunk (mediana de 20 × 32)`);
+    expect(ms).toBeLessThan(0.06);
   });
 
   /**

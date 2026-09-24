@@ -31,8 +31,8 @@ export type Recipe = ShapedRecipe | ShapelessRecipe;
 
 /** Grupos de itens intercambiáveis. */
 export const TAGS: Record<string, readonly string[]> = {
-  planks: ['oak_planks', 'birch_planks', 'spruce_planks', 'acacia_planks'],
-  logs: ['oak_log', 'birch_log', 'spruce_log', 'acacia_log'],
+  planks: ['oak_planks', 'birch_planks', 'spruce_planks', 'acacia_planks', 'jungle_planks'],
+  logs: ['oak_log', 'birch_log', 'spruce_log', 'acacia_log', 'jungle_log'],
   coals: ['coal', 'charcoal'],
   // Toda lã serve onde a receita pede lã: linha, quadro e cama (M8).
   wool: DYES.map((dye) => (dye.name === 'white' ? 'white_wool' : `${dye.name}_wool`)),
@@ -125,9 +125,11 @@ export const RECIPES: readonly Recipe[] = [
   { type: 'shaped', pattern: ['GGG', 'GAG', 'GGG'], key: { G: 'gold_ingot', A: 'apple' }, result: { item: 'golden_apple', count: 1 } },
   { type: 'shapeless', ingredients: ['brown_mushroom', 'red_mushroom', 'bowl'], result: { item: 'mushroom_stew', count: 1 } },
   { type: 'shapeless', ingredients: ['sugar_cane'], result: { item: 'sugar', count: 1 } },
-  // Desvio consciente: o biscoito do gênero leva cacau, e não há selva nem
-  // cacau no jogo. O açúcar faz o papel — é o que a cana ganha de utilidade.
-  { type: 'shaped', pattern: ['WSW'], key: { W: 'wheat', S: 'sugar' }, result: { item: 'cookie', count: 8 } },
+  // O biscoito leva cacau, como no gênero. Até o M14 levava açúcar, porque não
+  // havia selva; o cacau agora cai da folha da selva (`data/loot.ts`).
+  { type: 'shaped', pattern: ['WCW'], key: { W: 'wheat', C: 'cocoa_beans' }, result: { item: 'cookie', count: 8 } },
+  // Vara de pesca (M14): gravetos na diagonal e a linha caindo da ponta.
+  { type: 'shaped', pattern: ['..S', '.SL', 'S.L'], key: { S: 'stick', L: 'string' }, result: { item: 'fishing_rod', count: 1 } },
   // O bolo devolve os três baldes vazios na grade (`consumeGrid`).
   {
     type: 'shaped', pattern: ['MMM', 'SES', 'WWW'],

@@ -8,6 +8,7 @@
  */
 
 import { TINT_COUNT, TINT_DYE_BASE } from '../../data/tints';
+import { COLORMAP_KINDS, COLORMAP_SIZE } from '../biometint';
 
 /**
  * Tabela de tints indexada pelo campo `tint` do vértice (M13: uniform, montada
@@ -32,6 +33,14 @@ uniform mat4 uViewProj;
 uniform vec3 uChunkOrigin;
 uniform float uDayFactor;      // 0 = noite, 1 = dia
 uniform float uMinSkyLight;    // luz ambiente mínima (não deixa a noite ficar preta)
+#ifdef BIOME_TINT
+// M14: tint por bioma (\`render/biometint.ts\`). Clima da coluna numa textura
+// toroidal, e a cor numa tabela clima → cor, uma faixa por tipo de tint.
+uniform sampler2D uClimate;
+uniform sampler2D uColormap;
+uniform float uClimateInv;     // 1 / lado da textura de clima
+uniform float uBiomeTint;      // 0 no Nether: volta à tabela fixa
+#endif
 
 out vec3 vUv;                  // xy = uv em tiles, z = camada do array
 out float vLight;
@@ -74,7 +83,17 @@ void main() {
 
   float light = max(bl, sl * uDayFactor);
   vLight = max(lightCurve(light), uMinSkyLight) * AO_LEVELS[ao] * FACE_SHADE[face];
-  vTint = uTints[tint];
+  vec3 tintColor = uTints[tint];
+#ifdef BIOME_TINT
+  // Grama, folha e água (1..3). O canto do bloco cai entre quatro texels, e a
+  // filtragem linear faz a média das quatro colunas — o blend do doc 03 §4.3.
+  if (tint >= 1u && tint <= 3u && uBiomeTint > 0.5) {
+    vec2 climate = textureLod(uClimate, world.xz * uClimateInv, 0.0).rg;
+    float row = float(tint - 1u) * ${COLORMAP_SIZE}.0 + clamp(climate.y * ${COLORMAP_SIZE}.0, 0.5, ${COLORMAP_SIZE - 0.5});
+    tintColor = textureLod(uColormap, vec2(climate.x, row / ${COLORMAP_SIZE * COLORMAP_KINDS}.0), 0.0).rgb;
+  }
+#endif
+  vTint = tintColor;
   vDye = tint >= ${TINT_DYE_BASE}u ? 1.0 : 0.0;
   vFogDepth = gl_Position.w;
 }
@@ -93,6 +112,7 @@ in float vFogDepth;
 uniform sampler2DArray uAtlas;
 uniform vec3 uFogColor;
 uniform float uFogDensity;
+uniform vec3 uMediumTint;     // M14: tom de dentro da água ou da lava; branco no ar
 
 out vec4 fragColor;
 
@@ -106,7 +126,7 @@ void main() {
 #else
   vec3 tint = vTint;
 #endif
-  vec3 color = texel.rgb * vLight * tint;
+  vec3 color = texel.rgb * vLight * tint * uMediumTint;
 
   float f = vFogDepth * uFogDensity;
   float fog = 1.0 - exp(-f * f);
@@ -191,6 +211,7 @@ uniform sampler2D uAtlas;
 uniform highp vec2 uAtlasTiles;
 uniform vec3 uFogColor;
 uniform float uFogDensity;
+uniform vec3 uMediumTint;
 
 void main() {
   // Repete o tile dentro da célula do atlas, com margem contra bleeding.
@@ -205,7 +226,7 @@ void main() {
 #else
   vec3 tint = vTint;
 #endif
-  vec3 color = texel.rgb * vLight * tint;
+  vec3 color = texel.rgb * vLight * tint * uMediumTint;
 
   float f = vFogDepth * uFogDensity;
   float fog = 1.0 - exp(-f * f);

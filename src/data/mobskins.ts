@@ -200,6 +200,18 @@ export const MOB_SKINS: Record<string, SkinRecipe> = {
     ],
   },
 
+  // Afogado (M14): o zumbi desbotado pela água, verde-azulado, com a roupa
+  // rasgada e alga no corpo.
+  drowned: {
+    base: [78, 138, 132], noise: 0.14,
+    parts: { head: [92, 154, 146], leg: [66, 102, 96], body: [58, 110, 116] },
+    details: [
+      { kind: 'patch', part: 'body', color: [52, 120, 64], count: 4, radius: 2 },
+      { kind: 'eyes', part: 'head', color: [150, 236, 226], y: 0.3, size: 2, gap: 2 },
+      { kind: 'mouth', part: 'head', color: [22, 44, 42], y: 0.66, w: 4, h: 1 },
+    ],
+  },
+
   skeleton: {
     base: [204, 204, 198], noise: 0.1,
     parts: { arm: [188, 188, 182], leg: [188, 188, 182] },
@@ -226,6 +238,13 @@ export const MOB_SKINS: Record<string, SkinRecipe> = {
       { kind: 'band', part: 'shaft', color: [120, 116, 110], y: 0.5, h: 1 },
     ],
   },
+
+  // M14: boia branca com a metade de baixo vermelha, e a linha cinza clara.
+  fishing_bobber: {
+    base: [236, 236, 232], noise: 0.04,
+    details: [{ kind: 'band', part: 'float', color: [200, 44, 40], y: 0.5, h: 2 }],
+  },
+  fishing_line: { base: [206, 206, 200], noise: 0 },
 
   slime: {
     base: [112, 198, 112], noise: 0.14,

@@ -20,14 +20,14 @@ const item = (name: string): number => {
 
 describe('combustível (doc 05 §5)', () => {
   it('tábua e tronco queimam 300 ticks', () => {
-    for (const wood of ['oak', 'birch', 'spruce', 'acacia']) {
+    for (const wood of ['oak', 'birch', 'spruce', 'acacia', 'jungle']) {
       expect(fuelTicks(item(`${wood}_planks`)), `${wood}_planks`).toBe(300);
       expect(fuelTicks(item(`${wood}_log`)), `${wood}_log`).toBe(300);
     }
   });
 
   it('muda queima 100 ticks', () => {
-    for (const wood of ['oak', 'birch', 'spruce', 'acacia']) {
+    for (const wood of ['oak', 'birch', 'spruce', 'acacia', 'jungle']) {
       expect(fuelTicks(item(`${wood}_sapling`)), wood).toBe(100);
     }
   });

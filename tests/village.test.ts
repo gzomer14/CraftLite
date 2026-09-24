@@ -243,6 +243,9 @@ describe('plano da aldeia em várias seeds', () => {
           const hasBed = hasBlock(chunk, slot.ox + bed[0], slot.oz + bed[2], BED);
           if (hasBed) built++;
           if (!slot.occupied) continue;
+          // Casa sobre a água não nasce (mar e, desde o M14, rio): o morador
+          // dela não entra na conta.
+          if (!hasBed && noise.field.heightAt(slot.ox, slot.oz) < 62) continue;
           occupied++;
           if (hasBed) housed++;
         }
@@ -253,7 +256,7 @@ describe('plano da aldeia em várias seeds', () => {
       }
       villages++;
       expect(occupied, `seed ${seed}: moradores planejados`).toBeGreaterThanOrEqual(Math.min(3, built));
-      // Casa sobre a água não nasce; fora isso, todo morador tem cama.
+      // Fora da água, todo morador tem cama.
       expect(housed / occupied, `seed ${seed}: moradores com casa`).toBeGreaterThanOrEqual(0.75);
     }
     expect(villages).toBeGreaterThanOrEqual(3);

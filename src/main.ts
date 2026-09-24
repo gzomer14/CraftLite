@@ -648,7 +648,9 @@ async function boot(): Promise<void> {
       camera.fovDeg += (wantFov - camera.fovDeg) * 0.18;
 
       renderer.skyFlash = session.weather.flash;
-      renderer.setDayTime(dayNight.time, dayNight.dayFactor, session.weather.intensity);
+      renderer.setDayTime(
+        dayNight.time, dayNight.dayFactor, session.weather.intensity, session.weather.moonPhase,
+      );
       audio.setListener(camera.x, camera.y, camera.z, player.yaw);
       if (sound.music !== null) {
         sound.music.mood = player.y < SEA_LEVEL - 6 ? 'underground' : 'surface';

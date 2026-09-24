@@ -1137,6 +1137,23 @@ export const TEXTURES: Record<string, TexRecipe> = {
     base: [196, 112, 62], noise: 'grain', scale: 6, variance: 0.1,
     ops: [plankLines(5, [146, 76, 40]), dither(0.05)],
   },
+  /** Selva (M14): casca escura com veios e musgo, tábua rosada. */
+  'block/jungle_log_side': {
+    base: [88, 68, 34], noise: 'grain', scale: 4, variance: 0.18,
+    ops: [stripes('v', 3, 0.22), speckle([74, 92, 38], 0.06, 2), dither(0.06)],
+  },
+  'block/jungle_log_top': {
+    base: [168, 124, 80], noise: 'value', scale: 4, variance: 0.1,
+    ops: [rings(3, [118, 84, 50]), border([88, 68, 34], 1), dither(0.04)],
+  },
+  'block/jungle_planks': {
+    base: [168, 118, 84], noise: 'grain', scale: 6, variance: 0.1,
+    ops: [border([128, 86, 58], 1), plankLines(4, [122, 82, 56]), dither(0.05)],
+  },
+  'block/jungle_leaves': {
+    base: [226, 226, 226], noise: 'cell', scale: 3, variance: 0.3,
+    ops: [blobs([168, 168, 168], 10, 2), alphaMask('holes', 0.14)],
+  },
   'block/pumpkin_side': {
     base: [214, 126, 30], noise: 'value', scale: 6, variance: 0.08,
     ops: [
@@ -1331,6 +1348,27 @@ export const TEXTURES: Record<string, TexRecipe> = {
       '................',
       '................',
     ], { T: [92, 64, 38], d: [70, 50, 30] })],
+  },
+  'block/jungle_sapling': {
+    base: [52, 120, 40], noise: 'flat', scale: 1, variance: 0,
+    ops: [pattern([
+      '................',
+      '................',
+      '....MM....MM....',
+      '...MMdM..MdMM...',
+      '....MMMMMMMM....',
+      '.....MMdMMM.....',
+      '...MMMMMMMMMM...',
+      '..MdMM.tt.MMdM..',
+      '...MM..tt..MM...',
+      '.......tt.......',
+      '.......tt.......',
+      '.......tt.......',
+      '......dttd......',
+      '................',
+      '................',
+      '................',
+    ], { t: [96, 72, 36], d: [36, 86, 28] })],
   },
   'block/acacia_sapling': {
     base: [134, 150, 54], noise: 'flat', scale: 1, variance: 0,

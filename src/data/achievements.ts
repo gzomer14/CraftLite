@@ -158,6 +158,12 @@ const SPECS: readonly Omit<AchievementDef, 'id'>[] = [
     description: 'O carrinho anda sozinho — basta ter para onde ir.',
     trigger: 'event', target: 'minecart',
   },
+  // M14: a comida que não depende de fazenda.
+  {
+    name: 'fisherman', display: 'Pescador',
+    description: 'Um peixe no anzol, e o jantar garantido.',
+    trigger: 'obtain', target: 'cod',
+  },
 ];
 
 export const ACHIEVEMENTS: readonly AchievementDef[] = SPECS.map((spec, id) => ({ ...spec, id }));

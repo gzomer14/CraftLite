@@ -31,8 +31,14 @@ export const BOAT_LAYER = 'boat';
 /** Camada do carrinho de mina (M7). */
 export const MINECART_LAYER = 'minecart';
 
+/** Boia e linha de pesca (M14). */
+export const BOBBER_LAYER = 'fishing_bobber';
+export const FISHING_LINE_LAYER = 'fishing_line';
+
 /** Camadas fora da tabela de mobs, mas com modelo e skin próprios. */
-const EXTRA_LAYERS: readonly string[] = [ARROW_LAYER, BOAT_LAYER, MINECART_LAYER];
+const EXTRA_LAYERS: readonly string[] = [
+  ARROW_LAYER, BOAT_LAYER, MINECART_LAYER, BOBBER_LAYER, FISHING_LINE_LAYER,
+];
 
 export class EntityAtlas {
   readonly texture: WebGLTexture;

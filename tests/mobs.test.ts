@@ -130,9 +130,10 @@ describe('morcego (categoria ambient)', () => {
 });
 
 describe('tabela de mobs', () => {
-  it('tem os 12 mobs do MVP, o aldeão, os dois do Nether, o morcego e o golem', () => {
-    // 12 do MVP + aldeão (M6) + porco zumbi e ghast (M7) + morcego + golem (M9).
-    expect(MOB_BY_NAME.size).toBe(17);
+  it('tem os 12 mobs do MVP, o aldeão, os dois do Nether, o morcego, o golem e o afogado', () => {
+    // 12 do MVP + aldeão (M6) + porco zumbi e ghast (M7) + morcego + golem (M9)
+    // + afogado (M14).
+    expect(MOB_BY_NAME.size).toBe(18);
     for (const name of MOB_BY_NAME.keys()) {
       const def = MOB_BY_NAME.get(name)!;
       expect(def.model.length).toBeGreaterThan(0);

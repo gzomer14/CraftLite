@@ -28,7 +28,7 @@ import type { SkyParams } from './terrain';
 
 const UNIFORMS = [
   'uViewProj', 'uMinSkyLight', 'uAtlas', 'uAtlasTiles',
-  'uFogColor', 'uFogDensity', 'uOpacity',
+  'uFogColor', 'uFogDensity', 'uOpacity', 'uMediumTint',
 ] as const;
 
 /** Floats por vértice: posição (3) + uv/camada (3) + sombra/luz/flash (3). */
@@ -321,6 +321,7 @@ export class MobRenderer {
     gl.uniform1f(this.uniforms.uMinSkyLight, sky.minSkyLight);
     gl.uniform3fv(this.uniforms.uFogColor, sky.fogColor);
     gl.uniform1f(this.uniforms.uFogDensity, sky.fogDensity);
+    gl.uniform3fv(this.uniforms.uMediumTint, sky.tint);
     gl.uniform1f(this.uniforms.uOpacity, 1);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);

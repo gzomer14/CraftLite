@@ -28,11 +28,13 @@ export const STATS: readonly StatDef[] = [
   { name: 'mobs_killed', display: 'Criaturas derrotadas', unit: 'count' },
   { name: 'deaths', display: 'Mortes', unit: 'count' },
   { name: 'trades', display: 'Trocas com aldeões', unit: 'count' },
+  // M14.
+  { name: 'fish_caught', display: 'Peixes pescados', unit: 'count' },
 ];
 
 export type StatName =
   | 'play_time' | 'walk' | 'swim' | 'fly' | 'ride' | 'blocks_mined' | 'blocks_placed'
-  | 'items_crafted' | 'mobs_killed' | 'deaths' | 'trades';
+  | 'items_crafted' | 'mobs_killed' | 'deaths' | 'trades' | 'fish_caught';
 
 /** Índice de cada estatística na tabela (e no save). */
 export const STAT_INDEX: ReadonlyMap<string, number> = new Map(STATS.map((s, i) => [s.name, i]));

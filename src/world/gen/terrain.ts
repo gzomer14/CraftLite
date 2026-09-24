@@ -17,6 +17,7 @@ import { hash2, hash3 } from '../../core/rng';
 import { clamp } from '../../core/math';
 import { decorate } from './decorate';
 import { HeightField } from './heightfield';
+import { SALT_HUMIDITY, SALT_TEMPERATURE } from './climate';
 import { placeStructures } from './structures';
 import { ChunkColumn, SEA_LEVEL, SECTION_SIZE, WORLD_HEIGHT } from '../chunk';
 
@@ -39,14 +40,13 @@ const SPAGHETTI_THRESHOLD = 0.045;
 /** Salts: cada mapa de ruído tem o seu, senão todos ficam correlacionados. */
 const SALT_CONTINENT = 1;
 const SALT_EROSION = 2;
-const SALT_TEMPERATURE = 3;
-const SALT_HUMIDITY = 4;
 const SALT_WEIRDNESS = 5;
 const SALT_DETAIL = 6;
 const SALT_CHEESE = 7;
 const SALT_SPAGHETTI_A = 8;
 const SALT_SPAGHETTI_B = 9;
 const SALT_ORE = 10;
+const SALT_RIVER = 11;
 
 /** Uma entrada da tabela de minérios (doc 03 §6). */
 interface OreSpec {
@@ -81,6 +81,7 @@ export class TerrainNoise {
   readonly cheese: Noise;
   readonly spaghettiA: Noise;
   readonly spaghettiB: Noise;
+  readonly river: Noise;
 
   constructor(seed: number) {
     this.continent = new Noise(seed, SALT_CONTINENT);
@@ -92,6 +93,7 @@ export class TerrainNoise {
     this.cheese = new Noise(seed, SALT_CHEESE);
     this.spaghettiA = new Noise(seed, SALT_SPAGHETTI_A);
     this.spaghettiB = new Noise(seed, SALT_SPAGHETTI_B);
+    this.river = new Noise(seed, SALT_RIVER);
     this.field = new HeightField(this);
   }
 

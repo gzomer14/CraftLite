@@ -63,8 +63,8 @@ const at = (world: World, x: number, y: number, z: number): number =>
   blockIdOf(world.getBlock(x, y, z));
 
 describe('a tabela', () => {
-  it('as quatro mudas existem e cada uma vira a sua árvore', () => {
-    for (const kind of ['oak', 'birch', 'spruce', 'acacia'] as const) {
+  it('as cinco mudas existem e cada uma vira a sua árvore', () => {
+    for (const kind of ['oak', 'birch', 'spruce', 'acacia', 'jungle'] as const) {
       const sapling = BLOCK_BY_NAME.get(`${kind}_sapling`);
       expect(sapling, kind).toBeDefined();
       expect(plantOfState(makeState(sapling!.id))?.tree).toBe(kind);
@@ -73,7 +73,7 @@ describe('a tabela', () => {
   });
 
   it('cada folha dá a muda da própria árvore', () => {
-    for (const kind of ['oak', 'birch', 'spruce', 'acacia']) {
+    for (const kind of ['oak', 'birch', 'spruce', 'acacia', 'jungle']) {
       const drops = BLOCK_LOOT[`${kind}_leaves`]?.drops ?? [];
       expect(drops.some((d) => d.item === `${kind}_sapling`), kind).toBe(true);
     }
@@ -106,7 +106,7 @@ describe('a muda vira árvore', () => {
   });
 
   it('cada espécie dá o seu tronco', () => {
-    for (const kind of ['birch', 'spruce', 'acacia'] as const) {
+    for (const kind of ['birch', 'spruce', 'acacia', 'jungle'] as const) {
       const world = makeWorld(GRASS_BLOCK);
       const g = growth(world);
       world.setBlock(0, GROUND + 1, 0, makeState(id(`${kind}_sapling`)), 'player');
@@ -143,7 +143,7 @@ describe('a muda vira árvore', () => {
   });
 
   it('a altura declarada cobre a árvore mais alta de cada espécie', () => {
-    for (const kind of ['oak', 'birch', 'spruce', 'acacia'] as const) {
+    for (const kind of ['oak', 'birch', 'spruce', 'acacia', 'jungle'] as const) {
       let top = 0;
       for (let seed = 0; seed < 64; seed++) {
         growTree(

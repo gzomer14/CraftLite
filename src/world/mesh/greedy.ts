@@ -19,7 +19,7 @@
 import { MeshBuilder, type MeshData } from '../../render/mesh';
 import { AIR } from '../../data/blocks';
 import {
-  LAYER_CUTOUT, LAYER_OPAQUE, LAYER_TRANSLUCENT, type BlockTables,
+  LAYER_CUTOUT, LAYER_OPAQUE, LAYER_TRANSLUCENT, cubeFaceTex, type BlockTables,
 } from './blockinfo';
 import { meshComplex } from './complex';
 
@@ -323,7 +323,8 @@ export class GreedyMesher {
     const basis = FACE_BASIS[face];
     const nx = basis[0], ny = basis[1], nz = basis[2];
 
-    const texLayer = face === 2 ? t.texTop[id] : face === 3 ? t.texBottom[id] : t.texSide[id];
+    // A face da frente (M15) sai do estado: o dispensador olha para um lado só.
+    const texLayer = cubeFaceTex(t, id, state >>> 10, face);
 
     // Luz vem do voxel do lado de fora — é ele que está iluminado.
     const lightByte = light[nbIndex(x + nx, y + ny, z + nz)];

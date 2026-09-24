@@ -128,6 +128,13 @@ export const RECIPES: readonly Recipe[] = [
   // O biscoito leva cacau, como no gênero. Até o M14 levava açúcar, porque não
   // havia selva; o cacau agora cai da folha da selva (`data/loot.ts`).
   { type: 'shaped', pattern: ['WCW'], key: { W: 'wheat', C: 'cocoa_beans' }, result: { item: 'cookie', count: 8 } },
+  // --- oficina (M15), nas receitas do gênero -----------------------------
+  { type: 'shaped', pattern: ['BBB', '.I.', 'III'], key: { B: 'iron_block', I: 'iron_ingot' }, result: { item: 'anvil', count: 1 } },
+  { type: 'shaped', pattern: ['I.I', 'ICI', '.I.'], key: { I: 'iron_ingot', C: 'chest' }, result: { item: 'hopper', count: 1 } },
+  { type: 'shaped', pattern: ['CCC', 'CBC', 'CRC'], key: { C: 'cobblestone', B: 'bow', R: 'redstone' }, result: { item: 'dispenser', count: 1 } },
+  { type: 'shaped', pattern: ['CCC', 'C.C', 'CRC'], key: { C: 'cobblestone', R: 'redstone' }, result: { item: 'dropper', count: 1 } },
+  { type: 'shaped', pattern: ['.T.', 'TQT', 'SSS'], key: { T: 'redstone_torch', Q: 'nether_quartz', S: 'stone' }, result: { item: 'comparator', count: 1 } },
+  { type: 'shaped', pattern: ['CCC', 'RRQ', 'CCC'], key: { C: 'cobblestone', R: 'redstone', Q: 'nether_quartz' }, result: { item: 'observer', count: 1 } },
   // Vara de pesca (M14): gravetos na diagonal e a linha caindo da ponta.
   { type: 'shaped', pattern: ['..S', '.SL', 'S.L'], key: { S: 'stick', L: 'string' }, result: { item: 'fishing_rod', count: 1 } },
   // O bolo devolve os três baldes vazios na grade (`consumeGrid`).

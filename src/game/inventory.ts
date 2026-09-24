@@ -165,7 +165,9 @@ export class Inventory {
     if (cursor === null) {
       if (slot === null) return false;
       const take = Math.ceil(slot.count / 2);
-      this.cursor = { item: slot.item, count: take, damage: slot.damage };
+      // Cópia da pilha inteira (encantamento e nome junto), só com outra
+      // quantidade. A cópia à mão perdia o `ench` da espada (corrigido no M15).
+      this.cursor = { ...slot, count: take };
       slot.count -= take;
       if (slot.count <= 0) this.slots[index] = null;
       this.changed();
@@ -173,7 +175,7 @@ export class Inventory {
     }
 
     if (slot === null) {
-      this.slots[index] = { item: cursor.item, count: 1, damage: cursor.damage };
+      this.slots[index] = { ...cursor, count: 1 };
       cursor.count--;
       if (cursor.count <= 0) this.cursor = null;
       this.changed();
@@ -302,7 +304,7 @@ export class Inventory {
       if (i === exclude) continue;
       const slot = this.slots[i];
       if (slot === null || slot.item !== stack.item || slot.damage !== stack.damage) continue;
-      if ((slot.ench ?? 0) !== (stack.ench ?? 0)) continue;
+      if ((slot.ench ?? 0) !== (stack.ench ?? 0) || slot.name !== stack.name) continue;
       const room = max - slot.count;
       if (room <= 0) continue;
       const moved = Math.min(room, remaining);
@@ -313,7 +315,7 @@ export class Inventory {
     for (let i = range.start; i < range.end && remaining > 0; i++) {
       if (i === exclude || this.slots[i] !== null) continue;
       const moved = Math.min(max, remaining);
-      this.slots[i] = { item: stack.item, count: moved, damage: stack.damage, ench: stack.ench ?? 0 };
+      this.slots[i] = { ...stack, count: moved, ench: stack.ench ?? 0 };
       remaining -= moved;
     }
     return remaining;
@@ -389,7 +391,7 @@ export class Inventory {
       const moved = Math.min(perSlot, room, cursor.count);
       if (moved <= 0) continue;
       if (slot === null) {
-        this.slots[index] = { item: cursor.item, count: moved, damage: cursor.damage };
+        this.slots[index] = { ...cursor, count: moved };
       } else {
         slot.count += moved;
       }
@@ -409,7 +411,8 @@ export class Inventory {
     const slot = this.slots[index];
     if (slot === null) return false;
     const count = whole ? slot.count : 1;
-    this.onDrop?.({ item: slot.item, count, damage: slot.damage });
+    // Jogar fora com Q levava a espada sem o encantamento (corrigido no M15).
+    this.onDrop?.({ ...slot, count });
     slot.count -= count;
     if (slot.count <= 0) this.slots[index] = null;
     this.changed();
@@ -434,6 +437,22 @@ export class Inventory {
    * partir dos campos (coletar do chão, shift-clique vindo de um baú): sem ele,
    * guardar uma picareta encantada apagaria o encantamento em silêncio.
    */
+  /**
+   * Guarda uma pilha inteira — encantamento e nome junto (M15). É o caminho
+   * de quem move uma pilha que já existe: recolher do chão, shift-clique, a
+   * grade que volta ao fechar. Devolve quanto não coube; a pilha não muda.
+   */
+  giveStack(stack: ItemStack): number {
+    const copy: ItemStack = { ...stack };
+    let remaining = this.moveInto(copy, { start: HOTBAR_START, end: HOTBAR_END }, -1);
+    if (remaining > 0) {
+      copy.count = remaining;
+      remaining = this.moveInto(copy, { start: MAIN_START, end: MAIN_END }, -1);
+    }
+    if (remaining !== stack.count) this.changed();
+    return remaining;
+  }
+
   give(item: number, count: number, damage = 0, ench = 0): number {
     const stack: ItemStack = { item, count, damage, ench };
     let remaining = this.moveInto(stack, { start: HOTBAR_START, end: HOTBAR_END }, -1);

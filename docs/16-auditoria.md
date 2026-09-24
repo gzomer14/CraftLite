@@ -12,6 +12,71 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-24 · 11:05 → 11:45 · M15: oficina
+
+**Pedido:** *"Pode seguir com o M15 então, incluindo essa pequena tarefa citada"* — a memória de
+áudio no teto.
+
+**Resultado:** M15 fechado, os cinco itens do doc 14 com os três critérios medidos: picareta de
+diamante encantada de 10% a 100% com 4 diamantes, sem perder o encantamento; 64 de 64 minérios
+fundidos por baú → funil → fornalha sem tocar; 32 funis a 0,35 ms no pior tick. Bigorna (conserto,
+junção, livro, nome, custo), reparo na grade, livro encantado, funil, dispensador, liberador,
+comparador (com modo subtração) e observador; face da frente no mesher para quem olha para um
+lado. Memória de áudio **3,497 → 3,140 MB** sem tirar som, com retorno a 8 kHz se o navegador
+recusar a taxa. Três perdas antigas de encantamento corrigidas (clique direito e Q). Visto no
+Chrome headless: os seis blocos e a tela da bigorna.
+
+Portões: **2156 testes** em 109 arquivos, lint limpo, build ok, **265,7 KB** de 350, smoke 7/7.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| **Áudio** | | |
+| `~` | `src/audio/synth.ts` | degrau de ¼ da taxa em `rateFor` |
+| `~` | `src/audio/engine.ts` | `renderAtRate`: nova tentativa em 8 kHz |
+| **Dado** | | |
+| `+` | `src/data/anvil.ts` | material de conserto por prefixo, custos, teto e tamanho do nome |
+| `~` | `src/data/blocks.ts` | bigorna, funil, dispensador, liberador, comparador (dois modos), observador; `tex.front`, `hasFrontTex` |
+| `~` | `src/data/textures.ts` | onze texturas da oficina |
+| `~` | `src/data/items.ts` | `enchanted_book` no fim da fila; `ItemStack.name` |
+| `~` | `src/data/itemart.ts` | arte do livro encantado |
+| `~` | `src/data/recipes.ts` | receitas do gênero para os seis blocos |
+| `~` | `src/data/loot.ts` | comparador em modo subtração dá comparador |
+| `~` | `src/data/enchants.ts` | livro comum aceita todo encantamento |
+| `~` | `src/data/redstone.ts` | papéis `comparator`, `observer`, `hopper`, `dispenser` |
+| **Mundo e desenho** | | |
+| `+` | `src/world/redstoneparts.ts` | conta do comparador, sinal por ocupação, vigia do observador |
+| `~` | `src/world/redstone.ts` | ganchos: comparador com atraso, observador, trava do funil, subida do dispensador, clique de modo |
+| `~` | `src/world/mesh/shapes.ts` | formas `anvil`, `hopper`, `comparator` |
+| `~` | `src/world/mesh/blockinfo.ts` | `texFront`/`hasFront`, `FRONT_FACE`, `cubeFaceTex` |
+| `~` | `src/world/mesh/greedy.ts` | face da frente pelo estado |
+| `~` | `src/render/itemsprites.ts` | frente no ícone isométrico; funil posa com o bico para baixo |
+| **Jogo** | | |
+| `+` | `src/game/anvil.ts` | resultado da bigorna: conserto, junção, encantamentos, nome, custo |
+| `+` | `src/game/itemflow.ts` | funil, dispensador, liberador e sinal do contêiner |
+| `~` | `src/game/workbench.ts` | tela da bigorna, cobrança, livro em pilha; grade simples para funil e afins |
+| `~` | `src/game/tiles.ts` | contêineres novos, lista de funis, aviso de conteúdo |
+| `~` | `src/game/container.ts` | tipos novos, slots da bigorna, `cooldown`, `giveStack`; livro vira livro encantado |
+| `~` | `src/game/crafting.ts` | `matchRepair` |
+| `~` | `src/game/inventory.ts` | `giveStack`; cópias de pilha inteiras (encantamento e nome) |
+| `~` | `src/game/interaction.ts` | direção ao colocar bigorna, funil, comparador, dispensador, liberador, observador |
+| `~` | `src/game/session.ts`, `src/game/sessionwiring.ts` | `ItemFlow` no tick, sinal e disparo no circuito |
+| `~` | `src/game/savegame.ts`, `src/save/db.ts`, `src/save/savemanager.ts`, `src/save/archive.ts` | nome no inventário, nos contêineres e no chão |
+| `~` | `src/entity/itementity.ts` | nome do item no chão; `takeOneIn`/`putBack` para o funil |
+| **Tela** | | |
+| `+` | `src/ui/containers/anvilpanel.ts` | campo do nome e custo da bigorna |
+| `~` | `src/ui/containers/screen.ts` | tela da bigorna, grade de funil e dispensador, nome no tooltip |
+| `~` | `src/ui/containers/containerclick.ts` | resultado da bigorna; cópia inteira no clique direito |
+| `~` | `src/ui/containers/screenstyle.ts` | estilo do painel da bigorna |
+| `~` | `src/ui/gamescreens.ts` | callbacks da bigorna |
+| **Testes** | | |
+| `+` | `tests/workshop.test.ts` | bigorna e critério, reparo, livro, funil e critério, comparador, observador, dispensador, liberador, nomes, orçamento de 32 funis, forma e face da frente |
+| `~` | `tests/audio.test.ts` | degrau de ¼ e a nova tentativa em 8 kHz |
+| **Docs** | | |
+| `~` | `docs/14-roadmap.md` | checklist do M15 fechado |
+| `~` | `docs/15-status.md`, `docs/16-auditoria.md`, `README.md` | §1, §2, §3 M15, §4, §5, §6, esta sessão, contagem |
+
+---
+
 ## 2026-09-24 11:03 · M14 validado em campo
 
 **Pedido:** *"Tudo testado e funcionando perfeitamente. Me relembre o que são cada um dos marcos

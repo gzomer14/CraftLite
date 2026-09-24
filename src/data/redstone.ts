@@ -26,10 +26,17 @@ import { BLOCK_BY_NAME, type BlockDef } from './blocks';
  * - `rail` — trilho motorizado: segue a energia no bit 4 do estado (M7).
  * - `detector` — trilho detector: **emite** quando há carrinho em cima. Quem
  *   liga o bit é `entity/minecart.ts`, não o circuito.
+ * - `comparator` — lê o contêiner (ou a energia) de trás e compara com as
+ *   laterais (M15); o par é o modo subtração, com `lit` no id de subtrair.
+ * - `observer` — solta um pulso para trás quando o bloco da frente muda (M15).
+ * - `hopper` — travado enquanto energizado (M15).
+ * - `dispenser` — dispara uma vez a cada subida de energia (M15; o liberador
+ *   também).
  */
 export type RedstoneKind =
   | 'wire' | 'source' | 'lever' | 'button' | 'plate'
-  | 'torch' | 'repeater' | 'piston' | 'lamp' | 'door' | 'rail' | 'detector';
+  | 'torch' | 'repeater' | 'piston' | 'lamp' | 'door' | 'rail' | 'detector'
+  | 'comparator' | 'observer' | 'hopper' | 'dispenser';
 
 export interface RedstoneDef {
   kind: RedstoneKind;
@@ -64,6 +71,13 @@ export const REDSTONE: Readonly<Record<string, RedstoneDef>> = {
   redstone_lamp_on: { kind: 'lamp', pair: 'redstone_lamp', lit: true },
   powered_rail: { kind: 'rail' },
   detector_rail: { kind: 'detector' },
+  // --- oficina (M15) ---
+  comparator: { kind: 'comparator', pair: 'comparator_subtract' },
+  comparator_subtract: { kind: 'comparator', pair: 'comparator', lit: true },
+  observer: { kind: 'observer' },
+  hopper: { kind: 'hopper' },
+  dispenser: { kind: 'dispenser' },
+  dropper: { kind: 'dispenser' },
 };
 
 /**

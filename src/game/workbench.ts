@@ -12,12 +12,15 @@ import type { Stats } from './stats';
 import { BLOCK_BY_NAME, blockIdOf, defOf } from '../data/blocks';
 import { ITEM_BY_NAME, type ItemStack } from '../data/items';
 import {
-  Container, EnchantTable, Furnace, ENCHANT_ITEM, ENCHANT_LAPIS, type ContainerView,
+  ANVIL_LEFT, ANVIL_OUTPUT, ANVIL_RIGHT, Container, EnchantTable, Furnace, ENCHANT_ITEM,
+  ENCHANT_LAPIS, type ContainerView,
 } from './container';
+import { anvilResult, type AnvilOutcome } from './anvil';
+import { TOO_EXPENSIVE } from '../data/anvil';
 import { consumeGrid, type CraftGrid, type RecipeBook, type RecipeEntry } from './crafting';
 import { MAX_BOOKSHELVES, type EnchantOffer } from './enchanting';
 import { CRAFT_END, CRAFT_RESULT, CRAFT_START, type Inventory } from './inventory';
-import { isContainerBlock, isFurnaceBlock, type Tiles } from './tiles';
+import { isContainerBlock, isFurnaceBlock, isGridContainer, type Tiles } from './tiles';
 import type { Achievements } from './achievements';
 import type { Experience } from './xp';
 import type { Player } from '../entity/player';
@@ -26,11 +29,14 @@ import type { World } from '../world/world';
 const CRAFTING_TABLE = BLOCK_BY_NAME.get('crafting_table')?.id ?? -1;
 const ENCHANTING_TABLE = BLOCK_BY_NAME.get('enchanting_table')?.id ?? -1;
 const BOOKSHELF = BLOCK_BY_NAME.get('bookshelf')?.id ?? -1;
+const ANVIL = BLOCK_BY_NAME.get('anvil')?.id ?? -1;
 const LAPIS = ITEM_BY_NAME.get('lapis_lazuli')?.id ?? -1;
+const BOOK = ITEM_BY_NAME.get('book')?.id ?? -1;
 
 /** O que o jogador tem aberto no momento. */
 export type OpenScreen =
-  | 'none' | 'inventory' | 'crafting' | 'furnace' | 'chest' | 'enchanting' | 'trading';
+  | 'none' | 'inventory' | 'crafting' | 'furnace' | 'chest' | 'enchanting' | 'trading'
+  | 'anvil';
 
 /** O que a bancada precisa da sessão. */
 export interface WorkbenchHost {
@@ -59,6 +65,15 @@ export class Workbench {
   readonly bench = new Container('chest', 9, 0, 0, 0);
   /** Mesa de encantamento, uma só e reusada — ver `EnchantTable`. */
   readonly enchantTable = new EnchantTable();
+  /**
+   * Bigorna (M15): uma só e reusada, como a mesa — não guarda nada entre
+   * aberturas. O slot 2 é o resultado, recalculado por `refreshAnvil`.
+   */
+  readonly anvil = new Container('anvil', 3, 0, 0, 0);
+  /** Nome digitado na bigorna; `null` = o campo não foi mexido. */
+  anvilName: string | null = null;
+  /** O que a bigorna faria agora (resultado, custo, material gasto). */
+  readonly anvilOutcome: AnvilOutcome = { result: null, cost: 0, rightUsed: 0 };
   private readonly host: WorkbenchHost;
 
   constructor(host: WorkbenchHost) {
@@ -97,6 +112,12 @@ export class Workbench {
       this.setScreen('crafting', this.bench);
       return true;
     }
+    if (id === ANVIL) {
+      this.anvilName = null;
+      this.refreshAnvil();
+      this.setScreen('anvil', this.anvil);
+      return true;
+    }
     if (id === ENCHANTING_TABLE) {
       this.enchantTable.shelves = this.countBookshelves(x, y, z);
       this.enchantTable.refresh();
@@ -108,6 +129,11 @@ export class Workbench {
     const container = tiles.atOrCreate(x, y, z, id);
     if (isFurnaceBlock(id)) {
       this.setScreen('furnace', container);
+      return true;
+    }
+    // Funil, dispensador e liberador: a grade simples, sem tampa (M15).
+    if (isGridContainer(id)) {
+      this.setScreen('chest', container);
       return true;
     }
     // Baú colado em outro baú abre os dois de uma vez (doc 08 §3.9).
@@ -215,12 +241,15 @@ export class Workbench {
     for (let i = CRAFT_START; i < CRAFT_END; i++) {
       const stack = inv.get(i);
       if (stack === null) continue;
-      const leftover = inv.give(stack.item, stack.count, stack.damage);
+      const leftover = inv.giveStack(stack);
       inv.set(i, null);
-      if (leftover > 0) this.host.dropItem({ item: stack.item, count: leftover, damage: stack.damage });
+      if (leftover > 0) this.host.dropItem({ ...stack, count: leftover });
     }
     this.returnGrid(this.bench);
     this.returnGrid(this.enchantTable);
+    // O resultado da bigorna não é item de ninguém: some antes de devolver.
+    this.anvil.slots[ANVIL_OUTPUT] = null;
+    this.returnGrid(this.anvil);
     inv.set(CRAFT_RESULT, null);
   }
 
@@ -230,13 +259,9 @@ export class Workbench {
     for (let i = 0; i < container.size; i++) {
       const stack = container.get(i);
       if (stack === null) continue;
-      const leftover = inv.give(stack.item, stack.count, stack.damage, stack.ench ?? 0);
+      const leftover = inv.giveStack(stack);
       container.set(i, null);
-      if (leftover > 0) {
-        this.host.dropItem({
-          item: stack.item, count: leftover, damage: stack.damage, ench: stack.ench ?? 0,
-        });
-      }
+      if (leftover > 0) this.host.dropItem({ ...stack, count: leftover });
     }
   }
 
@@ -297,6 +322,15 @@ export class Workbench {
     if (!creative && table.lapis < offer.lapis) return 'no-lapis';
     if (!creative && !xp.canAfford(offer.cost)) return 'no-level';
 
+    // Pilha de livros: um só vira livro encantado, o resto volta (M15).
+    const item = table.get(ENCHANT_ITEM);
+    if (item !== null && item.item === BOOK && item.count > 1) {
+      const rest = { ...item, count: item.count - 1 };
+      item.count = 1;
+      const left = this.host.inventory.giveStack(rest);
+      if (left > 0) this.host.dropItem({ ...rest, count: left });
+    }
+
     // No criativo a mesa também precisa do lápis? Não: criativo não paga nada,
     // mas a oferta ainda tem que existir e o item tem que estar lá.
     if (creative) {
@@ -314,6 +348,52 @@ export class Workbench {
   /** Chamado pela UI ao mexer nos slots da mesa: as ofertas dependem do item. */
   refreshEnchantOffers(): void {
     this.enchantTable.refresh();
+  }
+
+  // --- bigorna (M15) ---------------------------------------------------------
+
+  /** Recalcula o slot de resultado da bigorna a partir dos outros dois e do nome. */
+  refreshAnvil(): void {
+    const outcome = anvilResult(
+      this.anvil.get(ANVIL_LEFT), this.anvil.get(ANVIL_RIGHT), this.anvilName, this.anvilOutcome,
+    );
+    this.anvil.slots[ANVIL_OUTPUT] = outcome.result;
+  }
+
+  /** Por que o resultado da bigorna não pode sair agora, ou `'ok'`. */
+  anvilBlocker(): 'ok' | 'nothing' | 'expensive' | 'no-level' {
+    const outcome = this.anvilOutcome;
+    if (outcome.result === null) return 'nothing';
+    if (this.host.player.mode === 'creative') return 'ok';
+    if (outcome.cost >= TOO_EXPENSIVE) return 'expensive';
+    if (!this.host.xp.canAfford(outcome.cost)) return 'no-level';
+    return 'ok';
+  }
+
+  /**
+   * O jogador tirou o resultado: cobra os níveis, gasta a peça e o material e
+   * devolve a peça nova — quem chama a põe no cursor. `null` se não pode.
+   */
+  takeAnvilResult(): ItemStack | null {
+    this.refreshAnvil();
+    if (this.anvilBlocker() !== 'ok') return null;
+    const outcome = this.anvilOutcome;
+    const result = outcome.result;
+    if (result === null) return null;
+
+    const right = this.anvil.get(ANVIL_RIGHT);
+    if (right !== null && outcome.rightUsed > 0) {
+      right.count -= outcome.rightUsed;
+      this.anvil.slots[ANVIL_RIGHT] = right.count > 0 ? right : null;
+    }
+    this.anvil.slots[ANVIL_LEFT] = null;
+    const { player, xp } = this.host;
+    if (player.mode !== 'creative') xp.spend(outcome.cost);
+    this.host.sound('village/anvil', player.x, player.y, player.z);
+    this.host.noteObtained(result.item);
+    this.anvilName = null;
+    this.refreshAnvil();
+    return result;
   }
 
   /**

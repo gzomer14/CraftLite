@@ -9,7 +9,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import { SOUNDS, blockSound, buildGraph, durationOf, rateFor, noiseBuffer } from '../src/audio/synth';
-import { AudioEngine, SUBTITLES } from '../src/audio/engine';
+import { AudioEngine, MIN_GUARANTEED_RATE, SUBTITLES, renderAtRate } from '../src/audio/engine';
 import { Music } from '../src/audio/music';
 import { MOBS } from '../src/data/mobs';
 import { BUSES, BUS_LABELS, BUS_SETTING, busFor } from '../src/data/soundbuses';
@@ -102,6 +102,9 @@ describe('tabela de sons', () => {
      * *acrescentando* três sons novos — morcego, trovão e o loop de chuva. O
      * teto desce junto: 3,5 MB deixa margem para alguns sons, não para
      * esquecer que existe um orçamento.
+     *
+     * No M14 a conta chegou a 3,497 MB. O degrau de um quarto da taxa (M15)
+     * a trouxe para 3,14 sem tirar som nenhum.
      */
     expect(bytes / (1024 * 1024)).toBeLessThan(3.5);
   });
@@ -109,7 +112,8 @@ describe('tabela de sons', () => {
   it('a taxa por receita nunca corta banda que o som usa', () => {
     // Ruído com highpass e estalo agudo têm energia até o topo: eles não podem
     // cair para metade da taxa, ou o chocalho do esqueleto perde o brilho.
-    expect(rateFor(SOUNDS['step/sand'], 22050)).toBe(11025);
+    // Passo na areia: lowpass em 600 Hz, cabe em um quarto da taxa (M15).
+    expect(rateFor(SOUNDS['step/sand'], 22050)).toBe(5513);
     expect(rateFor(SOUNDS['break/snow'], 22050)).toBe(22050);
     expect(rateFor(SOUNDS['break/glass'], 22050)).toBe(22050);
     // A chuva passa **raspando** do outro lado: o lowpass dela está em 4 kHz e
@@ -117,6 +121,50 @@ describe('tabela de sons', () => {
     // 22 kHz de propósito — encolher a folga para ganhar 88 KB comeria a saia
     // do filtro de todo mundo.
     expect(rateFor(SOUNDS['weather/rain'], 22050)).toBe(22050);
+  });
+
+  it('taxa recusada pelo navegador cai para 8 kHz, e o som não fica mudo', async () => {
+    const rates: number[] = [];
+    class StrictOffline {
+      constructor(_channels: number, _length: number, readonly sampleRate: number) {
+        rates.push(sampleRate);
+        if (sampleRate < MIN_GUARANTEED_RATE) throw new Error('NotSupportedError');
+      }
+      get destination() { return {}; }
+      createBufferSource() { return { connect: () => {}, start: () => {}, buffer: null }; }
+      createBiquadFilter() { return { connect: () => {}, type: '', frequency: { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {} }, Q: { value: 0 } }; }
+      createGain() { return { connect: () => {}, gain: { value: 0, setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {} } }; }
+      createBuffer(_c: number, length: number, rate: number) { return { getChannelData: () => new Float32Array(length), sampleRate: rate }; }
+      startRendering() { return Promise.resolve({ sampleRate: this.sampleRate }); }
+    }
+    const scope = globalThis as unknown as { OfflineAudioContext?: unknown };
+    const before = scope.OfflineAudioContext;
+    scope.OfflineAudioContext = StrictOffline;
+    try {
+      const buffer = await renderAtRate(SOUNDS['weather/thunder'], 5513);
+      expect(buffer).not.toBeNull();
+      expect(rates).toEqual([5513, MIN_GUARANTEED_RATE]);
+    } finally {
+      scope.OfflineAudioContext = before;
+    }
+  });
+
+  it('o grave cai para um quarto da taxa, sem cortar banda (M15)', () => {
+    // Trovão com lowpass de 400 Hz e o mugido com formantes até 900 Hz:
+    // 5,5 kHz sobram.
+    expect(rateFor(SOUNDS['weather/thunder'], 22050)).toBe(5513);
+    expect(rateFor(SOUNDS['mob/cow_death'], 22050)).toBe(5513);
+    // A lula é senoide, mas com ruído rosa sem filtro: continua cheia.
+    expect(rateFor(SOUNDS['mob/squid_death'], 22050)).toBe(22050);
+    // Toda receita em um quarto tem a banda (com a folga) abaixo do Nyquist dele.
+    for (const name of Object.keys(SOUNDS)) {
+      const recipe = SOUNDS[name];
+      if (rateFor(recipe, 22050) !== 5513) continue;
+      expect(recipe.kind, name).not.toBe('clicks');
+      if (recipe.kind === 'noise') expect(recipe.filter, name).toBe('lowpass');
+    }
+    // Serra sem formante continua cheia: os harmônicos não têm teto.
+    expect(rateFor(SOUNDS['player/death'], 22050)).toBe(22050);
   });
 
   it('todo som cai num barramento, e os de mob no lado certo', () => {

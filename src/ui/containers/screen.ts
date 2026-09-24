@@ -22,12 +22,14 @@ import { ItemTooltip } from './tooltip';
 import { clickContainer } from './containerclick';
 import { injectStyle } from './screenstyle';
 import { TradePanel } from './tradepanel';
+import { AnvilPanel, type AnvilStatus } from './anvilpanel';
 import type { TradeOfferView, TradeResult } from '../../game/trading';
 import type { RecipeEntry } from '../../game/crafting';
 
 /** Qual tela está aberta. */
 export type ScreenKind =
-  | 'none' | 'inventory' | 'crafting' | 'furnace' | 'chest' | 'enchanting' | 'trading';
+  | 'none' | 'inventory' | 'crafting' | 'furnace' | 'chest' | 'enchanting' | 'trading'
+  | 'anvil';
 
 /** Por que uma oferta de encantamento não pôde ser comprada. */
 export type EnchantResult = 'ok' | 'no-offer' | 'no-level' | 'no-lapis';
@@ -83,6 +85,13 @@ export interface ContainerScreenCallbacks {
   longPressMs?: () => number;
   /** Vibração curta ao confirmar o toque longo; ausente = sem retorno tátil. */
   vibrate?: () => void;
+  // --- bigorna (M15) ---
+  /** Recalcula o resultado; `name` só quando o jogador mexeu no campo. */
+  onAnvilChange?: (name?: string) => void;
+  /** Tira o resultado: cobra e devolve a peça, ou `null` se não pode. */
+  onAnvilTake?: () => ItemStack | null;
+  /** Custo e bloqueio atuais, para o painel. */
+  anvilStatus?: () => AnvilStatus;
 }
 
 /**
@@ -145,6 +154,8 @@ export class ContainerScreen {
   private readonly bookToggle: HTMLButtonElement;
   /** Ofertas do aldeão (M9), criadas na primeira tela de troca. */
   private trades: TradePanel | null = null;
+  /** Campo do nome e custo da bigorna (M15). */
+  private anvilPanel: AnvilPanel | null = null;
   /** Rodapé com o botão de fechar — a única saída sem teclado. */
   private readonly footer: HTMLDivElement;
   /** Colunas do painel; `column` é onde `addSection` escreve agora. */
@@ -366,7 +377,7 @@ export class ContainerScreen {
 
     const titles: Record<ScreenKind, string> = {
       none: '', inventory: 'Inventário', crafting: 'Bancada',
-      furnace: 'Fornalha', chest: 'Baú', enchanting: 'Mesa de Encantamento',
+      furnace: 'Fornalha', chest: 'Baú', enchanting: 'Mesa de Encantamento', anvil: 'Bigorna',
       trading: this.callbacks.tradeTitle?.() ?? 'Aldeão',
     };
     this.title.textContent = titles[this.kind];
@@ -416,11 +427,26 @@ export class ContainerScreen {
       });
       this.trades.reset();
       this.column.appendChild(this.trades.element);
+    } else if (this.kind === 'anvil') {
+      this.addSection('Bigorna', 1, [0], 'cont', 'Peça');
+      this.addSection('', 1, [1], 'cont', 'Material, peça ou livro');
+      this.anvilPanel ??= new AnvilPanel({
+        onName: (name) => { this.callbacks.onAnvilChange?.(name); this.refresh(); },
+      });
+      this.anvilPanel.reset();
+      this.column.appendChild(this.anvilPanel.element);
+      this.addSection('', 1, [2], 'cont', 'Resultado');
     } else if (this.kind === 'chest') {
+      // Baú, e desde o M15 também funil, dispensador e liberador: a mesma
+      // grade, com a largura e o título do contêiner.
       const size = this.container?.size ?? 27;
       const indices: number[] = [];
       for (let i = 0; i < size; i++) indices.push(i);
-      this.addSection(size > 27 ? 'Baú Duplo' : 'Baú', 9, indices, 'cont');
+      const kind = this.container?.kind;
+      const title = kind === 'hopper' ? 'Funil' : kind === 'dispenser' ? 'Dispensador'
+        : kind === 'dropper' ? 'Liberador' : size > 27 ? 'Baú Duplo' : 'Baú';
+      const columns = kind === 'hopper' ? 5 : kind === 'dispenser' || kind === 'dropper' ? 3 : 9;
+      this.addSection(title, columns, indices, 'cont');
     }
 
     // Inventário do jogador aparece em todas as telas — e é a coluna larga.
@@ -712,7 +738,7 @@ export class ContainerScreen {
    */
   private isOutputSlot(view: SlotView): boolean {
     if (view.source === 'inv') return view.index === CRAFT_RESULT;
-    return this.kind === 'furnace' && view.index === 2;
+    return (this.kind === 'furnace' || this.kind === 'anvil') && view.index === 2;
   }
 
   /**
@@ -746,7 +772,7 @@ export class ContainerScreen {
     } else {
       clickContainer(
         inventory, this.container, this.kind, view.index, button, options.shift,
-        this.callbacks.onFurnaceOutput,
+        this.callbacks.onFurnaceOutput, this.callbacks.onAnvilTake,
       );
     }
     this.refresh();
@@ -755,6 +781,8 @@ export class ContainerScreen {
   /** Redesenha o que mudou. */
   refresh(): void {
     if (this.kind === 'none' || this.inventory === null) return;
+    // A bigorna recalcula o resultado antes de os slots serem desenhados (M15).
+    if (this.kind === 'anvil') this.callbacks.onAnvilChange?.();
 
     for (const view of this.slots) {
       const stack = view.source === 'inv'
@@ -788,6 +816,10 @@ export class ContainerScreen {
     if (this.kind === 'furnace') this.refreshFurnace();
     if (this.kind === 'enchanting') this.refreshOffers();
     if (this.kind === 'trading') this.trades?.refresh();
+    if (this.kind === 'anvil') {
+      const status = this.callbacks.anvilStatus?.();
+      if (status !== undefined) this.anvilPanel?.refresh(status);
+    }
   }
 
   /**
@@ -891,7 +923,8 @@ export class ContainerScreen {
     if (stack === null) return null;
 
     const def = itemDef(stack.item);
-    let text = def?.display ?? '?';
+    // Nome da bigorna em cima, com o nome do item embaixo (M15).
+    let text = stack.name !== undefined ? `"${stack.name}"\n${def?.display ?? '?'}` : def?.display ?? '?';
     // Encantamentos em cima da durabilidade, como no doc 08 §3.5.
     const enchants = describeEnchants(stack.ench ?? 0);
     if (enchants !== '') text += `\n${enchants}`;

@@ -16,6 +16,13 @@ import type { World } from '../world/world';
 const FURNACE = BLOCK_BY_NAME.get('furnace')?.id ?? -1;
 const FURNACE_LIT = BLOCK_BY_NAME.get('furnace_lit')?.id ?? -1;
 const CHEST = BLOCK_BY_NAME.get('chest')?.id ?? -1;
+export const HOPPER = BLOCK_BY_NAME.get('hopper')?.id ?? -1;
+const DISPENSER = BLOCK_BY_NAME.get('dispenser')?.id ?? -1;
+const DROPPER = BLOCK_BY_NAME.get('dropper')?.id ?? -1;
+
+/** Slots de funil, dispensador e liberador (M15). */
+export const HOPPER_SLOTS = 5;
+export const DISPENSER_SLOTS = 9;
 
 /** Os quatro vizinhos horizontais, para achar a outra metade do baú duplo. */
 const CHEST_NEIGHBORS: readonly (readonly [number, number])[] = [
@@ -27,10 +34,33 @@ export interface TileEvents {
   onChanged(x: number, y: number, z: number, previous: number, state: number): void;
   /** O conteúdo de um contêiner quebrado cai no chão. */
   onDrop(stack: ItemStack, x: number, y: number, z: number): void;
+  /** O conteúdo de um contêiner mudou (M15: o comparador ao lado relê). */
+  onContents?(x: number, y: number, z: number): void;
 }
 
 export function isContainerBlock(id: number): boolean {
-  return id === FURNACE || id === FURNACE_LIT || id === CHEST;
+  return id === FURNACE || id === FURNACE_LIT || id === CHEST
+    || id === HOPPER || id === DISPENSER || id === DROPPER;
+}
+
+/** true se o contêiner abre na grade simples (baú, funil, dispensador, liberador). */
+export function isGridContainer(id: number): boolean {
+  return id === HOPPER || id === DISPENSER || id === DROPPER;
+}
+
+/** Um contêiner novo para o bloco `id`, na posição dada. */
+function containerFor(id: number, x: number, y: number, z: number): Container {
+  if (isFurnaceBlock(id)) return new Furnace(x, y, z);
+  if (id === HOPPER) {
+    const hopper = new Container('hopper', HOPPER_SLOTS, x, y, z);
+    // Vai para o save mesmo vazio: é assim que o funil volta a sugar depois de
+    // recarregar o mundo, sem ninguém abri-lo antes.
+    hopper.persistent = true;
+    return hopper;
+  }
+  if (id === DISPENSER) return new Container('dispenser', DISPENSER_SLOTS, x, y, z);
+  if (id === DROPPER) return new Container('dropper', DISPENSER_SLOTS, x, y, z);
+  return new Container('chest', CHEST_SLOTS, x, y, z);
 }
 
 export function isFurnaceBlock(id: number): boolean {
@@ -44,6 +74,8 @@ export class Tiles {
   private readonly containers = new Map<number, Container>();
   /** Baús com a tampa levantada, como triplas `(x, y, z)` (M8). */
   private readonly openLids: number[] = [];
+  /** Os funis, para quem move item não varrer todo contêiner (M15). */
+  readonly hoppers = new Set<Container>();
 
   constructor(world: World, events: TileEvents) {
     this.world = world;
@@ -52,11 +84,16 @@ export class Tiles {
 
   /** Cria o tile entity quando um baú ou fornalha é colocado. */
   create(x: number, y: number, z: number, blockId: number): void {
-    if (isFurnaceBlock(blockId)) {
-      this.containers.set(positionKey(x, y, z), new Furnace(x, y, z));
-    } else if (blockId === CHEST) {
-      this.containers.set(positionKey(x, y, z), new Container('chest', CHEST_SLOTS, x, y, z));
-    }
+    if (!isContainerBlock(blockId)) return;
+    this.track(containerFor(blockId, x, y, z));
+  }
+
+  /** Registra o contêiner: posição, lista de funis e aviso de conteúdo. */
+  private track(container: Container): void {
+    const { x, y, z } = container;
+    this.containers.set(positionKey(x, y, z), container);
+    if (container.kind === 'hopper') this.hoppers.add(container);
+    container.onChange = () => { this.events.onContents?.(x, y, z); };
   }
 
   /** Remove o tile entity e dropa o conteúdo. Devolve o que saiu, se havia. */
@@ -65,6 +102,8 @@ export class Tiles {
     const container = this.containers.get(key);
     if (container === undefined) return undefined;
     this.containers.delete(key);
+    this.hoppers.delete(container);
+    container.onChange = null;
     for (const stack of container.slots) {
       if (stack !== null) this.events.onDrop(stack, x + 0.5, y + 0.5, z + 0.5);
     }
@@ -80,10 +119,8 @@ export class Tiles {
     const key = positionKey(x, y, z);
     let container = this.containers.get(key);
     if (container === undefined) {
-      container = isFurnaceBlock(blockId)
-        ? new Furnace(x, y, z)
-        : new Container('chest', CHEST_SLOTS, x, y, z);
-      this.containers.set(key, container);
+      container = containerFor(blockId, x, y, z);
+      this.track(container);
     }
     return container;
   }
@@ -186,7 +223,7 @@ export class Tiles {
       const item = ITEM_BY_NAME.get(name);
       if (item !== undefined) container.give(item.id, count);
     });
-    this.containers.set(key, container);
+    this.track(container);
   }
 
   /** Todos os contêineres com conteúdo, para o save. */
@@ -202,12 +239,14 @@ export class Tiles {
 
   /** Restaura contêineres vindos do save. */
   restore(container: Container): void {
-    this.containers.set(positionKey(container.x, container.y, container.z), container);
+    if (container.kind === 'hopper') container.persistent = true;
+    this.track(container);
   }
 
   /** Esquece tudo (troca de dimensão). */
   clear(): void {
     this.containers.clear();
+    this.hoppers.clear();
     this.openLids.length = 0;
   }
 }

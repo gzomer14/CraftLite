@@ -317,7 +317,7 @@ export class AudioEngine {
         this.overridden++;
         continue;
       }
-      const buffer = await renderRecipe(recipe, rateFor(recipe, this.sampleRate));
+      const buffer = await renderAtRate(recipe, rateFor(recipe, this.sampleRate));
       if (buffer !== null) this.buffers.set(name, buffer);
     }
   }
@@ -357,6 +357,23 @@ export class AudioEngine {
   resume(): void {
     void this.ctx?.resume();
   }
+}
+
+/**
+ * Menor taxa que a especificação do Web Audio **garante** para um contexto
+ * (8–96 kHz). O Chrome aceita desde 3 kHz; quem não aceita lança.
+ */
+export const MIN_GUARANTEED_RATE = 8000;
+
+/**
+ * Renderiza na taxa pedida e, se o navegador recusar uma taxa abaixo da
+ * garantida (o degrau de um quarto do M15 fica em 5,5 kHz), tenta de novo em
+ * 8 kHz — ainda acima do que o som precisa, e nunca um som mudo.
+ */
+export async function renderAtRate(recipe: Recipe, rate: number): Promise<AudioBuffer | null> {
+  const buffer = await renderRecipe(recipe, rate);
+  if (buffer !== null || rate >= MIN_GUARANTEED_RATE) return buffer;
+  return renderRecipe(recipe, MIN_GUARANTEED_RATE);
 }
 
 /** Renderiza uma receita para `AudioBuffer`. Devolve null se não der. */

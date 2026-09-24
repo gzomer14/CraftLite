@@ -1474,6 +1474,70 @@ export const TEXTURES: Record<string, TexRecipe> = {
       dither(0.04),
     ],
   },
+  // --- oficina (M15) -----------------------------------------------------
+  /** Bigorna: ferro escuro batido, com a mesa polida por cima. */
+  'block/anvil_side': {
+    base: [70, 70, 76], noise: 'value', scale: 5, variance: 0.08,
+    ops: [border([44, 44, 50], 1), rect(1, 1, 14, 1, [104, 104, 112], 0.6), dither(0.05)],
+  },
+  'block/anvil_top': {
+    base: [96, 96, 104], noise: 'grain', scale: 8, variance: 0.07,
+    ops: [border([52, 52, 58], 2), rect(3, 3, 10, 10, [118, 118, 126], 0.5), dither(0.04)],
+  },
+  /** Funil: tigela de ferro, escura por dentro. */
+  'block/hopper_side': {
+    base: [64, 64, 70], noise: 'value', scale: 6, variance: 0.07,
+    ops: [border([40, 40, 46], 1), rect(0, 5, 16, 1, [96, 96, 104], 0.7), dither(0.04)],
+  },
+  'block/hopper_top': {
+    base: [70, 70, 76], noise: 'value', scale: 6, variance: 0.06,
+    ops: [rect(2, 2, 12, 12, [26, 26, 30]), outline(2, 2, 12, 12, [44, 44, 50]),
+      rect(6, 6, 4, 4, [14, 14, 16]), dither(0.04)],
+  },
+  /** Dispensador e liberador: a pedra da fornalha, lisa, sem boca. */
+  'block/dispenser_side': {
+    inherit: 'block/cobblestone',
+    ops: [tintBy(0.78), border(IRON_DARK, 2), rect(2, 2, 12, 1, [150, 150, 158], 0.5), dither(0.04)],
+  },
+  /** Dispensador: a pedra lisa com uma boca redonda de arremesso. */
+  'block/dispenser_front': {
+    inherit: 'block/dispenser_side',
+    ops: [
+      rect(4, 5, 8, 7, [34, 30, 30]), rect(5, 4, 6, 9, [34, 30, 30]),
+      rect(6, 6, 4, 4, [16, 14, 14]), outline(4, 4, 8, 9, IRON_DARK, 0.6), dither(0.04),
+    ],
+  },
+  /** Liberador: a boca é uma fenda — larga e baixa, sem arremesso. */
+  'block/dropper_front': {
+    inherit: 'block/dispenser_side',
+    ops: [rect(3, 6, 10, 4, [34, 30, 30]), rect(4, 7, 8, 2, [16, 14, 14]),
+      outline(3, 6, 10, 4, IRON_DARK, 0.6), dither(0.04)],
+  },
+  /** Comparador: o tampo do repetidor com três tochinhas, a da frente apagada. */
+  'block/comparator': {
+    base: [186, 186, 190], noise: 'value', scale: 6, variance: 0.06,
+    ops: [
+      border([142, 142, 148], 1),
+      rect(3, 11, 2, 2, [196, 58, 48]), rect(11, 11, 2, 2, [196, 58, 48]),
+      rect(7, 2, 2, 2, [110, 60, 56]),
+      rect(7, 6, 2, 4, [150, 150, 156]),
+      dither(0.04),
+    ],
+  },
+  'block/comparator_subtract': {
+    inherit: 'block/comparator', ops: [rect(7, 2, 2, 2, [236, 84, 60])],
+  },
+  /** Observador: a pedra com a cara de dois olhos que vigia a frente. */
+  'block/observer_side': {
+    base: [112, 112, 116], noise: 'value', scale: 5, variance: 0.08,
+    ops: [border([76, 76, 80], 1), stripes('h', 4, 0.12), dither(0.05)],
+  },
+  'block/observer_front': {
+    inherit: 'block/observer_side',
+    ops: [rect(2, 4, 12, 8, [44, 44, 48]), rect(3, 6, 4, 3, [150, 150, 158]),
+      rect(9, 6, 4, 3, [150, 150, 158]), rect(4, 7, 2, 1, [22, 22, 24]),
+      rect(10, 7, 2, 1, [22, 22, 24]), dither(0.04)],
+  },
   'block/piston': {
     base: [150, 122, 74], noise: 'grain', scale: 6, variance: 0.1,
     ops: [plankLines(8, WOOD_DARK), border(IRON_DARK, 2), dither(0.04)],

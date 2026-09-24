@@ -88,7 +88,8 @@ export interface WorldArchive {
 
 export interface ArchiveItems {
   dimension: number;
-  items: number[];
+  /** Números por item e, no fim, os nomes da bigorna (M15). */
+  items: (number | string)[];
 }
 
 export interface ArchiveMapRegion {
@@ -237,7 +238,7 @@ export async function exportWorld(db: SaveDatabase, worldId: string): Promise<Ui
   const items: ArchiveItems[] = [];
   for (let dimension = 0; dimension < DIMENSION_COUNT; dimension++) {
     const id = dimensionIdFor(worldId, dimension);
-    const floor = (await db.get<number[]>(STORE_SETTINGS, `${id}.items`)) ?? [];
+    const floor = (await db.get<(number | string)[]>(STORE_SETTINGS, `${id}.items`)) ?? [];
     if (floor.length > 0) items.push({ dimension, items: floor });
     const chunks = await db.allChunks(id);
     const tiles = (await db.get<unknown[]>(STORE_SETTINGS, `${id}.tiles`)) ?? [];

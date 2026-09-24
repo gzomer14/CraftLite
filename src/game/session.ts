@@ -18,8 +18,10 @@ import { RecipeBook } from './crafting';
 import type { ItemUseContext } from './itemuse';
 import { ItemUser } from './itemuser';
 import { FishingLine } from './fishing';
+import type { ItemFlow } from './itemflow';
 import {
   applyStructures, mobEvents, wireInventory, wireProjectiles, wireSurvival,
+  wireItemFlow,
 } from './sessionwiring';
 import { DayNight } from './daynight';
 import { Weather } from './weather';
@@ -109,6 +111,8 @@ export class Session {
   /** Mapa explorado, marcadores e estatísticas (M10). */
   readonly journal = new Journal();
   readonly orbs = new XpOrbs();
+  /** Funil, dispensador e liberador (M15, `game/itemflow.ts`). */
+  readonly itemFlow: ItemFlow;
   /** A linha de pesca (M14): uma boia só, a do jogador. */
   readonly fishing = new FishingLine();
   readonly xp = new Experience();
@@ -212,7 +216,10 @@ export class Session {
         this.lighting.onBlockChanged(x, y, z, previous, state);
       },
       onDrop: (stack, x, y, z) => { this.items.spawn(x, y, z, stack); },
+      // O comparador encostado relê o contêiner (M15).
+      onContents: (x, y, z) => { this.redstone.scheduleNeighborhood(x, y, z, false); },
     });
+    this.itemFlow = wireItemFlow(this, events);
     this.workbench = new Workbench({
       world, player, inventory: this.inventory, recipes: this.recipes, tiles: this.tiles,
       xp: this.xp, achievements: this.achievements, stats: this.journal.stats,
@@ -385,6 +392,7 @@ export class Session {
     this.tickRedstone();
     this.travel.tick(this.player.x, this.player.y, this.player.z);
     this.tiles.tick();
+    this.itemFlow.tick();
     this.spawners.tick(this.player.x, this.player.y, this.player.z);
     this.tickMobs();
   }

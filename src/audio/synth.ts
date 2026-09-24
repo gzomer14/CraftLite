@@ -62,10 +62,15 @@ export type Recipe =
  * a taxa certa, e mexer num filtro não deixa uma anotação velha para trás.
  */
 export function rateFor(recipe: Recipe, base: number): number {
-  const top = topFrequencyOf(recipe);
-  // Metade da taxa cobre até `base / 4`; a folga de 1,4 evita comer a saia do
-  // filtro, que não corta em vertical.
-  return top * 1.4 <= base / 4 ? Math.round(base / 2) : base;
+  const top = topFrequencyOf(recipe) * 1.4;
+  // Metade da taxa cobre até `base / 4`, e um quarto até `base / 8`; a folga
+  // de 1,4 evita comer a saia do filtro, que não corta em vertical.
+  //
+  // O degrau de um quarto entrou no M15, com a memória de áudio a 3 KB do
+  // teto: trovão, portal, fornalha e os mugidos graves não passam de ~2 kHz, e
+  // guardavam o dobro do que o ouvido recebe.
+  if (top <= base / 8) return Math.round(base / 4);
+  return top <= base / 4 ? Math.round(base / 2) : base;
 }
 
 /** Maior frequência que a receita pode produzir, em Hz. */

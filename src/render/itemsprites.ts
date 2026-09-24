@@ -16,10 +16,10 @@
 
 import { dyeRgbOf } from '../data/tints';
 import { BIOMES } from '../data/biomes';
-import { defOf, makeState, texOf } from '../data/blocks';
+import { defOf, hasFrontTex, makeState, texOf } from '../data/blocks';
 import {
   BOX_STRIDE, MAX_BOXES, MOUNT_FLOOR, SHAPE_BUTTON, SHAPE_BY_NAME, SHAPE_CROSS, SHAPE_LEVER,
-  SHAPE_NONE, SHAPE_RAIL, SHAPE_STAIRS, SHAPE_TORCH, boxesFor,
+  SHAPE_NONE, SHAPE_RAIL, SHAPE_STAIRS, SHAPE_TORCH, SHAPE_HOPPER, boxesFor,
 } from '../world/mesh/shapes';
 import { ITEMS, type ItemDef } from '../data/items';
 import { DIAL_FRAMES, ITEM_ART, SHAPES, type DialKind, type ItemArt } from '../data/itemart';
@@ -323,6 +323,9 @@ export function drawBlockIsometric(
   const topPixels = top ?? side;
   const sidePixels = side ?? top;
   if (topPixels === null || sidePixels === null) return;
+  // Dispensador, liberador e observador (M15): a frente vai na face da esquerda.
+  const frontPixels = hasFrontTex(def)
+    ? (source.texturePixels(texOf(def, 'front')) ?? sidePixels) : sidePixels;
 
   /*
    * Unidades da máscara (16) mapeadas no tile: o desenho é o mesmo em 16 e 32.
@@ -354,7 +357,7 @@ export function drawBlockIsometric(
     drawBox(
       out, size, k,
       BOXES[o], BOXES[o + 1], BOXES[o + 2], BOXES[o + 3], BOXES[o + 4], BOXES[o + 5],
-      topPixels, sidePixels, topTint, sideTint,
+      topPixels, sidePixels, topTint, sideTint, frontPixels,
     );
   }
 
@@ -431,7 +434,7 @@ function drawBox(
   out: Uint8ClampedArray, size: number, k: number,
   x0: number, y0: number, z0: number, x1: number, y1: number, z1: number,
   topPixels: Uint8ClampedArray, sidePixels: Uint8ClampedArray,
-  topTint: Rgb | null, sideTint: Rgb | null,
+  topTint: Rgb | null, sideTint: Rgb | null, leftPixels: Uint8ClampedArray = sidePixels,
 ): void {
   for (let v = 0; v < SPRITE_SIZE; v += STEP) {
     for (let u = 0; u < SPRITE_SIZE; u += STEP) {
@@ -448,7 +451,7 @@ function drawBox(
       bx = x0 + (x1 - x0) * fu;
       let by = y1 - (y1 - y0) * fv;
       plot(out, size, isoX(bx, z1) * k, isoY(bx, by, z1) * k,
-        sidePixels, u, v, SHADE_LEFT, sideTint);
+        leftPixels, u, v, SHADE_LEFT, sideTint);
 
       // Face +X: a que aparece à direita.
       bz = z1 - (z1 - z0) * fu;
@@ -485,6 +488,8 @@ const ORDER = new Uint8Array(MAX_BOXES);
 const SPRITE_LINKS = 0b0011;
 /** Estado com que cada forma posa no slot. O que não está aqui posa em 0. */
 const SPRITE_STATE: Readonly<Record<number, number>> = {
+  // O funil posa com o bico para baixo, que é como ele é reconhecido (M15).
+  [SHAPE_HOPPER]: 5,
   [SHAPE_TORCH]: MOUNT_FLOOR,
   [SHAPE_LEVER]: MOUNT_FLOOR,
   [SHAPE_BUTTON]: MOUNT_FLOOR,

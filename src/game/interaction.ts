@@ -376,8 +376,25 @@ export class Interaction {
       // Encaixa na superfície clicada: o apoio fica do lado oposto à normal.
       return mountFromNormal(hit.nx, hit.ny, hit.nz);
     }
-    if (shape === 'repeater') return facing4FromLook(this.player.yaw);
+    if (shape === 'repeater' || shape === 'comparator') return facing4FromLook(this.player.yaw);
     if (shape === 'piston') return facing6FromLook(this.player.yaw, this.player.pitch);
+    // --- oficina (M15) -----------------------------------------------------
+    // A mesa da bigorna fica atravessada na frente de quem a coloca.
+    if (shape === 'anvil') return facingFromYaw(this.player.yaw);
+    // O bico do funil entra no bloco clicado: no lado dele, ou para baixo.
+    if (shape === 'hopper') {
+      if (hit.nx > 0) return 1;
+      if (hit.nx < 0) return 0;
+      if (hit.nz > 0) return 3;
+      if (hit.nz < 0) return 2;
+      return 5;
+    }
+    // Dispensador e liberador olham para quem os colocou; o observador vigia o
+    // bloco para onde se olhava ao colocá-lo, e solta o pulso para trás.
+    if (def.name === 'dispenser' || def.name === 'dropper') {
+      return facing6FromLook(this.player.yaw, this.player.pitch) ^ 1;
+    }
+    if (def.name === 'observer') return facing6FromLook(this.player.yaw, this.player.pitch);
     return 0;
   }
 

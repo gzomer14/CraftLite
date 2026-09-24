@@ -573,6 +573,16 @@ register({
   use: 'fish',
 });
 
+// --- apêndice do M15: o livro que a mesa encanta e a bigorna consome ---------
+// Sempre no fim da fila: o id de item vai para o save.
+register({
+  id: nextId++,
+  name: 'enchanted_book',
+  display: 'Livro Encantado',
+  tex: 'item/enchanted_book',
+  maxStack: 1,
+});
+
 /**
  * Usos de cada item, em ordem de tentativa (ver `ItemDef.uses`).
  *
@@ -614,6 +624,11 @@ export interface ItemStack {
    * `game/enchanting.ts` para a razão de ser um inteiro e não um objeto.
    */
   ench?: number;
+  /**
+   * Nome dado na bigorna (M15). Só em item que não empilha — ver
+   * `game/anvil.ts` —, então juntar pilhas nunca precisa escolher um nome.
+   */
+  name?: string;
 }
 
 export function makeStack(item: number, count = 1): ItemStack {

@@ -24,7 +24,15 @@ export const FURNACE_OUTPUT = 2;
 export const ENCHANT_ITEM = 0;
 export const ENCHANT_LAPIS = 1;
 
-export type ContainerKind = 'chest' | 'double_chest' | 'furnace' | 'enchanting';
+export type ContainerKind =
+  | 'chest' | 'double_chest' | 'furnace' | 'enchanting'
+  // M15: a bigorna (tela, sem posição) e os três que movem item no mundo.
+  | 'anvil' | 'hopper' | 'dispenser' | 'dropper';
+
+/** Slots da bigorna (M15): 0 peça, 1 material ou segunda peça, 2 resultado. */
+export const ANVIL_LEFT = 0;
+export const ANVIL_RIGHT = 1;
+export const ANVIL_OUTPUT = 2;
 
 /**
  * O que a interface precisa enxergar de um contêiner.
@@ -57,6 +65,12 @@ export class Container {
   onChange: (() => void) | null = null;
 
   /**
+   * Ticks até o próximo item que o funil move (M15). Só o funil usa; num campo
+   * da base é um número a mais por contêiner, contra uma subclasse para isso.
+   */
+  cooldown = 0;
+
+  /**
    * true = vai para o save **mesmo vazio** (M6).
    *
    * Existe por causa do baú de estrutura: ele nasce cheio a partir da seed, e
@@ -86,6 +100,21 @@ export class Container {
     this.onChange?.();
   }
 
+  /** Guarda uma pilha inteira, com encantamento e nome (M15); devolve o que não coube. */
+  giveStack(stack: ItemStack): number {
+    if (stack.name !== undefined) {
+      // Item com nome não empilha: só entra em slot vazio.
+      for (let i = 0; i < this.slots.length; i++) {
+        if (this.slots[i] !== null) continue;
+        this.slots[i] = { ...stack };
+        this.onChange?.();
+        return 0;
+      }
+      return stack.count;
+    }
+    return this.give(stack.item, stack.count, stack.damage, stack.ench ?? 0);
+  }
+
   /** Guarda itens; devolve quanto não coube. `ench` viaja junto (ver `Inventory.give`). */
   give(item: number, count: number, damage = 0, ench = 0): number {
     let remaining = count;
@@ -93,7 +122,7 @@ export class Container {
     for (let i = 0; i < this.slots.length && remaining > 0; i++) {
       const slot = this.slots[i];
       if (slot === null || slot.item !== item || slot.damage !== damage) continue;
-      if ((slot.ench ?? 0) !== ench) continue;
+      if ((slot.ench ?? 0) !== ench || slot.name !== undefined) continue;
       const room = max - slot.count;
       if (room <= 0) continue;
       const moved = Math.min(room, remaining);
@@ -346,6 +375,8 @@ export class EnchantTable extends Container {
     if (this.lapis < offer.lapis) return false;
 
     applyEnchant(stack, offer.enchant, offer.level);
+    // O livro encantado é outro item (M15): é ele que a bigorna consome.
+    if (stack.item === BOOK_ITEM) stack.item = ENCHANTED_BOOK_ITEM;
 
     const payment = this.get(ENCHANT_LAPIS);
     if (payment !== null) {
@@ -362,3 +393,5 @@ export class EnchantTable extends Container {
 }
 
 const LAPIS_ITEM = ITEM_BY_NAME.get('lapis_lazuli')?.id ?? -1;
+const BOOK_ITEM = ITEM_BY_NAME.get('book')?.id ?? -1;
+const ENCHANTED_BOOK_ITEM = ITEM_BY_NAME.get('enchanted_book')?.id ?? -1;

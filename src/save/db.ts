@@ -77,6 +77,11 @@ export interface PlayerSave {
    */
   enchants?: number[];
   /**
+   * Nomes da bigorna por slot (M15), paralelo como `enchants`; ausente quando
+   * nenhum item tem nome, que é o save de sempre.
+   */
+  names?: (string | null)[];
+  /**
    * Dimensão em que o jogador estava (M7). Ausente = superfície, que é o que
    * todo save anterior ao M7 significa — sem migração.
    */

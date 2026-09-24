@@ -6,12 +6,12 @@
  * consulta; um `Uint8Array` indexado por id não.
  */
 
-import { BLOCKS, AIR, WATER, LAVA, texOf } from '../../data/blocks';
+import { BLOCKS, AIR, WATER, LAVA, hasFrontTex, texOf } from '../../data/blocks';
 import {
   SHAPE_BUTTON, SHAPE_CARPET, SHAPE_CROSS, SHAPE_DOOR, SHAPE_FENCE, SHAPE_FENCE_GATE, SHAPE_FLAT,
   SHAPE_LADDER, SHAPE_LEVER, SHAPE_NONE, SHAPE_PAINTING, SHAPE_PANE, SHAPE_PISTON,
   SHAPE_BED, SHAPE_BELL, SHAPE_CAKE, SHAPE_CHEST, SHAPE_PISTON_HEAD, SHAPE_PLATE, SHAPE_RAIL, SHAPE_REPEATER, SHAPE_SIGN, SHAPE_SLAB,
-  SHAPE_STAIRS, SHAPE_TORCH, SHAPE_TRAPDOOR,
+  SHAPE_STAIRS, SHAPE_TORCH, SHAPE_TRAPDOOR, SHAPE_ANVIL, SHAPE_HOPPER, SHAPE_COMPARATOR,
 } from './shapes';
 import { layerOf, type LayerIndex } from '../../render/layers';
 import { tintIndexOf } from '../../data/tints';
@@ -78,6 +78,9 @@ const COMPLEX_BY_SHAPE: Record<string, number> = {
   chest: CPLX_CHEST,
   cake: CPLX_BOXES,
   bell: CPLX_BOXES,
+  anvil: CPLX_BOXES,
+  hopper: CPLX_BOXES,
+  comparator: CPLX_BOXES,
   slab: CPLX_BOXES,
   carpet: CPLX_BOXES,
   flat: CPLX_BOXES,
@@ -107,6 +110,9 @@ const SHAPE_ID_BY_NAME: Record<string, number> = {
   chest: SHAPE_CHEST,
   cake: SHAPE_CAKE,
   bell: SHAPE_BELL,
+  anvil: SHAPE_ANVIL,
+  hopper: SHAPE_HOPPER,
+  comparator: SHAPE_COMPARATOR,
   slab: SHAPE_SLAB,
   carpet: SHAPE_CARPET,
   flat: SHAPE_FLAT,
@@ -141,6 +147,12 @@ export interface BlockTables {
   texTop: Uint16Array;
   texSide: Uint16Array;
   texBottom: Uint16Array;
+  /**
+   * Face da frente (M15): dispensador, liberador, observador. `hasFront` diz
+   * se o bloco tem uma; a direção sai dos bits 0..2 do estado (`FRONT_FACE`).
+   */
+  texFront: Uint16Array;
+  hasFront: Uint8Array;
   tint: Uint8Array;
   emission: Uint8Array;
   attenuation: Uint8Array;
@@ -165,6 +177,8 @@ export function buildBlockTables(index: LayerIndex): BlockTables {
     texTop: new Uint16Array(n),
     texSide: new Uint16Array(n),
     texBottom: new Uint16Array(n),
+    texFront: new Uint16Array(n),
+    hasFront: new Uint8Array(n),
     tint: new Uint8Array(n),
     emission: new Uint8Array(n),
     attenuation: new Uint8Array(n),
@@ -189,6 +203,8 @@ export function buildBlockTables(index: LayerIndex): BlockTables {
     tables.texTop[id] = layerOf(index, texOf(def, 'top'));
     tables.texSide[id] = layerOf(index, texOf(def, 'side'));
     tables.texBottom[id] = layerOf(index, texOf(def, 'bottom'));
+    tables.texFront[id] = layerOf(index, texOf(def, 'front'));
+    tables.hasFront[id] = hasFrontTex(def) ? 1 : 0;
     tables.complex[id] = COMPLEX_BY_SHAPE[def.shape] ?? CPLX_NONE;
     tables.shape[id] = SHAPE_ID_BY_NAME[def.shape] ?? SHAPE_NONE;
 
@@ -238,6 +254,19 @@ export function buildBlockTables(index: LayerIndex): BlockTables {
 export function stageTexOf(tables: BlockTables, id: number, state: number): number {
   if (tables.hasStages[id] === 0) return tables.texSide[id];
   return tables.stageTex[id * MAX_STAGES + Math.min(state, MAX_STAGES - 1)];
+}
+
+/**
+ * Face do greedy (`FACE_*` de `render/vertex.ts`: ±X, ±Y, ±Z) para cada
+ * direção dos bits 0..2 do estado, na ordem de `PISTON_STEP` (+X, −X, +Z, −Z,
+ * +Y, −Y).
+ */
+export const FRONT_FACE: readonly number[] = [0, 1, 4, 5, 2, 3];
+
+/** Camada da face `face` de um cubo, com a frente pelo estado (M15). */
+export function cubeFaceTex(tables: BlockTables, id: number, bits: number, face: number): number {
+  if (tables.hasFront[id] === 1 && FRONT_FACE[bits & 7] === face) return tables.texFront[id];
+  return face === 2 ? tables.texTop[id] : face === 3 ? tables.texBottom[id] : tables.texSide[id];
 }
 
 /** `SHAPE_*` de um bloco, para quem monta a lista de caixas. */

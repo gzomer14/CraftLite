@@ -6,7 +6,7 @@
  * tela, e é testável sem DOM.
  */
 
-import { itemDef } from '../../data/items';
+import { itemDef, type ItemStack } from '../../data/items';
 import { Furnace, type ContainerView } from '../../game/container';
 import type { ClickButton, Inventory } from '../../game/inventory';
 import type { ScreenKind } from './screen';
@@ -19,14 +19,29 @@ export function clickContainer(
 inventory: Inventory, container: ContainerView | null, kind: ScreenKind,
 index: number, button: ClickButton, shift: boolean,
 onFurnaceOutput?: (furnace: Furnace, item: number) => void,
+onAnvilTake?: () => ItemStack | null,
 ): void {
 if (container === null) return;
 
   const slot = container.get(index);
 
+  // Resultado da bigorna (M15): só sai, e só se a bancada deixar (níveis).
+  if (kind === 'anvil' && index === 2) {
+    if (slot === null || inventory.cursor !== null) return;
+    const taken = onAnvilTake?.() ?? null;
+    if (taken === null) return;
+    if (shift) {
+      const left = inventory.giveStack(taken);
+      if (left > 0) inventory.cursor = { ...taken, count: left };
+    } else {
+      inventory.cursor = taken;
+    }
+    return;
+  }
+
   if (shift) {
     if (slot === null) return;
-    const leftover = inventory.give(slot.item, slot.count, slot.damage, slot.ench ?? 0);
+    const leftover = inventory.giveStack(slot);
     if (leftover === slot.count) return;
     if (kind === 'furnace' && index === 2 && container instanceof Furnace) {
       onFurnaceOutput?.(container, slot.item);
@@ -51,7 +66,8 @@ if (container === null) return;
     if (slot === null) return;
     if (button === 'right') {
       const take = Math.ceil(slot.count / 2);
-      inventory.cursor = { item: slot.item, count: take, damage: slot.damage };
+      // Cópia inteira: a cópia à mão perdia o encantamento (corrigido no M15).
+      inventory.cursor = { ...slot, count: take };
       slot.count -= take;
       container.set(index, slot.count > 0 ? slot : null);
     } else {
@@ -63,7 +79,7 @@ if (container === null) return;
 
   if (slot === null) {
     if (button === 'right') {
-      container.set(index, { item: cursor.item, count: 1, damage: cursor.damage });
+      container.set(index, { ...cursor, count: 1 });
       cursor.count--;
       if (cursor.count <= 0) inventory.cursor = null;
     } else {

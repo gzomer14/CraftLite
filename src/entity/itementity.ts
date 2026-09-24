@@ -65,6 +65,11 @@ export class ItemEntities {
    * caía na morte voltava comum ao ser recolhida (achado no M10).
    */
   private readonly ench: Int32Array;
+  /**
+   * Nome dado na bigorna (M15), ou `undefined`. Array comum e não tipado: quase
+   * todo item do chão não tem nome, e a posição só guarda uma referência.
+   */
+  private readonly names: (string | undefined)[];
   private readonly age: Int32Array;
   /** Ticks que cada item ainda precisa esperar para poder ser coletado. */
   private readonly pickupAt: Int32Array;
@@ -90,6 +95,7 @@ export class ItemEntities {
     this.count = new Uint8Array(capacity);
     this.damage = new Uint16Array(capacity);
     this.ench = new Int32Array(capacity);
+    this.names = new Array<string | undefined>(capacity).fill(undefined);
     this.age = new Int32Array(capacity);
     this.pickupAt = new Int32Array(capacity);
   }
@@ -141,8 +147,43 @@ export class ItemEntities {
     this.count[i] = Math.min(255, stack.count);
     this.damage[i] = stack.damage;
     this.ench[i] = stack.ench ?? 0;
+    this.names[i] = stack.name;
     this.age[i] = 0;
     return true;
+  }
+
+  /**
+   * Tira **uma** unidade do primeiro item dentro da caixa (M15: o funil suga
+   * o que cai em cima dele) e escreve a pilha de 1 em `out`. Devolve false se
+   * não há item ali, ou se ele ainda não pode ser coletado.
+   */
+  takeOneIn(
+    x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, out: ItemStack,
+  ): boolean {
+    for (let i = 0; i < this.activeCount; i++) {
+      const x = this.x[i];
+      const y = this.y[i];
+      const z = this.z[i];
+      if (x < x0 || x > x1 || y < y0 || y > y1 || z < z0 || z > z1) continue;
+      // `pickupAt` é a idade a partir da qual o item pode ser recolhido.
+      if (this.age[i] < this.pickupAt[i]) continue;
+      out.item = this.item[i];
+      out.count = 1;
+      out.damage = this.damage[i];
+      out.ench = this.ench[i];
+      if (this.names[i] === undefined) delete out.name;
+      else out.name = this.names[i];
+      this.count[i]--;
+      if (this.count[i] <= 0) this.removeAt(i);
+      return true;
+    }
+    return false;
+  }
+
+  /** Devolve uma unidade tirada por `takeOneIn` que não coube (M15). */
+  putBack(out: ItemStack, x: number, y: number, z: number): void {
+    this.spawn(x, y, z, out);
+    this.pickupAt[this.activeCount - 1] = 0;
   }
 
   /** Um tick: física, fusão, coleta e despawn. */
@@ -220,9 +261,11 @@ export class ItemEntities {
     if (dy < -PICKUP_BELOW || dy > PICKUP_ABOVE) return false;
     if (this.onPickup === null) return false;
 
-    const leftover = this.onPickup({
+    const stack: ItemStack = {
       item: this.item[i], count: this.count[i], damage: this.damage[i], ench: this.ench[i],
-    });
+    };
+    if (this.names[i] !== undefined) stack.name = this.names[i];
+    const leftover = this.onPickup(stack);
     if (leftover >= this.count[i]) return false; // inventário cheio: fica no chão
     if (leftover > 0) {
       this.count[i] = leftover;
@@ -240,7 +283,7 @@ export class ItemEntities {
     for (let i = 0; i < this.activeCount; i++) {
       for (let j = i + 1; j < this.activeCount; j++) {
         if (this.item[i] !== this.item[j] || this.damage[i] !== this.damage[j]
-          || this.ench[i] !== this.ench[j]) continue;
+          || this.ench[i] !== this.ench[j] || this.names[i] !== this.names[j]) continue;
         const max = maxStackOf(this.item[i]);
         if (this.count[i] >= max) break;
 
@@ -284,6 +327,8 @@ export class ItemEntities {
     this.count[i] = this.count[last];
     this.damage[i] = this.damage[last];
     this.ench[i] = this.ench[last];
+    this.names[i] = this.names[last];
+    this.names[last] = undefined;
     this.age[i] = this.age[last];
     this.pickupAt[i] = this.pickupAt[last];
   }
@@ -313,41 +358,66 @@ export class ItemEntities {
    * sair do mundo apagava o inventário da morte que o jogador ia buscar.
    * Velocidade não vai: o item volta parado, e a gravidade faz o resto.
    */
-  snapshot(): number[] {
-    const out: number[] = [];
+  snapshot(): (number | string)[] {
+    const out: (number | string)[] = [];
     for (let i = 0; i < this.activeCount; i++) {
       out.push(
         round2(this.x[i]), round2(this.y[i]), round2(this.z[i]),
         this.item[i], this.count[i], this.damage[i], this.ench[i], this.age[i],
       );
     }
+    /*
+     * Nomes da bigorna (M15), depois de todos os registros: a marca `NAMES` e
+     * pares `[índice, nome]`. Save de antes do M15 não tem a marca, e save do
+     * M15 sem item nomeado no chão fica igual ao de antes.
+     */
+    let marked = false;
+    for (let i = 0; i < this.activeCount; i++) {
+      const name = this.names[i];
+      if (name === undefined) continue;
+      if (!marked) { out.push(NAMES); marked = true; }
+      out.push(i, name);
+    }
     return out;
   }
 
   /** Devolve ao mundo o que `snapshot` gravou. Substitui o que houver. */
-  restore(flat: readonly number[] | undefined): void {
+  restore(flat: readonly (number | string)[] | undefined): void {
     this.activeCount = 0;
+    this.names.fill(undefined);
     if (flat === undefined) return;
-    for (let k = 0; k + ITEM_RECORD <= flat.length && this.activeCount < this.capacity; k += ITEM_RECORD) {
-      const item = flat[k + 3];
-      const count = flat[k + 4];
+    const end = flat.indexOf(NAMES);
+    const records = end < 0 ? flat.length : end;
+    const index = new Int32Array(Math.floor(records / ITEM_RECORD)).fill(-1);
+    for (let k = 0; k + ITEM_RECORD <= records && this.activeCount < this.capacity; k += ITEM_RECORD) {
+      const item = flat[k + 3] as number;
+      const count = flat[k + 4] as number;
       if (!(item > 0) || !(count > 0)) continue;
       const i = this.activeCount++;
-      this.x[i] = flat[k]; this.y[i] = flat[k + 1]; this.z[i] = flat[k + 2];
+      index[k / ITEM_RECORD] = i;
+      this.x[i] = flat[k] as number; this.y[i] = flat[k + 1] as number; this.z[i] = flat[k + 2] as number;
       this.prevX[i] = this.x[i]; this.prevY[i] = this.y[i]; this.prevZ[i] = this.z[i];
       this.vx[i] = 0; this.vy[i] = 0; this.vz[i] = 0;
       this.item[i] = item;
       this.count[i] = Math.min(255, count);
-      this.damage[i] = flat[k + 5];
-      this.ench[i] = flat[k + 6];
-      this.age[i] = flat[k + 7];
+      this.damage[i] = flat[k + 5] as number;
+      this.ench[i] = flat[k + 6] as number;
+      this.age[i] = flat[k + 7] as number;
       this.pickupAt[i] = 0;
+    }
+    if (end < 0) return;
+    for (let k = end + 1; k + 1 < flat.length; k += 2) {
+      const i = index[flat[k] as number] ?? -1;
+      const name = flat[k + 1];
+      if (i >= 0 && typeof name === 'string') this.names[i] = name;
     }
   }
 }
 
 /** Números por item em `snapshot`. */
 export const ITEM_RECORD = 8;
+/** Marca da seção de nomes no fim do `snapshot` (M15). */
+export const NAMES = 'names';
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100;

@@ -28,6 +28,7 @@ import type { Player } from '../entity/player';
 import type { Session, VehicleRecord } from './session';
 import { encodeRegion } from './worldmap';
 import type { Marker } from './markers';
+import type { ItemStack } from '../data/items';
 
 /** Id do jogador local. O multiplayer do M7 vai usar outros (doc 12). */
 export const LOCAL_PLAYER = 'local';
@@ -48,6 +49,8 @@ export interface ContainerRecord {
   slots: number[];
   /** Encantamentos, um inteiro por slot (M6). Ver `PlayerSave.enchants`. */
   enchants?: number[];
+  /** Nomes da bigorna por slot (M15). Ver `PlayerSave.names`. */
+  names?: (string | null)[];
   /** true = baú de estrutura, salvo mesmo vazio para não reabastecer (M6). */
   persistent?: boolean;
   /** Fornalha: [burnTicks, burnTotal, cookTicks]. */
@@ -139,7 +142,7 @@ export class SaveGame {
 
   private async finishSwitch(
     dimension: number, tiles: readonly TileRecord[], vehicles: readonly VehicleRecord[],
-    items: readonly number[],
+    items: readonly (number | string)[],
   ): Promise<void> {
     try {
       await this.manager.saveTiles(tiles);
@@ -229,6 +232,7 @@ export class SaveGame {
   snapshot(): PlayerSave {
     const inventory: number[] = new Array(INVENTORY_SIZE * 3).fill(0);
     const enchants: number[] = new Array(INVENTORY_SIZE).fill(0);
+    let names: (string | null)[] | undefined;
     for (let i = 0; i < INVENTORY_SIZE; i++) {
       const stack = this.session.inventory.get(i);
       if (stack === null) continue;
@@ -236,6 +240,10 @@ export class SaveGame {
       inventory[i * 3 + 1] = stack.count;
       inventory[i * 3 + 2] = stack.damage;
       enchants[i] = stack.ench ?? 0;
+      if (stack.name !== undefined) {
+        names ??= new Array<string | null>(INVENTORY_SIZE).fill(null);
+        names[i] = stack.name;
+      }
     }
 
     return {
@@ -253,6 +261,7 @@ export class SaveGame {
       dimension: this.session.world.dimension,
       inventory,
       enchants,
+      names,
       xp: this.session.xp.total,
       achievements: this.session.achievements.mask,
       effects: this.session.survival.effects.snapshot(),
@@ -296,11 +305,11 @@ export class SaveGame {
       this.session.inventory.set(
         i,
         item > 0 && count > 0
-          ? {
+          ? withName({
             item, count,
             damage: saved.inventory[i * 3 + 2] ?? 0,
             ench: saved.enchants?.[i] ?? 0,
-          }
+          }, saved.names?.[i])
           : null,
       );
     }
@@ -388,6 +397,7 @@ export class SaveGame {
 export function tileFrom(container: Container): ContainerRecord {
   const slots: number[] = new Array(container.size * 3).fill(0);
   const enchants: number[] = new Array(container.size).fill(0);
+  let names: (string | null)[] | undefined;
   for (let i = 0; i < container.size; i++) {
     const stack = container.get(i);
     if (stack === null) continue;
@@ -395,11 +405,16 @@ export function tileFrom(container: Container): ContainerRecord {
     slots[i * 3 + 1] = stack.count;
     slots[i * 3 + 2] = stack.damage;
     enchants[i] = stack.ench ?? 0;
+    if (stack.name !== undefined) {
+      names ??= new Array<string | null>(container.size).fill(null);
+      names[i] = stack.name;
+    }
   }
 
   const record: TileRecord = {
     kind: container.kind, x: container.x, y: container.y, z: container.z, slots, enchants,
   };
+  if (names !== undefined) record.names = names;
   if (container.persistent) record.persistent = true;
   if (container instanceof Furnace) {
     record.burn = [container.burnTicks, container.burnTotal, container.cookTicks];
@@ -418,9 +433,9 @@ export function containerFrom(record: ContainerRecord): Container {
     const item = record.slots[i * 3];
     const count = record.slots[i * 3 + 1];
     if (item > 0 && count > 0) {
-      container.slots[i] = {
+      container.slots[i] = withName({
         item, count, damage: record.slots[i * 3 + 2], ench: record.enchants?.[i] ?? 0,
-      };
+      }, record.names?.[i]);
     }
   }
 
@@ -432,4 +447,10 @@ export function containerFrom(record: ContainerRecord): Container {
     container.cookTicks = record.burn[2];
   }
   return container;
+}
+
+/** A pilha com o nome do save, se houver um (M15). */
+function withName(stack: ItemStack, name: string | null | undefined): ItemStack {
+  if (typeof name === 'string' && name !== '') stack.name = name;
+  return stack;
 }

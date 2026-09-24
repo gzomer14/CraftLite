@@ -56,6 +56,12 @@ export const SHAPE_CAKE = 24;
 export const CAKE_SLICES = 7;
 /** Sino pendurado (M9): coroa presa no teto, corpo e boca. */
 export const SHAPE_BELL = 25;
+/** Bigorna (M15): pé, cintura e mesa, a mesa no eixo dos bits 0..1. */
+export const SHAPE_ANVIL = 26;
+/** Funil (M15): tigela, corpo e o bico para a saída dos bits 0..2. */
+export const SHAPE_HOPPER = 27;
+/** Comparador (M15): o tampo do repetidor com três tochinhas. */
+export const SHAPE_COMPARATOR = 28;
 
 /**
  * Formas de trilho nos bits 0..3 do estado (M7), na codificação do gênero.
@@ -135,6 +141,9 @@ export const SHAPE_BY_NAME: Readonly<Record<string, number>> = {
   chest: SHAPE_CHEST,
   cake: SHAPE_CAKE,
   bell: SHAPE_BELL,
+  anvil: SHAPE_ANVIL,
+  hopper: SHAPE_HOPPER,
+  comparator: SHAPE_COMPARATOR,
   slab: SHAPE_SLAB,
   carpet: SHAPE_CARPET,
   flat: SHAPE_FLAT,
@@ -278,6 +287,12 @@ export function boxesFor(
       one(out, 0, 6 / 16, 13 / 16, 6 / 16, 10 / 16, 1, 10 / 16);
       one(out, 1, 5 / 16, 5 / 16, 5 / 16, 11 / 16, 13 / 16, 11 / 16);
       return one(out, 2, 4 / 16, 3 / 16, 4 / 16, 12 / 16, 5 / 16, 12 / 16);
+    case SHAPE_ANVIL:
+      return anvil(state & 3, out);
+    case SHAPE_HOPPER:
+      return hopper(state & 7, out);
+    case SHAPE_COMPARATOR:
+      return comparator(state & 3, out);
     case SHAPE_RAIL:
       // O desenho é um quad só (ver `mesh/complex.ts`); a caixa existe para
       // quem pergunta pela forma — hoje ninguém, porque trilho não colide.
@@ -755,6 +770,56 @@ function repeater(state: number, out: Float32Array): number {
   count = torchNub(out, count, facing, 3 / 16);
   count = torchNub(out, count, facing, (7 + delay * 2) / 16);
   return count;
+}
+
+/**
+ * Bigorna (M15): pé largo, cintura estreita e a mesa comprida. O comprimento
+ * corre no eixo **perpendicular** ao olhar de quem a colocou, como no gênero:
+ * o martelo bate de lado.
+ */
+function anvil(facing: number, out: Float32Array): number {
+  const alongX = facing >= 2; // olhando em Z, a mesa corre em X
+  let count = one(out, 0, 2 / 16, 0, 2 / 16, 14 / 16, 4 / 16, 14 / 16);
+  count = alongX
+    ? one(out, count, 4 / 16, 4 / 16, 6 / 16, 12 / 16, 10 / 16, 10 / 16)
+    : one(out, count, 6 / 16, 4 / 16, 4 / 16, 10 / 16, 10 / 16, 12 / 16);
+  return alongX
+    ? one(out, count, 0, 10 / 16, 3 / 16, 1, 1, 13 / 16)
+    : one(out, count, 3 / 16, 10 / 16, 0, 13 / 16, 1, 1);
+}
+
+/**
+ * Funil (M15): a tigela de cima, o corpo no meio e o bico. O bico aponta para
+ * a saída — para baixo (5) ou para um dos lados (0..3, `PISTON_STEP`).
+ */
+function hopper(output: number, out: Float32Array): number {
+  let count = one(out, 0, 0, 10 / 16, 0, 1, 1, 1);
+  count = one(out, count, 4 / 16, 4 / 16, 4 / 16, 12 / 16, 10 / 16, 12 / 16);
+  switch (output) {
+    case 0: return one(out, count, 12 / 16, 4 / 16, 6 / 16, 1, 8 / 16, 10 / 16);
+    case 1: return one(out, count, 0, 4 / 16, 6 / 16, 4 / 16, 8 / 16, 10 / 16);
+    case 2: return one(out, count, 6 / 16, 4 / 16, 12 / 16, 10 / 16, 8 / 16, 1);
+    case 3: return one(out, count, 6 / 16, 4 / 16, 0, 10 / 16, 8 / 16, 4 / 16);
+    default: return one(out, count, 6 / 16, 0, 6 / 16, 10 / 16, 4 / 16, 10 / 16);
+  }
+}
+
+/** Comparador (M15): tampo, duas tochinhas atrás e a da frente. */
+function comparator(facing: number, out: Float32Array): number {
+  let count = one(out, 0, 0, 0, 0, 1, 2 / 16, 1);
+  count = torchNub(out, count, facing, 2 / 16);
+  // As duas de trás ficam lado a lado, a 3/16 da face de trás.
+  const back = 11 / 16;
+  const y0 = 2 / 16;
+  const y1 = 5 / 16;
+  if (facing === 0 || facing === 1) {
+    const x = facing === 0 ? 1 - back - 2 / 16 : back;
+    count = one(out, count, x, y0, 3 / 16, x + 2 / 16, y1, 5 / 16);
+    return one(out, count, x, y0, 11 / 16, x + 2 / 16, y1, 13 / 16);
+  }
+  const z = facing === 2 ? 1 - back - 2 / 16 : back;
+  count = one(out, count, 3 / 16, y0, z, 5 / 16, y1, z + 2 / 16);
+  return one(out, count, 11 / 16, y0, z, 13 / 16, y1, z + 2 / 16);
 }
 
 /** Tochinha do repetidor a `back` blocos da face de saída. */

@@ -13,10 +13,10 @@
  *   fraca **liga mecanismo** (porta, lâmpada, pistão) mas **não** realimenta pó
  *   — é o que impede o fio de atravessar parede e voltar a 15 do outro lado.
  *
- * O que ficou de fora, e por quê: não há comparador, observador, tremonha nem
- * queima de tocha por excesso de pulsos. Não há energia quasi-conectada. O pó
- * não muda de desenho com a conexão (ver `data/textures.ts`). Tudo isso é
- * complexidade que o alvo do projeto — um Android de 2016 — não paga.
+ * O que ficou de fora, e por quê: não há queima de tocha por excesso de
+ * pulsos nem energia quasi-conectada, e o pó não muda de desenho com a conexão
+ * (ver `data/textures.ts`). Comparador, observador e funil entraram no M15,
+ * com as contas em `redstoneparts.ts` — o circuito passou a mexer em item.
  *
  * **Propagação.** Não há varredura do mundo: toda mudança de bloco entra numa
  * fila de posições a reavaliar, como em `fluids.ts` e `growth.ts`. A fila é
@@ -34,6 +34,10 @@ import { MOUNT_CEILING, MOUNT_FLOOR, PISTON_STEP } from './mesh/shapes';
 import { WORLD_HEIGHT } from './chunk';
 import type { World } from './world';
 import { partnerIdOf, partnerOffset } from './multiblock';
+import {
+  COMPARATOR_DELAY, OBSERVER_PULSE, comparatorOutput, comparatorPower, observerWatches,
+  type ComparatorInputs,
+} from './redstoneparts';
 
 /** Teto de posições reavaliadas por tick. Mesma disciplina do doc 03 §9. */
 export const MAX_UPDATES_PER_TICK = 1024;
@@ -114,7 +118,7 @@ interface Roles {
 export const KIND_NONE = 0;
 const KIND_ORDER: readonly RedstoneKind[] = [
   'wire', 'source', 'lever', 'button', 'plate', 'torch', 'repeater', 'piston', 'lamp', 'door',
-  'rail', 'detector',
+  'rail', 'detector', 'comparator', 'observer', 'hopper', 'dispenser',
 ];
 const KIND_ID: Readonly<Record<RedstoneKind, number>> = Object.fromEntries(
   KIND_ORDER.map((name, i) => [name, i + 1]),
@@ -132,6 +136,15 @@ export const KIND_LAMP = KIND_ID.lamp;
 export const KIND_DOOR = KIND_ID.door;
 export const KIND_RAIL = KIND_ID.rail;
 export const KIND_DETECTOR = KIND_ID.detector;
+export const KIND_COMPARATOR = KIND_ID.comparator;
+export const KIND_OBSERVER = KIND_ID.observer;
+export const KIND_HOPPER = KIND_ID.hopper;
+export const KIND_DISPENSER = KIND_ID.dispenser;
+/**
+ * Bit 3 de funil (travado), dispensador e liberador (disparado) e observador
+ * (pulsando) — os bits 0..2 são a direção dos três (M15).
+ */
+const ACTIVE_BIT = 8;
 
 /**
  * Bit de energizado do trilho (`RAIL_POWERED` de `world/mesh/shapes.ts`).
@@ -149,7 +162,7 @@ const RAIL_POWERED_BIT = 16;
  */
 const IMMOVABLE: ReadonlySet<string> = new Set([
   'bedrock', 'obsidian', 'chest', 'furnace', 'furnace_lit', 'enchanting_table', 'mob_spawner',
-  'piston_head',
+  'piston_head', 'hopper', 'dispenser', 'dropper', 'anvil',
 ]);
 
 function buildRoles(): Roles {
@@ -205,9 +218,16 @@ function reachesFar(state: number): boolean {
   return ROLES.kind[id] !== KIND_NONE || ROLES.conductive[id] === 1;
 }
 
-export class Redstone {
+export class Redstone implements ComparatorInputs {
   private readonly world: World;
   private readonly events: RedstoneEvents;
+  /**
+   * Sinal do contêiner numa posição, 0..15, ou −1 (M15). Quem responde é
+   * `game/itemflow.ts`; sem ele o comparador só lê energia.
+   */
+  signalOf: ((x: number, y: number, z: number) => number) | null = null;
+  /** Dispensador ou liberador recebeu energia agora (M15): quem ouve dispara. */
+  onTrigger: ((x: number, y: number, z: number) => void) | null = null;
 
   /** Fila de posições a reavaliar neste tick. */
   private queue: number[] = [];
@@ -245,7 +265,50 @@ export class Redstone {
         change.x, change.y, change.z,
         reachesFar(change.state) || reachesFar(change.previous),
       );
+      this.notifyObservers(change.x, change.y, change.z);
     });
+  }
+
+  /**
+   * Observador (M15): quem vigia a posição que mudou solta um pulso. Seis
+   * leituras por mudança de bloco — o observador é achado por quem muda, e não
+   * varre nada.
+   */
+  private notifyObservers(x: number, y: number, z: number): void {
+    for (let d = 0; d < 6; d++) {
+      const step = DIRS[d];
+      const ox = x + step[0];
+      const oy = y + step[1];
+      const oz = z + step[2];
+      const state = this.world.getBlock(ox, oy, oz);
+      const id = blockIdOf(state);
+      if (ROLES.kind[id] !== KIND_OBSERVER) continue;
+      const bits = stateBitsOf(state);
+      if ((bits & ACTIVE_BIT) !== 0) continue;
+      if (!observerWatches(ox, oy, oz, bits & 7, x, y, z)) continue;
+      this.replace(ox, oy, oz, makeState(id, bits | ACTIVE_BIT));
+      this.scheduleAt(ox, oy, oz, OBSERVER_PULSE);
+    }
+  }
+
+  // --- entradas do comparador (M15) ----------------------------------------
+
+  containerSignal(x: number, y: number, z: number): number {
+    return this.signalOf === null ? -1 : this.signalOf(x, y, z);
+  }
+
+  /** Energia que chega a `(x,y,z)` do vizinho na direção `fromDir`. */
+  powerFrom(x: number, y: number, z: number, fromDir: number): number {
+    const step = DIRS[fromDir];
+    const nx = x + step[0];
+    const ny = y + step[1];
+    const nz = z + step[2];
+    const state = this.world.getBlock(nx, ny, nz);
+    const id = blockIdOf(state);
+    const direct = this.emitted(state, id, opposite(fromDir));
+    if (direct > 0 || ROLES.conductive[id] !== 1) return direct;
+    if (this.strongInto(nx, ny, nz) > 0) return MAX_POWER;
+    return this.weakInto(nx, ny, nz);
   }
 
   /**
@@ -349,6 +412,10 @@ export class Redstone {
     if (kind === KIND_TORCH) this.applyTorch(x, y, z, id);
     else if (kind === KIND_REPEATER) this.applyRepeater(x, y, z, state, true);
     else if (kind === KIND_BUTTON) this.release(x, y, z, state);
+    else if (kind === KIND_COMPARATOR) this.applyComparator(x, y, z, state, id, true);
+    else if (kind === KIND_OBSERVER) {
+      this.replace(x, y, z, makeState(id, stateBitsOf(state) & ~ACTIVE_BIT));
+    }
   }
 
   // --- avaliação de uma posição -------------------------------------------
@@ -370,6 +437,10 @@ export class Redstone {
       case KIND_PISTON: this.applyPiston(x, y, z, state); break;
       case KIND_RAIL: this.applyRail(x, y, z, state, id); break;
       case KIND_BUTTON: this.rearm(x, y, z, state, id); break;
+      case KIND_COMPARATOR: this.applyComparator(x, y, z, state, id, false); break;
+      case KIND_HOPPER: this.applyHopper(x, y, z, state, id); break;
+      case KIND_DISPENSER: this.applyDispenser(x, y, z, state, id); break;
+      case KIND_OBSERVER: this.rearmObserver(x, y, z, state); break;
       default: break; // alavanca, placa e bloco de redstone só emitem
     }
   }
@@ -537,6 +608,12 @@ export class Redstone {
       case KIND_REPEATER:
         if ((stateBitsOf(state) & 16) === 0) return 0;
         return toDir === (stateBitsOf(state) & 3) ? MAX_POWER : 0;
+      case KIND_COMPARATOR:
+        return toDir === (stateBitsOf(state) & 3) ? comparatorPower(state) : 0;
+      case KIND_OBSERVER:
+        // O pulso sai por trás, o lado oposto à cara.
+        if ((stateBitsOf(state) & ACTIVE_BIT) === 0) return 0;
+        return toDir === opposite(stateBitsOf(state) & 7) ? MAX_POWER : 0;
       default:
         return 0;
     }
@@ -574,6 +651,9 @@ export class Redstone {
         if ((stateBitsOf(state) & 16) !== 0 && toDir === (stateBitsOf(state) & 3)) {
           best = MAX_POWER;
         }
+      } else if (kind === KIND_COMPARATOR || kind === KIND_OBSERVER) {
+        // Como o repetidor: energizam forte o bloco para onde a saída aponta.
+        best = Math.max(best, this.emitted(state, id, toDir));
       }
       if (best >= MAX_POWER) return MAX_POWER;
     }
@@ -737,6 +817,52 @@ export class Redstone {
     this.events.onSound?.('block/door', x, y, z);
   }
 
+  // --- oficina (M15) -------------------------------------------------------
+
+  /**
+   * Comparador: a conta é de `redstoneparts.ts`; aqui, o atraso — como o
+   * repetidor, a reavaliação agenda e a tarefa vencida aplica.
+   */
+  private applyComparator(
+    x: number, y: number, z: number, state: number, id: number, immediate: boolean,
+  ): void {
+    const bits = stateBitsOf(state);
+    const power = comparatorOutput(this, x, y, z, bits & 3, ROLES.lit[id] === 1);
+    if (power === comparatorPower(state)) return;
+    if (!immediate) {
+      this.scheduleAt(x, y, z, COMPARATOR_DELAY);
+      return;
+    }
+    this.replace(x, y, z, makeState(id, (bits & 3) | (power << 2)));
+  }
+
+  /** Funil: travado (bit 3) enquanto energizado. Quem move item lê o bit. */
+  private applyHopper(x: number, y: number, z: number, state: number, id: number): void {
+    const bits = stateBitsOf(state);
+    const powered = this.poweredAt(x, y, z);
+    if (powered === ((bits & ACTIVE_BIT) !== 0)) return;
+    this.replace(x, y, z, makeState(id, powered ? bits | ACTIVE_BIT : bits & ~ACTIVE_BIT));
+  }
+
+  /**
+   * Dispensador e liberador: disparam **na subida** da energia. O bit 3
+   * lembra que já dispararam, para energia constante não virar metralhadora.
+   */
+  private applyDispenser(x: number, y: number, z: number, state: number, id: number): void {
+    const bits = stateBitsOf(state);
+    const powered = this.poweredAt(x, y, z);
+    const armed = (bits & ACTIVE_BIT) !== 0;
+    if (powered === armed) return;
+    this.replace(x, y, z, makeState(id, powered ? bits | ACTIVE_BIT : bits & ~ACTIVE_BIT));
+    if (powered) this.onTrigger?.(x, y, z);
+  }
+
+  /** Observador pulsando que ficou sem tarefa (save no meio do pulso) volta a ter. */
+  private rearmObserver(x: number, y: number, z: number, state: number): void {
+    if ((stateBitsOf(state) & ACTIVE_BIT) === 0) return;
+    this.scheduleAt(x, y, z, OBSERVER_PULSE);
+  }
+
   // --- pistão --------------------------------------------------------------
 
   /**
@@ -847,6 +973,15 @@ export class Redstone {
         this.events.onSound?.('block/click', x, y, z);
         this.scheduleAt(x, y, z, ROLES.pressTicks[id]);
         return true;
+      case KIND_COMPARATOR: {
+        // Clique troca o modo: comparar ↔ subtrair, que são dois ids (M15).
+        const other = ROLES.pair[id];
+        if (other === 0) return false;
+        this.replace(x, y, z, makeState(other, bits));
+        this.events.onSound?.('block/click', x, y, z);
+        this.schedule(x, y, z);
+        return true;
+      }
       case KIND_REPEATER: {
         // Quatro atrasos em ciclo, como na referência.
         const delay = ((bits >> 2) + 1) & 3;

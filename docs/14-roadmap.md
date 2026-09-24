@@ -401,24 +401,24 @@ jogo. Geração de chunk continua abaixo de 25 ms (hoje 6,4). **Os quatro medido
 
 ---
 
-## M15 — Oficina
+## M15 — Oficina ✅
 
 > Meio de jogo. Hoje a ferramenta encantada quebra e acabou, e o circuito não tem como mexer em
-> item.
+> item. **Fechado em 2026-09-24** — detalhe no doc 15 §3.
 
-- [ ] **Bigorna**: reparar ferramenta com o material, juntar duas ferramentas e dois livros
-      encantados, dar nome. Custo em nível, como a mesa de encantamento.
-- [ ] **Reparo na grade**: duas ferramentas iguais e gastas viram uma com a soma, sem
-      encantamento. É uma receita especial do matcher, não uma tela.
-- [ ] **Funil, dispensador e liberador**: o circuito passa a mexer em item. É o que torna possível
-      fazenda automática e fornalha alimentada.
-- [ ] **Comparador e observador**: ler quanto tem num baú, e perceber que um bloco mudou.
-- [ ] **Livro encantado** como item guardável, saído da mesa de encantamento, que a bigorna
+- [x] **Bigorna**: reparar ferramenta com o material, juntar duas ferramentas e dois livros
+      encantados, dar nome. Custo em nível, como a mesa de encantamento (`game/anvil.ts`).
+- [x] **Reparo na grade**: duas ferramentas iguais e gastas viram uma com a soma, sem
+      encantamento. Receita especial do casador (`matchRepair`).
+- [x] **Funil, dispensador e liberador**: o circuito passa a mexer em item (`game/itemflow.ts`).
+- [x] **Comparador e observador** (`world/redstoneparts.ts`).
+- [x] **Livro encantado** como item guardável, saído da mesa de encantamento, que a bigorna
       consome.
 
 **Critério de aceite:** uma picareta de diamante encantada volta de 10% para 100% de durabilidade
 sem perder o encantamento; uma fornalha alimentada por funil a partir de um baú funde 64 minérios
 sem o jogador tocar. Tick de circuito com 32 funis abaixo de 5 ms (o orçamento atual do fio de 64).
+**Os três medidos** — 10% → 100% com 4 diamantes; 64 de 64; 0,35 ms no pior tick.
 
 ---
 

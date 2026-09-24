@@ -9,9 +9,11 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-24 11:03 — **M14 validado em campo**: *"Tudo testado e funcionando
-perfeitamente."* Próximo: escolher entre M15, M16 e M17 (§6). Antes, 2026-09-24 10:45: M14
-fechado — água e paisagem, com sol e lua corrigidos, tint de bioma e clima espalhado (§3, §4).
+**Última atualização:** 2026-09-24 11:45 — **M15 fechado: oficina.** Bigorna (consertar,
+juntar, livro encantado, nome), reparo na grade, livro encantado saído da mesa, funil,
+dispensador, liberador, comparador e observador — o circuito passou a mexer em item. Os dois
+critérios do doc 14 medidos. A memória de áudio saiu do teto (3,497 → 3,140 MB) sem tirar som, e
+três perdas de encantamento antigas foram corrigidas (§4). Antes, 11:03: M14 validado em campo.
 ---
 
 ## 1. Panorama
@@ -44,7 +46,7 @@ fechado — água e paisagem, com sol e lua corrigidos, tint de bioma e clima es
 | **M12** O mundo chega antes do jogador | culling por conectividade e por direção de face, cópia de vizinhança fora da thread principal, luz na borda do chunk | ✅ **validado em campo em 2026-09-23** | preset do T0 não revisto (sem T0 na mão) — §3 |
 | **M13** Casa em ordem | uso de item como dado, `session.ts` e `main.ts` abaixo de 700 linhas, lã e cama em 16 cores por tint | ✅ **validado em campo em 2026-09-23** | — |
 | **M14** Água e paisagem | visão submersa, rios, pesca, afogado, lua com fases, biomas por tint, selva | ✅ **validado em campo em 2026-09-24** | muda o terreno gerado: **mundo antigo ganha costura** (§3) |
-| **M15** Oficina | bigorna, reparo na grade, funil, dispensador, comparador, observador | ⬜ proposto (2026-09-22) | — |
+| **M15** Oficina | bigorna, reparo na grade, funil, dispensador, comparador, observador | ✅ concluído em 2026-09-24 | **não visto em aparelho** (§6) |
 | **M16** Um fim para a jornada | fortaleza do Nether, blaze, poções, olho do ender, End, dragão, créditos | ⬜ proposto (2026-09-22) | depende de M11 (efeitos) e M13 (atlas); a bruxa veio para cá (§5) |
 | **M17** Alcance | menu Idioma (doc 08 §3.11) com `en`, primeira hora guiada, seed compartilhável | ⬜ proposto (2026-09-22) | — |
 
@@ -59,21 +61,23 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-24 10:30, ao fechar o M14, com `npm test`, `npm run build`,
+Medidas em 2026-09-24 11:40, ao fechar o M15, com `npm test`, `npm run build`,
 `SIZE_BUDGET_KB=350 npm run size` e `npm run smoke`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **257,9 KB** (249,5 antes do M14; 240,0 antes do M10; 229,0 no M12) | < 350 KB | `npm run size` |
-| Testes | **2116**, 108 arquivos (2064 antes do M14; 2036 antes do M10) | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **265,7 KB** (257,9 antes do M15; 249,5 antes do M14; 240,0 antes do M10) | < 350 KB | `npm run size` |
+| Testes | **2156**, 109 arquivos (2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
 | Smoke test de navegador | **7 passos verdes**: carregar, criar, andar 10 s, quebrar, salvar, recarregar, conferir | verde | `npm run smoke` |
-| Camadas de atlas | **201** com a selva (+5: tronco lado/topo, tábua, folha, muda); 194 antes do M14 | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
-| Memória de áudio | **3,497 MB** — no teto (§5). O 3,33 que estava aqui era velho: o respingo da pesca, único som novo do M14, custa 0,018 | < 3,5 MB | `tests/audio.test.ts` |
+| Camadas de atlas | **212** com a oficina (+11: bigorna, funil, dispensador, liberador, comparador, observador); 201 com a selva; 194 antes do M14 | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
+| Memória de áudio | **3,140 MB** (3,497 no M14, colado no teto): degrau de ¼ da taxa para som grave, sem tirar nenhum (§4) | < 3,5 MB | `tests/audio.test.ts` |
 | Mapa explorado (M10) | **0,23 ms por segundo de jogo**; 500 blocos = 16 regiões, ~146 KB; voando a 20 blocos/s, zero buraco | < 1 ms/s; ≤ 64 regiões | `tests/journal.test.ts` |
 | Geração de chunk | **6,4 ms** (mediana; 6,2 antes do rio) | < 25 ms | `tests/perf.test.ts` |
 | Clima do tint de bioma, thread principal | **8–9 µs por chunk** (até 32 por quadro) | < 60 µs | `tests/perf.test.ts` |
 | Rio (seed 2, 768×768 blocos) | atravessa deserto e planície; maior degrau **≤ 8** | sem parede | `tests/rivers.test.ts` |
 | Pesca | **≥ 10 peixes em 5 min** de jogo, reagindo em 0,3 s | 10 em 5 min (aceite do M14) | `tests/fishing.test.ts` |
+| 32 funis movendo item | **0,35 ms** no pior tick (funil + circuito) | < 5 ms (aceite do M15) | `tests/workshop.test.ts` |
+| Bigorna e fornalha automática | picareta de diamante encantada **10% → 100%** com 4 diamantes, sem perder o encantamento; baú → funil → fornalha funde **64 de 64** | aceite do M15 | `tests/workshop.test.ts` |
 | Geração de chunk do Nether | 5,1 ms (mediana; 3,8 antes de a luz entrar) | < 25 ms | `tests/perf.test.ts` |
 | Meshing de section | 0,64 ms (mediana) | < 8 ms | `tests/perf.test.ts` |
 | Meshing de um piso de 256 tochas | **1,10 ms** (o pior caso construível da forma nova) | < 2 ms | `tests/perf.test.ts` |
@@ -1693,6 +1697,60 @@ afogado não tem tridente.
 mundo antigo, o que já foi salvo fica como está e o terreno novo encosta nele com costura — como
 no ajuste de terreno do M8.
 
+### M15 — Oficina ✅ — 2026-09-24
+
+Pedido: *"Pode seguir com o M15 então, incluindo essa pequena tarefa citada"* — a memória de
+áudio no teto. O que cada item virou:
+
+- **Memória de áudio** (`audio/synth.ts`, `audio/engine.ts`). A taxa por receita ganhou um degrau
+  de **¼** (5,5 kHz) para o que não passa de ~2 kHz — trovão, portal, fornalha, passo na areia,
+  mugido e gemido graves —, pela mesma regra de Nyquist com folga de 1,4. **3,497 → 3,140 MB**,
+  nenhum som tirado. A especificação só garante 8 kHz: se o navegador recusar 5,5, a receita é
+  renderizada de novo em 8 kHz (`renderAtRate`), e nenhum som fica mudo.
+- **Bigorna** (`game/anvil.ts`, `data/anvil.ts`, tela em `ui/containers/anvilpanel.ts`). Três
+  slots — peça, material ou segunda peça ou livro, resultado — e o campo do nome. Conserta com o
+  material (¼ da durabilidade por unidade; a madeira aceita qualquer tábua), junta duas peças
+  (soma e 12%, encantamentos somados: nível igual sobe um), aplica livro encantado, junta dois
+  livros e dá nome (1 nível). O que briga (Toque Suave × Fortuna) ou não cabe (Afiação na picareta)
+  fica de fora. Custa níveis; o Criativo não paga.
+- **Reparo na grade** (`matchRepair` em `game/crafting.ts`): duas peças iguais em qualquer lugar da
+  grade viram uma com a soma e 5%, **sem encantamento**. Receita especial do casador, não tela.
+- **Livro encantado**: o livro comum aceita qualquer encantamento na mesa e sai como
+  `enchanted_book` (item novo no fim da fila de ids); pilha de livros encanta um e devolve o resto.
+- **Funil** (`game/itemflow.ts`). A cada 8 ticks empurra um item para o contêiner do bico e puxa
+  um do de cima — ou do item caído em cima dele. Fornalha pela regra do gênero: por cima, entrada
+  (só o que funde); de lado, combustível (só o que queima); puxando de baixo, só a saída.
+  Energizado, trava. Vai para o save **mesmo vazio**, para voltar a sugar ao recarregar.
+- **Dispensador e liberador**: disparam na **subida** da energia (energia parada não metralha).
+  O liberador solta o item, ou o empurra para o contêiner da frente; o dispensador atira flecha,
+  ovo e bola de neve, despeja e recolhe balde, acende isqueiro, e solta o resto. Sorteiam o slot.
+- **Comparador** (`world/redstoneparts.ts`): lê a ocupação do contêiner de trás (0 vazio, 1 com
+  qualquer item, 15 cheio) ou a energia de trás, compara com as laterais; o clique troca para
+  subtração, que é outro id (não sobrou bit: os 6 bits são direção e força da saída).
+- **Observador**: quando o bloco da frente muda, pulso de 2 ticks para trás. É achado por quem muda
+  — seis leituras por mudança de bloco —, sem varredura.
+- **Face da frente** (`tex.front` em `data/blocks.ts`, `cubeFaceTex` em `world/mesh/blockinfo.ts`):
+  o mesher escolhe a textura da face pelos bits de direção do estado. Dispensador, liberador e
+  observador olham para um lado só, no mundo e no ícone do inventário. Bigorna, funil e comparador
+  são listas de caixas (`world/mesh/shapes.ts`).
+
+**Critérios de aceite, medidos** (`tests/workshop.test.ts`): picareta de diamante com Eficiência
+III e Inquebrável II a 10% volta a 100% com 4 diamantes, **com os dois encantamentos**; baú de
+cima → funil → fornalha, com carvão por um funil de lado e a saída puxada por um funil embaixo,
+funde **64 de 64** minérios sem tocar em nada; **32 funis** movendo item custam **0,35 ms** no pior
+tick (teto 5).
+
+**Visto no Chrome headless:** os seis blocos numa fileira (a mesa da bigorna atravessada, o bico
+do funil dentro do baú, a boca do dispensador, a fenda do liberador e a cara do observador para
+quem os colocou) e a tela da bigorna com o nome digitado, o custo e a picareta consertada.
+
+**Desvios conscientes, no comentário do módulo:** sem custo de trabalho anterior, a bigorna não se
+desgasta nem cai (`game/anvil.ts`) — por isso o "Caro demais" (40 níveis) não é alcançável com
+os 8 encantamentos de hoje, que somam no máximo ~25; nome só em item que não empilha; o
+comparador lê o contêiner encostado (não através de bloco) e as laterais aceitam qualquer emissor
+(`world/redstoneparts.ts`); comparador e observador energizando um bloco sólido realimentam pó com
+15, a regra do circuito do M7.
+
 ## 4. Correções fora de marco
 
 Bugs anteriores encontrados durante o M5 e já corrigidos — ficam registrados porque explicam
@@ -1700,6 +1758,8 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-24 | `game/inventory.ts`, `ui/containers/containerclick.ts`, `game/workbench.ts` | **Três cópias de pilha perdiam o encantamento** (M6). Tirar metade com clique direito (numa espada, "metade" é ela inteira), soltar uma unidade com clique direito e **jogar fora com Q** montavam a pilha nova campo a campo, sem o `ench`: a espada encantada saía comum. Agora a cópia é da pilha inteira, e `giveStack` guarda com encantamento e nome. Regressões em `tests/workshop.test.ts` ("pilhas inteiras"). |
+| 2026-09-24 | `audio/synth.ts` | **A memória de áudio estava a 3 KB do teto** (M14: 3,497 de 3,5 MB). Degrau de ¼ da taxa para som grave: 3,140 MB sem tirar som, com nova tentativa em 8 kHz se o navegador recusar (§3, M15). |
 | 2026-09-24 | `render/sky.ts` | **Sol e lua trocados** (M1). O ciclo põe o meio-dia em 6000, mas o céu calculava `sunDir.y = −cos`: o disco do sol ficava **debaixo do chão ao meio-dia e a pino à meia-noite**, e a lua, sempre oposta, nunca subia à noite. Achado ao pôr as fases da lua (M14): as capturas da meia-noite mostravam o mesmo disco brilhante nas quatro fases. A conta saiu para `sunDirection`, com o sinal certo. Regressão em `tests/moon.test.ts`. |
 | 2026-09-24 | `world/gen/climate.ts` | **O clima não chegava às pontas da tabela de biomas** (M1). O doc 03 §4.3 escreve as faixas em −1..1, mas o FBM de três oitavas fica em ±0,7, com os quartis em ±0,22: floresta cobria **0,3%** do mundo e savana e pântano **0,0%**, medidos em três seeds numa grade de 12 000 blocos — a cabana de pântano do M11 praticamente não tinha onde nascer. O valor agora é espalhado para −1..1 no nó da rede (1% e 99% nas pontas): floresta ~1%, deserto 5–7%, savana 0,2–0,4%, pântano 0,2% do mundo (com o mar contando); a tabela do doc não mudou. **Muda o terreno gerado** (§3, M14). Regressão em `tests/biometint.test.ts`. |
 | 2026-09-24 | `render/biometint.ts`, `render/shaders/terrain.glsl.ts` | **O tint por bioma do doc 03 §4.3 nunca existiu** (M1). `data/biomes.ts` tinha as cores de grama, folha e água de cada bioma, e nada as lia: toda grama do mundo era de uma cor só (`TINT_COLORS`). Virou o tint por clima do M14 (§3). |
@@ -1864,17 +1924,20 @@ ligado.
 ~~**Pendência de 2026-09-23: item no chão não vai para o save.**~~ **Fechada no M10**: vai, por
 dimensão, e no `.clw` v3.
 
-**Pendência aberta em 2026-09-23: `main.ts` (720) e `session.ts` (808) acima das 700 linhas.** O M13
+**Pendência aberta em 2026-09-23: `main.ts` (720) e `session.ts` (816) acima das 700 linhas.** O M13
 tinha deixado os dois abaixo disso; o M9 passou a `Session` e o M10 o `main`, e o M14 somou 2 e
 15 linhas (a lua e a linha de pesca). Candidatos a sair: a ligação das telas do M10 no `main` e a
 ligação de aldeia, caderno e pesca na `Session`. Não depende de nada.
 
+**Pendência aberta em 2026-09-24 (M15): três módulos cresceram acima do teto.** `world/redstone.ts`
+tem **1116** linhas (981 antes; as contas novas foram para `redstoneparts.ts`, ficaram os ganchos),
+`ui/containers/screen.ts` **949** (916; a bigorna foi para `anvilpanel.ts`, ficaram a grade e os
+callbacks) e `session.ts` 816. O corte natural do circuito é por papel — pó e energia, componentes,
+pistão —, e o da tela, a grade de slots de um lado e os painéis do outro. Não depende de nada.
+
 **Pendências abertas em 2026-09-24 (M14):**
 
-- **Memória de áudio em 3,497 MB, com teto de 3,5.** O próximo som estoura `tests/audio.test.ts`.
-  O M15 e o M16 vão pedir som (bigorna, funil, poção, dragão): antes disso, ou se baixa a taxa de
-  algum som longo (`weather/rain` é o maior, 0,17 MB; as mortes de mob, 0,09 cada) ou se revê o
-  teto com o doc 10 §2.
+- ~~**Memória de áudio em 3,497 MB, com teto de 3,5.**~~ **Fechada no M15**: 3,140 MB (§3).
 - **A bruxa foi para o M16.** O doc 15 dizia "a bruxa é do M14", mas o checklist do M14 no doc 14
   não a lista, e ela sem poção não tem o que arremessar. A cabana continua vazia.
 - **Custo do tint de bioma em T0 não medido.** São duas leituras de textura por vértice no terreno
@@ -2032,10 +2095,24 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
 
 ## 6. Próximo passo recomendado
 
-0. **Escolher o próximo marco**: M15 oficina, M16 fim da jornada ou M17 alcance (doc 14). Antes
-   do M15 ou do M16, resolver a memória de áudio no teto (§5).
+0. **Olhar o M15 num aparelho**, e depois escolher entre M16 (fim da jornada) e M17 (alcance).
+   O M15 só foi visto em testes e no Chrome headless. Em ordem de quanto pode estar errado:
+   - **tela da bigorna no celular**: peça, material, o campo do nome (o teclado do celular abre e
+     não fecha a tela?), o custo em verde ou "faltam níveis" em vermelho, e tirar o resultado com
+     toque. Depois um livro encantado numa ferramenta;
+   - **funil e fornalha**: baú em cima de um funil em cima de uma fornalha, carvão por um funil de
+     lado, e um funil embaixo levando a saída para um baú — deixar a fornalha trabalhar sozinha;
+   - **colocar**: o bico do funil entra no bloco clicado; dispensador e liberador olham para quem
+     coloca; o observador vigia o bloco para onde se olhava. Se algum sair virado, é
+     `stateForPlacement` em `game/interaction.ts`;
+   - **dispensador**: flecha com alavanca, balde de água, e um liberador jogando item num baú;
+   - **comparador e observador**: comparador saindo de um baú para uma lâmpada (enche o baú, a
+     lâmpada acende); observador de frente para uma plantação que cresce;
+   - **reparo na grade**: duas picaretas gastas na bancada.
 
-   ~~**Olhar o M14 num aparelho, num mundo novo**~~ — **feito em 2026-09-24**: *"Tudo testado e
+   ~~**Escolher o próximo marco**~~ — **M15 escolhido em 2026-09-24**, com a memória de áudio junto.
+
+~~**Olhar o M14 num aparelho, num mundo novo**~~ — **feito em 2026-09-24**: *"Tudo testado e
    funcionando perfeitamente."* O roteiro que foi seguido, para referência:
    - **cor da grama por bioma**: andar da planície para a floresta, o deserto e a neve; a cor tem que
      mudar em degradê, sem costura quadrada de chunk. Se aparecer um chunk com a cor errada por um

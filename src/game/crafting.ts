@@ -82,6 +82,8 @@ export class RecipeBook {
 
   /** Resultado do que está na grade, ou `null`. Não consome nada. */
   match(grid: CraftGrid): ItemStack | null {
+    const repaired = matchRepair(grid);
+    if (repaired !== null) return repaired;
     for (let i = 0; i < this.compiled.length; i++) {
       const recipe = this.compiled[i];
       const ok = recipe.type === 'shaped'
@@ -142,6 +144,32 @@ export class RecipeBook {
 }
 
 /** Consome uma unidade de cada ingrediente usado. */
+/** Bônus do reparo na grade: 5% do máximo, como no gênero. */
+const REPAIR_BONUS = 0.05;
+
+/**
+ * Reparo na grade (M15): exatamente duas peças iguais com durabilidade, em
+ * qualquer lugar da grade, viram uma com a soma das duas e mais 5%. **Sem
+ * encantamento** — é o que separa a grade (barata, perde tudo) da bigorna.
+ * Uma receita especial do casador, não uma tela: `consumeGrid` gasta as duas.
+ */
+export function matchRepair(grid: CraftGrid): ItemStack | null {
+  let a: ItemStack | null = null;
+  let b: ItemStack | null = null;
+  for (let i = 0; i < grid.slots.length; i++) {
+    const stack = grid.slots[i];
+    if (stack === null) continue;
+    if (a === null) a = stack;
+    else if (b === null) b = stack;
+    else return null;
+  }
+  if (a === null || b === null || a.item !== b.item) return null;
+  const max = itemDef(a.item)?.durability ?? 0;
+  if (max <= 0) return null;
+  const remaining = (max - a.damage) + (max - b.damage) + Math.floor(max * REPAIR_BONUS);
+  return { item: a.item, count: 1, damage: Math.max(0, max - remaining) };
+}
+
 export function consumeGrid(grid: CraftGrid): void {
   for (let i = 0; i < grid.slots.length; i++) {
     const stack = grid.slots[i];

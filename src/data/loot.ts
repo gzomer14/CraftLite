@@ -91,6 +91,7 @@ export const BLOCK_LOOT: Record<string, LootEntry> = {
   // conhece, e o pó volta a ser pó.
   redstone_wire: { drops: [{ item: 'redstone', count: 1 }] },
   redstone_torch_off: { drops: [{ item: 'redstone_torch', count: 1 }] },
+  comparator_subtract: { drops: [{ item: 'comparator', count: 1 }] },
   redstone_lamp_on: { drops: [{ item: 'redstone_lamp', count: 1 }] },
   // O braço não é item: quem o quebra fica com o pistão, que volta a recolher.
   piston_head: { drops: [] },

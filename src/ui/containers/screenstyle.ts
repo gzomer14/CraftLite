@@ -122,6 +122,15 @@ export function injectStyle(): void {
 #container-screen .offer.affordable{background:#5b2a8a;color:#fff}
 #container-screen .offer:disabled{cursor:not-allowed;opacity:.6}
 #container-screen .offer:focus-visible{outline:2px solid #fff}
+/* Bigorna (M15): o campo do nome e o custo, entre os slots e o resultado. */
+#container-screen .anvil{display:flex;flex-direction:column;gap:calc(1 * var(--px,3px));
+  justify-content:center}
+#container-screen .anvil input{width:calc(40 * var(--px,3px));min-height:36px;padding:2px 6px;
+  background:#1d1d24;color:#fff;border:2px solid #000;
+  font:calc(4 * var(--px,3px))/1.25 ui-monospace,monospace}
+#container-screen .anvil input:disabled{opacity:.5}
+#container-screen .anvil-cost{color:#8fd76a;font:calc(4 * var(--px,3px))/1.25 ui-monospace,monospace}
+#container-screen .anvil-cost.blocked{color:#ff7b6b}
 /* Troca com aldeão (M9): o item que ele quer, a seta e o que ele dá. */
 #container-screen .offer.trade{display:flex;align-items:center;gap:calc(2 * var(--px,3px))}
 #container-screen .trade-icon{width:calc(14 * var(--px,3px));height:calc(14 * var(--px,3px));

@@ -279,12 +279,13 @@ export class SaveManager {
    * Mesma regra de chave dos veículos: o monte da morte no Nether não aparece
    * na superfície.
    */
-  async saveItems(items: readonly number[]): Promise<void> {
+  /** Itens no chão: números por item e, no fim, os nomes (M15, ver `ItemEntities`). */
+  async saveItems(items: readonly (number | string)[]): Promise<void> {
     await this.db.put(STORE_SETTINGS, items, `${this.chunkStoreId}.items`);
   }
 
-  async loadItems(): Promise<number[]> {
-    const stored = await this.db.get<number[]>(STORE_SETTINGS, `${this.chunkStoreId}.items`);
+  async loadItems(): Promise<(number | string)[]> {
+    const stored = await this.db.get<(number | string)[]>(STORE_SETTINGS, `${this.chunkStoreId}.items`);
     return stored ?? [];
   }
 

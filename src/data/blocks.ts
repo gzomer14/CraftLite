@@ -17,7 +17,7 @@ export type BlockShape =
   | 'cube' | 'cross' | 'slab' | 'stairs' | 'fence' | 'fence_gate' | 'door' | 'trapdoor'
   | 'torch' | 'carpet' | 'flat' | 'liquid' | 'pane' | 'ladder' | 'sign' | 'painting'
   | 'lever' | 'button' | 'plate' | 'repeater' | 'piston' | 'piston_head' | 'rail' | 'bed'
-  | 'chest' | 'cake' | 'bell' | 'none';
+  | 'chest' | 'cake' | 'bell' | 'anvil' | 'hopper' | 'comparator' | 'none';
 
 /**
  * De que o bloco precisa para continuar existindo (M7).
@@ -63,7 +63,12 @@ export interface BlockDef {
   name: string;
   display: string;
   /** Textura por face; string única = todas iguais. */
-  tex: string | { top?: string; bottom?: string; side?: string };
+  /**
+   * `front` (M15): a face que olha para a direção dos bits 0..2 do estado, na
+   * ordem de `PISTON_STEP` — a boca do dispensador, a cara do observador. As
+   * outras faces laterais usam `side`.
+   */
+  tex: string | { top?: string; bottom?: string; side?: string; front?: string };
   shape: BlockShape;
   solid: boolean;
   /** Bloqueia luz totalmente e esconde a face do vizinho. */
@@ -760,6 +765,39 @@ SPECS.push(
   { id: 147, name: 'jungle_sapling', display: 'Muda da Selva', tex: 'block/jungle_sapling',
     ...plant(), fuel: 100 },
 );
+
+/*
+ * Oficina (M15). Bigorna e funil têm forma de caixas (`world/mesh/shapes.ts`);
+ * dispensador, liberador e observador são cubos com **face da frente**
+ * (`tex.front`), que o mesher escolhe pelos bits 0..2 do estado.
+ *
+ * Bits de estado:
+ * - bigorna: 0..1 direção (`FACING_STEP`);
+ * - funil: 0..2 saída (`PISTON_STEP`: 0..3 lados, 5 para baixo), 3 travado;
+ * - dispensador, liberador, observador: 0..2 frente (`PISTON_STEP`), 3 ligado;
+ * - comparador: 0..1 saída, 2..5 força do sinal de saída. O modo subtração é
+ *   outro id (`comparator_subtract`), como a tocha apagada — não sobra bit.
+ */
+SPECS.push(
+  { id: 148, name: 'anvil', display: 'Bigorna', shape: 'anvil', hardness: 5,
+    ...rock('pickaxe', 1), sound: 'metal', opaque: false, lightAttenuation: 0,
+    tex: { top: 'block/anvil_top', side: 'block/anvil_side', bottom: 'block/anvil_side' } },
+  { id: 149, name: 'hopper', display: 'Funil', shape: 'hopper', hardness: 3,
+    ...rock('pickaxe', 1), sound: 'metal', opaque: false, lightAttenuation: 0,
+    tex: { top: 'block/hopper_top', side: 'block/hopper_side', bottom: 'block/hopper_side' } },
+  { id: 150, name: 'dispenser', display: 'Dispensador', hardness: 3.5, ...rock(),
+    tex: { top: 'block/dispenser_side', side: 'block/dispenser_side', front: 'block/dispenser_front' } },
+  { id: 151, name: 'dropper', display: 'Liberador', hardness: 3.5, ...rock(),
+    tex: { top: 'block/dispenser_side', side: 'block/dispenser_side', front: 'block/dropper_front' } },
+  { id: 152, name: 'comparator', display: 'Comparador', shape: 'comparator',
+    tex: 'block/comparator', solid: false, opaque: false, lightAttenuation: 0, hardness: 0,
+    sound: 'stone', support: 'below' },
+  { id: 153, name: 'comparator_subtract', display: 'Comparador', shape: 'comparator',
+    tex: 'block/comparator_subtract', solid: false, opaque: false, lightAttenuation: 0,
+    hardness: 0, sound: 'stone', support: 'below', itemless: true },
+  { id: 154, name: 'observer', display: 'Observador', hardness: 3, ...rock(),
+    tex: { top: 'block/observer_side', side: 'block/observer_side', front: 'block/observer_front' } },
+);
 SPECS.push(...dyedSpecs());
 
 /**
@@ -860,8 +898,13 @@ export function defOf(state: number): BlockDef {
 }
 
 /** Textura de uma face, resolvendo a forma abreviada da tabela. */
-export function texOf(def: BlockDef, face: 'top' | 'bottom' | 'side'): string {
+export function texOf(def: BlockDef, face: 'top' | 'bottom' | 'side' | 'front'): string {
   const tex = def.tex;
   if (typeof tex === 'string') return tex;
   return tex[face] ?? tex.side ?? tex.top ?? 'block/missing';
+}
+
+/** true se o bloco tem face da frente própria (M15). */
+export function hasFrontTex(def: BlockDef): boolean {
+  return typeof def.tex !== 'string' && def.tex.front !== undefined;
 }

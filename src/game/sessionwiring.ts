@@ -12,6 +12,7 @@ import { MOB_BY_NAME } from '../data/mobs';
 import { FIREBALL_FLAGS } from '../entity/projectile';
 import { GROW_TICKS, type MobEvents } from '../entity/mobs';
 import { EGG_HATCH_CHANCE } from './itemuse';
+import { ItemFlow } from './itemflow';
 import type { ItemStack } from '../data/items';
 import type { ChunkColumn } from '../world/chunk';
 import type { Session, SessionEvents } from './session';
@@ -23,6 +24,25 @@ const FIREBALL_SPEED = 0.45;
 /** Força da explosão da bola de fogo: quebra ponte, não some com a base. */
 const FIREBALL_POWER = 1.6;
 
+/**
+ * Funil, dispensador e liberador (M15): o `ItemFlow` com o que ele toca, e o
+ * circuito sabendo ler contêiner e disparar o dispensador.
+ */
+export function wireItemFlow(s: Session, events: SessionEvents): ItemFlow {
+  const flow = new ItemFlow({
+    world: s.world, tiles: s.tiles, items: s.items, projectiles: s.projectiles, fire: s.fire,
+    blockChanged: (x, y, z, previous, state) => {
+      s.lighting.onBlockChanged(x, y, z, previous, state);
+      s.fluids.scheduleAround(x, y, z);
+    },
+    sound: (name, x, y, z) => { events.onSound?.(name, x, y, z); },
+    random: () => s.random(),
+  });
+  s.redstone.signalOf = (x, y, z) => flow.signal(x, y, z);
+  s.redstone.onTrigger = (x, y, z) => { flow.dispense(x, y, z); };
+  return flow;
+}
+
 export function wireInventory(
   s: Session, events: SessionEvents, dropItem: (stack: ItemStack) => void,
 ): void {
@@ -31,7 +51,7 @@ export function wireInventory(
   s.inventory.takeResult = () => s.workbench.consumeCraft();
 
   s.items.onPickup = (stack) => {
-    const leftover = s.inventory.give(stack.item, stack.count, stack.damage, stack.ench ?? 0);
+    const leftover = s.inventory.giveStack(stack);
     if (leftover < stack.count) {
       events.onPickup(stack.item, stack.count - leftover);
       s.noteObtained(stack.item);

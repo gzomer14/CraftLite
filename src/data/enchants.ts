@@ -110,6 +110,9 @@ const TARGET_BIT = new Map<EnchantTarget, number>(
   TARGET_ORDER.map((name, index) => [name, 1 << index]),
 );
 
+/** Todos os alvos: o do livro (M15). */
+const ALL_TARGETS = (1 << TARGET_ORDER.length) - 1;
+
 /** Máscara de alvos de cada encantamento, pré-calculada. */
 const ENCHANT_MASK: readonly number[] = SPECS.map((spec) => {
   let mask = 0;
@@ -121,6 +124,9 @@ const ENCHANT_MASK: readonly number[] = SPECS.map((spec) => {
 export function targetMaskOf(item: number): number {
   const def = itemDef(item);
   if (def === undefined) return 0;
+  // O livro comum aceita qualquer encantamento na mesa e vira livro encantado
+  // (M15); é o livro encantado que a bigorna passa para a peça.
+  if (def.name === 'book') return ALL_TARGETS;
   if (def.tool !== undefined) return TARGET_BIT.get(def.tool.kind as EnchantTarget) ?? 0;
   if (def.armor !== undefined) {
     let mask = TARGET_BIT.get('armor') ?? 0;

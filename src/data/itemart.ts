@@ -1002,6 +1002,8 @@ const SIMPLE: Record<string, [string, Rgb]> = {
 
   // M14: selva e pesca.
   cocoa_beans: ['seeds', [118, 70, 38]],
+  // M15: o livro da mesa, roxo como o brilho do encantamento.
+  enchanted_book: ['sheet', [126, 70, 176]],
   cod: ['fish', [190, 164, 116]],
   cooked_cod: ['fish', [206, 140, 74]],
 };

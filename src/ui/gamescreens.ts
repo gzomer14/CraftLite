@@ -6,7 +6,7 @@
  */
 
 import { professionOf } from '../data/villagers';
-import { itemDef } from '../data/items';
+import { itemDef, maxStackOf } from '../data/items';
 import { ContainerScreen } from './containers/screen';
 import { CreativeScreen } from './containers/creative';
 import type { Atlas } from '../render/atlas';
@@ -56,6 +56,23 @@ export function createGameScreens(deps: GameScreensDeps): {
       return i < 0 ? 'Aldeão' : `Aldeão — ${professionOf(s.mobs.store.variant[i]).display}`;
     },
     onFurnaceOutput: (furnace, item) => session().workbench.collectFurnaceXp(furnace, item),
+    // Bigorna (M15).
+    onAnvilChange: (name) => {
+      const bench = session().workbench;
+      if (name !== undefined) bench.anvilName = name;
+      bench.refreshAnvil();
+    },
+    onAnvilTake: () => session().workbench.takeAnvilResult(),
+    anvilStatus: () => {
+      const bench = session().workbench;
+      const left = bench.anvil.get(0);
+      return {
+        cost: bench.anvilOutcome.cost,
+        blocker: bench.anvilBlocker(),
+        currentName: left?.name ?? '',
+        nameable: left !== null && maxStackOf(left.item) === 1,
+      };
+    },
     longPressMs,
     // O toque longo do slot não tem retorno visual próprio; a vibração é o que
     // diz ao jogador que o gesto pegou.

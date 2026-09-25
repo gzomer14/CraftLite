@@ -222,7 +222,10 @@ export class MobSpawner {
    * onde nenhum dos dois pode nascer.
    */
   private allowedHere(rule: SpawnRule): boolean {
-    return (rule.dimension ?? DIM_OVERWORLD) === this.world.dimension;
+    const allowed = rule.dimension ?? DIM_OVERWORLD;
+    return typeof allowed === 'number'
+      ? allowed === this.world.dimension
+      : allowed.includes(this.world.dimension);
   }
 
   /** Inteiro em [min, max] com a fonte de aleatório do spawner. */

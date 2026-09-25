@@ -12,6 +12,74 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-25 13:10 → 17:27 · M18 e M19: casa em ordem e pontas soltas
+
+**Pedido:** *"Pode seguir com sua ordem e implementar tudo para concluirmos esse MVP"* — depois de
+perguntar pelos marcos pendentes e pedir *"focar nas implementações para depois você fazer um
+roteiro do que falta testar ainda no celular"*.
+
+**Resultado:** dois marcos novos, propostos e fechados na mesma sessão. **M18**: os cinco módulos
+acima do teto cortados por papel (circuito 1116 → 640, tela de contêiner 957 → 690, mobs 895 → 683,
+sessão 889 → 702, `main.ts` 749 → 700), memória de áudio 3,442 → 2,924 MB com a taxa exata de
+Nyquist, e a varredura de idioma pelo destino, que pegou cinco textos em português do M17.
+**M19**: enderman no End; o dragão quebra o que atravessa, sopra e morre devagar com raios de luz;
+as ilhas de fora do End com santuário e baú, e o portal de passagem; o tint de bioma no WebGL1; a
+casa sem cama fechada por não se reproduzir. Dois defeitos do M16 (sol no céu do End, dragão
+piscando). Visto no Chrome headless; roteiro de celular no doc 15 §6. Abertura em 3G rápido
+remedida: 2,82 s.
+
+Portões: **2281 testes** em 116 arquivos, lint limpo, build ok, **301,8 KB** de 350, smoke 7/7.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| **M18 — circuito** | | |
+| `~` | `src/world/redstone.ts` | fila, tick e componentes; o resto saiu |
+| `+` | `src/world/redstoneroles.ts` | tabelas de papel por id, bits, chaves de posição, `CircuitWriter` |
+| `+` | `src/world/redstonepower.ts` | energia forte, fraca, do pó e do vizinho, só leitura |
+| `+` | `src/world/redstonepiston.ts` | empurrar e recolher |
+| `+` | `src/world/redstoneplates.ts` | a varredura das placas de pressão |
+| **M18 — tela, mobs, sessão, main** | | |
+| `~` | `src/ui/containers/screen.ts` | usa o slot e os gestos de fora |
+| `+` | `src/ui/containers/slotview.ts`, `slotgestures.ts` | DOM e desenho do slot; toque longo, arraste e duplo clique |
+| `~` | `src/entity/mobs.ts` | usa `mobcare`, `mobpick`, `mobrules`; a agonia (`FLAG_DYING`) |
+| `+` | `src/entity/mobcare.ts`, `mobpick.ts`, `mobrules.ts` | domar/alimentar/cruzar; mira; despawn, drop, teleporte, fogo |
+| `~` | `src/game/session.ts` | construtor e ações delegados; `events` público |
+| `+` | `src/game/sessionbuild.ts`, `mobclick.ts`, `dimensionhop.ts` | montagem dos sistemas; clique em mob; troca de dimensão |
+| `~` | `src/main.ts` | usa os três módulos abaixo; *"Controle conectado"* por chave |
+| `+` | `src/ui/blockfeedback.ts`, `src/game/startingkit.ts`, `src/save/storagewarning.ts` | partícula/som/vibração de bloco; kit inicial; aviso de armazenamento |
+| **M18 — som e idioma** | | |
+| `~` | `src/audio/synth.ts` | `rateFor` com a taxa exata acima do quarto |
+| `~` | `tests/audio.test.ts` | taxas novas; teto 3,2 MB; banda de toda receita coberta |
+| `~` | `tests/i18n.test.ts` | a varredura pelo destino |
+| `~` | `src/ui/gameflow.ts`, `src/ui/containers/anvilpanel.ts`, `src/data/strings/pt.ts`, `en.ts` | os cinco textos que sobraram, por chave |
+| **M19 — End e dragão** | | |
+| `~` | `src/data/mobs.ts` | traços `deathTicks` e `breaksBlocksExcept`; enderman também no End |
+| `~` | `src/entity/spawn.ts`, `src/entity/mobstore.ts`, `src/entity/ai/goals.ts` | regra com lista de dimensões; `FLAG_DYING`; som `hurt` no goal |
+| `~` | `src/entity/ai/dragongoals.ts` | fase de agonia, quebra de blocos, sopro |
+| `~` | `src/game/dragonfight.ts` | a nuvem do sopro; ergue o portal de passagem |
+| `~` | `src/game/survival.ts`, `src/game/playercombat.ts` | causa de morte `breath` |
+| `~` | `src/world/gen/end.ts` | ilhas de fora, santuário, destino do portal de passagem |
+| `~` | `src/data/structures.ts` | `END_SHRINE` e o loot `end_shrine` |
+| `~` | `src/data/blocks.ts`, `src/data/strings/names.en.ts` | bloco 163, portal de passagem |
+| `+` | `src/game/endgateway.ts` | erguer o portal, destino e chegada com o de volta |
+| `~` | `src/game/travel.ts` | rota `gateway`, evento `onTeleport` |
+| **M19 — render** | | |
+| `~` | `src/render/scenefeed.ts` | raios da agonia, nuvem do sopro, pisca só com pavio |
+| `~` | `src/render/particles.ts` | tamanho do brilho |
+| `~` | `src/render/sky.ts`, `shaders/sky.glsl.ts` | `uCelestial`: sem sol nem lua sem céu |
+| `~` | `src/render/biometint.ts`, `shaders/terrain.glsl.ts`, `terrain.ts` | tint de bioma no WebGL1 |
+| **Testes** | | |
+| `~` | `tests/theend.test.ts` | enderman, agonia, quebra, sopro, ilhas, santuário, portal de passagem |
+| `~` | `tests/biometint.test.ts` | WebGL1 |
+| `~` | `tests/village.test.ts` | sem tolerância de casa sem cama |
+| **Docs** | | |
+| `~` | `docs/14-roadmap.md` | M18 e M19 |
+| `~` | `docs/15-status.md` | M18 e M19, métricas, §4, §5, roteiro de celular no §6 |
+| `~` | `docs/16-auditoria.md` | esta sessão |
+| `~` | `README.md` | marcos, testes e bundle |
+
+---
+
 ## 2026-09-25 12:20 → 13:04 · M17: alcance
 
 **Pedido:** *"Vamos seguir com o desenvolvimento do projeto. Acredito que o próximo marco seja

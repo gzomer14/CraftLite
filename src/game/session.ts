@@ -54,13 +54,18 @@ import { DragonFight } from './dragonfight';
 import { breakPortalNear } from './portal';
 import { BlockUse } from './blockuse';
 import { TRADE_REACH, Villages } from './village';
-import { FLAG_TRADING } from '../entity/mobstore';
 import { Trading } from './trading';
 import { SpawnerBlocks } from '../entity/spawnerblocks';
 import { DIM_OVERWORLD, dimensionOf } from '../data/dimensions';
 import { Lighting } from '../world/lighting';
 import { WORLD_HEIGHT, type ChunkColumn } from '../world/chunk';
 import type { World } from '../world/world';
+import {
+  buildBlockUse, buildCombat, buildDragonFight, buildItemUser, buildTrading, buildTravel,
+  buildVillages, buildWorkbench,
+} from './sessionbuild';
+import { useOnMob } from './mobclick';
+import { arrived, enterDimension } from './dimensionhop';
 import { t } from '../core/i18n';
 
 /** A vara de pesca (M14): a linha só vive com ela na mão. */
@@ -161,9 +166,10 @@ export class Session {
   /** Geradores de monstros ativos, por posição empacotada (doc 03 §7). */
   readonly spawners: SpawnerBlocks;
   /** Cama, porta e bolo: o clique que é do bloco (`game/blockuse.ts`). */
-  private readonly blockUse: BlockUse;
+  readonly blockUse: BlockUse;
 
-  private readonly events: SessionEvents;
+  /** Os ganchos da interface; `mobclick.ts` e `dimensionhop.ts` também avisam por eles. */
+  readonly events: SessionEvents;
   /** Posição do jogador no tick anterior, para a exaustão por distância. */
   private lastX = 0;
   private lastZ = 0;
@@ -212,21 +218,7 @@ export class Session {
       },
     });
     this.vehicles = new Vehicles(player, carts, (kind) => { this.achievements.event(kind); });
-    this.travel = new Travel(world, {
-      // A travessia entra pelo mesmo caminho que o save e o renascimento.
-      onDimensionChange: (dimension, x, z) => { this.enterDimension(dimension, x, z); },
-      onArrive: (x, y, z, route) => {
-        this.player.setPosition(x, y, z);
-        this.player.vx = 0; this.player.vy = 0; this.player.vz = 0;
-        this.player.fallDistance = 0;
-        this.arrived(route);
-      },
-      onMessage: (text) => this.events.onMessage?.(text),
-      homePoint: () => (this.spawnY >= 0
-        ? [this.spawnX, this.spawnY, this.spawnZ]
-        : [this.worldSpawnX, -1, this.worldSpawnZ]),
-      blockChanged: (x, y, z, previous, state) => { this.lighting.onBlockChanged(x, y, z, previous, state); },
-    });
+    this.travel = buildTravel(this, events);
     this.interaction = new Interaction(world, player, this.lighting);
     this.tiles = new Tiles(world, {
       onChanged: (x, y, z, previous, state) => {
@@ -237,70 +229,18 @@ export class Session {
       onContents: (x, y, z) => { this.redstone.scheduleNeighborhood(x, y, z, false); },
     });
     this.itemFlow = wireItemFlow(this, events);
-    this.workbench = new Workbench({
-      world, player, inventory: this.inventory, recipes: this.recipes, tiles: this.tiles,
-      xp: this.xp, achievements: this.achievements, stats: this.journal.stats,
-      onOpenScreen: (screen, container) => {
-        // Qualquer tela que não seja a de troca solta o aldeão que negociava.
-        if (screen !== 'trading') this.villages.stopTrading();
-        this.events.onOpenScreen(screen, container);
-      },
-      sound: (name, x, y, z) => { this.events.onSound?.(name, x, y, z); },
-      dropItem: (stack) => { this.dropItem(stack); },
-      noteObtained: (item) => { this.noteObtained(item); },
-      spawnOrb: (x, y, z, amount) => { this.orbs.spawn(x, y, z, amount); },
-    });
+    this.workbench = buildWorkbench(this, events);
 
     const maxMobs = options.maxMobs ?? 70;
     this.mobs = new Mobs(world, mobEvents(this, events), Math.max(32, maxMobs * 2));
-    this.dragonFight = new DragonFight({
-      world, mobs: this.mobs,
-      blockChanged: (x, y, z, previous, state) => { this.lighting.onBlockChanged(x, y, z, previous, state); },
-      sound: (name, x, y, z) => { this.events.onSound?.(name, x, y, z); },
-      message: (text) => { this.events.onMessage?.(text); },
-      achievement: (name) => { this.achievements.event(name); },
-    });
+    this.dragonFight = buildDragonFight(this, events);
     this.spawners = new SpawnerBlocks(this.mobs.store, world.seed, (x, y, z) => {
       this.events.onSound?.('block/furnace', x, y, z);
     });
-    this.blockUse = new BlockUse({
-      world, survival: this.survival, dayNight: this.dayNight, achievements: this.achievements,
-      mobs: this.mobs.store,
-      changed: (x, y, z, previous, state) => {
-        this.lighting.onBlockChanged(x, y, z, previous, state);
-      },
-      sound: (name, x, y, z) => { this.events.onSound?.(name, x, y, z); },
-      message: (text) => { this.events.onMessage?.(text); },
-      setSpawn: (x, y, z) => { this.spawnX = x; this.spawnY = y; this.spawnZ = z; },
-    });
-    this.villages = new Villages({
-      world, mobs: this.mobs.store, seed: world.seed,
-      totalTicks: () => this.dayNight.totalTicks,
-      sound: (name, x, y, z) => { this.events.onSound?.(name, x, y, z); },
-      message: (text) => { this.events.onMessage?.(text); },
-      toggleDoor: (x, y, z) => { this.blockUse.toggle(x, y, z); },
-      makeRoom: () => this.mobs.makeRoom(this.player.x, this.player.z),
-    });
-    this.trading = new Trading({
-      mobs: this.mobs.store, inventory: this.inventory,
-      day: () => this.dayNight.day,
-      creative: () => this.player.mode === 'creative',
-      dropItem: (stack) => { this.dropItem(stack); },
-      sound: (name, x, y, z) => { this.events.onSound?.(name, x, y, z); },
-      noteObtained: (item) => { this.noteObtained(item); },
-    });
-    this.combat = new PlayerCombat({
-      world, player, inventory: this.inventory, survival: this.survival, mobs: this.mobs,
-      achievements: this.achievements, stats: this.journal.stats,
-      isBlocking: () => this.isBlocking,
-      sound: (name, x, y, z) => { this.events.onSound?.(name, x, y, z); },
-      blockRemoved: (x, y, z, previous) => {
-        this.lighting.onBlockChanged(x, y, z, previous, AIR);
-        this.removeContainerAt(x, y, z);
-        this.fluids.scheduleAround(x, y, z);
-      },
-      drop: (stack, x, y, z) => { this.items.spawn(x, y, z, stack); },
-    });
+    this.blockUse = buildBlockUse(this, events);
+    this.villages = buildVillages(this, events);
+    this.trading = buildTrading(this, events);
+    this.combat = buildCombat(this, events);
     this.spawner = new MobSpawner(
       world, this.mobs, capsForTier(maxMobs), options.simulationDistance ?? 4,
     );
@@ -309,31 +249,11 @@ export class Session {
     // Mundo restaurado direto no Nether nasce sem céu, sem passar por portal.
     this.weather.hasSky = dimensionOf(world.dimension).hasSky;
     this.weather.onChange = (kind) => {
-      if (kind === 'thunder') this.events.onMessage?.('A tempestade chegou');
+      if (kind === 'thunder') this.events.onMessage?.(t('msg.thunder'));
       else if (kind === 'rain') this.events.onMessage?.(t('msg.rain'));
     };
 
-    this.itemUser = new ItemUser({
-      world, player, inventory: this.inventory, survival: this.survival,
-      projectiles: this.projectiles, mobs: this.mobs.store,
-      random: () => this.random(),
-      blockChanged: (x, y, z, previous, state) => {
-        this.lighting.onBlockChanged(x, y, z, previous, state);
-        this.fluids.scheduleAround(x, y, z);
-      },
-      sound: (name, x, y, z) => { this.events.onSound?.(name, x, y, z); },
-      drop: (stack, x, y, z) => { this.items.spawn(x, y, z, stack); },
-      wearHeld: () => { this.damageTool(); },
-      target: () => this.interaction.state.target,
-      aim: this.interaction.aim,
-      vehicles: this.vehicles,
-      fire: this.fire,
-      achievement: (name) => { this.achievements.event(name); },
-      openMap: () => { this.events.onOpenMap?.(); },
-      fishing: this.fishing,
-      spawnXp: (x, y, z, amount) => { this.orbs.spawn(x, y, z, amount); },
-      caughtFish: () => { this.journal.stats.add('fish_caught'); },
-    });
+    this.itemUser = buildItemUser(this, events);
     this.fishing.onBite = (x, y, z) => { this.events.onSound?.('fishing/splash', x, y, z); };
     this.fishing.onSplash = this.fishing.onBite;
     wireInventory(this, events, (stack) => this.dropItem(stack));
@@ -525,88 +445,22 @@ export class Session {
 
   // --- ações do jogador -----------------------------------------------------
 
-  /**
-   * Clique direito mirando um mob: doma com o item certo (doc 07 §2).
-   * Devolve true se o mob consumiu o clique.
-   */
+  /** Clique direito mirando um mob (`mobclick.ts`). Devolve true se ele consumiu o clique. */
   useOnMob(dx: number, dy: number, dz: number): boolean {
-    const eyeY = this.player.y + this.player.eyeHeight;
-    const index = this.mobs.pickTarget(
-      this.player.x, eyeY, this.player.z, dx, dy, dz, this.player.reach,
-    );
-    if (index < 0) return false;
-    // Aldeão: clique direito é conversa, com ou sem item na mão (M9).
-    if (this.villages.isVillager(index)) return this.talkTo(index);
-
-    const held = this.inventory.held;
-    if (held === null) return false;
-    const name = itemDef(held.item)?.name;
-    if (name === undefined) return false;
-
-    // Ações de item em bicho (tesoura, balde na vaca, corante na ovelha).
-    if (this.itemUser.onMob(held, index)) return true;
-
-    const tame = this.mobs.tryTame(index, name);
-    if (tame !== 'none') {
-      if (this.player.mode === 'survival') this.inventory.consumeHeld();
-      this.events.onMessage?.(tame === 'tamed' ? t('msg.tamed') : t('msg.not_tamed'));
-      return true;
-    }
-
-    const feed = this.mobs.tryFeed(index, name);
-    if (feed === 'none') return false;
-    // Quem acabou de cruzar não come de novo: o item não some à toa.
-    if (feed === 'wait') return true;
-    if (this.player.mode === 'survival') this.inventory.consumeHeld();
-    this.achievements.event('breed');
-    return true;
-  }
-
-  /** Abre a troca com o aldeão, se a aldeia dele ainda aceita o jogador. */
-  private talkTo(index: number): boolean {
-    const store = this.mobs.store;
-    if (this.villages.isBanned(index)) {
-      this.events.onMessage?.(t('msg.no_trade'));
-      this.events.onSound?.('mob/villager_hurt', store.x[index], store.centerY(index), store.z[index]);
-      return true;
-    }
-    this.villages.stopTrading();
-    store.setFlag(index, FLAG_TRADING, true);
-    this.workbench.setScreen('trading', null);
-    return true;
+    return useOnMob(this, this.events, dx, dy, dz);
   }
 
   /**
-   * Entra numa dimensão sem portal: usado pelo save ao restaurar o mundo e pelo
-   * renascimento. Quem troca pipeline, save e céu é quem ouve o evento.
+   * Entra numa dimensão sem portal: usado pelo save ao restaurar o mundo, pelo
+   * renascimento e pela travessia (`dimensionhop.ts`).
    */
   enterDimension(dimension: number, x?: number, z?: number): void {
-    if (dimension === this.world.dimension) return;
-    /*
-     * O evento vem **antes** da limpeza de propósito: quem ouve precisa ler
-     * baús e veículos que ainda são desta dimensão para gravá-los. Invertendo a
-     * ordem, o save encontraria as listas já vazias — e todo baú do Nether
-     * sumiria ao voltar para casa.
-     */
-    // A vida do dragão fica guardada antes de os mobs do End saírem (M16).
-    this.dragonFight.remember();
-    this.dragonFight.onDimensionChange();
-    this.events.onDimensionChange?.(dimension);
-    this.clearForDimension();
-    this.world.dimension = dimension;
-    // Sem céu não chove: `hasSky` da tabela de dimensões existia desde o M7 e
-    // ninguém a lia, então chovia no Nether — debaixo de um teto de rocha-mãe.
-    this.weather.hasSky = dimensionOf(dimension).hasSky;
-    /*
-     * Quem chega por portal já sabe onde vai cair, e precisa estar lá **antes**
-     * do próximo `pipeline.setCenter` — é a posição do jogador que decide onde
-     * o mundo novo nasce. O Y é o de agora; o definitivo vem de `arriveAt`
-     * quando o chunk chega. Renascimento e restauração do save não passam
-     * coordenadas: eles posicionam o jogador por conta própria.
-     */
-    if (x !== undefined && z !== undefined) {
-      this.player.setPosition(x + 0.5, this.player.y, z + 0.5);
-    }
+    enterDimension(this, this.events, dimension, x, z);
+  }
+
+  /** O jogador saiu do outro lado de um portal (`dimensionhop.ts`). */
+  arrived(route: TravelRoute): void {
+    arrived(this, this.events, route);
   }
 
   /** Clique direito: abre contêiner, ara, planta ou come; senão, coloca bloco. */
@@ -654,50 +508,9 @@ export class Session {
       && placesOnContainer(heldBlock, blockIdOf(this.world.getBlock(x, y, z)));
   }
 
-  /** O jogador saiu do outro lado de um portal: conquista e, na volta do End, créditos. */
-  private arrived(route: TravelRoute): void {
-    if (route === 'end_in') {
-      // A plataforma fica a leste da ilha: chega olhando para ela.
-      this.player.yaw = -Math.PI / 2;
-      this.player.pitch = 0;
-      this.achievements.event('enter_end');
-      return;
-    }
-    if (route === 'end_out') {
-      if (this.dragonFight.state.killed && !this.dragonFight.state.creditsSeen) {
-        this.dragonFight.state.creditsSeen = true;
-        this.events.onCredits?.();
-      }
-      return;
-    }
-    this.achievements.event(
-      this.world.dimension === DIM_OVERWORLD ? 'return_overworld' : 'enter_nether',
-    );
-  }
-
   /** Quantos hostis existem num raio de 8 blocos (dormir exige abrigo). */
   hostilesNear(x: number, y: number, z: number): number {
     return this.blockUse.hostilesNear(x, y, z);
-  }
-
-  /**
-   * Esvazia o que é da dimensão que está sendo deixada.
-   *
-   * Mob, item no chão, orbe, barco, flecha e contêiner vivem em coordenadas —
-   * e as coordenadas do outro lado são de outro mundo. Inventário, vida, XP e
-   * conquistas são do **jogador** e atravessam com ele.
-   */
-  private clearForDimension(): void {
-    this.mobs.clear();
-    this.items.clear();
-    this.orbs.clear();
-    this.projectiles.clear();
-    this.falling.clear();
-    this.vehicles.clear();
-    this.tiles.clear();
-    this.signs.clear();
-    this.spawners.clear();
-    this.workbench.closeScreen();
   }
 
   /**
@@ -742,7 +555,7 @@ export class Session {
   }
 
   /** Gasta durabilidade da ferramenta usada para quebrar. */
-  private damageTool(): void {
+  damageTool(): void {
     if (this.player.mode !== 'survival') return;
     const stack = this.inventory.held;
     if (stack === null) return;
@@ -792,7 +605,7 @@ export class Session {
    * nada (relato de campo 2026-09-14). Agora ele sai para a frente, e o atraso
    * de coleta de `ItemEntities` cobre o resto.
    */
-  private dropItem(stack: ItemStack): void {
+  dropItem(stack: ItemStack): void {
     forwardFrom(this.dropDirection, this.player.yaw, this.player.pitch);
     this.items.spawn(
       this.player.x, this.player.y + 1.2, this.player.z, stack, this.dropDirection,
@@ -805,7 +618,7 @@ export class Session {
   // --- contêineres no mundo: delegados a `game/tiles.ts` ----------------------
 
   /** Remove o tile entity, dropa o conteúdo e fecha a tela se era a dele. */
-  private removeContainerAt(x: number, y: number, z: number): void {
+  removeContainerAt(x: number, y: number, z: number): void {
     const removed = this.tiles.remove(x, y, z);
     if (removed !== undefined) this.workbench.onContainerRemoved(removed);
   }

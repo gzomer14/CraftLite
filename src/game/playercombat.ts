@@ -134,7 +134,7 @@ export class PlayerCombat {
 
   /** Dano no jogador com empurrão. Usado por mob, flecha e explosão. */
   hurtPlayer(
-    amount: number, cause: 'mob' | 'arrow' | 'explosion', pushX: number, pushZ: number,
+    amount: number, cause: 'mob' | 'arrow' | 'explosion' | 'breath', pushX: number, pushZ: number,
   ): void {
     const { player, survival } = this.host;
     if (player.mode !== 'survival') return;

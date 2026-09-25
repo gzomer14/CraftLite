@@ -104,9 +104,11 @@ describe('tabela de sons', () => {
      * esquecer que existe um orçamento.
      *
      * No M14 a conta chegou a 3,497 MB. O degrau de um quarto da taxa (M15)
-     * a trouxe para 3,14 sem tirar som nenhum.
+     * a trouxe para 3,14 sem tirar som nenhum; o M16 a levou a 3,442 com as
+     * vozes novas, e a taxa contínua (M18) a trouxe para 2,92 — outra vez sem
+     * tirar som. O teto desce com ela: 3,2 MB.
      */
-    expect(bytes / (1024 * 1024)).toBeLessThan(3.5);
+    expect(bytes / (1024 * 1024)).toBeLessThan(3.2);
   });
 
   it('a taxa por receita nunca corta banda que o som usa', () => {
@@ -115,12 +117,16 @@ describe('tabela de sons', () => {
     // Passo na areia: lowpass em 600 Hz, cabe em um quarto da taxa (M15).
     expect(rateFor(SOUNDS['step/sand'], 22050)).toBe(5513);
     expect(rateFor(SOUNDS['break/snow'], 22050)).toBe(22050);
-    expect(rateFor(SOUNDS['break/glass'], 22050)).toBe(22050);
-    // A chuva passa **raspando** do outro lado: o lowpass dela está em 4 kHz e
-    // a folga de 1,4 pede 5,6 kHz, contra os 5,5 que meia taxa cobre. Fica em
-    // 22 kHz de propósito — encolher a folga para ganhar 88 KB comeria a saia
-    // do filtro de todo mundo.
-    expect(rateFor(SOUNDS['weather/rain'], 22050)).toBe(22050);
+    // O vidro são senoides, sem harmônico: desde o M18 fica na taxa exata da
+    // nota mais aguda, com a folga.
+    expect(rateFor(SOUNDS['break/glass'], 22050)).toBe(17000);
+    // A chuva: lowpass em 4 kHz, com a folga de 1,4 pede 5,6 kHz de banda.
+    // Até o M17 ela passava raspando da meia taxa e ficava em 22 kHz; com a
+    // taxa contínua (M18) fica nos 12 kHz de que precisa.
+    expect(rateFor(SOUNDS['weather/rain'], 22050)).toBe(12000);
+    // Vozes agudas com formantes (M18): a taxa exata, não a cheia.
+    expect(rateFor(SOUNDS['mob/chicken_death'], 22050)).toBe(15000);
+    expect(rateFor(SOUNDS['mob/ghast_death'], 22050)).toBe(12000);
   });
 
   it('taxa recusada pelo navegador cai para 8 kHz, e o som não fica mudo', async () => {
@@ -313,5 +319,25 @@ describe('música procedural', () => {
     music.enabled = false;
     for (let i = 0; i < 20 * 60 * 20; i++) music.tick();
     expect(ctx.created.length).toBe(0);
+  });
+});
+
+describe('taxa contínua (M18)', () => {
+  it('toda taxa cobre o dobro da banda da receita, com a folga de 1,4', () => {
+    // A banda de cada tipo, como `rateFor` a lê: formante × 2 na voz, o corte
+    // do lowpass no ruído, a nota mais aguda nos tons.
+    for (const [name, recipe] of Object.entries(SOUNDS)) {
+      let top = Infinity;
+      if (recipe.kind === 'voice' && recipe.formants !== undefined) top = Math.max(...recipe.formants) * 2;
+      if (recipe.kind === 'noise' && recipe.filter === 'lowpass') top = Math.max(recipe.freq ?? Infinity, recipe.freqTo ?? 0);
+      if (recipe.kind === 'tones') top = Math.max(...recipe.freqs, recipe.freqTo ?? 0);
+      if (recipe.kind === 'arpeggio') top = Math.max(...recipe.notes) * 4;
+      const rate = rateFor(recipe, 22050);
+      if (!Number.isFinite(top)) {
+        expect(rate, name).toBe(22050);
+        continue;
+      }
+      expect(rate, name).toBeGreaterThanOrEqual(Math.min(22050, top * 1.4 * 2));
+    }
   });
 });

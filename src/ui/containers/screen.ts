@@ -9,8 +9,8 @@
  */
 
 import { t } from '../../core/i18n';
-import { itemDef, type ItemStack } from '../../data/items';
-import { describeEnchants, type EnchantOffer } from '../../game/enchanting';
+import type { ItemStack } from '../../data/items';
+import type { EnchantOffer } from '../../game/enchanting';
 import {
   ARMOR_START, CRAFT_RESULT, CRAFT_START, HOTBAR_END, HOTBAR_START, MAIN_END, MAIN_START,
   OFFHAND, type ClickButton, type Inventory,
@@ -21,6 +21,8 @@ import { PaperDoll } from './paperdoll';
 import { ItemTooltip } from './tooltip';
 import { clickContainer } from './containerclick';
 import { injectStyle } from './screenstyle';
+import { SlotGestures } from './slotgestures';
+import { describeStack, labelFor, makeSlotView, renderSlot, type SlotView } from './slotview';
 import { TradePanel } from './tradepanel';
 import { AnvilPanel, type AnvilStatus } from './anvilpanel';
 import { EnchantPanel, type EnchantResult, type EnchantStatus } from './enchantpanel';
@@ -35,20 +37,6 @@ export type ScreenKind =
   | 'anvil' | 'brewing';
 
 export type { EnchantResult } from './enchantpanel';
-
-/** Um slot desenhado: de onde vem o item e para onde vai o clique. */
-interface SlotView {
-  el: HTMLDivElement;
-  label: HTMLSpanElement;
-  bar: HTMLDivElement;
-  /** `'inv'` = inventário do jogador, `'cont'` = contêiner aberto. */
-  source: 'inv' | 'cont';
-  index: number;
-  /** Última chave desenhada, para pular redesenho. */
-  rendered: string;
-  /** Texto mostrado quando o slot está vazio — o que vai ali (armadura). */
-  placeholder?: string;
-}
 
 export interface ContainerScreenCallbacks {
   /** Chamado quando a tela fecha, para devolver o pointer lock. */
@@ -96,20 +84,6 @@ export interface ContainerScreenCallbacks {
   anvilStatus?: () => AnvilStatus;
 }
 
-/**
- * Quanto o dedo pode escorregar antes de o toque virar rolagem, em pixels de
- * tela. Abaixo disso é tremor de mão, não intenção.
- */
-const TOUCH_SLOP = 12;
-
-/**
- * true quando o evento veio de um mouse de verdade.
- *
- * `pointerType` ausente ou vazio conta como mouse, que é a mesma regra de
- * `isMouseClick` em `input/controls.ts`: evento sintetizado — por teclado, por
- * navegador antigo ou por teste — não deve cair no caminho de toque, onde a
- * ação espera um `pointerup` que talvez nunca venha.
- */
 /** true no aparelho de dedo. Falha fechado: sem `matchMedia`, esconde a dica. */
 function coarsePointer(): boolean {
   try {
@@ -118,13 +92,6 @@ function coarsePointer(): boolean {
     return false;
   }
 }
-
-function isMousePointer(e: PointerEvent): boolean {
-  const type = e.pointerType;
-  return type === undefined || type === '' || type === 'mouse';
-}
-/** Toque longo quando as opções não informam o valor escolhido pelo jogador. */
-const DEFAULT_LONG_PRESS_MS = 300;
 
 /** Cores das quatro peças vestidas, reusado a cada `refresh` para não alocar. */
 const DOLL_ARMOR: (string | null)[] = [null, null, null, null];
@@ -144,14 +111,6 @@ export class ContainerScreen {
    * mantido daí em diante — recriar o canvas a cada abertura regeraria a skin.
    */
   private doll: PaperDoll | null = null;
-  /**
-   * Toque em curso num slot: de onde partiu, se o toque longo já resolveu, e o
-   * relógio dele. `null` quando não há dedo na tela.
-   */
-  private touchPress: {
-    index: number; x: number; y: number; consumed: boolean;
-    timer: ReturnType<typeof setTimeout>;
-  } | null = null;
   private readonly book: RecipeBookPanel | null;
   private readonly bookToggle: HTMLButtonElement;
   /** Ofertas do aldeão (M9), criadas na primeira tela de troca. */
@@ -174,15 +133,22 @@ export class ContainerScreen {
   private kind: ScreenKind = 'none';
   private readonly callbacks: ContainerScreenCallbacks;
 
-  /** Slots tocados durante um arraste de distribuição. */
-  private dragging: 'left' | 'right' | null = null;
-  private readonly dragSlots: number[] = [];
-  private lastClickAt = 0;
-  private lastClickIndex = -1;
+  /** Toque, arraste e duplo clique nos slots (`slotgestures.ts`). */
+  private readonly gestures: SlotGestures;
 
   constructor(callbacks: ContainerScreenCallbacks) {
     this.callbacks = callbacks;
     injectStyle();
+    this.gestures = new SlotGestures({
+      inventory: () => this.inventory,
+      click: (view, button, shift) => this.handleClick(view, button, { shift }),
+      isOutputSlot: (view) => this.isOutputSlot(view),
+      describe: (view) => this.describeSlot(view),
+      refresh: () => this.refresh(),
+      tooltip: this.tooltip,
+      ...(callbacks.longPressMs !== undefined ? { longPressMs: callbacks.longPressMs } : {}),
+      ...(callbacks.vibrate !== undefined ? { vibrate: callbacks.vibrate } : {}),
+    });
 
     this.root = document.createElement('div');
     this.root.id = 'container-screen';
@@ -309,7 +275,7 @@ export class ContainerScreen {
       if (e.target === this.root) this.inventory?.dropCursor();
     });
     this.root.addEventListener('pointermove', (e) => this.moveCursor(e.clientX, e.clientY));
-    window.addEventListener('pointerup', () => this.endDrag());
+    window.addEventListener('pointerup', () => this.gestures.endDrag());
     this.root.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
@@ -608,162 +574,12 @@ export class ContainerScreen {
     this.column.appendChild(section);
   }
 
+  /** Um slot novo na tela atual, com os gestos ligados. */
   private makeSlot(source: 'inv' | 'cont', index: number, placeholder?: string): HTMLDivElement {
-    const el = document.createElement('div');
-    el.className = 'slot';
-    // Identifica o slot no DOM: serve para depurar a tela no aparelho e é como
-    // os testes acham o slot de resultado sem depender da ordem de montagem.
-    el.dataset.slot = `${source}:${index}`;
-    el.setAttribute('role', 'button');
-    el.tabIndex = 0;
-    // Rótulo inicial: `renderSlot` sai cedo quando a chave não mudou, e para um
-    // slot que nasce vazio a chave inicial já é a final — sem isto o leitor de
-    // tela encontraria um botão sem nome.
-    el.setAttribute('aria-label', placeholder ?? t('screen.empty'));
-
-    const label = document.createElement('span');
-    if (placeholder !== undefined) {
-      el.classList.add('ghost');
-      label.textContent = placeholder;
-    }
-    const bar = document.createElement('div');
-    bar.className = 'durability';
-    // Nasce escondida: `renderSlot` sai cedo quando a chave não mudou, e para
-    // um slot vazio a chave inicial já é a final — a barra nunca seria ocultada.
-    bar.hidden = true;
-    el.append(label, bar);
-
-    const view: SlotView = {
-      el, label, bar, source, index, rendered: '',
-      ...(placeholder !== undefined ? { placeholder } : {}),
-    };
+    const view = makeSlotView(source, index, placeholder);
     this.slots.push(view);
-
-    el.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      if (isMousePointer(e)) {
-        // No mouse a ação resolve já: é disso que depende o arraste de
-        // distribuição entre slots, que só existe com ponteiro fino.
-        this.resolveSlot(view, e.button === 2 ? 'right' : e.button === 1 ? 'middle' : 'left',
-          e.shiftKey);
-        return;
-      }
-
-      /*
-       * No toque a ação resolve **ao soltar**, e não ao encostar.
-       *
-       * É o que abre espaço para o toque longo valer como botão direito —
-       * pegar metade da pilha e soltar uma unidade de cada vez (doc 08 §3.5).
-       * Sem ele, no celular **todo** toque movia a pilha inteira, e montar uma
-       * receita que pede uma tábua em cada célula era impossível: o jogador
-       * colocava as 24 de uma vez (relato de campo 2026-09-14).
-       *
-       * O arraste de distribuição não é perdido nessa troca porque ele **nunca
-       * funcionou no toque**: o ponteiro de toque recebe captura implícita no
-       * elemento do `pointerdown`, então `pointerenter` não dispara nos outros
-       * slots. Ele era, e continua, um gesto de mouse.
-       */
-      const text = this.describeSlot(view);
-      if (text !== null) this.tooltip.flash(text, e.clientX, e.clientY);
-      this.armTouch(view, e);
-    });
-    el.addEventListener('pointerup', (e) => {
-      if (isMousePointer(e)) return;
-      if (this.touchPress === null || this.touchPress.index !== view.index) return;
-      const consumed = this.touchPress.consumed;
-      this.cancelTouch();
-      // O toque longo já resolveu; soltar depois dele não pode agir de novo.
-      if (!consumed) this.resolveSlot(view, 'left', false);
-    });
-    el.addEventListener('pointermove', (e) => {
-      if (isMousePointer(e) || this.touchPress === null) return;
-      // Escorregar o dedo é rolagem, não escolha: cancela o toque longo e a
-      // ação curta junto.
-      const dx = e.clientX - this.touchPress.x;
-      const dy = e.clientY - this.touchPress.y;
-      if (dx * dx + dy * dy > TOUCH_SLOP * TOUCH_SLOP) this.cancelTouch();
-    });
-    el.addEventListener('pointercancel', () => this.cancelTouch());
-    el.addEventListener('pointerenter', (e) => {
-      if (this.dragging !== null) this.dragSlots.push(view.index);
-      // Só o mouse tem "estar em cima"; no toque quem mostra é o `pointerdown`.
-      if (e.pointerType !== 'mouse') return;
-      const text = this.describeSlot(view);
-      if (text === null) this.tooltip.hide();
-      else this.tooltip.show(text, e.clientX, e.clientY);
-    });
-    el.addEventListener('pointerleave', (e) => {
-      if (e.pointerType === 'mouse') this.tooltip.hide();
-    });
-    el.addEventListener('keydown', (e) => {
-      if (e.key !== 'Enter' && e.key !== ' ') return;
-      e.preventDefault();
-      this.handleClick(view, 'left', { shift: e.shiftKey });
-    });
-
-    return el;
-  }
-
-  /**
-   * Arma o toque: o relógio do toque longo começa aqui, e a ação curta espera
-   * o dedo sair.
-   */
-  private armTouch(view: SlotView, e: PointerEvent): void {
-    this.cancelTouch();
-    // `setTimeout` global e não `window.setTimeout`: a tela é montada em
-    // ambiente sem `window` nos testes, e o relógio é o mesmo.
-    const press = {
-      index: view.index, x: e.clientX, y: e.clientY, consumed: false,
-      timer: null as unknown as ReturnType<typeof setTimeout>,
-    };
-    press.timer = setTimeout(() => {
-      press.consumed = true;
-      // Toque longo = botão direito: pega metade, ou solta uma unidade.
-      this.resolveSlot(view, 'right', false);
-      this.callbacks.vibrate?.();
-    }, this.callbacks.longPressMs?.() ?? DEFAULT_LONG_PRESS_MS);
-    this.touchPress = press;
-  }
-
-  private cancelTouch(): void {
-    if (this.touchPress === null) return;
-    clearTimeout(this.touchPress.timer);
-    this.touchPress = null;
-  }
-
-  private resolveSlot(view: SlotView, button: ClickButton, shift: boolean): void {
-    /*
-     * Duplo clique junta os stacks iguais (doc 08 §3.5) — menos nos slots que
-     * só produzem saída.
-     *
-     * Craftar em série é tocar repetidamente no mesmo slot de resultado, e dois
-     * toques dentro de 350 ms caem exatamente na janela do duplo clique. O
-     * `doubleClick` então varria o inventário inteiro para o cursor: quem tinha
-     * acabado de guardar 64 tábuas via as 64 voltarem para a mão sozinhas
-     * (relato de campo 2026-09-12, "fica pegando os 64 no lugar como se eu
-     * ainda tivesse ele selecionado"). Em slot de saída o gesto não existe.
-     */
-    const now = performance.now();
-    if (button === 'left' && !this.isOutputSlot(view)
-      && view.index === this.lastClickIndex && now - this.lastClickAt < 350) {
-      this.inventory?.doubleClick();
-      this.lastClickIndex = -1;
-      this.refresh();
-      return;
-    }
-    this.lastClickAt = now;
-    this.lastClickIndex = view.index;
-
-    // Cursor cheio inicia um arraste de distribuição.
-    if ((button === 'left' || button === 'right') && this.inventory?.cursor !== null) {
-      this.dragging = button;
-      this.dragSlots.length = 0;
-      this.dragSlots.push(view.index);
-    }
-
-    this.handleClick(view, button, { shift });
+    this.gestures.attach(view);
+    return view.el;
   }
 
   /**
@@ -775,24 +591,19 @@ export class ContainerScreen {
     return (this.kind === 'furnace' || this.kind === 'anvil') && view.index === 2;
   }
 
+  /** Nome, encantamentos e durabilidade do slot, ou `null` se estiver vazio. */
+  private describeSlot(view: SlotView): string | null {
+    return describeStack(view.source === 'inv'
+      ? this.inventory?.get(view.index) ?? null
+      : this.container?.get(view.index) ?? null);
+  }
+
   /**
    * Avisa o CSS que o livro está aberto. A largura do painel só cresce quando
    * ele aparece — fechado, a tela continua do tamanho de antes.
    */
   private syncBookLayout(): void {
     this.panel.classList.toggle('with-book', this.book?.isOpen === true);
-  }
-
-  private endDrag(): void {
-    if (this.dragging === null) return;
-    const button = this.dragging;
-    this.dragging = null;
-    // Um slot só já foi tratado pelo clique; distribuir exige dois ou mais.
-    if (this.dragSlots.length > 1 && this.inventory !== null) {
-      this.inventory.distribute(this.dragSlots, button);
-      this.refresh();
-    }
-    this.dragSlots.length = 0;
   }
 
   private handleClick(
@@ -822,7 +633,7 @@ export class ContainerScreen {
       const stack = view.source === 'inv'
         ? this.inventory.get(view.index)
         : (this.container?.get(view.index) ?? null);
-      this.renderSlot(view, stack);
+      renderSlot(view, stack, this.callbacks.spriteOf, this.callbacks.colorOf);
     }
 
     if (this.book !== null && this.book.isOpen && this.callbacks.recipes !== undefined) {
@@ -863,57 +674,6 @@ export class ContainerScreen {
     }
   }
 
-  private renderSlot(view: SlotView, stack: ItemStack | null): void {
-    const key = stack === null
-      ? ''
-      : `${stack.item}:${stack.count}:${stack.damage}:${stack.ench ?? 0}`;
-    if (view.rendered === key) return;
-    view.rendered = key;
-
-    if (stack === null) {
-      view.label.textContent = view.placeholder ?? '';
-      view.bar.hidden = true;
-      view.el.classList.remove('filled', 'sprite', 'enchanted');
-      view.el.classList.toggle('ghost', view.placeholder !== undefined);
-      view.el.style.removeProperty('--item-color');
-      view.el.style.removeProperty('background-position');
-      view.el.setAttribute('aria-label', view.placeholder ?? t('screen.empty'));
-      return;
-    }
-    view.el.classList.remove('ghost');
-    const def = itemDef(stack.item);
-    view.el.setAttribute('aria-label', `${def?.display ?? '?'} ×${stack.count}`);
-
-    // Com sprite, o slot mostra o desenho e só o número; sem, cai na cor média
-    // do bloco com as duas primeiras letras do nome.
-    const sprite = this.callbacks.spriteOf?.(stack.item) ?? null;
-    if (sprite !== null) {
-      view.el.classList.add('sprite');
-      view.el.style.backgroundPosition = sprite;
-      view.el.style.removeProperty('--item-color');
-      view.label.textContent = stack.count > 1 ? String(stack.count) : '';
-    } else {
-      view.el.classList.remove('sprite');
-      view.el.style.removeProperty('background-position');
-      view.el.style.setProperty('--item-color', this.callbacks.colorOf(stack.item));
-      view.label.textContent = labelFor(stack);
-    }
-    view.el.classList.add('filled');
-    // Item encantado ganha um brilho arroxeado — é o único sinal na grade de
-    // que aquela picareta não é uma picareta comum.
-    view.el.classList.toggle('enchanted', (stack.ench ?? 0) !== 0);
-
-    const durability = def?.durability;
-    if (durability !== undefined && stack.damage > 0) {
-      view.bar.hidden = false;
-      const remaining = 1 - stack.damage / durability;
-      view.bar.style.transform = `scaleX(${remaining.toFixed(3)})`;
-      view.bar.style.background = remaining > 0.5 ? '#5ad04a' : remaining > 0.2 ? '#d0c04a' : '#d04a4a';
-    } else {
-      view.bar.hidden = true;
-    }
-  }
-
   private refreshFurnace(): void {
     const furnace = this.container as Furnace | null;
     if (furnace === null) return;
@@ -923,35 +683,8 @@ export class ContainerScreen {
     if (arrow !== null) arrow.style.transform = `scaleX(${furnace.cookProgress.toFixed(3)})`;
   }
 
-  /** Nome, encantamentos e durabilidade do slot, ou `null` se estiver vazio. */
-  private describeSlot(view: SlotView): string | null {
-    const stack = view.source === 'inv'
-      ? this.inventory?.get(view.index) ?? null
-      : this.container?.get(view.index) ?? null;
-    if (stack === null) return null;
-
-    const def = itemDef(stack.item);
-    // Nome da bigorna em cima, com o nome do item embaixo (M15).
-    let text = stack.name !== undefined ? `"${stack.name}"\n${def?.display ?? '?'}` : def?.display ?? '?';
-    // Encantamentos em cima da durabilidade, como no doc 08 §3.5.
-    const enchants = describeEnchants(stack.ench ?? 0);
-    if (enchants !== '') text += `\n${enchants}`;
-    if (def?.durability !== undefined) {
-      text += `\nDurabilidade: ${def.durability - stack.damage} / ${def.durability}`;
-    }
-    return text;
-  }
-
   private moveCursor(x: number, y: number): void {
     this.cursorEl.style.transform = `translate(${x + 8}px, ${y + 8}px)`;
     this.tooltip.position(x, y);
   }
-}
-
-/** Texto do slot. Sem sprites de item ainda: inicial + contagem. */
-function labelFor(stack: ItemStack): string {
-  const def = itemDef(stack.item);
-  const name = def?.display ?? '?';
-  const short = name.replace(/^(de |da |do )/, '').slice(0, 2);
-  return stack.count > 1 ? `${short}\n${stack.count}` : short;
 }

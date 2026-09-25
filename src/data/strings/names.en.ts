@@ -177,6 +177,7 @@ export const THING_NAMES_EN: Record<string, string> = {
   end_portal_frame: 'End Portal Frame',
   end_portal_frame_eye: 'End Portal Frame',
   end_portal: 'End Portal',
+  end_gateway: 'End Gateway',
   dragon_egg: 'Dragon Egg',
   coal: 'Coal',
   charcoal: 'Charcoal',

@@ -29,8 +29,11 @@ olho do ender, a fortaleza da superfície com a sala do portal, o End, o dragão
 ovo e os créditos — e a bruxa. Ainda não visto em aparelho. O **M17** (2026-09-25) abriu o jogo
 para quem não lê português: menu **Idioma** com inglês (segue o aparelho por padrão), uma dica na
 linha do alto do HUD que ensina do primeiro tronco à picareta de pedra com o gesto do aparelho na
-mão, e a seed em código curto (`03NQ-K8NH`) para copiar e colar. Fecha a lista M11–M17; ainda não
-visto em aparelho.
+mão, e a seed em código curto (`03NQ-K8NH`) para copiar e colar. O **M18** pôs a casa em ordem
+(módulos grandes cortados por papel, memória de áudio com folga) e o **M19** fechou as pontas
+soltas: enderman no End, o dragão que quebra, sopra e morre devagar, as ilhas de fora do End com
+o portal de passagem, e o tint de bioma no WebGL1. M16 a M19 ainda não vistos em aparelho — o
+roteiro está no doc 15 §6.
 
 - **M0 — esqueleto:** Vite + TypeScript strict, renderer WebGL2 próprio com fallback WebGL1,
   detecção de tier, loop de 20 Hz com interpolação, gerador procedural de texturas alimentando um
@@ -147,11 +150,11 @@ visto em aparelho.
   aponta direto na casinha desejada, e o gatilho esquerdo vale **clique direito** — que é o que
   permite pegar metade de uma pilha.
 
-Abre em **4,5 s em 3G rápido** (critério: < 5 s) e aguentou **92 min de voo contínuo sem um
+Abre em **2,8 s em 3G rápido** (critério: < 5 s) e aguentou **92 min de voo contínuo sem um
 erro**, com o heap estável e o anel de chunks fixo em 489 colunas ao longo de 67 mil blocos — os
 dois medidos por `npm run slow-network` e `npm run soak`, que dirigem um Chrome de verdade.
 
-**298 KB gzip** no total (código + worker + HTML + service worker, com o inglês), zero assets baixados
+**302 KB gzip** no total (código + worker + HTML + service worker, com o inglês), zero assets baixados
 além de dois ícones de PWA de 6,7 KB, gerados por código.
 
 Validado em aparelho alvo (**Galaxy J7 Metal**, Android 7, 2 GB, Mali-T830) em 2026-09-12:
@@ -164,7 +167,7 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 2271 testes (vitest)
+npm test           # 2281 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
 npm run smoke      # abre o jogo num Chrome headless e joga o roteiro do doc 14 (precisa do build)
@@ -243,7 +246,7 @@ src/
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      2271 testes, incluindo orçamento de performance e de luz
+tests/                      2281 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios
@@ -260,7 +263,7 @@ docs/
   11-persistencia-e-saves.md IndexedDB, formato de save, PWA
   12-multiplayer.md         ganchos de arquitetura, protocolo P2P
   13-assets-e-arte.md       texturas procedurais, sprites, fonte, licença
-  14-roadmap.md             marcos com checklist e critérios de aceite (M0–M17 feitos)
+  14-roadmap.md             marcos com checklist e critérios de aceite (M0–M19 feitos)
   15-status.md              estado real: status por marco, pendências, próximo passo
   16-auditoria.md           histórico por sessão, com grid de arquivos
   mockups/                  14 wireframes SVG + generate.py

@@ -46,7 +46,7 @@ export interface AiContext {
   breakBlock(x: number, y: number, z: number): void;
   /** Pede um caminho A* (entra na fila com orçamento do doc 07 §3). */
   requestPath(i: number, x: number, y: number, z: number): void;
-  playSound(i: number, kind: 'ambient' | 'attack'): void;
+  playSound(i: number, kind: 'ambient' | 'attack' | 'hurt'): void;
   /** Os dois se encontraram: nasce o filhote entre eles. */
   breed(i: number, partner: number): void;
   /** Um mob acerta outro — o golem no zumbi (M9). */

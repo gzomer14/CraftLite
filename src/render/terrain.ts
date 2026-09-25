@@ -53,9 +53,9 @@ export class TerrainPass {
     this.atlas = atlas;
     this.biomeTint = biomeTint;
     const use300 = ctx.gl2 !== null;
-    const vs = use300
-      ? withDefines(TERRAIN_VS_300, biomeTint !== null ? ['BIOME_TINT'] : [])
-      : TERRAIN_VS_100;
+    const vs = withDefines(
+      use300 ? TERRAIN_VS_300 : TERRAIN_VS_100, biomeTint !== null ? ['BIOME_TINT'] : [],
+    );
     const fs = use300 ? TERRAIN_FS_300 : TERRAIN_FS_100;
 
     this.opaque = createProgram(ctx.gl, vs, fs, 'terrain');

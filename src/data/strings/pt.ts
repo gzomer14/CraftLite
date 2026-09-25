@@ -544,6 +544,18 @@ export const PT = {
   'tag.planks': 'tábuas de qualquer madeira',
   // dica de toque no modo B
   'hint.touch_b': 'Esquerda: joystick · Direita: arrastar para olhar · segure ⛏ para quebrar, ▣ coloca e usa',
+  // tooltip do slot
+  'screen.durability': 'Durabilidade: {0} / {1}',
+  // clima
+  'msg.thunder': 'A tempestade chegou',
+  // achados da varredura por destino
+  'hud.pad_connected': 'Controle conectado: {0}',
+  'anvil.optional': 'opcional',
+  'pause.saving': 'salvando…',
+  // sopro do dragão (M19)
+  'death.breath': 'Você respirou o sopro do dragão',
+  // portal de passagem (M19)
+  'travel.gateway': 'Atravessando o vazio…',
   // @end
 };
 

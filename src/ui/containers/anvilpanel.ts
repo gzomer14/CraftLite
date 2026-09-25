@@ -44,7 +44,7 @@ export class AnvilPanel {
     this.input = document.createElement('input');
     this.input.type = 'text';
     this.input.maxLength = MAX_NAME_LENGTH;
-    this.input.placeholder = 'opcional';
+    this.input.placeholder = t('anvil.optional');
     this.input.id = 'anvil-name';
     // A tecla digitada no campo não pode andar, abrir a mochila nem fechar a tela.
     this.input.addEventListener('keydown', (e) => e.stopPropagation());

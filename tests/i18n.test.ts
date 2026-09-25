@@ -196,4 +196,48 @@ describe('varredura do código', () => {
     }
     expect(leaks).toEqual([]);
   });
+
+  /*
+   * A segunda rede, pelo **destino**: um literal que vai direto para a tela
+   * não pode ter palavra nenhuma, com ou sem cara de português. Foi o que
+   * faltou para pegar *"A tempestade chegou"* e *"Durabilidade:"*, que não têm
+   * acento nem palavra-função.
+   */
+  it('nada escrito direto para a tela: mensagem, texto, rótulo, dica', () => {
+    const SINK = /showMessage\(|onMessage\?*\.?\(|message\(|showSubtitle\(|setStatus\(|textContent\s*=|innerHTML\s*=|placeholder\s*=|\.title\s*=|'aria-label',|\blabel:\s*['`]|menuButton\(\s*['`]|menuPanel\(\s*['`]|menuSection\(\s*['`]|textField\(\s*['`]/;
+    // Palavras que são nome próprio ou sigla, iguais em qualquer idioma.
+    const PROPER = new Set([
+      'CraftLite', 'Português', 'English', 'DualSense', 'DualShock', 'Xbox', 'Nintendo', 'Switch',
+      'Pro', 'PS4', 'PS5', 'Protanopia', 'Deuteranopia', 'Tritanopia', 'WebGL', 'WebGL1',
+      'WebGL2', 'code', 'keyCode', 'div', 'class', 'flame', 'arrow', 'bar', 'span', 'FPS',
+    ]);
+    const leaks: string[] = [];
+    for (const file of files) {
+      if (file.replace(/\\/g, '/').startsWith('src/data/strings/')) continue;
+      const source = readFileSync(file, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
+      source.split('\n').forEach((raw, index) => {
+        const line = raw.replace(/\/\/.*$/, '');
+        if (!SINK.test(line) || /new Error\(|console\./.test(line)) return;
+        const literal = /'((?:[^'\\]|\\.)*)'|`((?:[^`\\]|\\.)*)`/g;
+        let m: RegExpExecArray | null;
+        while ((m = literal.exec(line)) !== null) {
+          // A chave de `t('…')`, o nome do atributo e o lado de uma comparação
+          // não vão para a tela.
+          const before = line.slice(0, m.index);
+          if (/\b(t|tf)\(\s*$|(===|!==)\s*$|setAttribute\(\s*$|value:\s*$/.test(before)) continue;
+          if (m[0] === "'aria-label'") continue;
+          if (/^\s*(===|!==)/.test(line.slice(m.index + m[0].length))) continue;
+          const text = (m[1] ?? m[2]).replace(/\$\{[^}]*\}/g, ' ');
+          // Pedaço de template aninhado: o regex de linha não o separa direito.
+          if (text.includes('${')) continue;
+          const words = text.match(/[A-Za-zÀ-ÿ]{3,}/g) ?? [];
+          if (words.some((w) => !PROPER.has(w))) {
+            leaks.push(`${file}:${index + 1}: ${text.slice(0, 80)}`);
+          }
+        }
+      });
+    }
+    expect(leaks).toEqual([]);
+  });
 });

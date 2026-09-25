@@ -17,6 +17,7 @@
 import { DIM_END, DIM_OVERWORLD } from '../data/dimensions';
 import { arriveAt, destinationOf, isPortalBlock } from './portal';
 import { buildEndPlatform, isEndPortal, type BlockChanged } from './endportal';
+import { gatewayArrival, gatewayDestination, isGateway } from './endgateway';
 import { END_SPAWN_Z, endArrivalX } from '../world/gen/end';
 import { freeStandY } from './spawnplacement';
 import { WORLD_HEIGHT } from '../world/chunk';
@@ -44,7 +45,7 @@ export type TravelPhase = 'idle' | 'loading' | 'done';
  * Por onde se viaja (M16): o portal do Nether (ida e volta), o do End que
  * leva à ilha, e o portal de saída que traz para casa depois do dragão.
  */
-export type TravelRoute = 'nether' | 'end_in' | 'end_out';
+export type TravelRoute = 'nether' | 'end_in' | 'end_out' | 'gateway';
 
 export interface TravelEvents {
   /**
@@ -57,6 +58,11 @@ export interface TravelEvents {
    * destino e o chunk esperado não chega nunca. Ver `begin`.
    */
   onDimensionChange(dimension: number, x: number, z: number): void;
+  /**
+   * Viagem sem trocar de dimensão (M19, o portal de passagem do End): leva o
+   * jogador para `(x, z)` na mesma dimensão, para o anel de chunks ir junto.
+   */
+  onTeleport?(x: number, z: number): void;
   /** O jogador saiu do outro lado, nestas coordenadas, pela rota dada. */
   onArrive(x: number, y: number, z: number, route: TravelRoute): void;
   /** Aviso curto para o HUD. */
@@ -123,11 +129,25 @@ export class Travel {
       return false;
     }
     this.charge++;
-    // O do End leva na hora, como no gênero; o do Nether carrega um segundo.
+    // O do End e o de passagem levam na hora; o do Nether carrega um segundo.
     if (kind === 'nether' && this.charge < PORTAL_TICKS) return false;
 
     this.begin(Math.floor(x), Math.floor(z), kind);
     return true;
+  }
+
+  /** O portal de passagem (M19): mesma dimensão, destino longe. */
+  private beginGateway(x: number): void {
+    gatewayDestination(this.world, x, DESTINATION);
+    this.route = 'gateway';
+    this.targetX = DESTINATION[0];
+    this.targetZ = DESTINATION[1];
+    this.targetY = -1;
+    this.charge = 0;
+    this.waiting = 0;
+    this.phase = 'loading';
+    this.events.onTeleport?.(this.targetX, this.targetZ);
+    this.events.onMessage?.(t('travel.gateway'));
   }
 
   /**
@@ -143,7 +163,8 @@ export class Travel {
    * distance. A física está congelada enquanto isto dura, então mover antes de
    * haver chão é seguro — o Y certo sai de `arriveAt` na chegada.
    */
-  begin(x: number, z: number, kind: 'nether' | 'end' = 'nether'): void {
+  begin(x: number, z: number, kind: 'nether' | 'end' | 'gateway' = 'nether'): void {
+    if (kind === 'gateway') { this.beginGateway(x); return; }
     let dimension: number;
     let message: string;
     this.targetY = -1;
@@ -206,6 +227,9 @@ export class Travel {
     if (this.route === 'end_in') {
       return buildEndPlatform(this.world, this.events.blockChanged ?? noChange);
     }
+    if (this.route === 'gateway') {
+      return gatewayArrival(this.world, this.targetX, this.targetZ, this.events.blockChanged ?? noChange);
+    }
     if (this.route === 'end_out') {
       const x = this.targetX;
       const z = this.targetZ;
@@ -225,7 +249,7 @@ export class Travel {
   }
 
   /** Que portal ocupa um dos dois blocos do jogador, ou `null`. */
-  private portalAt(x: number, y: number, z: number): 'nether' | 'end' | null {
+  private portalAt(x: number, y: number, z: number): 'nether' | 'end' | 'gateway' | null {
     const bx = Math.floor(x);
     const bz = Math.floor(z);
     const by = Math.floor(y + 0.1);
@@ -233,9 +257,13 @@ export class Travel {
       const state = this.world.getBlock(bx, by + dy, bz);
       if (isPortalBlock(state)) return 'nether';
       if (isEndPortal(state)) return 'end';
+      if (isGateway(state)) return 'gateway';
     }
     return null;
   }
 }
 
 function noChange(): void { /* ninguém ouve */ }
+
+/** Destino do portal de passagem, reusado. */
+const DESTINATION = new Int32Array(2);

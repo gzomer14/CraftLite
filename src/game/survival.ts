@@ -46,7 +46,7 @@ export type Difficulty = 0 | 1 | 2 | 3;
 /** Causa da morte, para a tela de morte (doc 08 §3.12). */
 export type DamageCause =
   | 'fall' | 'drown' | 'suffocate' | 'fire' | 'lava' | 'cactus' | 'void' | 'starve' | 'mob'
-  | 'arrow' | 'explosion' | 'poison';
+  | 'arrow' | 'explosion' | 'poison' | 'breath';
 
 const CAUSE_MESSAGES: Record<DamageCause, string> = {
   fall: t('death.fall'),
@@ -63,6 +63,7 @@ const CAUSE_MESSAGES: Record<DamageCause, string> = {
   // O veneno para em meio coração e nunca é a causa da morte; a mensagem
   // existe porque o tipo pede uma para cada causa.
   poison: t('death.poison'),
+  breath: t('death.breath'),
 };
 
 /**

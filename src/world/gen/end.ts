@@ -17,9 +17,16 @@
  * - o **portal de saída** no centro, apagado: a bacia de rocha-mãe com a
  *   coluna do meio. Ele acende quando o dragão cai.
  *
- * **Desvio consciente:** o gênero tem ilhas menores a mil blocos do centro,
- * com cidades; aqui só há a principal. Elas são exploração depois do fim, e o
- * doc 14 pede o fim.
+ * **As ilhas de fora** (M19): a partir de `OUTER_START` blocos do centro, o
+ * vazio ganha ilhas menores, uma por célula de `OUTER_CELL` blocos (metade
+ * das células), de 12 a 27 de raio, em alturas diferentes. Algumas têm um
+ * **santuário** de obsidiana com um baú (`END_SHRINE`). Chega-se a elas pelo
+ * portal de passagem que aparece na ilha principal quando o dragão cai
+ * (`game/endportal.ts`).
+ *
+ * **Desvio consciente:** o gênero tem cidades nas ilhas de fora; aqui há o
+ * santuário com o baú. A exploração depois do fim existe, sem virar um
+ * segundo jogo.
  *
  * Sem luz do céu: a ambiente da dimensão (`data/dimensions.ts`) é o que
  * ilumina, como no Nether.
@@ -27,10 +34,12 @@
 
 import { AIR, BEDROCK, BLOCK_BY_NAME, makeState } from '../../data/blocks';
 import { DIM_END, dimensionOf } from '../../data/dimensions';
+import { END_SHRINE } from '../../data/structures';
 import { Noise } from '../../core/noise';
 import { hash2 } from '../../core/rng';
 import { ChunkColumn, SECTION_SIZE } from '../chunk';
 import { computeChunkLight } from './terrain';
+import { stamp } from './structures';
 
 /** Altura da superfície da ilha no centro, e do piso do portal de saída. */
 export const END_ISLAND_Y = 56;
@@ -67,6 +76,16 @@ const ARRIVAL_MAX_X = ISLAND_RADIUS + ISLAND_WOBBLE + 8;
 
 /** Raio da bacia do portal de saída. */
 export const EXIT_RADIUS = 3;
+
+/** Ilhas de fora (M19): onde começam, e o lado da célula de cada uma. */
+export const OUTER_START = 768;
+const OUTER_CELL = 80;
+/** Onde fica o portal de passagem, na ilha principal: a oeste, longe da chegada. */
+export const GATEWAY_X = -(ISLAND_RADIUS - 24);
+export const GATEWAY_Z = 0;
+/** Para onde ele leva: o ponto do vazio procurado, na mesma direção. */
+const GATEWAY_REACH = 1000;
+const SALT_OUTER = 34;
 
 const SALT_EDGE = 31;
 const SALT_TOP = 32;
@@ -181,6 +200,103 @@ function islandColumn(noise: EndNoise, x: number, z: number, out: Int32Array): n
   return top;
 }
 
+/** Uma ilha de fora: centro, raio, altura do topo e se tem santuário. */
+interface OuterIsland { x: number; z: number; radius: number; top: number; shrine: boolean }
+const ISLAND: OuterIsland = { x: 0, z: 0, radius: 0, top: 0, shrine: false };
+
+/**
+ * A ilha da célula `(cellX, cellZ)`, em `out`; false se a célula não tem ilha.
+ * Tudo sai do hash da célula: gerar em qualquer ordem dá o mesmo vazio.
+ */
+function outerIsland(seed: number, cellX: number, cellZ: number, out: OuterIsland): boolean {
+  const h = hash2(endSeed(seed), cellX, cellZ, SALT_OUTER);
+  if ((h & 1) === 0) return false;
+  out.x = cellX * OUTER_CELL + 16 + ((h >>> 1) % (OUTER_CELL - 32));
+  out.z = cellZ * OUTER_CELL + 16 + ((h >>> 7) % (OUTER_CELL - 32));
+  if (Math.hypot(out.x, out.z) < OUTER_START) return false;
+  out.radius = 12 + ((h >>> 13) % 16);
+  out.top = END_ISLAND_Y - 6 + ((h >>> 17) % 14);
+  out.shrine = out.radius >= 18 && ((h >>> 22) & 3) === 0;
+  return true;
+}
+
+/** Superfície de ilha de fora na coluna, ou −1. `out[0]` recebe o fundo. */
+function outerColumn(seed: number, noise: EndNoise, x: number, z: number, out: Int32Array): number {
+  if (Math.hypot(x, z) < OUTER_START - OUTER_CELL) return -1;
+  const cellX = Math.floor(x / OUTER_CELL);
+  const cellZ = Math.floor(z / OUTER_CELL);
+  let best = -1;
+  for (let dz = -1; dz <= 1; dz++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (!outerIsland(seed, cellX + dx, cellZ + dz, ISLAND)) continue;
+      const distance = Math.hypot(x - ISLAND.x, z - ISLAND.z);
+      const edge = ISLAND.radius + 4 * noise.edge.noise2(x / 20, z / 20);
+      if (distance >= edge) continue;
+      const t = 1 - distance / edge;
+      const top = ISLAND.top + Math.round(2 * Math.min(1, t * 2) + noise.top.noise2(x / 16, z / 16));
+      if (top <= best) continue;
+      best = top;
+      out[0] = Math.min(top - 1, ISLAND.top - Math.round(ISLAND.radius * 0.8 * Math.sqrt(t)));
+    }
+  }
+  return best;
+}
+
+/**
+ * A ilha de fora mais perto do ponto a `GATEWAY_REACH` blocos na direção do
+ * portal de passagem — para onde ele leva. `out` recebe `[x, z]` do centro
+ * dela; sem ilha nenhuma por perto (quase impossível), o próprio ponto.
+ */
+export function gatewayTarget(seed: number, out: Int32Array): void {
+  const length = Math.hypot(GATEWAY_X, GATEWAY_Z) || 1;
+  const px = Math.round((GATEWAY_X / length) * GATEWAY_REACH);
+  const pz = Math.round((GATEWAY_Z / length) * GATEWAY_REACH);
+  out[0] = px;
+  out[1] = pz;
+  let bestDistance = Infinity;
+  const cellX = Math.floor(px / OUTER_CELL);
+  const cellZ = Math.floor(pz / OUTER_CELL);
+  for (let dz = -2; dz <= 2; dz++) {
+    for (let dx = -2; dx <= 2; dx++) {
+      if (!outerIsland(seed, cellX + dx, cellZ + dz, ISLAND)) continue;
+      const distance = Math.hypot(ISLAND.x - px, ISLAND.z - pz);
+      if (distance >= bestDistance) continue;
+      bestDistance = distance;
+      out[0] = ISLAND.x;
+      out[1] = ISLAND.z;
+    }
+  }
+}
+
+/** Superfície (ilha principal ou de fora) na coluna, ou −1. Para quem chega. */
+export function endSurfaceAt(seed: number, noise: EndNoise, x: number, z: number): number {
+  const main = islandColumn(noise, x, z, BOTTOM);
+  return main >= 0 ? main : outerColumn(seed, noise, x, z, BOTTOM);
+}
+
+/** O santuário das ilhas que caem no chunk, carimbado no centro de cada uma. */
+function stampShrines(chunk: ChunkColumn, seed: number, noise: EndNoise): void {
+  const x0 = chunk.cx * SECTION_SIZE;
+  const z0 = chunk.cz * SECTION_SIZE;
+  if (Math.hypot(x0, z0) < OUTER_START - OUTER_CELL * 2) return;
+  const cellX = Math.floor(x0 / OUTER_CELL);
+  const cellZ = Math.floor(z0 / OUTER_CELL);
+  for (let dz = -1; dz <= 1; dz++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (!outerIsland(seed, cellX + dx, cellZ + dz, ISLAND) || !ISLAND.shrine) continue;
+      const half = END_SHRINE.size[0] >> 1;
+      if (ISLAND.x + half < x0 || ISLAND.x - half >= x0 + SECTION_SIZE) continue;
+      if (ISLAND.z + half < z0 || ISLAND.z - half >= z0 + SECTION_SIZE) continue;
+      const cx = ISLAND.x;
+      const cz = ISLAND.z;
+      const top = outerColumn(seed, noise, cx, cz, SHRINE_BOTTOM);
+      if (top < 0) continue;
+      stamp(chunk, seed, END_SHRINE, cx - half, top, cz - half);
+    }
+  }
+}
+const SHRINE_BOTTOM = new Int32Array(1);
+
 /** Gera uma coluna do End. */
 export function generateEndChunk(seed: number, noise: EndNoise, cx: number, cz: number): ChunkColumn {
   const chunk = new ChunkColumn(cx, cz);
@@ -191,7 +307,8 @@ export function generateEndChunk(seed: number, noise: EndNoise, cx: number, cz: 
       chunk.biomeMap[(lz << 4) | lx] = 0;
       const x = cx * SECTION_SIZE + lx;
       const z = cz * SECTION_SIZE + lz;
-      const top = islandColumn(noise, x, z, BOTTOM);
+      let top = islandColumn(noise, x, z, BOTTOM);
+      if (top < 0) top = outerColumn(seed, noise, x, z, BOTTOM);
       if (top >= 0) {
         for (let y = Math.max(1, BOTTOM[0]); y <= top; y++) chunk.setBlock(lx, y, lz, END_STONE);
       }
@@ -206,6 +323,7 @@ export function generateEndChunk(seed: number, noise: EndNoise, cx: number, cz: 
       exitPortalColumn(chunk, lx, lz, x, z, air);
     }
   }
+  stampShrines(chunk, seed, noise);
   chunk.recomputeHeightMap();
   computeChunkLight(chunk);
   return chunk;

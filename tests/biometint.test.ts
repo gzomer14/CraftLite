@@ -7,6 +7,7 @@
  * que a thread principal calcula (tem que ser o mesmo do gerador) e o anel de
  * chunks em volta da câmera, com GL de mentira.
  */
+import { TERRAIN_VS_100 } from '../src/render/shaders/terrain.glsl';
 import { describe, expect, it } from 'vitest';
 import { BIOMES, pickBiome, pickClimateBiome } from '../src/data/biomes';
 import {
@@ -124,15 +125,15 @@ describe('clima na thread principal', () => {
 
 /** GL de mentira: conta os uploads, guarda o último pedaço. */
 function fakeGl() {
-  const calls = { sub: 0, full: 0 };
+  const calls = { sub: 0, full: 0, formats: [] as number[] };
   const gl = {
-    TEXTURE_2D: 1, RGBA8: 2, RGBA: 3, UNSIGNED_BYTE: 4, RG8: 5, RG: 6, LINEAR: 7,
+    TEXTURE_2D: 1, RGBA8: 2, RGBA: 3, UNSIGNED_BYTE: 4, RG8: 5, RG: 6, LINEAR: 7, LUMINANCE_ALPHA: 15,
     CLAMP_TO_EDGE: 8, REPEAT: 9, TEXTURE_MIN_FILTER: 10, TEXTURE_MAG_FILTER: 11,
     TEXTURE_WRAP_S: 12, TEXTURE_WRAP_T: 13, UNPACK_ALIGNMENT: 14, TEXTURE0: 100,
     createTexture: () => ({}),
     bindTexture: () => {},
-    texImage2D: () => { calls.full++; },
-    texSubImage2D: () => { calls.sub++; },
+    texImage2D: (...args: unknown[]) => { calls.full++; calls.formats.push(args[6] as number); },
+    texSubImage2D: (...args: unknown[]) => { calls.sub++; calls.formats.push(args[6] as number); },
     texParameteri: () => {},
     pixelStorei: () => {},
     activeTexture: () => {},
@@ -153,7 +154,7 @@ describe('anel de clima em volta da câmera', () => {
 
   it('preenche do centro para fora, no máximo 32 chunks por quadro, e não refaz', () => {
     const { gl, calls } = fakeGl();
-    const tint = new BiomeTint(gl);
+    const tint = new BiomeTint(gl, gl);
     tint.setRenderDistance(4);
     tint.setSeed(2);
     const ring = (2 * 5 + 1) ** 2;
@@ -177,11 +178,30 @@ describe('anel de clima em volta da câmera', () => {
 
   it('no Nether não calcula clima', () => {
     const { gl } = fakeGl();
-    const tint = new BiomeTint(gl);
+    const tint = new BiomeTint(gl, gl);
     tint.setRenderDistance(4);
     tint.setSeed(2);
     tint.enabled = false;
     tint.update(0, 0);
     expect(tint.filled).toBe(0);
+  });
+});
+
+describe('tint de bioma no WebGL1 (M19)', () => {
+  it('sem RG8, o clima vai em LUMINANCE_ALPHA: os mesmos dois bytes por coluna', () => {
+    const { gl, calls } = fakeGl();
+    const tint = new BiomeTint(gl as unknown as WebGLRenderingContext, null);
+    tint.setRenderDistance(2);
+    tint.setSeed(2);
+    tint.update(0, 0);
+    expect(tint.filled).toBeGreaterThan(0);
+    // O primeiro upload é a tabela de cores (RGBA); os de clima, todos em LA.
+    expect(calls.formats.slice(1).every((f) => f === 15)).toBe(true);
+  });
+
+  it('o shader WebGL1 lê o clima no vertex, com o mesmo define do WebGL2', () => {
+    expect(TERRAIN_VS_100).toContain('#ifdef BIOME_TINT');
+    expect(TERRAIN_VS_100).toContain('texture2DLod(uClimate');
+    expect(TERRAIN_VS_100).toContain('.ra');
   });
 });

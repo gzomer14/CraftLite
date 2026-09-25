@@ -542,5 +542,17 @@ export const EN: Readonly<Record<StringKey, string>> = {
   'tag.planks': 'planks of any wood',
   // dica de toque no modo B
   'hint.touch_b': 'Left: joystick · Right: drag to look · hold ⛏ to break, ▣ places and uses',
+  // tooltip do slot
+  'screen.durability': 'Durability: {0} / {1}',
+  // clima
+  'msg.thunder': 'A thunderstorm has arrived',
+  // achados da varredura por destino
+  'hud.pad_connected': 'Gamepad connected: {0}',
+  'anvil.optional': 'optional',
+  'pause.saving': 'saving…',
+  // sopro do dragão (M19)
+  'death.breath': 'You breathed in the dragon\'s breath',
+  // portal de passagem (M19)
+  'travel.gateway': 'Crossing the void…',
   // @end
 };

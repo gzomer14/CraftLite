@@ -21,6 +21,7 @@
  * Tudo roda só no End, e custa uma volta pelo pool de mobs por tick.
  */
 
+import { openMainGateway } from './endgateway';
 import { DIM_END } from '../data/dimensions';
 import { MOB_BY_NAME, mobDef } from '../data/mobs';
 import { FLAG_PERSISTENT } from '../entity/mobstore';
@@ -37,6 +38,11 @@ const CRYSTAL = MOB_BY_NAME.get('end_crystal')?.id ?? -1;
 const HEAL_EVERY = 10;
 /** Onde o dragão nasce: alto, sobre o centro. */
 const SPAWN_HEIGHT = END_ISLAND_Y + 40;
+/** A nuvem do sopro (M19): raio, altura, e o dano a cada meio segundo dentro dela. */
+export const BREATH_RADIUS = 3.5;
+const BREATH_HEIGHT = 2.5;
+const BREATH_DAMAGE = 3;
+const BREATH_EVERY = 10;
 
 /** O que vai para o save do mundo. */
 export interface EndState {
@@ -56,6 +62,10 @@ export interface DragonFightHost {
   sound(name: string, x: number, y: number, z: number): void;
   message(text: string): void;
   achievement(name: string): void;
+  /** Onde o jogador está, para a nuvem do sopro (M19). */
+  readonly player: { readonly x: number; readonly y: number; readonly z: number };
+  /** O sopro fere (M19). */
+  hurtPlayer(amount: number): void;
 }
 
 export class DragonFight {
@@ -81,7 +91,19 @@ export class DragonFight {
     this.bossHealth = -1;
     this.crystalsAlive = 0;
     dragonState.crystals = 0;
+    dragonState.breathTicks = 0;
   }
+
+  /** A nuvem do sopro no chão, se houver: `null` sem nuvem. O render lê daqui. */
+  get breath(): { x: number; y: number; z: number; ticks: number } | null {
+    if (dragonState.breathTicks <= 0) return null;
+    this.breathView.x = dragonState.breathX;
+    this.breathView.y = dragonState.breathY;
+    this.breathView.z = dragonState.breathZ;
+    this.breathView.ticks = dragonState.breathTicks;
+    return this.breathView;
+  }
+  private readonly breathView = { x: 0, y: 0, z: 0, ticks: 0 };
 
   /**
    * Antes de os mobs do End saírem da memória (portal, morte, save): guarda a
@@ -109,14 +131,30 @@ export class DragonFight {
     if (world.dimension !== DIM_END) return;
     this.tickCount++;
     this.tickCrystals();
+    this.tickBreath();
     if (this.state.killed) {
       this.bossHealth = -1;
       // Chunk do centro carregado de novo sem o portal aceso (gerado da seed):
       // acende outra vez. Idempotente.
       if (world.isLoaded(0, 0) && !exitPortalOpen(world)) openExitPortal(world, this.host.blockChanged);
+      // O portal de passagem para as ilhas de fora (M19), idem.
+      if (this.tickCount % 20 === 0) openMainGateway(world, this.host.blockChanged);
       return;
     }
     this.tickDragon();
+  }
+
+  /** Quem fica na nuvem do sopro leva dano a cada meio segundo (M19). */
+  private tickBreath(): void {
+    if (dragonState.breathTicks <= 0) return;
+    dragonState.breathTicks--;
+    if (dragonState.breathTicks % BREATH_EVERY !== 0) return;
+    const p = this.host.player;
+    const dx = p.x - dragonState.breathX;
+    const dz = p.z - dragonState.breathZ;
+    if (dx * dx + dz * dz > BREATH_RADIUS * BREATH_RADIUS) return;
+    if (Math.abs(p.y - dragonState.breathY) > BREATH_HEIGHT) return;
+    this.host.hurtPlayer(BREATH_DAMAGE);
   }
 
   private tickCrystals(): void {
@@ -186,6 +224,7 @@ export class DragonFight {
     this.bossHealth = -1;
     this.dragonPlaced = false;
     if (world.isLoaded(0, 0)) openExitPortal(world, this.host.blockChanged);
+    openMainGateway(world, this.host.blockChanged);
     this.host.sound('block/end_portal', 0.5, END_ISLAND_Y + 2, 0.5);
     this.host.message(t('msg.dragon_down'));
     this.host.achievement('kill_dragon');

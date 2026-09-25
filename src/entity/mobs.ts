@@ -8,31 +8,28 @@
  * escolher onde nascer (é `spawn.ts`) e desenhar (é `render/mobrender.ts`).
  */
 
-import { LAVA, blockIdOf } from '../data/blocks';
-import { ITEM_BY_NAME } from '../data/items';
-import { lootingBonus } from '../game/enchanting';
 import { MOBS, mobDef, type GoalName, type MobDef, type ShotKind } from '../data/mobs';
 import { raycast } from '../world/raycast';
 import { GOALS, type AiContext, type Goal } from './ai/goals';
 import { VILLAGE_GOALS } from './ai/villagegoals';
 import { DRAGON_GOALS } from './ai/dragongoals';
-import { babyVariant, deathDrops, tickHusbandry } from './husbandry';
-import { Pathfinder, REQUESTS_PER_TICK, standHeight } from './ai/pathfinder';
+import { deathDrops, tickHusbandry } from './husbandry';
+import { breed, tryFeed, tryTame, type CareHost } from './mobcare';
+import { pickMob } from './mobpick';
+import { environmentHarm, rollDrop, shouldDespawn, teleport } from './mobrules';
+
+export { BREED_COOLDOWN, GROW_TICKS, LOVE_TICKS } from './mobcare';
+export { rayBoxDistance } from './mobpick';
+import { Pathfinder, REQUESTS_PER_TICK } from './ai/pathfinder';
 import {
-  FLAG_ANGRY, FLAG_PERSISTENT, FLAG_TAMED, MobStore, PATH_MAX, slimeHealth, slimeScale,
+  FLAG_ANGRY, FLAG_DYING, FLAG_PERSISTENT, FLAG_TAMED, MobStore, PATH_MAX, slimeHealth, slimeScale,
 } from './mobstore';
-import type { Drop } from '../data/loot';
 import type { World } from '../world/world';
 
 /** Ticks entre buscas de alvo (doc 07 §2). */
 const TARGET_INTERVAL = 10;
 /** Ticks sem linha de visão até perder o alvo: 5 s. */
 const BLIND_LIMIT = 100;
-/** Distância em que o hostil despawna na hora (doc 07 §4). */
-const DESPAWN_HARD = 128;
-/** A partir daqui, 1/800 de chance por tick. */
-const DESPAWN_SOFT = 32;
-const DESPAWN_CHANCE = 800;
 /**
  * Força da explosão do creeper (doc 07 §6). No Difícil o doc 06 §10 pede raio
  * maior: `explode()` deriva o raio de `power * 1.3`, então 3 → 3,9 blocos e
@@ -42,24 +39,10 @@ const CREEPER_POWER = 3;
 const CREEPER_POWER_HARD = 4;
 /** Aranha só fica hostil no escuro (doc 07 §2). */
 const SPIDER_LIGHT_LIMIT = 11;
-/** Ticks de fogo ao pegar sol, e dano a cada 20 ticks. */
-const SUNLIGHT_FIRE_TICKS = 160;
-/** Dano de lava por meio segundo, e quanto tempo o mob continua queimando. */
-const LAVA_DAMAGE = 4;
-const LAVA_FIRE_TICKS = 100;
 /** Ticks de piscada vermelha ao levar dano. */
 const HURT_TICKS = 10;
 /** Força do empurrão que o mob dá no jogador. */
 const KNOCKBACK = 0.42;
-/** Ticks que o bicho fica "no amor" depois de comer o item certo (30 s). */
-export const LOVE_TICKS = 600;
-/** Ticks até o filhote virar adulto (5 min) — o original leva 20. */
-export const GROW_TICKS = 6000;
-/** Ticks entre duas reproduções do mesmo bicho (2,5 min). */
-export const BREED_COOLDOWN = 3000;
-/** Quanto cada item de comida apressa o crescimento do filhote. */
-const FEED_GROWTH = 600;
-
 export interface MobEvents {
   /** Item dropado ao morrer. */
   onDrop(item: number, count: number, x: number, y: number, z: number): void;
@@ -136,6 +119,8 @@ export class Mobs {
   private rng: () => number = Math.random;
 
   private readonly ctx: AiContext;
+  /** O que domar, alimentar e cruzar precisam daqui (`mobcare.ts`). */
+  private readonly care: CareHost;
   private readonly player: PlayerView = { x: 0, y: 0, z: 0, eyeY: 0, held: -1, alive: true };
   private tickCount = 0;
   /** Explosões de morte a disparar no próximo tick: `[x, y, z, força, …]` (M16). */
@@ -156,6 +141,12 @@ export class Mobs {
     this.pathTargetY = new Int32Array(capacity);
     this.pathTargetZ = new Int32Array(capacity);
 
+    this.care = {
+      store: this.store,
+      random: () => this.rng(),
+      sound: (i, kind) => this.emitSound(i, kind),
+      onXp: (amount, x, y, z) => this.events.onXp(amount, x, y, z),
+    };
     // O contexto é um objeto só, reusado por todos os mobs em todos os ticks:
     // criar um por mob por tick geraria 400 objetos por segundo em T0.
     this.ctx = {
@@ -327,7 +318,11 @@ export class Mobs {
       tickHusbandry(s, i, mobDef(s.type[i]), this.world, this.rng, this.events);
       this.ambientSound(i);
 
-      if (this.tickDespawn(i)) { i--; continue; }
+      if (shouldDespawn(s, i, this.player.x, this.player.z, this.difficulty, this.rng)) {
+        s.removeAt(i);
+        i--;
+        continue;
+      }
     }
 
     this.drainPathQueue();
@@ -335,42 +330,14 @@ export class Mobs {
 
   // --- ambiente -------------------------------------------------------------
 
-  /** Fogo, lava, void e sol. Devolve true se o mob morreu (e saiu do pool). */
+  /** Fogo, lava, void e sol (`mobrules.ts`). Devolve true se o mob morreu. */
   private tickEnvironment(i: number): boolean {
-    const s = this.store;
-    const def = mobDef(s.type[i]);
-
-    if (def.traits.burnsInSunlight === true && this.isDay && this.ctx.skyLight >= 15
-      && s.fireTicks[i] <= 0) {
-      s.fireTicks[i] = SUNLIGHT_FIRE_TICKS;
-    }
-
-    /*
-     * Lava (M7). O traço `fireImmune` existia desde o M5 e **nenhum mob o
-     * declarava** — não havia como pegar fogo além do sol. O Nether é metade
-     * lava, e sem isto o ghast e o porco zumbi passeariam dentro dela junto com
-     * o zumbi que os seguiu pelo portal.
-     */
-    if (def.traits.fireImmune !== true && this.inLava(i)) {
-      s.fireTicks[i] = LAVA_FIRE_TICKS;
-      if (this.tickCount % 10 === 0) return this.damage(i, LAVA_DAMAGE, 'fire');
-    }
-
-    if (s.fireTicks[i] > 0 && def.traits.fireImmune !== true) {
-      s.fireTicks[i]--;
-      if (s.fireTicks[i] % 20 === 0) return this.damage(i, 1, 'fire');
-    }
-
-    if (s.y[i] < -4) return this.damage(i, 4, 'void');
-    return false;
-  }
-
-  /** true se os pés do mob estão dentro de lava. */
-  private inLava(i: number): boolean {
-    const s = this.store;
-    return blockIdOf(this.world.getBlock(
-      Math.floor(s.x[i]), Math.floor(s.y[i] + 0.1), Math.floor(s.z[i]),
-    )) === LAVA;
+    const harm = environmentHarm(
+      this.store, i, this.world, this.isDay, this.ctx.skyLight, this.tickCount,
+    );
+    if (harm <= 0) return false;
+    // A causa só distingue o golpe do jogador; queda no void e fogo dão no mesmo.
+    return this.damage(i, harm, this.store.y[i] < -4 ? 'void' : 'fire');
   }
 
   /** Sons ambientes esparsos — um mob silencioso não assusta. */
@@ -569,6 +536,8 @@ export class Mobs {
   damage(i: number, amount: number, cause: 'player' | 'fire' | 'void' | 'fall'): boolean {
     const s = this.store;
     if (amount <= 0) return false;
+    // Na agonia já não há o que ferir: o fim é o goal que decide (M19).
+    if (s.hasFlag(i, FLAG_DYING)) return false;
 
     const def = mobDef(s.type[i]);
     s.health[i] -= amount;
@@ -585,6 +554,14 @@ export class Mobs {
     }
 
     if (s.health[i] > 0) {
+      this.emitSound(i, 'hurt');
+      return false;
+    }
+    // Quem morre devagar entra na agonia com um fio de vida; o goal o leva ao
+    // fim, e o `tick` o tira do pool quando a vida zerar.
+    if (def.traits.deathTicks !== undefined) {
+      s.health[i] = 0.01;
+      s.setFlag(i, FLAG_DYING, true);
       this.emitSound(i, 'hurt');
       return false;
     }
@@ -606,7 +583,8 @@ export class Mobs {
     const baby = s.isBaby(i);
     if (!baby) {
       for (let d = 0; d < def.drops.length; d++) {
-        this.rollDrop(def.drops[d], x, y, z);
+        const drop = rollDrop(def.drops[d], this.rng, this.looting);
+        if (drop !== null) this.events.onDrop(drop.item, drop.count, x, y, z);
       }
     }
     deathDrops(s, i, def, this.events, x, y, z);
@@ -631,31 +609,6 @@ export class Mobs {
     }
   }
 
-  /**
-   * Sorteia um drop.
-   *
-   * Diferente de bloco quebrado, aqui o sorteio **não** é derivado da seed: o
-   * drop de um mob não é conteúdo do mundo, e amarrá-lo à posição faria o mesmo
-   * zumbi soltar sempre a mesma coisa no mesmo lugar.
-   */
-  private rollDrop(drop: Drop, x: number, y: number, z: number): void {
-    const item = ITEM_BY_NAME.get(drop.item);
-    if (item === undefined) return;
-    if (drop.chance !== undefined && this.rng() >= drop.chance) return;
-
-    let count: number;
-    if (typeof drop.count === 'number') {
-      count = drop.count;
-    } else {
-      count = drop.count[0] + Math.floor(this.rng() * (drop.count[1] - drop.count[0] + 1));
-    }
-    // Pilhagem só acrescenta ao que já saiu: um drop que falhou no sorteio de
-    // chance continua não saindo.
-    if (count > 0) count += lootingBonus(this.looting, this.rng());
-    if (count <= 0) return;
-    this.events.onDrop(item.id, count, x, y, z);
-  }
-
   /** Lobo atacado chama o bando (doc 07 §2). */
   private callForHelp(i: number): void {
     const s = this.store;
@@ -668,105 +621,6 @@ export class Mobs {
       s.setFlag(k, FLAG_ANGRY, true);
       s.hasTarget[k] = 1;
     }
-  }
-
-  /** Enderman teleporta para uma posição válida num raio de 16 (doc 07 §2). */
-  teleport(i: number): void {
-    const s = this.store;
-    const tall = Math.max(1, Math.ceil(s.height(i)));
-    for (let attempt = 0; attempt < 8; attempt++) {
-      const x = Math.floor(s.x[i] + (this.rng() - 0.5) * 32);
-      const z = Math.floor(s.z[i] + (this.rng() - 0.5) * 32);
-      const y = standHeight(this.world, x, Math.floor(s.y[i]) + 2, z, tall);
-      if (y < 0) continue;
-      s.x[i] = x + 0.5; s.y[i] = y; s.z[i] = z + 0.5;
-      s.prevX[i] = s.x[i]; s.prevY[i] = s.y[i]; s.prevZ[i] = s.z[i];
-      s.vx[i] = 0; s.vy[i] = 0; s.vz[i] = 0;
-      s.clearMoveTarget(i);
-      this.events.onSound('mob/enderman_teleport', s.x[i], s.centerY(i), s.z[i]);
-      return;
-    }
-  }
-
-  /**
-   * Tenta domar o mob `i` com `itemName` (doc 07 §2: osso, 1/3 de chance).
-   *
-   * Devolve `'none'` se o mob não é domável ou o item é outro — aí o item não é
-   * consumido e o clique segue o caminho normal (colocar bloco, abrir baú).
-   */
-  tryTame(i: number, itemName: string): 'none' | 'tamed' | 'failed' {
-    const s = this.store;
-    const traits = mobDef(s.type[i]).traits;
-    if (traits.tameItem === undefined || traits.tameItem !== itemName) return 'none';
-    if (s.hasFlag(i, FLAG_TAMED)) return 'none';
-
-    if (this.rng() >= (traits.tameChance ?? 1 / 3)) {
-      this.emitSound(i, 'hurt');
-      return 'failed';
-    }
-    s.setFlag(i, FLAG_TAMED, true);
-    s.setFlag(i, FLAG_PERSISTENT, true);
-    s.setFlag(i, FLAG_ANGRY, false);
-    s.hasTarget[i] = 0;
-    // Domado ganha vida cheia de bicho de estimação (doc 07 §2: HP 20).
-    s.health[i] = 20;
-    this.emitSound(i, 'ambient');
-    return 'tamed';
-  }
-
-  /**
-   * Dá o item de reprodução na mão do jogador ao mob `i`.
-   *
-   * Adulto pronto entra no amor; filhote cresce mais rápido; quem acabou de
-   * cruzar recusa. Devolve `'none'` quando o item não serve — aí o clique
-   * segue o caminho normal (comer, colocar bloco).
-   */
-  tryFeed(i: number, itemName: string): 'none' | 'love' | 'grow' | 'wait' {
-    const s = this.store;
-    const traits = mobDef(s.type[i]).traits;
-    if (traits.breedItem === undefined || traits.breedItem !== itemName) return 'none';
-
-    if (s.isBaby(i)) {
-      s.growTicks[i] = Math.max(0, s.growTicks[i] - FEED_GROWTH);
-      if (s.growTicks[i] === 0) s.scale[i] = 1;
-      this.emitSound(i, 'ambient');
-      return 'grow';
-    }
-    if (s.breedCooldown[i] > 0 || s.loveTicks[i] > 0) return 'wait';
-
-    s.loveTicks[i] = LOVE_TICKS;
-    s.setFlag(i, FLAG_PERSISTENT, true);
-    this.emitSound(i, 'ambient');
-    return 'love';
-  }
-
-  /**
-   * Nasce um filhote entre os dois pais (doc 14 — M6).
-   *
-   * Os dois saem do amor e entram em cooldown mesmo se o pool estiver cheio:
-   * senão um par preso num canto ficaria tentando cruzar todo tick.
-   */
-  breed(i: number, partner: number): void {
-    const s = this.store;
-    s.loveTicks[i] = 0;
-    s.loveTicks[partner] = 0;
-    s.breedCooldown[i] = BREED_COOLDOWN;
-    s.breedCooldown[partner] = BREED_COOLDOWN;
-    s.clearMoveTarget(i);
-    s.clearMoveTarget(partner);
-
-    const x = (s.x[i] + s.x[partner]) * 0.5;
-    const y = Math.max(s.y[i], s.y[partner]);
-    const z = (s.z[i] + s.z[partner]) * 0.5;
-    const baby = this.store.spawn(
-      s.type[i], x, y, z, babyVariant(mobDef(s.type[i]), s.variant[i]),
-    );
-    if (baby >= 0) {
-      this.store.makeBaby(baby, GROW_TICKS);
-      this.store.setFlag(baby, FLAG_PERSISTENT, true);
-      this.emitSound(baby, 'ambient');
-    }
-    this.events.onXp(1 + Math.floor(this.rng() * 7), x, y, z);
   }
 
   /**
@@ -794,6 +648,34 @@ export class Mobs {
     s.vy[target] = 0.45;
   }
 
+  /** Enderman teleporta num raio de 16 (`mobrules.ts`). */
+  teleport(i: number): void {
+    teleport(this.store, i, this.world, this.rng, this.events.onSound);
+  }
+
+  /** Doma o mob com o item, se ele aceitar (`mobcare.ts`). */
+  tryTame(i: number, itemName: string): 'none' | 'tamed' | 'failed' {
+    return tryTame(this.care, i, itemName);
+  }
+
+  /** Dá o item de reprodução ao mob (`mobcare.ts`). */
+  tryFeed(i: number, itemName: string): 'none' | 'love' | 'grow' | 'wait' {
+    return tryFeed(this.care, i, itemName);
+  }
+
+  /** Nasce um filhote entre os dois pais (`mobcare.ts`). */
+  breed(i: number, partner: number): void {
+    breed(this.care, i, partner);
+  }
+
+  /** O mob mais próximo que o raio atravessa, ou −1 (`mobpick.ts`). */
+  pickTarget(
+    ox: number, oy: number, oz: number,
+    dx: number, dy: number, dz: number, maxDistance: number,
+  ): number {
+    return pickMob(this.store, ox, oy, oz, dx, dy, dz, maxDistance);
+  }
+
   /** Provoca um mob (usado quando o jogador olha para o enderman, por exemplo). */
   provoke(i: number): void {
     this.store.setFlag(i, FLAG_ANGRY, true);
@@ -802,57 +684,6 @@ export class Mobs {
 
   // --- despawn --------------------------------------------------------------
 
-  /** Regras do doc 07 §4. Devolve true se o mob saiu do pool. */
-  private tickDespawn(i: number): boolean {
-    const s = this.store;
-    const def = mobDef(s.type[i]);
-    if (!def.despawnable || s.hasFlag(i, FLAG_PERSISTENT)) return false;
-
-    const dx = s.x[i] - this.player.x;
-    const dz = s.z[i] - this.player.z;
-    const distanceSq = dx * dx + dz * dz;
-
-    if (distanceSq > DESPAWN_HARD * DESPAWN_HARD) {
-      s.removeAt(i);
-      return true;
-    }
-    if (distanceSq > DESPAWN_SOFT * DESPAWN_SOFT && this.rng() < 1 / DESPAWN_CHANCE) {
-      s.removeAt(i);
-      return true;
-    }
-    // Pacífico: hostis somem (doc 06 §10).
-    if (this.difficulty === 0 && def.category === 'hostile') {
-      s.removeAt(i);
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * O mob mais próximo de um raio, para o jogador atacar.
-   * Devolve o índice ou −1.
-   */
-  pickTarget(
-    ox: number, oy: number, oz: number,
-    dx: number, dy: number, dz: number, maxDistance: number,
-  ): number {
-    const s = this.store;
-    let best = -1;
-    let bestDistance = maxDistance;
-    for (let i = 0; i < s.active; i++) {
-      const width = s.width(i);
-      const height = s.height(i);
-      const distance = rayBoxDistance(
-        ox, oy, oz, dx, dy, dz,
-        s.x[i] - width / 2, s.y[i], s.z[i] - width / 2,
-        s.x[i] + width / 2, s.y[i] + height, s.z[i] + width / 2,
-      );
-      if (distance < 0 || distance >= bestDistance) continue;
-      bestDistance = distance;
-      best = i;
-    }
-    return best;
-  }
 }
 
 /** Total de tipos de mob — o renderer usa para dimensionar buffers. */
@@ -860,36 +691,3 @@ export const MOB_TYPES = MOBS.length;
 
 /** Todos os goals: os de sempre e os da aldeia (M9). */
 const ALL_GOALS: Record<GoalName, Goal> = { ...GOALS, ...VILLAGE_GOALS, ...DRAGON_GOALS };
-
-/**
- * Distância do raio até a AABB, ou −1 se não acerta (slab method).
- * Usado para o jogador mirar num mob em vez de num bloco.
- */
-export function rayBoxDistance(
-  ox: number, oy: number, oz: number,
-  dx: number, dy: number, dz: number,
-  minX: number, minY: number, minZ: number,
-  maxX: number, maxY: number, maxZ: number,
-): number {
-  let near = 0;
-  let far = Infinity;
-
-  for (let axis = 0; axis < 3; axis++) {
-    const origin = axis === 0 ? ox : axis === 1 ? oy : oz;
-    const direction = axis === 0 ? dx : axis === 1 ? dy : dz;
-    const min = axis === 0 ? minX : axis === 1 ? minY : minZ;
-    const max = axis === 0 ? maxX : axis === 1 ? maxY : maxZ;
-
-    if (Math.abs(direction) < 1e-8) {
-      if (origin < min || origin > max) return -1;
-      continue;
-    }
-    let t1 = (min - origin) / direction;
-    let t2 = (max - origin) / direction;
-    if (t1 > t2) { const tmp = t1; t1 = t2; t2 = tmp; }
-    if (t1 > near) near = t1;
-    if (t2 < far) far = t2;
-    if (near > far) return -1;
-  }
-  return far < 0 ? -1 : near;
-}

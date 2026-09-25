@@ -56,7 +56,7 @@ export class GameFlow {
       spectator: () => player.spectator,
       onToggleSpectator: () => this.setSpectator(!player.spectator),
       onSaveAndQuit: () => {
-        this.pauseMenu.setStatus('salvando…');
+        this.pauseMenu.setStatus(t('pause.saving'));
         void (async () => {
           await deps.saveAll();
           // Recarregar é a saída honesta para voltar ao título: garante que nada

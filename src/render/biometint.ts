@@ -20,8 +20,12 @@
  * 3. O vertex shader do terreno lê o clima no canto do bloco (a filtragem
  *    linear já faz a média das quatro colunas em volta) e a cor na tabela.
  *
- * Só WebGL2: textura no vertex shader não é garantida no WebGL1, e lá o tint
- * continua o fixo de antes. No Nether não há clima (`enabled = false`).
+ * No WebGL1 também (M19): textura no vertex shader não é **garantida** lá,
+ * mas quase todo aparelho a tem — `MAX_VERTEX_TEXTURE_IMAGE_UNITS` diz. Onde
+ * não tem, o tint continua o fixo de antes. O WebGL1 não tem textura de dois
+ * canais `RG8`; o clima vai em `LUMINANCE_ALPHA`, os mesmos dois bytes por
+ * coluna, e o shader lê `.ra` em vez de `.rg`. No Nether não há clima
+ * (`enabled = false`).
  *
  * O que ficou de fora: o bioma **de altura** (montanha, praia, rio) pinta com
  * o clima em que está, não com a cor da própria linha — é o que o gênero
@@ -122,13 +126,19 @@ export function climateTextureSide(renderDistance: number): number {
   return side;
 }
 
+/** Os dois contextos: o WebGL1 é a interseção que o `BiomeTint` usa. */
+type AnyGl = WebGLRenderingContext | WebGL2RenderingContext;
+
 /**
- * Clima em volta da câmera, numa textura RG8 toroidal. Quem ocupa cada slot
+ * Clima em volta da câmera, numa textura de dois canais toroidal. Quem ocupa cada slot
  * de chunk fica em `slotCx/slotCz`; um slot só é recalculado quando o chunk
  * que devia estar nele muda.
  */
 export class BiomeTint {
-  private readonly gl: WebGL2RenderingContext;
+  private readonly gl: AnyGl;
+  /** Formato do clima: `RG` no WebGL2, `LUMINANCE_ALPHA` no WebGL1. */
+  private readonly climateFormat: number;
+  private readonly climateInternal: number;
   private readonly climate: WebGLTexture;
   private readonly colormap: WebGLTexture;
   private sampler: ClimateSampler | null = null;
@@ -145,8 +155,10 @@ export class BiomeTint {
   /** Chunks preenchidos no último quadro — lido pelos testes e pelo debug. */
   filled = 0;
 
-  constructor(gl: WebGL2RenderingContext) {
+  constructor(gl: AnyGl, gl2: WebGL2RenderingContext | null) {
     this.gl = gl;
+    this.climateFormat = gl2 !== null ? gl2.RG : gl.LUMINANCE_ALPHA;
+    this.climateInternal = gl2 !== null ? gl2.RG8 : gl.LUMINANCE_ALPHA;
     const climate = gl.createTexture();
     const colormap = gl.createTexture();
     if (climate === null || colormap === null) throw new Error('Falha ao criar textura de clima.');
@@ -155,7 +167,7 @@ export class BiomeTint {
 
     gl.bindTexture(gl.TEXTURE_2D, colormap);
     gl.texImage2D(
-      gl.TEXTURE_2D, 0, gl.RGBA8, COLORMAP_SIZE, COLORMAP_SIZE * COLORMAP_KINDS, 0,
+      gl.TEXTURE_2D, 0, gl2 !== null ? gl2.RGBA8 : gl.RGBA, COLORMAP_SIZE, COLORMAP_SIZE * COLORMAP_KINDS, 0,
       gl.RGBA, gl.UNSIGNED_BYTE, buildColormap(),
     );
     setFilter(gl, gl.CLAMP_TO_EDGE);
@@ -185,7 +197,9 @@ export class BiomeTint {
     for (let i = 0; i < neutral.length; i += 2) { neutral[i] = t; neutral[i + 1] = h; }
     gl.bindTexture(gl.TEXTURE_2D, this.climate);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, side, side, 0, gl.RG, gl.UNSIGNED_BYTE, neutral);
+    gl.texImage2D(
+      gl.TEXTURE_2D, 0, this.climateInternal, side, side, 0, this.climateFormat, gl.UNSIGNED_BYTE, neutral,
+    );
     setFilter(gl, gl.REPEAT);
   }
 
@@ -225,7 +239,9 @@ export class BiomeTint {
     const gl = this.gl;
     gl.bindTexture(gl.TEXTURE_2D, this.climate);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, sx * 16, sz * 16, 16, 16, gl.RG, gl.UNSIGNED_BYTE, this.scratch);
+    gl.texSubImage2D(
+      gl.TEXTURE_2D, 0, sx * 16, sz * 16, 16, 16, this.climateFormat, gl.UNSIGNED_BYTE, this.scratch,
+    );
     this.slotCx[slot] = cx;
     this.slotCz[slot] = cz;
     this.filled++;
@@ -248,7 +264,7 @@ export class BiomeTint {
   }
 }
 
-function setFilter(gl: WebGL2RenderingContext, wrap: number): void {
+function setFilter(gl: AnyGl, wrap: number): void {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
@@ -257,8 +273,8 @@ function setFilter(gl: WebGL2RenderingContext, wrap: number): void {
 
 /** O `BiomeTint` do contexto, ou `null` onde ele não roda (WebGL1). */
 export function createBiomeTint(ctx: GlContext): BiomeTint | null {
-  if (ctx.gl2 === null) return null;
-  // Textura no vertex shader: o WebGL2 garante 16 unidades, mas confere.
-  if (ctx.gl2.getParameter(ctx.gl2.MAX_VERTEX_TEXTURE_IMAGE_UNITS) < 2) return null;
-  return new BiomeTint(ctx.gl2);
+  // Textura no vertex shader: o WebGL2 garante 16 unidades; o WebGL1 pode ter
+  // zero, e aí o tint fica o fixo.
+  if (ctx.gl.getParameter(ctx.gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS) < 2) return null;
+  return new BiomeTint(ctx.gl, ctx.gl2);
 }

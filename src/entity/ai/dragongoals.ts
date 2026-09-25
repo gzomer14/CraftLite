@@ -14,6 +14,14 @@
  * - **LAND / PERCH**: desce no portal de saída e fica parado 10 s olhando o
  *   jogador — mordendo quem chega perto. É a janela da espada.
  * - **LIFT**: sobe reto do portal antes de voltar ao anel.
+ * - **DYING** (M19): o golpe final o põe em agonia (`deathTicks`): ele sobe
+ *   devagar girando, invulnerável, e só no fim cai e solta a experiência.
+ *   Os raios de luz são de `render/scenefeed.ts`.
+ *
+ * E em qualquer fase (M19): **quebra o que atravessa**, menos a ilha, as
+ * colunas e o portal (`breaksBlocksExcept`), e, pousado, **sopra** — uma nuvem
+ * no chão onde o jogador estava, que fere quem ficar nela
+ * (`game/dragonfight.ts`).
  *
  * O estado mora nos campos do `MobStore` que o dragão não usa: `variant` é a
  * fase, `fuse` o relógio da fase e `product` o ponto do anel. Nada de objeto
@@ -22,8 +30,9 @@
 
 import type { GoalName } from '../../data/mobs';
 import { mobDef } from '../../data/mobs';
+import { BLOCKS, BLOCK_BY_NAME, blockIdOf } from '../../data/blocks';
 import { END_ISLAND_Y } from '../../world/gen/end';
-import { turnTowards } from '../mobstore';
+import { FLAG_DYING, turnTowards } from '../mobstore';
 import type { AiContext, Goal } from './goals';
 
 export const PHASE_CIRCLE = 0;
@@ -31,6 +40,7 @@ export const PHASE_CHARGE = 1;
 export const PHASE_LAND = 2;
 export const PHASE_PERCH = 3;
 export const PHASE_LIFT = 4;
+export const PHASE_DYING = 5;
 
 /** Pontos do anel e o raio dele. */
 const WAYPOINTS = 12;
@@ -58,13 +68,82 @@ const CHARGE_CHANCE = 0.3;
 const LAND_CHANCE = 0.15;
 /** Com todos os cristais quebrados, ele pousa bem mais. */
 const LAND_CHANCE_NO_CRYSTALS = 0.4;
+/** Altura até onde ele sobe na agonia. */
+const DYING_RISE = 30;
+/** Blocos que ele confere em volta do centro, a cada `BREAK_EVERY` ticks. */
+const BREAK_RADIUS = 3;
+const BREAK_HEIGHT = 2;
+const BREAK_EVERY = 4;
+/** Pousado, sopra a cada tantos ticks — se o jogador estiver a este alcance. */
+const BREATH_EVERY = 80;
+const BREATH_RANGE = 24;
+/** Quanto a nuvem dura no chão: 6 s. */
+export const BREATH_TICKS = 120;
 
 /**
  * Quantos cristais ainda vivem — quem conta é a luta, e escreve aqui antes do
  * tick dos mobs. Um número de módulo e não um campo do contexto de IA, que
  * não tem por que conhecer o End.
  */
-export const dragonState = { crystals: 0 };
+export const dragonState = {
+  crystals: 0,
+  /** A nuvem do sopro: onde está e quantos ticks faltam (0 = nenhuma). */
+  breathX: 0, breathY: 0, breathZ: 0, breathTicks: 0,
+};
+
+/**
+ * Por tipo de mob, 1 = atravessa este bloco sem quebrá-lo. Montado na
+ * primeira vez que o mob quebra algo, do traço `breaksBlocksExcept`; o laço
+ * de quebra só lê o array.
+ */
+const unbreakableByType = new Map<number, Uint8Array>();
+
+function unbreakableFor(type: number): Uint8Array {
+  let table = unbreakableByType.get(type);
+  if (table !== undefined) return table;
+  table = new Uint8Array(BLOCKS.length);
+  for (let id = 0; id < BLOCKS.length; id++) {
+    const block = BLOCKS[id];
+    // Ar, líquido e o que nada quebra (rocha-mãe): nem o dragão.
+    if (block === undefined || id === 0 || block.hardness < 0
+      || block.name === 'water' || block.name === 'lava') table[id] = 1;
+  }
+  for (const name of mobDef(type).traits.breaksBlocksExcept ?? []) {
+    const block = BLOCK_BY_NAME.get(name);
+    if (block !== undefined) table[block.id] = 1;
+  }
+  unbreakableByType.set(type, table);
+  return table;
+}
+
+/** Quebra o que o corpo atravessa (M19). Sem alocação: lê o mundo e avisa. */
+function breakThrough(ctx: AiContext, i: number): void {
+  const s = ctx.store;
+  const table = unbreakableFor(s.type[i]);
+  const cx = Math.floor(s.x[i]);
+  const cy = Math.floor(s.centerY(i));
+  const cz = Math.floor(s.z[i]);
+  for (let y = cy - BREAK_HEIGHT; y <= cy + BREAK_HEIGHT; y++) {
+    for (let z = cz - BREAK_RADIUS; z <= cz + BREAK_RADIUS; z++) {
+      for (let x = cx - BREAK_RADIUS; x <= cx + BREAK_RADIUS; x++) {
+        if (table[blockIdOf(ctx.world.getBlock(x, y, z))] === 1) continue;
+        ctx.breakBlock(x, y, z);
+      }
+    }
+  }
+}
+
+/** Sopra no chão onde o jogador está, se ele estiver ao alcance (M19). */
+function breathe(ctx: AiContext, i: number): void {
+  const s = ctx.store;
+  const reach = Math.hypot(ctx.playerX - s.x[i], ctx.playerZ - s.z[i]);
+  if (reach > BREATH_RANGE || s.hasTarget[i] === 0) return;
+  dragonState.breathX = ctx.playerX;
+  dragonState.breathY = ctx.playerY;
+  dragonState.breathZ = ctx.playerZ;
+  dragonState.breathTicks = BREATH_TICKS;
+  ctx.playSound(i, 'attack');
+}
 
 /** Ponto `k` do anel, em `out` como `[x, y, z]`. */
 export function waypoint(k: number, out: Float64Array): void {
@@ -113,7 +192,21 @@ export const DRAGON_GOALS: Pick<Record<GoalName, Goal>, 'dragon'> = {
   dragon(ctx, i) {
     const s = ctx.store;
     if (s.fuse[i] > 0) s.fuse[i]--;
+    if (s.hasFlag(i, FLAG_DYING) && s.variant[i] !== PHASE_DYING) {
+      toPhase(ctx, i, PHASE_DYING, mobDef(s.type[i]).traits.deathTicks ?? 1);
+    }
+    if (s.variant[i] !== PHASE_DYING && s.age[i] % BREAK_EVERY === 0) breakThrough(ctx, i);
     switch (s.variant[i]) {
+      case PHASE_DYING: {
+        // Sobe devagar girando; no fim, a vida zera e o `tick` dos mobs o tira.
+        s.setMoveTarget(i, s.x[i], END_ISLAND_Y + RING_HEIGHT + DYING_RISE, s.z[i], 0.12);
+        s.vx[i] = 0; s.vz[i] = 0;
+        s.yaw[i] += 0.05;
+        s.headYaw[i] = s.yaw[i];
+        if (s.fuse[i] % 20 === 0) ctx.playSound(i, 'hurt');
+        if (s.fuse[i] === 0) s.health[i] = 0;
+        return true;
+      }
       case PHASE_CHARGE: {
         s.setMoveTarget(i, ctx.playerX, ctx.playerY + 1, ctx.playerZ, 1.3);
         faceMotion(ctx, i, ctx.playerX, ctx.playerZ);
@@ -140,6 +233,8 @@ export const DRAGON_GOALS: Pick<Record<GoalName, Goal>, 'dragon'> = {
         s.yaw[i] = turnTowards(s.yaw[i], angle, 0.08);
         s.headYaw[i] = s.yaw[i];
         strike(ctx, i, BITE_RANGE);
+        // O sopro: ao pousar e de tempos em tempos enquanto está no portal.
+        if ((PERCH_TICKS - s.fuse[i]) % BREATH_EVERY === 1) breathe(ctx, i);
         if (s.fuse[i] === 0) toPhase(ctx, i, PHASE_LIFT, LIFT_TICKS);
         return true;
       }

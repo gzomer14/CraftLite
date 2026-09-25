@@ -154,6 +154,14 @@ uniform vec3 uChunkOrigin;
 uniform float uDayFactor;
 uniform float uMinSkyLight;
 uniform highp vec2 uAtlasTiles;  // x = tiles por linha, y = 1/tilesPorLinha
+#ifdef BIOME_TINT
+// M19: o tint por bioma no WebGL1, como no WebGL2 — o clima vem em
+// LUMINANCE_ALPHA (\`.ra\`), e a leitura no vertex é \`texture2DLod\`.
+uniform sampler2D uClimate;
+uniform sampler2D uColormap;
+uniform highp float uClimateInv;
+uniform float uBiomeTint;
+#endif
 
 varying highp vec2 vUv;
 varying highp vec2 vTileOrigin;
@@ -176,6 +184,13 @@ void main() {
   float ao = mod(floor(bits / 256.0), 4.0);
   float tint = mod(floor(bits / 1024.0), 64.0);
   vec3 tintColor = uTints[int(tint)];
+#ifdef BIOME_TINT
+  if (tint > 0.5 && tint < 3.5 && uBiomeTint > 0.5) {
+    vec2 climate = texture2DLod(uClimate, world.xz * uClimateInv, 0.0).ra;
+    float row = (tint - 1.0) * ${COLORMAP_SIZE}.0 + clamp(climate.y * ${COLORMAP_SIZE}.0, 0.5, ${COLORMAP_SIZE - 0.5});
+    tintColor = texture2DLod(uColormap, vec2(climate.x, row / ${COLORMAP_SIZE * COLORMAP_KINDS}.0), 0.0).rgb;
+  }
+#endif
   vDye = tint > ${TINT_DYE_BASE}.0 - 0.5 ? 1.0 : 0.0;
 
   float aoMul = 0.55 + ao * 0.15;

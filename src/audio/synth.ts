@@ -63,15 +63,25 @@ export type Recipe =
  */
 export function rateFor(recipe: Recipe, base: number): number {
   const top = topFrequencyOf(recipe) * 1.4;
-  // Metade da taxa cobre até `base / 4`, e um quarto até `base / 8`; a folga
-  // de 1,4 evita comer a saia do filtro, que não corta em vertical.
+  // A folga de 1,4 evita comer a saia do filtro, que não corta em vertical.
   //
   // O degrau de um quarto entrou no M15, com a memória de áudio a 3 KB do
   // teto: trovão, portal, fornalha e os mugidos graves não passam de ~2 kHz, e
   // guardavam o dobro do que o ouvido recebe.
   if (top <= base / 8) return Math.round(base / 4);
-  return top <= base / 4 ? Math.round(base / 2) : base;
+  if (!Number.isFinite(top)) return base;
+  /*
+   * Acima disso, a taxa **exata** de Nyquist, arredondada para cima em kHz
+   * (M18). Até aqui havia só dois degraus, meia taxa e taxa cheia: a galinha,
+   * com formante em 2,6 kHz, precisa de 15 kHz e pagava 22 — as vozes agudas
+   * eram metade da memória de áudio. O `AudioBuffer` aceita qualquer taxa de
+   * 8 a 96 kHz, e abaixo de 8 o motor já tenta de novo em 8 (`renderAtRate`).
+   */
+  return Math.min(base, Math.ceil((top * 2) / RATE_STEP) * RATE_STEP);
 }
+
+/** Passo da taxa contínua: 1 kHz. */
+const RATE_STEP = 1000;
 
 /** Maior frequência que a receita pode produzir, em Hz. */
 function topFrequencyOf(recipe: Recipe): number {

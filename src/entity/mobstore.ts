@@ -33,6 +33,8 @@ export const FLAG_CLIMBING = 16;
 export const FLAG_SLEEPING = 32;
 /** Aldeão com a tela de troca aberta: fica de frente para o jogador. */
 export const FLAG_TRADING = 64;
+/** Na agonia de quem morre devagar (M19, traço `deathTicks`): invulnerável. */
+export const FLAG_DYING = 128;
 
 const GRAVITY = -0.08;
 const VERTICAL_DRAG = 0.98;

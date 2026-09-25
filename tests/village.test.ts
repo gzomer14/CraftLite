@@ -256,8 +256,11 @@ describe('plano da aldeia em várias seeds', () => {
       }
       villages++;
       expect(occupied, `seed ${seed}: moradores planejados`).toBeGreaterThanOrEqual(Math.min(3, built));
-      // Fora da água, todo morador tem cama.
-      expect(housed / occupied, `seed ${seed}: moradores com casa`).toBeGreaterThanOrEqual(0.75);
+      // Fora da água, todo morador tem cama. Até o M18 o teste tolerava 25%
+      // de falha por causa de uma casa em terra sem cama na seed 1; ela não se
+      // reproduz desde os rios (M14) — procurada em 80 seeds, 11 aldeias, todas
+      // com 100% —, e a tolerância saiu: casa sem cama agora reprova.
+      expect(housed, `seed ${seed}: moradores com casa`).toBe(occupied);
     }
     expect(villages).toBeGreaterThanOrEqual(3);
   }, 120_000);

@@ -450,7 +450,7 @@ precisa de mundo roda de verdade (`tests/theend.test.ts`); o dragão com os dez 
 
 ---
 
-## M17 — Alcance
+## M17 — Alcance ✅
 
 > Quem ainda não joga. O jogo só fala português e não ensina nada.
 
@@ -474,6 +474,50 @@ conteúdo e **o código-fonte** atrás de literal em português fora do lugar; o
 inglês no Chrome headless sem palavra em português. `tests/firsthour.test.ts` leva três troncos de
 bétula à picareta de pedra só pelo livro de receitas, com a dica andando a cada passo. Ninguém novo
 jogou ainda.
+
+---
+
+## M18 — Casa em ordem, segunda volta ✅
+
+> Acrescentado em 2026-09-25, a pedido do usuário: *"Pode seguir com sua ordem e implementar tudo
+> para concluirmos esse MVP"*. Dívida técnica acumulada do M14 ao M17, sem conteúdo novo.
+
+- [x] **Os cinco módulos acima do teto** (doc 15 §5) abaixo de ~700 linhas, cortados por papel:
+      circuito (`world/redstone.ts` 1116 → 640: `redstoneroles`, `redstonepower`,
+      `redstonepiston`, `redstoneplates`), tela de contêiner (957 → 690: `slotview`,
+      `slotgestures`), mobs (895 → 683: `mobcare`, `mobpick`, `mobrules`), sessão (889 → 702:
+      `sessionbuild`, `mobclick`, `dimensionhop`) e `main.ts` (749 → 700: `blockfeedback`,
+      `startingkit`, `storagewarning`).
+- [x] **Memória de áudio com folga** (3,442 de 3,5 MB): taxa de amostragem exata de Nyquist por
+      receita, e não três degraus.
+- [x] **A varredura de idioma pelo destino** (M17 deixou passar texto sem acento nem
+      palavra-função).
+
+**Critério de aceite:** nenhum teste muda de resultado; a memória de áudio abaixo de 3,2 MB sem
+tirar som. **Medido:** 2,92 MB; a suíte inteira verde a cada corte.
+
+---
+
+## M19 — Pontas soltas ✅
+
+> Acrescentado em 2026-09-25, no mesmo pedido. Os desvios e pendências de conteúdo que os marcos
+> anteriores declararam no doc 15 §5.
+
+- [x] **Enderman no End** — a ilha ficava vazia fora da luta (`SPAWN_RULES.enderman.dimension`).
+- [x] **O dragão quebra o que atravessa**, menos a ilha, as colunas e o portal
+      (`breaksBlocksExcept`); **sopra** uma nuvem que fere, pousado; e **morre devagar**
+      (`deathTicks`): sobe girando com raios de luz antes de cair.
+- [x] **As ilhas de fora do End**, a partir de 768 blocos, com santuário e baú, e o **portal de
+      passagem** que aparece quando o dragão cai (`world/gen/end.ts`, `game/endgateway.ts`).
+- [x] **Casa de aldeia sem cama** (seed 1): procurada em 80 seeds, não se reproduz; a tolerância
+      do teste saiu.
+- [x] **Tint de bioma no WebGL1** (`render/biometint.ts`): textura no vertex onde o aparelho tem.
+
+**Critério de aceite:** cada item com teste; o End visto no navegador. **Medido:**
+`tests/theend.test.ts` (enderman, agonia, quebra, sopro, ilhas, santuário, portal de passagem de
+ida com o de volta), `tests/biometint.test.ts` (WebGL1) e `tests/village.test.ts` (sem
+tolerância). Visto no Chrome headless: a agonia, o portal de passagem, as ilhas; WebGL1 e WebGL2
+com o mesmo tint.
 
 ---
 

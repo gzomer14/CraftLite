@@ -837,6 +837,11 @@ SPECS.push(
     hardness: 3, opaque: false, lightAttenuation: 0, emission: 1, sound: 'stone' },
   { id: 162, name: 'nether_brick_fence', display: 'Cerca de Tijolo do Nether', shape: 'fence',
     tex: 'block/nether_bricks', hardness: 2, ...rock(), opaque: false, lightAttenuation: 0 },
+  // M19: o portal de passagem do End, que leva às ilhas de fora. Mesmo desenho
+  // do portal do End (nenhuma camada de atlas nova), em pé: entra-se andando.
+  { id: 163, name: 'end_gateway', display: 'Portal de Passagem', tex: 'block/end_portal',
+    solid: false, opaque: false, lightAttenuation: 0, emission: 15, translucent: true,
+    hardness: -1, sound: 'glass', itemless: true },
 );
 SPECS.push(...dyedSpecs());
 

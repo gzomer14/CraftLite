@@ -121,6 +121,17 @@ export interface MobTraits {
   explodesOnDeath?: number;
   /** Chefe: não conta nos tetos de spawn e ganha a barra de vida no HUD. */
   boss?: boolean;
+  /**
+   * Morre devagar (M19, o dragão): o golpe final não o tira do mundo — ele
+   * fica tantos ticks na agonia, invulnerável, e só então cai e solta a
+   * experiência. Quem desenha a agonia é o goal dele.
+   */
+  deathTicks?: number;
+  /**
+   * Quebra os blocos por onde passa, menos estes (M19, o dragão). Uma casa no
+   * caminho dele vira buraco; a ilha e as colunas, não.
+   */
+  breaksBlocksExcept?: readonly string[];
 }
 
 export interface SpawnRule {
@@ -142,10 +153,11 @@ export interface SpawnRule {
   /** Só nasce de noite (slime no pântano). */
   nightOnly?: boolean;
   /**
-   * Dimensão em que a regra vale (`DIM_*`). Ausente = superfície.
-   * É o que mantém o zumbi fora do Nether e o ghast fora da superfície.
+   * Dimensão em que a regra vale (`DIM_*`), ou a lista delas. Ausente =
+   * superfície. É o que mantém o zumbi fora do Nether e o ghast fora da
+   * superfície — e, desde o M19, o que põe o enderman também no End.
    */
-  dimension?: number;
+  dimension?: number | readonly number[];
 }
 
 export interface MobAttack {
@@ -198,7 +210,12 @@ export const SPAWN_RULES: Record<string, SpawnRule> = {
   chicken: { light: 'bright', ground: ['grass_block'], minY: 60, maxY: 110, biomes: ['plains', 'forest', 'swamp', 'savanna', 'birch_forest', 'flower_plains', 'jungle'], packMin: 4, packMax: 4, weight: 6 },
   squid: { light: 'any', ground: [], inWater: true, minY: 45, maxY: 62, biomes: [], packMin: 1, packMax: 3, weight: 6 },
   wolf: { light: 'bright', ground: ['grass_block', 'podzol', 'snow_block'], minY: 60, maxY: 120, biomes: ['taiga', 'forest', 'birch_forest'], packMin: 2, packMax: 4, weight: 4 },
-  enderman: { light: 'dark', ground: [], minY: 0, maxY: 127, biomes: [], packMin: 1, packMax: 1, weight: 2 },
+  /*
+   * Enderman: na superfície e no End (M19), onde é o único que nasce — a ilha
+   * ficava vazia fora da luta, e é dele a pérola para mais olhos. No End o
+   * escuro vale sempre (não há céu), e o chão é a pedra do End.
+   */
+  enderman: { light: 'dark', ground: [], minY: 0, maxY: 127, biomes: [], packMin: 1, packMax: 1, weight: 2, dimension: [0, 2] },
   spider: { light: 'dark', ground: [], minY: 0, maxY: 127, biomes: [], packMin: 1, packMax: 2, weight: 8 },
   zombie: { light: 'dark', ground: [], minY: 0, maxY: 127, biomes: [], packMin: 3, packMax: 4, weight: 12 },
   skeleton: { light: 'dark', ground: [], minY: 0, maxY: 127, biomes: [], packMin: 1, packMax: 3, weight: 10 },
@@ -558,7 +575,14 @@ const SPECS: MobSpec[] = [
     goals: ['dragon'],
     model: 'dragon', skin: 'dragon', sound: 'ender_dragon',
     despawnable: false,
-    traits: { flies: true, fireImmune: true, modelScale: 8, noClip: true, noKnockback: true, boss: true },
+    traits: {
+      flies: true, fireImmune: true, modelScale: 8, noClip: true, noKnockback: true, boss: true,
+      deathTicks: 200,
+      breaksBlocksExcept: [
+        'end_stone', 'obsidian', 'bedrock', 'end_portal', 'end_portal_frame',
+        'end_portal_frame_eye', 'dragon_egg', 'fire',
+      ],
+    },
   },
   /*
    * Cristal do End: a pedra que cura o dragão, no topo de cada coluna. Um

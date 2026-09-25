@@ -17,8 +17,6 @@ import './data/strings/localize';
 import { htmlLang, t, tf } from './core/i18n';
 import { AudioEngine } from './audio/engine';
 import { AudioStart } from './audio/audiostart';
-import { dyeRgbOf } from './data/tints';
-import { blockSound } from './audio/synth';
 import { EffectsBar } from './ui/effectsbar';
 import { startUiNavLoop } from './input/uinavloop';
 import { showHint } from './ui/controlhint';
@@ -27,8 +25,8 @@ import { GameLoop } from './core/loop';
 import { registerServiceWorker, showUpdateToast } from './core/pwa';
 import { detectTier, presetFor, readDeviceInfo } from './core/tier';
 import { DEG2RAD } from './core/math';
-import { BLOCK_BY_NAME, defOf, texOf } from './data/blocks';
-import { ITEM_BY_NAME, makeStack } from './data/items';
+import { defOf } from './data/blocks';
+import { ITEM_BY_NAME } from './data/items';
 import { MOB_BY_NAME } from './data/mobs';
 import { Player } from './entity/player';
 import { SaveGame } from './game/savegame';
@@ -78,15 +76,11 @@ import { World } from './world/world';
 import { MapScreen } from './ui/screens/mapscreen';
 import { MarkerBar } from './ui/markerbar';
 import { ObjectiveLine } from './ui/objectiveline';
+import { attachBlockFeedback } from './ui/blockfeedback';
+import { giveStartingKit } from './game/startingkit';
+import { warnStorage } from './save/storagewarning';
 import { buildMapPalette } from './render/mapcolors';
 
-/** Blocos que aparecem na hotbar inicial, até o inventário existir (M4). */
-/** Acima disto de cota usada, o doc 11 §4 manda avisar o jogador. */
-const QUOTA_WARN_RATIO = 0.8;
-
-const STARTING_BLOCKS = [
-  'stone', 'cobblestone', 'dirt', 'oak_planks', 'oak_log', 'glass', 'torch', 'glowstone', 'sand',
-];
 
 async function boot(): Promise<void> {
   const view = document.getElementById('view') as HTMLCanvasElement | null;
@@ -257,16 +251,7 @@ async function boot(): Promise<void> {
    * agir: descobrir que o progresso não seria salvo depois de duas horas de
    * construção é tarde demais.
    */
-  if (db === null) {
-    hud.showMessage(t('store.none'), 400);
-  } else {
-    void db.estimate().then((estimate) => {
-      if (estimate === null || estimate.quota <= 0) return;
-      if (estimate.usage / estimate.quota <= QUOTA_WARN_RATIO) return;
-      const used = Math.round((estimate.usage / estimate.quota) * 100);
-      hud.showMessage(tf('store.almost_full', used), 400);
-    });
-  }
+  warnStorage(db, hud);
   const screenMode = new ScreenMode();
   const isTouchDevice = matchMedia('(pointer: coarse)').matches;
 
@@ -313,13 +298,12 @@ async function boot(): Promise<void> {
       audio.playUi('ui/click', 0.5);
     },
     onDeath: (message) => deathScreen.show(message),
+    onOpenMap: () => flow.openMap(), // usou o mapa (M10)
     /*
      * Escrever numa placa (M8). A sessão só avisa; quem sabe o que é um campo
      * de texto é a UI. Solta o ponteiro pela mesma razão que um baú: com o
      * mouse capturado não há como clicar no campo nem ver o cursor.
      */
-    // Usou o mapa (M10).
-    onOpenMap: () => flow.openMap(),
     onSignEdit: (x, y, z, lines) => {
       controls.mouse.exitLock();
       signEditor.open(x, y, z, lines);
@@ -422,43 +406,7 @@ async function boot(): Promise<void> {
   session.worldSpawnX = meta.spawn[0];
   session.worldSpawnZ = meta.spawn[2];
 
-  if (!restored) {
-    // Modo criativo começa com blocos para experimentar.
-    if (player.mode === 'creative') {
-      for (let i = 0; i < STARTING_BLOCKS.length; i++) {
-        const block = BLOCK_BY_NAME.get(STARTING_BLOCKS[i]);
-        if (block !== undefined) inventory.set(i, makeStack(block.id, 64));
-      }
-    } else {
-      // Sobrevivência começa sem nada — é o ponto do marco.
-      const axe = ITEM_BY_NAME.get('wooden_axe');
-      if (axe !== undefined) inventory.set(0, makeStack(axe.id, 1));
-    }
-  }
-
-  // Partículas com a cor média do bloco quebrado (doc 06 §4) + haptics.
-  // A `Session` já registrou o próprio handler; aqui só encadeamos o efeito.
-  const particleColor = new Float32Array(3);
-  const sessionBroken = interaction.onBlockBroken;
-  interaction.onBlockBroken = (x, y, z, state) => {
-    sessionBroken?.(x, y, z, state);
-    const layer = atlas.layerOf(texOf(defOf(state), 'side'));
-    atlas.averageColor(layer, particleColor);
-    // Lã e cama tingidas: o desenho é cinza, a partícula sai da cor (M13).
-    const dye = dyeRgbOf(defOf(state));
-    if (dye !== null) for (let c = 0; c < 3; c++) particleColor[c] *= dye[c] / 255;
-    renderer.particles.emitBlockBreak(
-      x, y, z, 8, particleColor[0], particleColor[1], particleColor[2],
-    );
-    audio.play(blockSound(defOf(state).sound, 'break'), x + 0.5, y + 0.5, z + 0.5);
-    if (settings.get('vibration')) navigator.vibrate?.(10);
-    controls.gamepad.rumble();
-  };
-  const sessionPlaced = interaction.onBlockPlaced;
-  interaction.onBlockPlaced = (x, y, z, state) => {
-    sessionPlaced?.(x, y, z, state);
-    audio.play(blockSound(defOf(state).sound, 'place'), x + 0.5, y + 0.5, z + 0.5, 0.7);
-  };
+  if (!restored) giveStartingKit(inventory, player.mode);
 
   // Passivos já nascem com o chunk (doc 07 §4) e a roça que veio do save entra
   // no registro de crescimento. A luz do chunk já vem pronta do worker.
@@ -491,6 +439,9 @@ async function boot(): Promise<void> {
     touchUi: () => touchUi,
     openOptions: (back) => menu.openOptions(back),
     saveAll: async () => { await save?.saveAll(); },
+  });
+  attachBlockFeedback({
+    interaction, atlas, renderer, audio, settings, rumble: () => controls.gamepad.rumble(),
   });
   const pauseMenu = flow.pauseMenu;
 
@@ -534,7 +485,7 @@ async function boot(): Promise<void> {
    * palpite de família e não a especificação.
    */
   gamepads.onConnect((profile) => {
-    hud.showMessage(`Controle conectado: ${profile.labels.family}`, 80);
+    hud.showMessage(tf('hud.pad_connected', profile.labels.family), 80);
     /*
      * O som não liga sozinho aqui.
      *

@@ -151,6 +151,16 @@ export const CHEST_LOOT: Record<string, readonly LootRoll[]> = {
     { item: 'flint_and_steel', count: [1, 1], chance: 0.2 },
     { item: 'blaze_rod', count: [1, 2], chance: 0.25 },
   ],
+  // M19: o santuário das ilhas de fora do End — o prêmio de quem foi além.
+  end_shrine: [
+    { item: 'diamond', count: [2, 5], chance: 0.6 },
+    { item: 'emerald', count: [2, 6], chance: 0.5 },
+    { item: 'golden_apple', count: [1, 2], chance: 0.35 },
+    { item: 'blaze_rod', count: [1, 3], chance: 0.4 },
+    { item: 'ender_pearl', count: [2, 5], chance: 0.5 },
+    { item: 'iron_ingot', count: [4, 10], chance: 0.6 },
+    { item: 'diamond_pickaxe', count: [1, 1], chance: 0.15 },
+  ],
   // M16: os baús da fortaleza da superfície. As pérolas são o seguro de quem
   // não conseguiu caçar endermen — o olho que faltou para acender o portal.
   stronghold_corridor: [
@@ -518,6 +528,28 @@ const SHIPWRECK: StructureDef = {
   placement: {
     attempts: 0.01, minY: 0, maxY: 0, surface: true, underwater: true, biomes: ['ocean'],
   },
+};
+
+/**
+ * Santuário das ilhas de fora do End (M19): um piso de obsidiana, quatro
+ * colunas e um teto, com o baú no meio. Não entra em `STRUCTURES` — quem o
+ * põe é o gerador do End (`world/gen/end.ts`), no centro da ilha.
+ */
+export const END_SHRINE: StructureDef = {
+  name: 'end_shrine',
+  size: [5, 5, 5],
+  pieces: [
+    { kind: 'fill', block: 'obsidian', box: [0, 0, 0, 4, 0, 4], replace: 'any' },
+    { kind: 'fill', block: 'air', box: [0, 1, 0, 4, 4, 4], replace: 'any' },
+    { kind: 'fill', block: 'obsidian', box: [0, 1, 0, 0, 3, 0], replace: 'any' },
+    { kind: 'fill', block: 'obsidian', box: [4, 1, 0, 4, 3, 0], replace: 'any' },
+    { kind: 'fill', block: 'obsidian', box: [0, 1, 4, 0, 3, 4], replace: 'any' },
+    { kind: 'fill', block: 'obsidian', box: [4, 1, 4, 4, 3, 4], replace: 'any' },
+    { kind: 'fill', block: 'end_stone', box: [0, 4, 0, 4, 4, 4], replace: 'any' },
+    { kind: 'point', block: 'glowstone', box: [2, 4, 2, 2, 4, 2], replace: 'any' },
+  ],
+  chests: [{ at: [2, 1, 2], loot: 'end_shrine' }],
+  placement: { attempts: 0, minY: 0, maxY: 0, surface: true },
 };
 
 export const STRUCTURES: readonly StructureDef[] = [

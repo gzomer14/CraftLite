@@ -170,7 +170,7 @@ export class Particles {
    * passe de render próprio: reusa a mesma draw call instanciada e some sozinho
    * se o pool encher, que é exatamente o comportamento desejado em T0.
    */
-  emitGlow(x: number, y: number, z: number, r: number, g: number, b: number): void {
+  emitGlow(x: number, y: number, z: number, r: number, g: number, b: number, size = 0.22): void {
     if (this.count >= this.limit) return;
     const s = this.count++;
     this.px[s] = x;
@@ -185,7 +185,7 @@ export class Particles {
     this.instanceData[o + 3] = r;
     this.instanceData[o + 4] = g;
     this.instanceData[o + 5] = b;
-    this.instanceData[o + 6] = 0.22;
+    this.instanceData[o + 6] = size;
   }
 
   /**

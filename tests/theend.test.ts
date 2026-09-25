@@ -18,12 +18,16 @@ import { itemId, makeStack } from '../src/data/items';
 import { MOB_BY_NAME, mobDef } from '../src/data/mobs';
 import { EFFECT_BY_NAME } from '../src/data/effects';
 import { DIM_END, DIM_OVERWORLD } from '../src/data/dimensions';
-import { END_ISLAND_Y, EndNoise, PILLAR_COUNT, endPillars, generateEndChunk } from '../src/world/gen/end';
+import {
+  END_ISLAND_Y, EndNoise, GATEWAY_X, GATEWAY_Z, OUTER_START, PILLAR_COUNT, endPillars, generateEndChunk,
+} from '../src/world/gen/end';
 import { RING, nearestStronghold } from '../src/world/gen/strongholdsites';
 import { exitPortalOpen, insertEye, isEndPortal } from '../src/game/endportal';
 import { DragonFight } from '../src/game/dragonfight';
 import { PERCH_TICKS, PERCH_Y, PHASE_CHARGE, PHASE_LAND, PHASE_PERCH } from '../src/entity/ai/dragongoals';
 import { EYE_TICKS, FLAG_IGNITES, FLAG_POTION } from '../src/entity/projectile';
+import { FLAG_DYING } from '../src/entity/mobstore';
+import { dragonState, BREATH_TICKS } from '../src/entity/ai/dragongoals';
 import { Travel } from '../src/game/travel';
 import { isUnlocked } from '../src/data/achievements';
 
@@ -237,8 +241,24 @@ describe('a luta contra o dragão', () => {
     const { world, session } = endSession();
     session.player.mode = 'creative';
     session.tick();
-    session.mobs.damage(indexOf(session, DRAGON), 1000, 'player');
+    const dragon = indexOf(session, DRAGON);
+    session.mobs.damage(dragon, 1000, 'player');
     session.tick();
+    // A agonia (M19): continua no mundo, invulnerável, subindo; o fim vem
+    // depois de `deathTicks`.
+    const store = session.mobs.store;
+    expect(count(session, DRAGON)).toBe(1);
+    expect(store.hasFlag(indexOf(session, DRAGON), FLAG_DYING)).toBe(true);
+    expect(session.mobs.damage(indexOf(session, DRAGON), 1000, 'player')).toBe(false);
+    expect(session.dragonFight.state.killed).toBe(false);
+    const startY = store.y[indexOf(session, DRAGON)];
+    const ticks = mobDef(DRAGON).traits.deathTicks ?? 0;
+    for (let t = 0; t < ticks / 2; t++) session.tick();
+    expect(store.y[indexOf(session, DRAGON)]).toBeGreaterThan(startY);
+    const orbsBefore = session.orbs.active;
+    for (let t = 0; t < ticks; t++) session.tick();
+    expect(count(session, DRAGON)).toBe(0);
+    expect(session.orbs.active).toBeGreaterThan(orbsBefore);
     expect(session.dragonFight.state.killed).toBe(true);
     expect(exitPortalOpen(world)).toBe(true);
     expect(blockIdOf(world.getBlock(0, END_ISLAND_Y + 5, 0))).toBe(block('dragon_egg'));
@@ -407,8 +427,157 @@ describe('guarda-costas da luta', () => {
       world: new World(1), mobs: new Session(flatWorld(), new Player(0, 70, 0), events()).mobs,
       blockChanged: () => { /* nada */ }, sound: () => { /* nada */ },
       message: () => { /* nada */ }, achievement: () => { /* nada */ },
+      player: { x: 0, y: 70, z: 0 }, hurtPlayer: () => { /* nada */ },
     });
     fight.restore(undefined);
     expect(fight.state).toEqual({ killed: false, crystalsBroken: 0, dragonHealth: 0, creditsSeen: false });
+  });
+});
+
+describe('enderman no End (M19)', () => {
+  it('é o único que nasce na ilha, e nasce em cima da pedra do End', () => {
+    const { world, session } = endSession();
+    const enderman = MOB_BY_NAME.get('enderman')!.id;
+    const spawner = session.spawner;
+    spawner.isDay = false;
+    spawner.isNight = true;
+    let total = 0;
+    for (let cycle = 0; cycle < 400 && total < 3; cycle++) {
+      for (const category of ['hostile', 'neutral', 'passive', 'ambient', 'water'] as const) {
+        total += spawner.runCycle(category, 0.5, END_ISLAND_Y + 1, 12.5);
+      }
+    }
+    expect(total).toBeGreaterThan(0);
+    const s = session.mobs.store;
+    const endStone = BLOCK_BY_NAME.get('end_stone')!.id;
+    for (let i = 0; i < s.active; i++) {
+      // O dragão e os cristais nascem pela luta, não pelo spawner.
+      if (s.type[i] === DRAGON || s.type[i] === CRYSTAL) continue;
+      expect(s.type[i]).toBe(enderman);
+      const below = blockIdOf(world.getBlock(Math.floor(s.x[i]), Math.floor(s.y[i]) - 1, Math.floor(s.z[i])));
+      expect(below).toBe(endStone);
+    }
+  });
+});
+
+describe('o dragão no M19: quebra, sopro', () => {
+  it('quebra o que o jogador construiu no caminho, e não a ilha nem as colunas', () => {
+    const { world, session } = endSession();
+    session.tick();
+    const i = indexOf(session, DRAGON);
+    const s = session.mobs.store;
+    const x = Math.floor(s.x[i]);
+    const y = Math.floor(s.centerY(i));
+    const z = Math.floor(s.z[i]);
+    const stone = makeState(STONE);
+    const endStone = makeState(block('end_stone'));
+    world.setBlock(x + 1, y, z, stone, 'player');
+    world.setBlock(x - 1, y, z, endStone, 'player');
+    for (let t = 0; t < 8; t++) session.tick();
+    // O dragão anda; o que interessa é o que estava no corpo dele no tick.
+    expect(world.getBlock(x + 1, y, z)).not.toBe(stone);
+    expect(world.getBlock(x - 1, y, z)).toBe(endStone);
+  });
+
+  it('pousado, sopra onde o jogador está; a nuvem fere quem fica e passa sozinha', () => {
+    const { session, player } = endSession();
+    player.mode = 'survival';
+    session.tick();
+    const i = indexOf(session, DRAGON);
+    const s = session.mobs.store;
+    // Pousa no portal, com o jogador perto e alvo marcado.
+    s.x[i] = 0.5; s.y[i] = PERCH_Y; s.z[i] = 0.5;
+    s.hasTarget[i] = 1;
+    s.variant[i] = PHASE_PERCH;
+    s.fuse[i] = PERCH_TICKS;
+    session.tick();
+    session.tick();
+    expect(dragonState.breathTicks).toBeGreaterThan(0);
+    // O jogador fica na nuvem: perde vida.
+    const before = session.survival.health;
+    for (let t = 0; t < 40; t++) {
+      player.setPosition(dragonState.breathX, dragonState.breathY, dragonState.breathZ);
+      session.tick();
+    }
+    expect(session.survival.health).toBeLessThan(before);
+    // Longe da nuvem (e fora do alcance do próximo sopro), nada.
+    session.survival.health = 20;
+    const cloudX = dragonState.breathX;
+    for (let t = 0; t < 40; t++) {
+      // No ar, longe: na altura da nuvem, a 30 blocos, cai dentro de uma coluna.
+      player.setPosition(cloudX + 30, dragonState.breathY + 20, dragonState.breathZ);
+      session.tick();
+    }
+    expect(session.survival.health).toBe(20);
+    for (let t = 0; t < BREATH_TICKS * 3; t++) session.tick();
+    expect(session.dragonFight.breath === null || session.dragonFight.breath.ticks <= BREATH_TICKS).toBe(true);
+  });
+});
+
+describe('as ilhas de fora e o portal de passagem (M19)', () => {
+  const noise = new EndNoise(SEED);
+  const hasStone = (cx: number, cz: number): boolean => {
+    const chunk = generateEndChunk(SEED, noise, cx, cz);
+    for (let i = 0; i < 256; i++) if (chunk.heightMap[i] > 0) return true;
+    return false;
+  };
+
+  it('o vazio entre a ilha principal e as de fora continua vazio', () => {
+    for (let r = 10; r < 44; r += 3) {
+      for (let a = 0; a < 8; a++) {
+        const angle = (a * Math.PI) / 4;
+        expect(hasStone(Math.round(Math.cos(angle) * r), Math.round(Math.sin(angle) * r)), `${r},${a}`).toBe(false);
+      }
+    }
+  });
+
+  it('a partir de ~770 blocos há ilhas, e algumas guardam um santuário com baú', () => {
+    let islands = 0;
+    let shrines = 0;
+    // Todo chunk de uma janela de ~500 × 500 blocos a oeste: o santuário
+    // ocupa 5 × 5 e cairia entre dois chunks pulados.
+    for (let cz = -16; cz <= 16; cz++) {
+      for (let cx = -80; cx <= -48; cx++) {
+        const chunk = generateEndChunk(SEED, noise, cx, cz);
+        let stone = false;
+        for (let i = 0; i < 256; i++) if (chunk.heightMap[i] > 0) stone = true;
+        if (stone) islands++;
+        for (const marker of chunk.structures) if (marker.kind === 'chest' && marker.data === 'end_shrine') shrines++;
+      }
+    }
+    expect(islands).toBeGreaterThan(20);
+    expect(shrines).toBeGreaterThan(0);
+  });
+
+  it('o dragão caído ergue o portal de passagem, que leva a uma ilha de fora e traz de volta', () => {
+    const { world, session, player } = endSession();
+    session.player.mode = 'creative';
+    session.tick();
+    session.mobs.damage(indexOf(session, DRAGON), 1000, 'player');
+    for (let t = 0; t < (mobDef(DRAGON).traits.deathTicks ?? 0) + 30; t++) session.tick();
+    expect(session.dragonFight.state.killed).toBe(true);
+    // O portal está de pé, na ilha principal, a oeste.
+    let gatewayY = -1;
+    for (let y = 40; y < 90; y++) if (blockIdOf(world.getBlock(GATEWAY_X, y, GATEWAY_Z)) === block('end_gateway')) { gatewayY = y; break; }
+    expect(gatewayY).toBeGreaterThan(0);
+
+    // Entrar: a sessão leva o jogador para longe; os chunks de lá chegam.
+    player.setPosition(GATEWAY_X + 0.5, gatewayY, GATEWAY_Z + 0.5);
+    session.tick();
+    expect(Math.abs(player.x)).toBeGreaterThan(OUTER_START - 100);
+    const cx = Math.floor(player.x) >> 4;
+    const cz = Math.floor(player.z) >> 4;
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) world.addChunk(generateEndChunk(SEED, noise, cx + dx, cz + dz));
+    session.tick();
+    const fx = Math.floor(player.x);
+    const fz = Math.floor(player.z);
+    // Chegou em pé sobre chão, com ar em volta da cabeça, e há um portal de volta perto.
+    expect(world.getBlock(fx, Math.floor(player.y) - 1, fz)).not.toBe(0);
+    expect(world.getBlock(fx, Math.floor(player.y), fz)).toBe(0);
+    let back = false;
+    for (let y = Math.floor(player.y) - 3; y <= Math.floor(player.y) + 3; y++) {
+      if (blockIdOf(world.getBlock(fx - 2, y, fz)) === block('end_gateway')) back = true;
+    }
+    expect(back).toBe(true);
   });
 });

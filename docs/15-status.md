@@ -9,18 +9,18 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-25 13:04 — **M17 fechado: alcance.** O jogo fala inglês: menu
-**Idioma** em Opções (doc 08 §3.11), que segue o aparelho por padrão, com ~500 textos de interface
-em `data/strings/pt.ts` e `en.ts` e os nomes de conteúdo em inglês ao lado das tabelas. Um teste
-varre o código atrás de português escrito direto na tela. **Primeira hora guiada**: a linha do alto
-do HUD ensina do primeiro tronco à picareta de pedra, com o gesto do aparelho na mão (teclado, toque
-A ou B, controle), e some quando o item aparece. **Seed compartilhável**: código curto `03NQ-K8NH`,
-copiar e colar na tela de mundos. Custou **15,9 KB** de bundle (298,4 de 350) e nenhum byte no
-worker. Três defeitos antigos achados no caminho (§4): a linha de objetivo **não mudava quando a
-conquista saía** (desde 2026-09-11), a primeira conquista só saía com tronco de carvalho, e a dica
-de toque descrevia o modo A com o B de padrão. Antes, 12:09: **M16 fechado: um fim para a
-jornada** (fortaleza do Nether, poções, End, dragão, créditos). Antes: M15 validado em campo
-(*"Tudo funcionando perfeitamente!"*).
+**Última atualização:** 2026-09-25 17:27 — **M18 e M19 fechados: o roteiro inteiro está
+implementado.** M18 (casa em ordem): os cinco módulos acima do teto cortados por papel (circuito
+1116 → 640, tela de contêiner 957 → 690, mobs 895 → 683, sessão 889 → 702, `main.ts` 749 → 700),
+a memória de áudio de 3,442 para **2,92 MB** sem tirar som (taxa exata de Nyquist por receita), e
+a varredura de idioma passou a olhar o **destino** do texto — pegou cinco textos que o M17 deixou em
+português. M19 (pontas soltas): enderman no End; o dragão quebra o que atravessa, sopra uma nuvem
+que fere e **morre devagar**, subindo com raios de luz; **as ilhas de fora do End** com santuário e
+baú, e o **portal de passagem** que o dragão abre; o tint de bioma no **WebGL1**; a casa de aldeia
+sem cama não se reproduz mais (o teste perdeu a tolerância). Dois defeitos do M16 achados no
+caminho (§4): o sol no céu do End e o dragão piscando branco. Falta o que depende de aparelho
+(§6). Antes, 13:04: **M17 fechado: alcance** (idioma inglês, primeira hora guiada, seed
+compartilhável).
 ---
 
 ## 1. Panorama
@@ -56,6 +56,8 @@ jornada** (fortaleza do Nether, poções, End, dragão, créditos). Antes: M15 v
 | **M15** Oficina | bigorna, reparo na grade, funil, dispensador, comparador, observador | ✅ **validado em campo em 2026-09-24** (depois da 1ª volta corrigida: telas e funil) | — |
 | **M16** Um fim para a jornada | fortaleza do Nether, blaze, poções, olho do ender, End, dragão, créditos, bruxa | ✅ concluído em 2026-09-24 | **não visto em aparelho**; End em T0 não medido (§6) |
 | **M17** Alcance | menu Idioma (doc 08 §3.11) com `en`, primeira hora guiada, seed compartilhável | ✅ concluído em 2026-09-25 | **não visto em aparelho** (visto no Chrome headless, em pt e en, desktop e celular emulado) |
+| **M18** Casa em ordem, 2ª volta | cinco módulos abaixo do teto, memória de áudio com folga, varredura de idioma pelo destino | ✅ concluído em 2026-09-25 | — |
+| **M19** Pontas soltas | enderman no End, dragão que quebra, sopra e morre devagar, ilhas de fora e portal de passagem, tint no WebGL1 | ✅ concluído em 2026-09-25 | **não visto em aparelho** (End visto no Chrome headless) |
 
 **O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
 ele irá pesar muito o jogo e trazer muita complexidade por enquanto desnecessária"*. O
@@ -68,18 +70,19 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-25 13:04, ao fechar o M17, com `npm test`, `npm run build`,
+Medidas em 2026-09-25 17:27, ao fechar o M19, com `npm test`, `npm run build`,
 `SIZE_BUDGET_KB=350 npm run size` e `npm run smoke`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **298,4 KB** (282,5 antes do M17: o inglês e as chaves custaram 15,9; o worker, 41,8, não mudou um byte; 267,3 antes do M16; 265,7 ao fechar o M15; 257,9 antes do M15; 249,5 antes do M14; 240,0 antes do M10) | < 350 KB | `npm run size` |
-| Testes | **2271**, 116 arquivos (2235 antes do M17; 2164 antes do M16; 2156 ao fechar o M15; 2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **301,8 KB** (298,4 ao fechar o M17; o M19 somou as ilhas de fora e o portal de passagem, e o worker foi a 42,3; 282,5 antes do M17: o inglês e as chaves custaram 15,9; o worker, 41,8, não mudou um byte; 267,3 antes do M16; 265,7 ao fechar o M15; 257,9 antes do M15; 249,5 antes do M14; 240,0 antes do M10) | < 350 KB | `npm run size` |
+| Testes | **2281**, 116 arquivos (2271 ao fechar o M17; 2235 antes do M17; 2164 antes do M16; 2156 ao fechar o M15; 2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
 | Smoke test de navegador | **7 passos verdes**: carregar, criar, andar 10 s, quebrar, salvar, recarregar, conferir | verde | `npm run smoke` |
 | Textos de interface | **~500 chaves**, as mesmas em `pt` e `en` (o compilador cobra); **nenhum literal com cara de português** fora de `data/strings/pt.ts` e dos campos de nome das tabelas | varredura verde | `tests/i18n.test.ts` |
+| Geração de chunk do End nas ilhas de fora | **~2,8 ms** (1089 chunks em ~3 s, com o santuário) | < 25 ms | `tests/theend.test.ts` |
 | Primeira hora guiada | três troncos de bétula → **picareta de pedra**, só pelo livro de receitas, com a dica andando a cada passo | aceite do M17 | `tests/firsthour.test.ts` |
 | Camadas de atlas | **223** com o M16 (+11: verruga, suporte, pedra do End, moldura com e sem olho, portal do End, ovo); **212** com a oficina (+11: bigorna, funil, dispensador, liberador, comparador, observador); 201 com a selva; 194 antes do M14 | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
-| Memória de áudio | **3,442 MB** com as vozes do blaze, da bruxa, do dragão e do cristal (§5: perto do teto de novo); **3,140 MB** no M15 (3,497 no M14, colado no teto): degrau de ¼ da taxa para som grave, sem tirar nenhum (§4) | < 3,5 MB | `tests/audio.test.ts` |
+| Memória de áudio | **2,924 MB** (M18: taxa exata de Nyquist por receita, teto do teste baixado para 3,2); antes **3,442 MB** com as vozes do blaze, da bruxa, do dragão e do cristal (§5: perto do teto de novo); **3,140 MB** no M15 (3,497 no M14, colado no teto): degrau de ¼ da taxa para som grave, sem tirar nenhum (§4) | < 3,5 MB | `tests/audio.test.ts` |
 | Mapa explorado (M10) | **0,23 ms por segundo de jogo**; 500 blocos = 16 regiões, ~146 KB; voando a 20 blocos/s, zero buraco | < 1 ms/s; ≤ 64 regiões | `tests/journal.test.ts` |
 | Geração de chunk | **6,4 ms** (mediana; 6,2 antes do rio) | < 25 ms | `tests/perf.test.ts` |
 | Clima do tint de bioma, thread principal | **8–9 µs por chunk** (até 32 por quadro) | < 60 µs | `tests/perf.test.ts` |
@@ -112,12 +115,12 @@ Medidas em 2026-09-25 13:04, ao fechar o M17, com `npm test`, `npm run build`,
 | Render em T0 | **2,7 ms** de 33,3 ms de orçamento | ≤ 8 ms (soma do doc 02 §2) | overlay F3 no aparelho |
 | Heap em T0 | **20 MB**, estável na sessão | sem crescimento | overlay F3 no aparelho |
 | FPS em celular atual | **75, T2, RD 16, escala 1,00, render 2,6 ms** (S24 Ultra) | — | teste manual |
-| Abertura em 3G rápido | **4,48 s** até a tela de título | < 5 s (PROMPT.md §11) | `npm run slow-network` |
+| Abertura em 3G rápido | **2,82 s** até a tela de título (medido de novo em 2026-09-25, com 301,8 KB; a medida anterior, 4,48 s, foi de outra rodada, com 240 KB) | < 5 s (PROMPT.md §11) | `npm run slow-network` |
 | Sessão longa (voo contínuo) | **92,5 min, 0 erros, 0 travamentos** | 2 h sem crash (PROMPT.md §11) | `npm run soak` |
 | Heap na sessão longa | **37,8 MB no início, 44,2 no fim**; média por faixa de 15 min entre 42,8 e 47,2 | sem crescimento | `npm run soak` |
 | FPS na sessão longa | mediana **60**, mínimo 50, nenhuma amostra abaixo de 30 | 30 estáveis | `npm run soak` |
 | Mundo gerado na sessão longa | **67 621 blocos** percorridos, anel estável em 489 colunas | — | `npm run soak` |
-| Abertura em 3G lento | 9,66 s | — | `npm run slow-network` |
+| Abertura em 3G lento | 9,61 s | — | `npm run slow-network` |
 | Abertura sem limite de rede | 2,89 s | — | `npm run slow-network` |
 | Bytes na rede até o título | **178,7 KB** estimados (174,8 KB do bundle, servido em gzip; a medida de campo é de 2026-09-14, com 169,1) | < 350 KB | `npm run slow-network` |
 
@@ -1930,6 +1933,67 @@ chave no lugar de texto e os módulos novos. O worker não mudou (mesmo hash).
 `pt.ts` (`names.en.ts`); o idioma não troca ao vivo, recarrega (`core/i18n.ts`); o inglês vai
 embutido e não sob demanda (§5).
 
+### M18 — Casa em ordem, segunda volta ✅ — 2026-09-25
+
+Pedido: *"Pode seguir com sua ordem e implementar tudo para concluirmos esse MVP"*, depois de o
+M17 fechar a lista M11–M17. O que virou:
+
+- **Os módulos acima do teto**, cortados por papel, sem mudar comportamento (a suíte inteira verde
+  a cada corte): o circuito (`world/redstone.ts` 1116 → 640) perdeu as tabelas de papel e as chaves
+  (`redstoneroles.ts`), as contas de energia que só leem o mundo (`redstonepower.ts`), o pistão
+  (`redstonepiston.ts`) e as placas (`redstoneplates.ts`); a tela de contêiner (957 → 690), o
+  desenho do slot (`slotview.ts`) e os gestos (`slotgestures.ts`); os mobs (895 → 683), domar,
+  alimentar e cruzar (`mobcare.ts`), a mira (`mobpick.ts`) e as regras que não são IA — despawn,
+  drop, teleporte, fogo e lava (`mobrules.ts`); a sessão (889 → 702), a montagem dos sistemas
+  (`sessionbuild.ts`), o clique em mob (`mobclick.ts`) e a troca de dimensão (`dimensionhop.ts`); o
+  `main.ts` (749 → 700), o retorno de quebrar e colocar (`ui/blockfeedback.ts`), o kit inicial
+  (`game/startingkit.ts`) e o aviso de armazenamento (`save/storagewarning.ts`).
+- **Memória de áudio** (`audio/synth.ts`, `rateFor`): acima do degrau de um quarto, a taxa passou a
+  ser a **exata** de Nyquist da receita, arredondada para cima em kHz, e não meia ou cheia. A
+  galinha (formante em 2,6 kHz) precisava de 15 kHz e pagava 22. **3,442 → 2,924 MB**, sem tirar
+  som; um teste novo garante que nenhuma taxa corta a banda de nenhuma receita.
+- **A varredura de idioma pelo destino** (`tests/i18n.test.ts`): um literal com palavra que vai
+  direto para a tela (`showMessage`, `onMessage`, `textContent`, `aria-label`, `placeholder`,
+  `label:`…) reprova, com ou sem cara de português. Pegou cinco textos que o M17 deixou passar
+  (§4).
+
+### M19 — Pontas soltas ✅ — 2026-09-25
+
+Mesmo pedido. Os desvios e pendências de conteúdo declarados nos marcos anteriores:
+
+- **Enderman no End** (`data/mobs.ts`): a regra de nascimento aceita lista de dimensões, e o
+  enderman nasce também na ilha, em cima da pedra do End — o único que nasce lá.
+- **O dragão** (`entity/ai/dragongoals.ts`, `game/dragonfight.ts`): **quebra o que atravessa** a
+  cada 4 ticks, numa caixa de 7×5×7 em volta do centro, menos pedra do End, obsidiana, rocha-mãe,
+  portal, moldura e ovo (traço `breaksBlocksExcept`); **pousado, sopra** onde o jogador está, a
+  cada 4 s: uma nuvem roxa de 3,5 blocos de raio que dura 6 s e tira 3 de vida a cada meio segundo
+  de quem fica nela (causa de morte própria); e **morre devagar** (traço `deathTicks`, 10 s): o
+  golpe final o deixa invulnerável, subindo e girando com seis raios de luz, e só então ele cai,
+  solta a experiência e abre o portal. Os raios e a nuvem são brilhos do pool de partículas
+  (`render/scenefeed.ts`), sem passe novo.
+- **As ilhas de fora do End** (`world/gen/end.ts`): a partir de 768 blocos do centro, uma ilha por
+  célula de 80 blocos em metade das células, de 12 a 27 de raio e em alturas diferentes; uma em
+  cada ~12 tem um **santuário** de obsidiana com baú (`END_SHRINE`, loot `end_shrine`: diamante,
+  esmeralda, maçã dourada, pérolas).
+- **O portal de passagem** (`game/endgateway.ts`, bloco 163): quando o dragão cai, ergue-se na ilha
+  principal a oeste uma coluna de dois blocos de portal com rocha-mãe em cima e embaixo; entra-se
+  andando e ele leva, na hora, à ilha de fora mais perto de 1000 blocos naquela direção, onde nasce
+  um portal de volta. A travessia é da mesma dimensão (`Travel`, rota `gateway`, evento
+  `onTeleport`). **Desvio consciente:** no gênero ele flutua e se entra com pérola; aqui fica no
+  chão.
+- **Casa de aldeia sem cama** (§5 do M14): procurada em 80 seeds, 11 aldeias, todas com 100% dos
+  moradores em terra com cama. Não se reproduz desde os rios; o teste perdeu a tolerância de 25%.
+- **Tint de bioma no WebGL1** (`render/biometint.ts`, `shaders/terrain.glsl.ts`): textura no
+  vertex shader não é garantida no WebGL1, mas quase todo aparelho a tem — o jogo pergunta
+  (`MAX_VERTEX_TEXTURE_IMAGE_UNITS`). O clima vai em `LUMINANCE_ALPHA`, os mesmos dois bytes do
+  `RG8`. Visto no Chrome com `?gl1`: a mesma grama, folha e água do WebGL2.
+
+**Critérios:** cada item tem teste (`tests/theend.test.ts`: o enderman, a agonia, a quebra, o
+sopro, o vazio entre as ilhas, as ilhas com santuário, o portal de passagem de ida com o de volta;
+`tests/biometint.test.ts`; `tests/village.test.ts`). **Visto no Chrome headless:** a agonia com os
+raios, o portal de passagem de pé, a chegada numa ilha de fora com outras boiando no vazio, e o
+céu do End sem sol.
+
 ## 4. Correções fora de marco
 
 Bugs anteriores encontrados durante o M5 e já corrigidos — ficam registrados porque explicam
@@ -1937,6 +2001,9 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-25 | `render/sky.ts`, `render/shaders/sky.glsl.ts` | **O sol aparecia no céu do End** (M16). A dimensão sem céu trocava as cores do céu e não apagava o disco do sol nem a lua — no Nether a névoa os escondia, no End ficavam no vazio. Um uniform `uCelestial` os apaga; as estrelas ficam. Achado ao olhar a agonia do dragão (M19). |
+| 2026-09-25 | `render/scenefeed.ts` | **O dragão piscava branco ao investir e ao pousar** (M16). O pisca do pavio valia para qualquer mob com `fuse > 0`, e o dragão usa `fuse` como relógio de fase. Agora só quem tem o goal `explode`. |
+| 2026-09-25 | `game/session.ts`, `main.ts`, `ui/gameflow.ts`, `ui/containers/anvilpanel.ts`, `ui/containers/slotview.ts` | **Cinco textos em português sobraram no M17**: *"A tempestade chegou"*, *"Controle conectado:"*, *"salvando…"*, *"opcional"* e *"Durabilidade:"*. Sem acento nem palavra-função, escaparam da varredura; a varredura pelo destino (M18) os pegou. |
 | 2026-09-25 | `ui/objectiveline.ts`, `main.ts` | **A linha de objetivo do HUD não mudava quando a conquista saía** (desde que ela existe, 2026-09-11). Era calculada uma vez, ao entrar no mundo: quem pegava o primeiro tronco continuava lendo *"consiga Tronco de Carvalho"* até sair e voltar. Agora é conferida uma vez por segundo e o texto só é remontado quando muda. Regressão em `tests/firsthour.test.ts`. |
 | 2026-09-25 | `data/achievements.ts`, `game/achievements.ts` | **"Cortando Madeira" só saía com tronco de carvalho** (M6). Quem nascia entre bétulas, pinheiros ou na selva não ganhava a primeira medalha, e o objetivo ficava pedindo carvalho. O alvo aceita `#tag` (`#logs`), e o objetivo diz *"um tronco qualquer"*. Regressão em `tests/achievements.test.ts`. |
 | 2026-09-25 | `ui/controlhint.ts` | **A dica de toque descrevia o modo A** (*"toque longo quebra"*) desde que o B virou o padrão (2026-09-14): no B quem quebra é o botão ⛏. Agora a dica segue o modo escolhido. |
@@ -2121,6 +2188,19 @@ tem **1116** linhas (981 antes; as contas novas foram para `redstoneparts.ts`, f
 `ui/containers/screen.ts` **949** (916; a bigorna foi para `anvilpanel.ts`, ficaram a grade e os
 callbacks; **930** depois que as ofertas da mesa foram para `enchantpanel.ts`, na volta de campo) e `session.ts` 816. O corte natural do circuito é por papel — pó e energia, componentes,
 pistão —, e o da tela, a grade de slots de um lado e os painéis do outro. Não depende de nada.
+
+**Pendências de 2026-09-25 (M18 e M19):**
+
+- ~~Módulos acima do teto~~ **fechada no M18** para os cinco da lista. Continuam acima de 700 as
+  tabelas de dados (`data/textures.ts` 1865, `data/itemart.ts` 1111, `data/blocks.ts` 955,
+  `data/items.ts` 704) — tabela longa é o formato do projeto —, `world/mesh/shapes.ts` 899 (as
+  formas de bloco) e `ui/hud.ts` 725. Nenhum bloqueia nada.
+- ~~Memória de áudio perto do teto~~ **fechada no M18**: 2,924 MB.
+- ~~Enderman não nasce no End~~, ~~o dragão não quebra bloco, não sopra e não tem animação de
+  morte~~, ~~só a ilha principal do End~~, ~~WebGL1 com uma cor de grama só~~ e ~~casa de aldeia
+  sem cama~~: **fechadas no M19**.
+- **Nada do M18 e do M19 foi visto em aparelho.** O M18 não muda o que se vê (a não ser o som, que
+  deve soar igual); o M19 é o End depois do dragão.
 
 **Pendências abertas em 2026-09-25 (M17):**
 
@@ -2310,7 +2390,56 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
 
 ## 6. Próximo passo recomendado
 
-1. **Jogar o M17 num aparelho, num mundo novo** — e, se der, entregar o celular a alguém que nunca
+1. **O roteiro de celular que fecha o MVP** (2026-09-25). O código de M0 a M19 está pronto; o que
+   falta é ver no aparelho o que só foi visto em teste e no Chrome headless — M16, M17, M18 e M19
+   — e medir no T0 o que o doc 14 pede (30 FPS no End e com o tint de bioma). Um mundo novo de
+   Sobrevivência, em ordem de jogo. Quem puder, entrega o celular a alguém que nunca jogou nas
+   partes A e B.
+
+   **A. Os primeiros minutos (M17)**
+   - A dica *"Dica — Mire num tronco…"* no alto: cabe deitado, sem brigar com a faixa de
+     marcadores nem com ⏸ ▤? Ela anda sozinha: tronco (três), tábuas por **Receitas** na mochila,
+     bancada, picareta de madeira na bancada, pedregulho, picareta de pedra — e no fim o aviso.
+   - A dica de toque ao entrar: *"segure ⛏ para quebrar, ▣ coloca e usa"*.
+   - O **Objetivo** muda na hora quando a conquista sai (era um defeito: só mudava ao voltar).
+   - Numa floresta de bétula ou pinheiro, *Cortando Madeira* sai com qualquer tronco.
+
+   **B. Idioma e seed (M17)**
+   - Opções → Idioma → English → *Aplicar agora*: tudo em inglês — menus, itens, conquistas,
+     mensagens (morrer, dormir, chuva, tempestade, *salvando…*), a bigorna (*optional*) e o
+     tooltip (*Durability*). Qualquer palavra em português é bug: anotar onde.
+   - Mundos → *Copiar seed*; criar outro colando com *Colar*: o mesmo lugar? O Colar pede
+     permissão?
+
+   **C. O caminho até o dragão (M16)**
+   - O suporte de preparo no celular: frascos, verruga, pó de blaze, a barra andando.
+   - A fortaleza do Nether: luzes na névoa, ponte, blazes (a bola incendeia; a água apaga).
+   - O olho do ender: arremessar e seguir; a fortaleza, a escada, a sala do portal.
+
+   **D. O End (M16 e M19)**
+   - A chegada de frente para a ilha; **endermen** andando na ilha.
+   - Os cristais (flecha); o dragão investindo **sem piscar branco**; pousado, o **sopro**: a nuvem
+     roxa no chão, que fere quem fica e passa em 6 s.
+   - Um bloco posto no caminho do dragão some; a pedra do End e as colunas, não.
+   - O golpe final: ele **sobe girando com raios de luz** por 10 s, depois cai; portal de saída,
+     ovo, conquista. **O céu do End não tem sol.**
+   - **O portal de passagem** a oeste do centro (a coluna com rocha-mãe em cima): entrar leva a uma
+     ilha de fora, com outras boiando em volta, e um portal de volta ao lado. Achar um **santuário**
+     com baú; voltar pelo portal.
+   - **O FPS no T0 (F3)**, com o dragão e na ilha de fora.
+   - A volta pelo portal de saída: os créditos, e chegar na cama.
+
+   **E. O resto**
+   - A bruxa, no pântano de noite.
+   - O som (M18 mudou a taxa de 40 sons, sem mudar a receita): galinha, aranha, esqueleto,
+     creeper, morcego, ghast e a chuva devem soar como antes. Se algum ficar abafado, é
+     `rateFor` em `audio/synth.ts`.
+   - No T0, **o tint de bioma**: andar da planície para a floresta e o deserto com o F3 aberto.
+
+   Com isso em ordem, os cinco critérios de "pronto" do doc 14 estão atendidos (os outros três —
+   3G, sessão longa sem crash, zero assets — já estão medidos no §2) e dá para declarar o MVP.
+
+   ~~**Jogar o M17 num aparelho, num mundo novo** — e, se der, entregar o celular a alguém que nunca
    jogou, sem explicar nada. O M17 fecha a lista M11–M17; depois dele não há marco proposto, e o
    próximo passo é escolher um (ou declarar o MVP, doc 14 "Critérios de pronto"). Em ordem de
    quanto pode estar errado:
@@ -2326,7 +2455,7 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
      que é o mesmo lugar. No celular, o Colar pede permissão?
    - **a dica de toque do modo B** ao entrar no mundo: *"segure ⛏ para quebrar, ▣ coloca e usa"*.
 
-0. **Jogar o M16 num aparelho**, num mundo novo — segue valendo; pode ir junto com o M17.
+   ~~**Jogar o M16 num aparelho**~~ — entrou no roteiro acima (partes C e D).
    O M16 só foi visto em testes e no Chrome headless. Em ordem de quanto pode estar errado:
    - **tela do suporte de preparo no celular**: Ingrediente, Combustível e os três Frasco, a barra
      andando com a tela aberta e a frase de cada passo. Encher o frasco de vidro na água; beber;

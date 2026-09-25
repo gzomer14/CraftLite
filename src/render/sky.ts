@@ -14,7 +14,7 @@ import { TICKS_PER_DAY } from '../game/daynight';
 import { createMat4, invert, multiply, type Mat4 } from '../core/math';
 
 const UNIFORMS = [
-  'uInvViewProj', 'uZenith', 'uHorizon', 'uSunDir', 'uDayFactor', 'uMoonPhase',
+  'uInvViewProj', 'uZenith', 'uHorizon', 'uSunDir', 'uDayFactor', 'uMoonPhase', 'uCelestial',
 ] as const;
 
 /** Marcos de cor: [fração do dia, zênite, horizonte]. */
@@ -100,7 +100,11 @@ export class SkyPass {
   }
 
   /** Atualiza as cores para o tick do dia atual e a fase da lua (0..7). */
+  /** 1 = desenha sol e lua; 0 nas dimensões sem céu (`override`). */
+  private celestial = 1;
+
   update(dayTime: number, moonPhase = 0): void {
+    this.celestial = 1;
     moonPhaseVector(moonPhase, this.moonPhase);
     const t = (dayTime / TICKS_PER_DAY) % 1;
     let i = 0;
@@ -129,6 +133,9 @@ export class SkyPass {
    * O zênite sai mais escuro que o horizonte, como num teto de rocha.
    */
   override(color: readonly [number, number, number]): void {
+    // Dimensão sem céu: sem sol nem lua. Até o M19 o End mostrava o disco do
+    // sol no vazio (o Nether o escondia atrás da névoa).
+    this.celestial = 0;
     for (let c = 0; c < 3; c++) {
       this.horizon[c] = color[c];
       this.zenith[c] = color[c] * 0.45;
@@ -164,6 +171,7 @@ export class SkyPass {
     gl.uniform3fv(this.uniforms.uSunDir, this.sunDir);
     gl.uniform1f(this.uniforms.uDayFactor, dayFactor);
     gl.uniform2fv(this.uniforms.uMoonPhase, this.moonPhase);
+    gl.uniform1f(this.uniforms.uCelestial, this.celestial);
 
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 

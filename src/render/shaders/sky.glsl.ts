@@ -53,6 +53,7 @@ in vec3 vRay;
 uniform vec3 uZenith;
 uniform vec3 uHorizon;
 uniform vec3 uSunDir;
+uniform float uCelestial;
 uniform float uDayFactor;
 uniform vec2 uMoonPhase;
 out vec4 fragColor;
@@ -67,9 +68,10 @@ void main() {
 
   // Sol/lua: disco com halo suave.
   float sun = dot(ray, uSunDir);
-  color += vec3(1.0, 0.95, 0.85) * pow(max(sun, 0.0), 900.0) * 1.4;
-  color += vec3(1.0, 0.8, 0.55) * pow(max(sun, 0.0), 12.0) * 0.10 * uDayFactor;
-  color += moonColor(ray, uSunDir, uMoonPhase, 1.0 - uDayFactor);
+  // Sem céu (Nether, End), sem sol nem lua: \`uCelestial\` 0 (M19).
+  color += vec3(1.0, 0.95, 0.85) * pow(max(sun, 0.0), 900.0) * 1.4 * uCelestial;
+  color += vec3(1.0, 0.8, 0.55) * pow(max(sun, 0.0), 12.0) * 0.10 * uDayFactor * uCelestial;
+  color += moonColor(ray, uSunDir, uMoonPhase, 1.0 - uDayFactor) * uCelestial;
 
   // Estrelas: ruído de alta frequência, só à noite e acima do horizonte.
   if (uDayFactor < 0.6 && ray.y > 0.0) {
@@ -102,6 +104,7 @@ varying vec3 vRay;
 uniform vec3 uZenith;
 uniform vec3 uHorizon;
 uniform vec3 uSunDir;
+uniform float uCelestial;
 uniform float uDayFactor;
 uniform vec2 uMoonPhase;
 ${MOON_FN}
@@ -110,9 +113,10 @@ void main() {
   float t = pow(clamp(ray.y * 0.5 + 0.5, 0.0, 1.0), 0.55);
   vec3 color = mix(uHorizon, uZenith, t);
   float sun = dot(ray, uSunDir);
-  color += vec3(1.0, 0.95, 0.85) * pow(max(sun, 0.0), 900.0) * 1.4;
-  color += vec3(1.0, 0.8, 0.55) * pow(max(sun, 0.0), 12.0) * 0.10 * uDayFactor;
-  color += moonColor(ray, uSunDir, uMoonPhase, 1.0 - uDayFactor);
+  // Sem céu (Nether, End), sem sol nem lua: \`uCelestial\` 0 (M19).
+  color += vec3(1.0, 0.95, 0.85) * pow(max(sun, 0.0), 900.0) * 1.4 * uCelestial;
+  color += vec3(1.0, 0.8, 0.55) * pow(max(sun, 0.0), 12.0) * 0.10 * uDayFactor * uCelestial;
+  color += moonColor(ray, uSunDir, uMoonPhase, 1.0 - uDayFactor) * uCelestial;
   gl_FragColor = vec4(color, 1.0);
 }
 `;

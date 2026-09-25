@@ -14,7 +14,8 @@ import { defOf, stateBitsOf, texOf } from '../data/blocks';
 import { mobDef } from '../data/mobs';
 import { modelOf } from '../data/mobmodels';
 import { SHAPE_BY_NAME, boundsFor } from '../world/mesh/shapes';
-import { FLAG_SLEEPING } from '../entity/mobstore';
+import { FLAG_DYING, FLAG_SLEEPING } from '../entity/mobstore';
+import { BREATH_RADIUS } from '../game/dragonfight';
 import {
   ARROW_LAYER, BOAT_LAYER, BOBBER_LAYER, FISHING_LINE_LAYER, MINECART_LAYER, type EntityAtlas,
 } from './entityatlas';
@@ -88,6 +89,7 @@ export class SceneFeed {
     // Orbes de XP: um brilho verde por orbe no pool de partículas, em vez de
     // um passe de render novo. Custa zero draw call a mais e some sozinho.
     session.orbs.forEach(this.addOrb, alpha);
+    this.breathCloud();
 
     // A mão acompanha a luz de onde o jogador está: sem isto ela fica acesa
     // dentro da caverna, como se tivesse luz própria.
@@ -141,10 +143,16 @@ export class SceneFeed {
       const light = Math.max(
         world.getBlockLight(bx, by, bz), world.getSkyLight(bx, by, bz) * dayFactor,
       );
-      // Creeper com o pavio aceso pisca branco: é o aviso de que dá tempo de correr.
+      /*
+       * Creeper com o pavio aceso pisca branco: é o aviso de que dá tempo de
+       * correr. Só quem tem o goal `explode` — o dragão usa `fuse` como relógio
+       * de fase (M16), e até o M19 piscava branco ao investir e ao pousar.
+       */
+      const fused = store.fuse[i] > 0 && def.goals.includes('explode');
       const flash = store.hurtTicks[i] > 0
         ? 1
-        : store.fuse[i] > 0 ? (store.fuse[i] % 8 < 4 ? 0.8 : 0) : 0;
+        : fused ? (store.fuse[i] % 8 < 4 ? 0.8 : 0) : 0;
+      if (store.hasFlag(i, FLAG_DYING)) this.deathRays(x, y + store.height(i) * 0.5, z, store.age[i]);
       // Aldeão dormindo (M9): o corpo inteiro deita, com a cabeça no travesseiro.
       const sleeping = store.hasFlag(i, FLAG_SLEEPING);
       mobRenderer.addModel(
@@ -304,7 +312,47 @@ export class SceneFeed {
     if (item !== 0) this.d.itemRenderer.add(x, y - 0.15, z, item, 0);
   };
 
+  /**
+   * A agonia do dragão (M19): seis raios de luz girando para fora do corpo,
+   * feitos de brilhos do pool de partículas — nenhum passe de render novo.
+   */
+  private deathRays(x: number, y: number, z: number, age: number): void {
+    const particles = this.d.renderer.particles;
+    for (let ray = 0; ray < RAYS; ray++) {
+      const yaw = age * 0.04 + (ray * Math.PI * 2) / RAYS;
+      const pitch = Math.sin(age * 0.03 + ray * 1.7) * 0.9;
+      const dx = Math.cos(yaw) * Math.cos(pitch);
+      const dy = Math.sin(pitch);
+      const dz = Math.sin(yaw) * Math.cos(pitch);
+      for (let step = 1; step <= RAY_STEPS; step++) {
+        const d = step * 2;
+        particles.emitGlow(x + dx * d, y + dy * d, z + dz * d, 1, 0.85, 1, 0.6);
+      }
+    }
+  }
+
+  /** A nuvem do sopro do dragão (M19): brilhos roxos rentes ao chão. */
+  private breathCloud(): void {
+    const cloud = this.d.session.dragonFight.breath;
+    if (cloud === null) return;
+    const particles = this.d.renderer.particles;
+    for (let k = 0; k < CLOUD_PUFFS; k++) {
+      const angle = Math.random() * Math.PI * 2;
+      const r = Math.sqrt(Math.random()) * BREATH_RADIUS;
+      particles.emitGlow(
+        cloud.x + Math.cos(angle) * r, cloud.y + Math.random() * 0.8, cloud.z + Math.sin(angle) * r,
+        0.72, 0.25, 0.9, 0.45,
+      );
+    }
+  }
+
   private readonly addOrb = (x: number, y: number, z: number): void => {
     this.d.renderer.particles.emitGlow(x, y + 0.15, z, 0.48, 0.84, 0.23);
   };
 }
+
+/** Raios da agonia do dragão, e brilhos por raio. */
+const RAYS = 6;
+const RAY_STEPS = 5;
+/** Brilhos da nuvem do sopro por quadro. */
+const CLOUD_PUFFS = 8;

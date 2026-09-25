@@ -104,15 +104,23 @@ export function renderSlot(
   // que aquela picareta não é uma picareta comum.
   view.el.classList.toggle('enchanted', (stack.ench ?? 0) !== 0);
 
-  const durability = def?.durability;
-  if (durability !== undefined && stack.damage > 0) {
-    view.bar.hidden = false;
-    const remaining = 1 - stack.damage / durability;
-    view.bar.style.transform = `scaleX(${remaining.toFixed(3)})`;
-    view.bar.style.background = remaining > 0.5 ? '#5ad04a' : remaining > 0.2 ? '#d0c04a' : '#d04a4a';
-  } else {
-    view.bar.hidden = true;
+  paintDurability(view.bar, stack);
+}
+
+/**
+ * A barra de durabilidade de uma pilha: some com a ferramenta nova, encolhe e
+ * vai do verde ao vermelho com o uso. A mesma na tela aberta e na hotbar do HUD.
+ */
+export function paintDurability(bar: HTMLElement, stack: ItemStack | null): void {
+  const durability = stack === null ? undefined : itemDef(stack.item)?.durability;
+  if (stack === null || durability === undefined || stack.damage <= 0) {
+    bar.hidden = true;
+    return;
   }
+  bar.hidden = false;
+  const remaining = 1 - stack.damage / durability;
+  bar.style.transform = `scaleX(${remaining.toFixed(3)})`;
+  bar.style.background = remaining > 0.5 ? '#5ad04a' : remaining > 0.2 ? '#d0c04a' : '#d04a4a';
 }
 
 /** Nome, encantamentos e durabilidade da pilha, ou `null` se não houver. */

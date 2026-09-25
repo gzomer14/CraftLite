@@ -512,6 +512,7 @@ async function boot(): Promise<void> {
   const objectiveLine = new ObjectiveLine({
     hud, guide: session.guide, settings, gamepads, keybinds, isTouch: isTouchDevice,
     slots: () => session.inventory.slots,
+    cursor: () => session.inventory.cursor,
     achievementMask: () => session.achievements.mask,
     survival: () => player.mode === 'survival',
   });

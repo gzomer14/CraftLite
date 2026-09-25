@@ -66,13 +66,19 @@ uniform sampler2DArray uAtlas;
 uniform float uLayer;
 uniform vec4 uCrackColor;
 out vec4 fragColor;
+const float CRACK_EDGE_ALPHA = 0.45;
+vec4 crack(float core, float ring) {
+  float edge = max(ring - core, 0.0);
+  vec3 color = mix(uCrackColor.rgb, 1.0 - uCrackColor.rgb, edge);
+  return vec4(color, max(core * uCrackColor.a, edge * CRACK_EDGE_ALPHA));
+}
 void main() {
   vec4 texel = texture(uAtlas, vec3(vUv, uLayer));
-  // A textura é branca com a fissura em preto: o canal vermelho vira máscara.
-  // A cor vem de fora porque ela depende do brilho do bloco — fissura preta
-  // some em tronco de carvalho escuro, e fissura clara some em areia.
-  float mask = 1.0 - texel.r;
-  fragColor = vec4(uCrackColor.rgb, mask * uCrackColor.a);
+  // Vermelho zerado = fissura; verde zerado = fissura ou contorno (M2, corrigido
+  // em 2026-09-25). A cor vem de fora porque depende do brilho do bloco — preta
+  // some em tronco escuro, clara some em areia —, e o contorno no tom oposto
+  // segura a textura de dois tons, como a casca do tronco.
+  fragColor = crack(1.0 - texel.r, 1.0 - texel.g);
 }
 `;
 
@@ -97,10 +103,16 @@ uniform sampler2D uAtlas;
 uniform vec2 uAtlasTiles;
 uniform float uLayer;
 uniform vec4 uCrackColor;
+const float CRACK_EDGE_ALPHA = 0.45;
+vec4 crack(float core, float ring) {
+  float edge = max(ring - core, 0.0);
+  vec3 color = mix(uCrackColor.rgb, 1.0 - uCrackColor.rgb, edge);
+  return vec4(color, max(core * uCrackColor.a, edge * CRACK_EDGE_ALPHA));
+}
 void main() {
   vec2 tile = vec2(mod(uLayer, uAtlasTiles.x), floor(uLayer * uAtlasTiles.y));
   vec2 uv = (tile + clamp(vUv, 0.002, 0.998)) * uAtlasTiles.y;
-  float mask = 1.0 - texture2D(uAtlas, uv).r;
-  gl_FragColor = vec4(uCrackColor.rgb, mask * uCrackColor.a);
+  vec4 texel = texture2D(uAtlas, uv);
+  gl_FragColor = crack(1.0 - texel.r, 1.0 - texel.g);
 }
 `;

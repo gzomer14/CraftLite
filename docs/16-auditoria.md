@@ -12,6 +12,43 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-25 18:50 → 19:11 · Campo: a dica das tábuas, durabilidade na hotbar, rachadura lateral
+
+**Pedido:** três situações do teste no celular — *"ao chegar no objetivo de construir quatro
+tábuas (…) o objetivo não foi atualizado"*, *"a barrinha de durabilidade dos itens fosse exibida
+também (…) na hotbar"* e *"você começa a quebrar a arvore e ele não muda a textura (…), eu só
+consigo ver na parte de cima ou de baixo do tronco"*.
+
+**Resultado:** três causas achadas e corrigidas, cada uma com regressão. **Tábuas:** reproduzido no
+Chrome headless — tocar no resultado põe as tábuas no cursor, e fechar a mochila as jogava no chão
+(`dropCursor`); agora guarda (`stowCursor`), o livro de receitas guarda o cursor antes de preencher,
+e a dica conta o cursor e ignora a prévia do resultado. **Durabilidade:** a barra da tela aberta
+virou `paintDurability`, usada também pela hotbar. **Rachadura:** não era o tom — as faces laterais
+do cubo da rachadura estavam enroladas para dentro e o culling as descartava em **todo** bloco;
+corrigido o enrolamento, e a fissura ganhou contorno no tom oposto. Visto no Chrome: rachadura na
+lateral de carvalho, bétula, pinheiro, tábua e pedra; barras na hotbar; tábuas na mochila e dica
+andando depois de fechar. 2290 testes, 302,2 KB.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| ~ | `src/game/inventory.ts` | `stowCursor`: guarda o cursor na mochila, só o que não cabe vai ao chão |
+| ~ | `src/ui/containers/screen.ts` | `close()` usa `stowCursor` em vez de `dropCursor` |
+| ~ | `src/game/workbench.ts` | `autoFillRecipe` guarda o cursor antes de preencher a grade |
+| ~ | `src/game/guide.ts` | passo conta o cursor e ignora `CRAFT_RESULT` (a prévia) |
+| ~ | `src/ui/objectiveline.ts`, `src/main.ts` | dependência `cursor` da linha do HUD |
+| ~ | `src/ui/containers/slotview.ts` | `paintDurability` exportada, compartilhada com o HUD |
+| ~ | `src/ui/hud.ts` | barra de durabilidade em cada slot da hotbar; desgaste na chave de redesenho |
+| ~ | `src/render/selection.ts` | `buildCrackCube` exportado, faces laterais anti-horárias vistas de fora |
+| ~ | `src/data/textures.ts` | `drawCracks`: vermelho = fissura, verde = fissura + contorno de 1 px |
+| ~ | `src/render/shaders/overlay.glsl.ts` | `crack()`: fissura no tom do bloco, contorno no oposto (WebGL2 e 1) |
+| ~ | `tests/firsthour.test.ts` | prévia não conta, cursor conta; fechar guarda as tábuas; bancada com tábuas no cursor |
+| ~ | `tests/inventory.test.ts` | `stowCursor`, com mochila cheia |
+| + | `tests/durabilitybar.test.ts` | barra some, encolhe e muda de cor |
+| ~ | `tests/cracks.test.ts` | enrolamento das 12 faces, textura de pé nas laterais, máscara do contorno |
+| ~ | `docs/15-status.md`, `README.md` | §4 com as três correções, §6 A com o que conferir, métricas |
+
+---
+
 ## 2026-09-25 13:10 → 17:27 · M18 e M19: casa em ordem e pontas soltas
 
 **Pedido:** *"Pode seguir com sua ordem e implementar tudo para concluirmos esse MVP"* — depois de

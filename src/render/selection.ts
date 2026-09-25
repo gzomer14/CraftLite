@@ -21,17 +21,27 @@ const EDGES = new Float32Array([
   0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1,
 ]);
 
-/** Cubo com UV por face, para a rachadura. 6 faces × 2 triângulos. */
-function buildCrackCube(): Float32Array {
+/**
+ * Cubo com UV por face, para a rachadura. 6 faces × 2 triângulos, **no sentido
+ * anti-horário visto de fora** (`e1 × e2` aponta para fora), porque o passe
+ * desenha com `CULL_FACE` ligado.
+ *
+ * **Corrige um defeito do M2:** as quatro faces laterais estavam enroladas
+ * para dentro e o culling as descartava — a rachadura só aparecia no topo e
+ * na base do bloco. Em tronco, que se quebra de lado, a quebra parecia não
+ * andar; a queixa de 2026-09-10 foi tratada como tom da fissura, mas a face
+ * nem chegava à tela.
+ */
+export function buildCrackCube(): Float32Array {
   const out: number[] = [];
-  // Cada face: origem + dois vetores de aresta, com UV 0..1.
+  // Cada face: origem + dois vetores de aresta, com UV 0..1 (v para cima nas laterais).
   const faces: readonly number[][] = [
-    [1, 0, 0, 0, 0, 1, 0, 1, 0], // +X
-    [0, 0, 1, 0, 0, -1, 0, 1, 0], // -X
+    [1, 0, 1, 0, 0, -1, 0, 1, 0], // +X
+    [0, 0, 0, 0, 0, 1, 0, 1, 0], // -X
     [0, 1, 1, 1, 0, 0, 0, 0, -1], // +Y
     [0, 0, 0, 1, 0, 0, 0, 0, 1], // -Y
-    [1, 0, 1, -1, 0, 0, 0, 1, 0], // +Z
-    [0, 0, 0, 1, 0, 0, 0, 1, 0], // -Z
+    [0, 0, 1, 1, 0, 0, 0, 1, 0], // +Z
+    [1, 0, 0, -1, 0, 0, 0, 1, 0], // -Z
   ];
   for (const f of faces) {
     const [ox, oy, oz, e1x, e1y, e1z, e2x, e2y, e2z] = f;

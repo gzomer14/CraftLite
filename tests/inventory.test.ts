@@ -297,6 +297,23 @@ describe('soltar item', () => {
     expect(dropped).toBe(12);
     expect(i.cursor).toBeNull();
   });
+
+  it('regressão: fechar a tela guarda o cursor; só o que não cabe vai ao chão', () => {
+    const i = inv();
+    let dropped = 0;
+    i.onDrop = (s) => { dropped += s.count; };
+    i.cursor = makeStack(STONE, 12);
+    i.stowCursor();
+    expect(i.cursor).toBeNull();
+    expect(i.get(0)?.count).toBe(12);
+    expect(dropped).toBe(0);
+    // Mochila cheia de terra: a pedra não cabe e vai para o chão.
+    for (let s = 0; s < 36; s++) i.set(s, makeStack(DIRT, 64));
+    i.cursor = makeStack(STONE, 5);
+    i.stowCursor();
+    expect(dropped).toBe(5);
+    expect(i.cursor).toBeNull();
+  });
 });
 
 describe('give', () => {

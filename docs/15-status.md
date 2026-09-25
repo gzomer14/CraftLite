@@ -9,8 +9,12 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-25 17:27 — **M18 e M19 fechados: o roteiro inteiro está
-implementado.** M18 (casa em ordem): os cinco módulos acima do teto cortados por papel (circuito
+**Última atualização:** 2026-09-25 19:11 — **três defeitos do teste de campo corrigidos** (§4): a
+dica das tábuas não andava (fechar a mochila com as tábuas no cursor as jogava no chão), a barra de
+durabilidade só existia com a mochila aberta (agora também na hotbar), e **a rachadura não aparecia
+nas faces laterais** de nenhum bloco (o cubo dela estava enrolado para dentro e o culling o
+descartava — só topo e base mostravam a quebra). Antes, 17:27 — **M18 e M19 fechados: o roteiro
+inteiro está implementado.** M18 (casa em ordem): os cinco módulos acima do teto cortados por papel (circuito
 1116 → 640, tela de contêiner 957 → 690, mobs 895 → 683, sessão 889 → 702, `main.ts` 749 → 700),
 a memória de áudio de 3,442 para **2,92 MB** sem tirar som (taxa exata de Nyquist por receita), e
 a varredura de idioma passou a olhar o **destino** do texto — pegou cinco textos que o M17 deixou em
@@ -70,13 +74,13 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-25 17:27, ao fechar o M19, com `npm test`, `npm run build`,
+Medidas em 2026-09-25 19:11, depois das correções de campo do M19, com `npm test`, `npm run build`,
 `SIZE_BUDGET_KB=350 npm run size` e `npm run smoke`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **301,8 KB** (298,4 ao fechar o M17; o M19 somou as ilhas de fora e o portal de passagem, e o worker foi a 42,3; 282,5 antes do M17: o inglês e as chaves custaram 15,9; o worker, 41,8, não mudou um byte; 267,3 antes do M16; 265,7 ao fechar o M15; 257,9 antes do M15; 249,5 antes do M14; 240,0 antes do M10) | < 350 KB | `npm run size` |
-| Testes | **2281**, 116 arquivos (2271 ao fechar o M17; 2235 antes do M17; 2164 antes do M16; 2156 ao fechar o M15; 2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **302,2 KB**, worker 42,4 (301,8 ao fechar o M19; 298,4 ao fechar o M17; o M19 somou as ilhas de fora e o portal de passagem, e o worker foi a 42,3; 282,5 antes do M17: o inglês e as chaves custaram 15,9; o worker, 41,8, não mudou um byte; 267,3 antes do M16; 265,7 ao fechar o M15; 257,9 antes do M15; 249,5 antes do M14; 240,0 antes do M10) | < 350 KB | `npm run size` |
+| Testes | **2290**, 117 arquivos (2281 ao fechar o M19; 2271 ao fechar o M17; 2235 antes do M17; 2164 antes do M16; 2156 ao fechar o M15; 2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
 | Smoke test de navegador | **7 passos verdes**: carregar, criar, andar 10 s, quebrar, salvar, recarregar, conferir | verde | `npm run smoke` |
 | Textos de interface | **~500 chaves**, as mesmas em `pt` e `en` (o compilador cobra); **nenhum literal com cara de português** fora de `data/strings/pt.ts` e dos campos de nome das tabelas | varredura verde | `tests/i18n.test.ts` |
 | Geração de chunk do End nas ilhas de fora | **~2,8 ms** (1089 chunks em ~3 s, com o santuário) | < 25 ms | `tests/theend.test.ts` |
@@ -2001,6 +2005,9 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-25 | `render/selection.ts`, `data/textures.ts`, `render/shaders/overlay.glsl.ts` | **A rachadura de quebra não aparecia nas faces laterais** (M2; campo: *"você começa a quebrar a árvore e ele não muda a textura (…), eu só consigo ver na parte de cima ou de baixo do tronco"*). As quatro faces laterais do cubo da rachadura estavam enroladas para dentro, e o passe desenha com `CULL_FACE`: só topo e base chegavam à tela, em **qualquer** bloco — no tronco, que se quebra de lado, a quebra parecia não andar. A correção de 2026-09-10 (tom da fissura, mais abaixo nesta tabela) tratou o sintoma errado. Agora as seis faces são anti-horárias vistas de fora, e a fissura ganhou um **contorno de um pixel no tom oposto** (canal verde da mesma textura), para a textura de dois tons, como a casca de bétula. Regressões em `tests/cracks.test.ts`. |
+| 2026-09-25 | `game/inventory.ts`, `ui/containers/screen.ts`, `game/workbench.ts`, `game/guide.ts` | **Fechar a mochila jogava no chão o que estava no cursor** (M4; campo: *"ao chegar no objetivo de construir quatro tábuas (…) o objetivo não foi atualizado"*). No celular, tocar no resultado da receita põe as tábuas no cursor; fechar a tela chamava `dropCursor` (o comentário dizia "devolve"), as tábuas iam para o chão e a dica do M17 nunca as via. Agora o fechamento **guarda** na mochila (`stowCursor`) e só joga o que não couber; o livro de receitas também guarda o cursor antes de preencher (com as tábuas na mão, "bancada" falhava em silêncio). A dica passou a contar o cursor e **não** a prévia do resultado (pulava para a bancada antes de o jogador tirar as tábuas). Regressões em `tests/firsthour.test.ts` e `tests/inventory.test.ts`. |
+| 2026-09-25 | `ui/hud.ts`, `ui/containers/slotview.ts` | **A barra de durabilidade só aparecia com a mochila aberta** (M4; pedido de campo). A hotbar do HUD ganhou a mesma barra (`paintDurability`, compartilhada), e o desgaste entrou na chave de redesenho do slot. Teste em `tests/durabilitybar.test.ts`. |
 | 2026-09-25 | `render/sky.ts`, `render/shaders/sky.glsl.ts` | **O sol aparecia no céu do End** (M16). A dimensão sem céu trocava as cores do céu e não apagava o disco do sol nem a lua — no Nether a névoa os escondia, no End ficavam no vazio. Um uniform `uCelestial` os apaga; as estrelas ficam. Achado ao olhar a agonia do dragão (M19). |
 | 2026-09-25 | `render/scenefeed.ts` | **O dragão piscava branco ao investir e ao pousar** (M16). O pisca do pavio valia para qualquer mob com `fuse > 0`, e o dragão usa `fuse` como relógio de fase. Agora só quem tem o goal `explode`. |
 | 2026-09-25 | `game/session.ts`, `main.ts`, `ui/gameflow.ts`, `ui/containers/anvilpanel.ts`, `ui/containers/slotview.ts` | **Cinco textos em português sobraram no M17**: *"A tempestade chegou"*, *"Controle conectado:"*, *"salvando…"*, *"opcional"* e *"Durabilidade:"*. Sem acento nem palavra-função, escaparam da varredura; a varredura pelo destino (M18) os pegou. |
@@ -2403,6 +2410,10 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
    - A dica de toque ao entrar: *"segure ⛏ para quebrar, ▣ coloca e usa"*.
    - O **Objetivo** muda na hora quando a conquista sai (era um defeito: só mudava ao voltar).
    - Numa floresta de bétula ou pinheiro, *Cortando Madeira* sai com qualquer tronco.
+   - **Correções de campo (19:11):** tocar no resultado das tábuas e **fechar a mochila** sem pô-las
+     num slot — elas ficam na mochila e a dica passa para a bancada; a picareta gasta mostra a
+     **barra na hotbar**; quebrar um tronco **de lado** mostra a rachadura crescendo (antes só no
+     topo e na base).
 
    **B. Idioma e seed (M17)**
    - Opções → Idioma → English → *Aplicar agora*: tudo em inglês — menus, itens, conquistas,

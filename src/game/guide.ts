@@ -15,6 +15,7 @@ import { GUIDE_STEPS } from '../data/guide';
 import { ITEM_BY_NAME } from '../data/items';
 import { TAGS } from '../data/recipes';
 import { ACHIEVEMENT_BY_NAME } from '../data/achievements';
+import { CRAFT_RESULT } from './inventory';
 import type { ItemStack } from '../data/items';
 
 /** Ids de item de cada passo, resolvidos uma vez (as tags viram listas). */
@@ -70,10 +71,12 @@ export class Guide {
    * Sem alocação: percorre a mochila uma vez por passo à frente, e roda uma vez
    * por segundo, não por quadro.
    */
-  update(slots: readonly (ItemStack | null)[], achievementMask: number): boolean {
+  update(
+    slots: readonly (ItemStack | null)[], achievementMask: number, cursor: ItemStack | null = null,
+  ): boolean {
     let reached = this.done;
     for (let step = GUIDE_STEPS.length - 1; step >= this.done; step--) {
-      if (stepMet(step, slots, achievementMask)) {
+      if (stepMet(step, slots, achievementMask, cursor)) {
         reached = step + 1;
         break;
       }
@@ -84,11 +87,21 @@ export class Guide {
   }
 }
 
-function stepMet(step: number, slots: readonly (ItemStack | null)[], mask: number): boolean {
+/**
+ * O passo vale com o item na mochila, na grade de criação ou no cursor (tirado
+ * do resultado e ainda não posto num slot) — mas **não** na prévia do
+ * resultado, que é só a receita mostrando o que daria: até 2026-09-25 a dica
+ * das tábuas pulava para a da bancada antes de o jogador tirar as tábuas.
+ */
+function stepMet(
+  step: number, slots: readonly (ItemStack | null)[], mask: number, cursor: ItemStack | null,
+): boolean {
   const bit = STEP_ACHIEVEMENT_BIT[step];
   if (bit !== 0 && (mask & bit) !== 0) return true;
   const ids = STEP_ITEMS[step];
+  if (cursor !== null && ids.includes(cursor.item)) return true;
   for (let i = 0; i < slots.length; i++) {
+    if (i === CRAFT_RESULT) continue;
     const stack = slots[i];
     if (stack !== null && ids.includes(stack.item)) return true;
   }

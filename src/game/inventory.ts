@@ -428,6 +428,24 @@ export class Inventory {
     return true;
   }
 
+  /**
+   * Fechar a tela com o cursor cheio **guarda** o que ele segura, e só joga no
+   * chão o que não coube — como a grade de criação que volta ao fechar.
+   *
+   * **Corrige um defeito do M4:** o fechamento chamava `dropCursor`, e as
+   * tábuas tiradas do resultado e ainda não postas num slot iam para o chão
+   * na frente do jogador. No celular é o caminho natural (tocar no resultado,
+   * fechar a mochila), e a dica da primeira hora parava nas tábuas (M17).
+   */
+  stowCursor(): void {
+    const cursor = this.cursor;
+    if (cursor === null) return;
+    this.cursor = null;
+    const leftover = this.giveStack(cursor);
+    if (leftover > 0) this.onDrop?.({ ...cursor, count: leftover });
+    this.changed();
+  }
+
   // --- utilidades ----------------------------------------------------------
 
   /**

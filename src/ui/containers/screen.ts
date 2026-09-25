@@ -317,8 +317,8 @@ export class ContainerScreen {
 
   close(): void {
     if (this.kind === 'none') return;
-    // Devolve o que estiver no cursor, senão o item some.
-    this.inventory?.dropCursor();
+    // Guarda o que estiver no cursor na mochila; só o que não cabe vai ao chão.
+    this.inventory?.stowCursor();
     this.kind = 'none';
     this.container = null;
     this.root.hidden = true;

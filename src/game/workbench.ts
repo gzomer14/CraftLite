@@ -200,6 +200,9 @@ export class Workbench {
     const size = grid.size;
     if (entry.width > size || entry.height > size) return false;
 
+    // O que o jogador segura no cursor conta como dele: as tábuas recém-tiradas
+    // do resultado precisam estar na mochila para a bancada achá-las.
+    this.host.inventory.stowCursor();
     this.returnCraftGrid();
     const taken: number[] = [];
     for (let row = 0; row < entry.height; row++) {

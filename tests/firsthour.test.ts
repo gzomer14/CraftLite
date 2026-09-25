@@ -68,6 +68,17 @@ describe('progresso da dica', () => {
     expect(guide.current).toBe(-1);
   });
 
+  it('regressão: a prévia do resultado não conta, o cursor conta', () => {
+    const guide = new Guide();
+    guide.update(slotsWith('oak_log'), 0);
+    const slots = slotsWith('oak_log');
+    slots[CRAFT_RESULT] = makeStack(itemId('oak_planks'), 4);
+    guide.update(slots, 0);
+    expect(guide.current).toBe(stepOf('planks'));
+    guide.update(slotsWith(), 0, makeStack(itemId('oak_planks'), 4));
+    expect(guide.current).toBe(stepOf('table'));
+  });
+
   it('o save devolve o passo, e valor estranho vira "nada feito"', () => {
     const guide = new Guide();
     guide.restore(3);
@@ -101,6 +112,7 @@ function lineHarness(overrides: Partial<Settings> = {}) {
     },
     guide,
     slots: () => state.slots,
+    cursor: () => null,
     achievementMask: () => state.mask,
     survival: () => state.survival,
     settings: { get: ((key: keyof Settings) => settings[key]) as never },
@@ -239,6 +251,46 @@ describe('um jogador novo, do tronco à picareta de pedra', () => {
     const empty = inventory.slots.findIndex((slot, i) => i < 36 && slot === null);
     expect(inventory.click(empty, 'left')).toBe(true);
   }
+
+  it('regressão: no celular, tocar no resultado e fechar a mochila guarda as tábuas', () => {
+    const { session } = harness();
+    const guide = session.guide;
+    const check = (): void => {
+      guide.update(session.inventory.slots, session.achievements.mask, session.inventory.cursor);
+    };
+    session.inventory.give(itemId('oak_log'), 1);
+    check();
+    session.workbench.toggleInventory();
+    const planks = itemId('oak_planks');
+    const entry = session.recipes.entries().find((e) => e.resultItem === planks)!;
+    expect(session.workbench.autoFillRecipe(entry)).toBe(true);
+    check();
+    expect(guide.current, 'a prévia não é tábua na mão').toBe(stepOf('planks'));
+    // Um toque no resultado: as tábuas ficam no cursor.
+    expect(session.inventory.click(CRAFT_RESULT, 'left')).toBe(true);
+    check();
+    expect(guide.current).toBe(stepOf('table'));
+    // Fechar a tela (o que ContainerScreen.close faz) guarda, não joga no chão.
+    session.inventory.stowCursor();
+    session.workbench.closeScreen();
+    expect(session.inventory.cursor).toBeNull();
+    expect(session.inventory.countOf(planks)).toBe(4);
+    expect(session.items.active, 'nada no chão').toBe(0);
+  });
+
+  it('regressão: com as tábuas no cursor, Receitas → bancada acha as tábuas', () => {
+    const { session } = harness();
+    session.inventory.give(itemId('oak_log'), 1);
+    session.workbench.toggleInventory();
+    const planks = itemId('oak_planks');
+    const table = itemId('crafting_table');
+    const entries = session.recipes.entries();
+    expect(session.workbench.autoFillRecipe(entries.find((e) => e.resultItem === planks)!)).toBe(true);
+    expect(session.inventory.click(CRAFT_RESULT, 'left')).toBe(true);
+    expect(session.inventory.cursor?.item).toBe(planks);
+    expect(session.workbench.autoFillRecipe(entries.find((e) => e.resultItem === table)!)).toBe(true);
+    expect(session.inventory.get(CRAFT_RESULT)?.item).toBe(table);
+  });
 
   it('numa floresta de bétula, cada dica fecha com o que a anterior deu', () => {
     const { world, player, session } = harness();

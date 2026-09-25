@@ -37,6 +37,8 @@ export interface ObjectiveLineDeps {
   hud: Pick<Hud, 'setObjective' | 'showMessage'>;
   guide: Guide;
   slots: () => readonly (ItemStack | null)[];
+  /** O que o jogador segura na tela aberta (tirado do resultado, por exemplo). */
+  cursor: () => ItemStack | null;
   achievementMask: () => number;
   /** A dica só vale no Sobrevivência: no Criativo não há o que ensinar a fazer. */
   survival: () => boolean;
@@ -81,7 +83,7 @@ export class ObjectiveLine {
     const d = this.d;
     const mask = d.achievementMask();
     const guiding = d.settings.get('guide') && d.survival() && !d.guide.finished;
-    if (guiding && d.guide.update(d.slots(), mask) && d.guide.finished) {
+    if (guiding && d.guide.update(d.slots(), mask, d.cursor()) && d.guide.finished) {
       d.hud.showMessage(t('guide.finished'), 100);
     }
 

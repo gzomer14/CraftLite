@@ -11,6 +11,7 @@
 import { t, tf } from '../core/i18n';
 import { itemDef, type ItemStack } from '../data/items';
 import type { ColorBlindMode, SettingsStore } from '../game/settings';
+import { paintDurability } from './containers/slotview';
 
 /** As quatro cores que o HUD usa como **única** portadora de informação. */
 const PALETTE_KEYS = ['hearts', 'hunger', 'air', 'xp'] as const;
@@ -61,6 +62,7 @@ export class Hud {
   private readonly root: HTMLDivElement;
   private readonly slots: HTMLDivElement[] = [];
   private readonly labels: HTMLSpanElement[] = [];
+  private readonly durabilityBars: HTMLDivElement[] = [];
   private selected = 0;
   /** Último conteúdo desenhado por slot, para evitar mexer no DOM à toa. */
   private readonly rendered: (string | null)[] = new Array(HOTBAR_SLOTS).fill(null);
@@ -221,7 +223,12 @@ export class Hud {
       slot.tabIndex = 0;
       slot.setAttribute('aria-label', tf('hud.slot_empty', i + 1));
       const label = document.createElement('span');
-      slot.appendChild(label);
+      // A barra de durabilidade também aqui, e não só com a mochila aberta:
+      // é na hotbar que se vê a picareta que está para quebrar.
+      const bar = document.createElement('div');
+      bar.className = 'durability';
+      bar.hidden = true;
+      slot.append(label, bar);
       // A hotbar é tocável: no celular é a única forma de trocar de item.
       slot.addEventListener('pointerdown', (e) => {
         e.preventDefault();
@@ -234,6 +241,7 @@ export class Hud {
       hotbar.appendChild(slot);
       this.slots.push(slot);
       this.labels.push(label);
+      this.durabilityBars.push(bar);
     }
 
     this.root.append(
@@ -274,12 +282,14 @@ export class Hud {
       const stack = stacks[i] ?? null;
       const sprite = stack === null ? null : this.spriteOf?.(stack.item) ?? null;
       // O sprite entra na chave: a bússola muda de quadro sem mudar de item (M10).
-      const key = stack === null ? '' : `${stack.item}x${stack.count}@${sprite ?? ''}`;
+      // O desgaste também: cada golpe da picareta encolhe a barra.
+      const key = stack === null ? '' : `${stack.item}x${stack.count}:${stack.damage}@${sprite ?? ''}`;
       if (this.rendered[i] === key) continue;
       this.rendered[i] = key;
 
       const label = this.labels[i];
       const slot = this.slots[i];
+      paintDurability(this.durabilityBars[i], stack);
       if (stack === null) {
         label.textContent = '';
         slot.classList.remove('sprite');
@@ -705,7 +715,7 @@ function injectStyle(): void {
   transform:translateX(-50%);display:flex;gap:0;padding:var(--px);background:#00000066;
   border:var(--px) solid #2f2f2f;box-shadow:inset var(--px) var(--px) 0 #00000059;
   pointer-events:auto;touch-action:none;max-width:calc(100vw - 8px)}
-#hud .slot{width:var(--slot);height:var(--slot);background:var(--slot-bg);
+#hud .slot{position:relative;width:var(--slot);height:var(--slot);background:var(--slot-bg);
   border:var(--px) solid #373737;display:grid;place-items:center;
   font:calc(5 * var(--px))/1 ui-monospace,"Courier New",monospace;color:var(--text);
   text-shadow:var(--px) var(--px) 0 var(--text-shadow);white-space:pre-line;text-align:center;
@@ -714,6 +724,9 @@ function injectStyle(): void {
   background-repeat:no-repeat;image-rendering:pixelated;align-items:end;justify-items:end}
 #hud .slot.sprite span{padding:0 var(--px);font-size:calc(5 * var(--px));
   text-shadow:0 0 2px #000,var(--px) var(--px) 0 #000}
+#hud .slot .durability{position:absolute;left:var(--px);right:var(--px);bottom:var(--px);
+  height:calc(1.5 * var(--px));transform-origin:left center;pointer-events:none}
+#hud .slot .durability[hidden]{display:none}
 #hud .slot.selected{outline:calc(2 * var(--px)) solid #fff;outline-offset:calc(-1 * var(--px));
   z-index:1}
 #hud .slot:focus-visible{outline:calc(2 * var(--px)) solid #7b94c7}

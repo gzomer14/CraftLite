@@ -1704,7 +1704,7 @@ function crackStages(): Record<string, TexRecipe> {
   const out: Record<string, TexRecipe> = {};
   for (let stage = 0; stage < 10; stage++) {
     out[`block/destroy_stage_${stage}`] = {
-      // Branco: com blend de multiplicação, só as fissuras escurecem o bloco.
+      // Branco é "nada": o shader lê a fissura e o contorno como máscaras.
       base: [255, 255, 255],
       noise: 'flat',
       variance: 0,
@@ -1759,13 +1759,30 @@ function buildCrackPattern(): Uint8Array {
 }
 
 /** Pinta os pixels cuja revelação já chegou em `stage`. */
+/**
+ * Dois canais, duas máscaras: o **vermelho** zera na fissura, o **verde** zera
+ * na fissura e no contorno de um pixel em volta dela (vizinhos de lado, sem
+ * dar a volta na borda). O shader (`CRACK_FS_*`) pinta a fissura no tom que
+ * contrasta com a média do bloco e o contorno no tom oposto.
+ *
+ * **Corrige um defeito do M2:** com um tom só, a fissura sumia em textura de
+ * dois tons — escura sobre as faixas escuras da casca do tronco, e o jogador
+ * só via a quebra andar no topo, de anéis claros. Com o contorno, onde a
+ * fissura some no fundo a borda aparece, e vice-versa.
+ */
 function drawCracks(reveal: Uint8Array, stage: number): TexOp {
   return (c) => {
     const d = c.data;
     for (let i = 0; i < 256; i++) {
       if (reveal[i] > stage) continue;
-      const o = i << 2;
-      d[o] = 42; d[o + 1] = 42; d[o + 2] = 44;
+      const x = i & 15;
+      const y = i >> 4;
+      d[i << 2] = 0;
+      d[(i << 2) + 1] = 0;
+      if (x > 0) d[((i - 1) << 2) + 1] = 0;
+      if (x < 15) d[((i + 1) << 2) + 1] = 0;
+      if (y > 0) d[((i - 16) << 2) + 1] = 0;
+      if (y < 15) d[((i + 16) << 2) + 1] = 0;
     }
   };
 }

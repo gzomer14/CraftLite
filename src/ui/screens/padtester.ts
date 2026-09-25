@@ -18,6 +18,7 @@
  * estar longe do monitor.
  */
 
+import { t, tf } from '../../core/i18n';
 import { STANDARD_BUTTONS, profileFor, type PadButton } from '../../data/gamepads';
 
 /** Quantas vezes por segundo o painel se atualiza. Só roda com a tela aberta. */
@@ -135,18 +136,16 @@ export class PadTester {
       this.lastAxes[i] = value;
     }
 
-    const layout = pad.mapping === 'standard'
-      ? 'layout normalizado pelo navegador'
-      : 'layout NÃO normalizado — os índices vêm da família';
+    const layout = pad.mapping === 'standard' ? t('pad.layout_standard') : t('pad.layout_raw');
 
     this.element.textContent =
       `${pad.id}\n`
-      + `${layout} · ${pad.buttons.length} botões · ${pad.axes.length} eixos\n`
-      + `apertado agora: ${pressed.length > 0 ? pressed.join(', ') : '—'}\n`
-      + `último aperto: ${this.lastPress === '' ? '—' : this.lastPress}\n`
-      + `último eixo que mexeu: ${this.lastAxis === '' ? '—' : this.lastAxis}\n`
-      + `última tecla na página: ${this.lastKey === '' ? '—' : this.lastKey}\n`
-      + `eixos: ${axes.join('  ')}`;
+      + `${tf('pad.counts', layout, pad.buttons.length, pad.axes.length)}\n`
+      + `${tf('pad.pressed_now', pressed.length > 0 ? pressed.join(', ') : '—')}\n`
+      + `${tf('pad.last_press', this.lastPress === '' ? '—' : this.lastPress)}\n`
+      + `${tf('pad.last_axis', this.lastAxis === '' ? '—' : this.lastAxis)}\n`
+      + `${tf('pad.last_key', this.lastKey === '' ? '—' : this.lastKey)}\n`
+      + tf('pad.axes', axes.join('  '));
   }
 }
 
@@ -165,7 +164,7 @@ function signalOf(
   const who = name === undefined ? String(index) : `${index} (${name})`;
   if (button.pressed) return who;
   if (button.value > 0) return `${who} ${button.value.toFixed(2)}`;
-  if (button.touched) return `${who} toque`;
+  if (button.touched) return tf('pad.touch', who);
   return null;
 }
 

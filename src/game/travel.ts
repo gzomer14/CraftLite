@@ -21,6 +21,7 @@ import { END_SPAWN_Z, endArrivalX } from '../world/gen/end';
 import { freeStandY } from './spawnplacement';
 import { WORLD_HEIGHT } from '../world/chunk';
 import type { World } from '../world/world';
+import { t } from '../core/i18n';
 
 /**
  * Ticks dentro do portal até a travessia. 1 s — tempo de o jogador notar que
@@ -154,20 +155,20 @@ export class Travel {
       this.targetY = home[1];
       this.targetZ = Math.floor(home[2]);
       dimension = DIM_OVERWORLD;
-      message = 'Voltando para casa…';
+      message = t('travel.home');
     } else if (kind === 'end') {
       this.route = 'end_in';
       this.targetX = endArrivalX(this.world.seed);
       this.targetZ = END_SPAWN_Z;
       dimension = DIM_END;
-      message = 'Entrando no End…';
+      message = t('travel.end');
     } else {
       const destination = destinationOf(x, z, this.world.dimension);
       this.route = 'nether';
       this.targetX = destination.x;
       this.targetZ = destination.z;
       dimension = destination.dimension;
-      message = dimension === DIM_OVERWORLD ? 'Voltando à superfície…' : 'Entrando no Nether…';
+      message = dimension === DIM_OVERWORLD ? t('travel.overworld') : t('travel.nether');
     }
     this.charge = 0;
     this.waiting = 0;
@@ -220,7 +221,7 @@ export class Travel {
   private fail(): void {
     this.phase = 'idle';
     this.cooldown = COOLDOWN_TICKS;
-    this.events.onMessage?.('O portal não encontrou saída.');
+    this.events.onMessage?.(t('travel.no_exit'));
   }
 
   /** Que portal ocupa um dos dois blocos do jogador, ou `null`. */

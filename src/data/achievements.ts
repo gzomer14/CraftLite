@@ -14,6 +14,9 @@
  * começou o mundo com um baú de presente.
  */
 
+import { t, tf } from '../core/i18n';
+import type { StringKey } from './strings/pt';
+
 /** O que o jogo precisa observar para a conquista disparar. */
 export type TriggerKind =
   /** Obteve um item (coletar, craftar, tirar da fornalha). */
@@ -37,8 +40,9 @@ export interface AchievementDef {
   description: string;
   trigger: TriggerKind;
   /**
-   * Alvo do gatilho: nome do item, do mob ou do bloco; para `depth` e `level`,
-   * o número; para `event`, o nome do marco.
+   * Alvo do gatilho: nome do item, do mob ou do bloco — ou `#tag` de
+   * `data/recipes.ts`, para "qualquer tronco"; para `depth` e `level`, o
+   * número; para `event`, o nome do marco.
    */
   target: string;
   /** Conquista anterior na árvore, só para a tela. */
@@ -47,9 +51,11 @@ export interface AchievementDef {
 
 const SPECS: readonly Omit<AchievementDef, 'id'>[] = [
   {
+    // Qualquer tronco (M17): com `oak_log`, quem nascia entre bétulas,
+    // pinheiros ou na selva nunca ganhava a primeira medalha.
     name: 'get_wood', display: 'Cortando Madeira',
     description: 'Você derrubou o primeiro tronco.',
-    trigger: 'obtain', target: 'oak_log',
+    trigger: 'obtain', target: '#logs',
   },
   {
     name: 'benchmarking', display: 'Ponto de Partida',
@@ -203,22 +209,26 @@ export const ACHIEVEMENT_BY_NAME: ReadonlyMap<string, AchievementDef> = new Map(
   ACHIEVEMENTS.map((a) => [a.name, a]),
 );
 
-/** Os gatilhos de evento não têm alvo legível — estes são os textos deles. */
-const EVENT_OBJECTIVES: Record<string, string> = {
-  breed: 'faça dois animais se reproduzirem',
-  sleep: 'durma numa cama',
-  enchant: 'encante um item na mesa de encantamento',
-  // A chave era `sail`, mas o gatilho que a sessão dispara é `boat` — com a
-  // chave errada o objetivo do barco saía como "faça algo novo" (M7).
-  boat: 'navegue de barco',
-  light_portal: 'acenda um portal de obsidiana com o isqueiro',
-  enter_nether: 'atravesse o portal para o Nether',
-  return_overworld: 'volte do Nether para a superfície',
-  minecart: 'entre num carrinho de mina',
-  ender_eye: 'arremesse um olho do ender',
-  end_portal: 'acenda o portal do End com os doze olhos',
-  enter_end: 'atravesse o portal do End',
-  kill_dragon: 'derrote o dragão do End',
+/**
+ * Os gatilhos de evento não têm alvo legível — estes são os textos deles, pela
+ * chave de `data/strings/pt.ts` (`objective.<evento>`).
+ *
+ * A chave do barco era `sail`, mas o gatilho que a sessão dispara é `boat` —
+ * com a chave errada o objetivo do barco saía como "faça algo novo" (M7).
+ */
+const EVENT_OBJECTIVES: Record<string, StringKey> = {
+  breed: 'objective.breed',
+  sleep: 'objective.sleep',
+  enchant: 'objective.enchant',
+  boat: 'objective.boat',
+  light_portal: 'objective.light_portal',
+  enter_nether: 'objective.enter_nether',
+  return_overworld: 'objective.return_overworld',
+  minecart: 'objective.minecart',
+  ender_eye: 'objective.ender_eye',
+  end_portal: 'objective.end_portal',
+  enter_end: 'objective.enter_end',
+  kill_dragon: 'objective.kill_dragon',
 };
 
 /**
@@ -229,12 +239,13 @@ const EVENT_OBJECTIVES: Record<string, string> = {
  * não deve depender das outras tabelas de dados só para escrever uma frase.
  */
 export function objectiveFor(def: AchievementDef, displayOf: (target: string) => string): string {
-  if (def.trigger === 'obtain') return `consiga ${displayOf(def.target)}`;
-  if (def.trigger === 'kill') return `derrote um ${displayOf(def.target)}`;
-  if (def.trigger === 'place') return `coloque ${displayOf(def.target)}`;
-  if (def.trigger === 'depth') return `desça abaixo de Y=${def.target}`;
-  if (def.trigger === 'level') return `chegue ao nível ${def.target} de experiência`;
-  return EVENT_OBJECTIVES[def.target] ?? 'faça algo novo';
+  if (def.trigger === 'obtain') return tf('objective.obtain', displayOf(def.target));
+  if (def.trigger === 'kill') return tf('objective.kill', displayOf(def.target));
+  if (def.trigger === 'place') return tf('objective.place', displayOf(def.target));
+  if (def.trigger === 'depth') return tf('objective.depth', def.target);
+  if (def.trigger === 'level') return tf('objective.level', def.target);
+  const key = EVENT_OBJECTIVES[def.target];
+  return key === undefined ? t('objective.new') : t(key);
 }
 
 /** true se a conquista de nome `name` já está na máscara. */

@@ -8,6 +8,7 @@
  * de escrever — o overlay não deve criar lixo por frame.
  */
 
+import { t, tf } from '../core/i18n';
 import { FRAME_HISTORY, type LoopStats } from '../core/loop';
 import type { DeviceInfo, Preset, Tier } from '../core/tier';
 import type { GlCaps } from '../render/gl';
@@ -23,7 +24,7 @@ const UPDATE_MS = 250;
  * (-X)" olhando para +X. Com norte em +Z, quem olha para o norte tem o leste à
  * direita, que é −X; o mapa do M10 segue esta rosa.
  */
-const FACINGS = ['norte (+Z)', 'oeste (+X)', 'sul (-Z)', 'leste (-X)'] as const;
+const FACINGS = t('debug.facings').split('|');
 
 export interface DebugSource {
   stats: LoopStats;
@@ -92,7 +93,7 @@ export class DebugOverlay {
      */
     this.headerPrefix =
       `CraftLite  ·  tier T${tier} (${preset.label})  ·  ${caps.webgl2 ? 'WebGL2' : 'WebGL1'}  ·  RD `;
-    this.headerSuffix = `  ·  atlas ${atlasLayers} camadas em ${atlasMs.toFixed(1)}ms`;
+    this.headerSuffix = `  ·  ${tf('debug.atlas', atlasLayers, atlasMs.toFixed(1))}`;
     this.setRenderDistance(preset.renderDistance);
 
     /*
@@ -104,8 +105,8 @@ export class DebugOverlay {
      * 2026-09-13). Sem os números na tela, diagnosticar isso é adivinhação.
      */
     this.deviceLine =
-      `mem ${device.memGB}GB  ·  ${device.cores} núcleos  ·  ${preset.workers} workers  ·  `
-      + `tex ${device.maxTexSize}  ·  ${device.renderer || 'GPU não informada'}`;
+      `mem ${device.memGB}GB  ·  ${tf('debug.cores', device.cores)}  ·  ${preset.workers} workers  ·  `
+      + `tex ${device.maxTexSize}  ·  ${device.renderer || t('debug.no_gpu')}`;
 
     this.root = document.createElement('div');
     this.root.id = 'debug';
@@ -174,30 +175,28 @@ export class DebugOverlay {
     l[0] = this.header;
     // O rAF segue a taxa do display, então mostrar os dois lado a lado evita a
     // confusão de ver 100 FPS num jogo "de 60".
-    const cap = src.maxFps > 0 ? `teto ${src.maxFps}` : `display ~${this.displayHz}Hz`;
+    const cap = src.maxFps > 0 ? `${t('debug.cap')} ${src.maxFps}` : `display ~${this.displayHz}Hz`;
     l[1] = this.deviceLine;
     l[2] =
       `fps ${s.fps.toFixed(0)} (${s.frameMs.toFixed(1)}ms)  |  ${cap}  |  ` +
-      `escala ${src.renderScale.toFixed(2)}` + (mem > 0 ? `  |  mem ${mem}MB` : '');
+      `${t('debug.scale')} ${src.renderScale.toFixed(2)}` + (mem > 0 ? `  |  mem ${mem}MB` : '');
     l[3] =
       `XYZ ${cam.renderX.toFixed(1)} / ${cam.renderY.toFixed(1)} / ${cam.renderZ.toFixed(1)}` +
       `   chunk ${cx} ${Math.floor(cam.renderY / 16)} ${cz}`;
-    l[4] = `bioma: ${src.biome}   luz: b${src.blockLight} s${src.skyLight}   olhando: ${facing}`;
+    l[4] = tf('debug.biome_line', src.biome, src.blockLight, src.skyLight, facing);
     const c = src.chunks;
     l[5] =
-      `C: ${c.loaded}/${c.total} colunas, ${c.queued} na fila, ` +
-      `${c.generating} gerando, ${c.meshing} meshando`;
+      tf('debug.chunks_line', c.loaded, c.total, c.queued, c.generating, c.meshing);
     l[6] =
-      `V: ${formatCount(src.vertices)} vértices, ${src.drawCalls} draw calls, ` +
-      `${c.visibleSections} sections visíveis`;
+      tf('debug.vertex_line', formatCount(src.vertices), src.drawCalls, c.visibleSections);
     const e = src.entities;
     l[7] =
-      `E: ${e.mobs} mobs, ${e.items} itens, ${e.arrows} flechas, ${e.paths} caminhos/tick` +
+      tf('debug.entity_line', e.mobs, e.items, e.arrows, e.paths) +
       // Só aparece quando há circuito rodando: linha curta é linha lida.
       (src.redstone > 0 ? `, ${src.redstone} redstone` : '') +
       // Idem: o teto de chamas é o que importa quando a floresta pega fogo.
-      (src.fire > 0 ? `, ${src.fire} fogo` : '') +
-      `   ${src.clock}` + (src.sounds > 0 ? `   ${src.sounds} sons` : '');
+      (src.fire > 0 ? `, ${src.fire} ${t('debug.fire')}` : '') +
+      `   ${src.clock}` + (src.sounds > 0 ? `   ${src.sounds} ${t('debug.sounds')}` : '');
     l[8] =
       `T: tick ${s.tickMs.toFixed(1)}ms  mesh-upload ${s.pumpMs.toFixed(1)}ms  ` +
       `render ${s.renderMs.toFixed(1)}ms`;

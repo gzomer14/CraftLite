@@ -6,6 +6,7 @@
  * derrubar o jogo. Quando a trava não funciona, o aviso "gire o aparelho" cobre
  * a diferença.
  */
+import { t } from '../core/i18n';
 
 export class ScreenMode {
   private readonly warning: HTMLDivElement;
@@ -16,7 +17,7 @@ export class ScreenMode {
     this.warning = document.createElement('div');
     this.warning.id = 'rotate-warning';
     this.warning.setAttribute('role', 'alert');
-    this.warning.innerHTML = '<span>⟳</span><p>Gire o aparelho para jogar</p>';
+    this.warning.innerHTML = `<span>⟳</span><p>${t('hud.rotate')}</p>`;
     this.warning.hidden = true;
     document.body.appendChild(this.warning);
 

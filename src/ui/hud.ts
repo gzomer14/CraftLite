@@ -8,6 +8,7 @@
  * 60 Hz é desperdício e gera lixo.
  */
 
+import { t, tf } from '../core/i18n';
 import { itemDef, type ItemStack } from '../data/items';
 import type { ColorBlindMode, SettingsStore } from '../game/settings';
 
@@ -211,14 +212,14 @@ export class Hud {
     const hotbar = document.createElement('div');
     hotbar.className = 'hotbar';
     hotbar.setAttribute('role', 'toolbar');
-    hotbar.setAttribute('aria-label', 'Barra rápida');
+    hotbar.setAttribute('aria-label', t('hud.hotbar'));
 
     for (let i = 0; i < HOTBAR_SLOTS; i++) {
       const slot = document.createElement('div');
       slot.className = 'slot';
       slot.setAttribute('role', 'button');
       slot.tabIndex = 0;
-      slot.setAttribute('aria-label', `Espaço ${i + 1}: vazio`);
+      slot.setAttribute('aria-label', tf('hud.slot_empty', i + 1));
       const label = document.createElement('span');
       slot.appendChild(label);
       // A hotbar é tocável: no celular é a única forma de trocar de item.
@@ -283,7 +284,7 @@ export class Hud {
         label.textContent = '';
         slot.classList.remove('sprite');
         slot.style.removeProperty('background-position');
-        slot.setAttribute('aria-label', `Espaço ${i + 1}: vazio`);
+        slot.setAttribute('aria-label', tf('hud.slot_empty', i + 1));
         continue;
       }
       const def = itemDef(stack.item);
@@ -299,7 +300,7 @@ export class Hud {
           ? `${name.slice(0, 2)}\n${stack.count}`
           : name.slice(0, 2);
       }
-      slot.setAttribute('aria-label', `Espaço ${i + 1}: ${name} ×${stack.count}`);
+      slot.setAttribute('aria-label', tf('hud.slot', i + 1, name, stack.count));
     }
   }
 
@@ -335,7 +336,7 @@ export class Hud {
       this.lastHealth = halfHearts;
       this.hearts.textContent = icons(halfHearts, 20, '♥', '♡');
       this.hearts.classList.toggle('critical', halfHearts <= 4);
-      this.hearts.setAttribute('aria-label', `Vida: ${halfHearts} de 20`);
+      this.hearts.setAttribute('aria-label', tf('hud.health', halfHearts));
     }
 
     const halfHunger = Math.round(hunger);
@@ -345,7 +346,7 @@ export class Hud {
       for (let i = 0; i < this.hungerIcons.length; i++) {
         this.hungerIcons[i].className = i < full ? '' : 'empty';
       }
-      this.hunger.setAttribute('aria-label', `Fome: ${halfHunger} de 20`);
+      this.hunger.setAttribute('aria-label', tf('hud.hunger', halfHunger));
     }
 
     const armorPoints = Math.round(armor);
@@ -354,7 +355,7 @@ export class Hud {
       this.armor.hidden = armorPoints <= 0 || this.creative;
       if (armorPoints > 0) {
         this.armor.textContent = icons(armorPoints, 20, '◆', '◇');
-        this.armor.setAttribute('aria-label', `Armadura: ${armorPoints} de 20`);
+        this.armor.setAttribute('aria-label', tf('hud.armor', armorPoints));
       }
     }
 
@@ -365,7 +366,7 @@ export class Hud {
       this.air.hidden = bubbles < 0;
       if (bubbles >= 0) {
         this.air.textContent = '●'.repeat(Math.max(0, bubbles));
-        this.air.setAttribute('aria-label', `Ar: ${bubbles} de 10`);
+        this.air.setAttribute('aria-label', tf('hud.air', bubbles));
       }
     }
   }
@@ -379,7 +380,7 @@ export class Hud {
     if (level !== this.lastXpLevel) {
       this.lastXpLevel = level;
       this.xpLevel.textContent = level > 0 ? String(level) : '';
-      this.xpBar.setAttribute('aria-label', `Nível ${level}`);
+      this.xpBar.setAttribute('aria-label', tf('hud.level', level));
     }
     if (rounded !== this.lastXpProgress) {
       this.lastXpProgress = rounded;
@@ -407,13 +408,16 @@ export class Hud {
   }
 
   /** Aviso curto no centro-baixo da tela; some sozinho. */
-  /** Próximo objetivo, ou `null` para esconder a linha. */
+  /**
+   * A linha do alto — dica da primeira hora ou objetivo, já com o prefixo
+   * (`ui/objectiveline.ts`) —, ou `null` para escondê-la.
+   */
   setObjective(text: string | null): void {
     if (text === null) {
       this.objective.hidden = true;
       return;
     }
-    this.objective.textContent = `Objetivo — ${text}`;
+    this.objective.textContent = text;
     this.objective.hidden = false;
   }
 

@@ -26,7 +26,11 @@ livro encantado, dar nome), reparo na grade, o livro encantado saído da mesa, e
 mexendo em item — funil, dispensador, liberador, comparador e observador — validado em aparelho.
 O **M16** deu um fim à jornada: a fortaleza do Nether com o blaze, poções no suporte de preparo, o
 olho do ender, a fortaleza da superfície com a sala do portal, o End, o dragão com os cristais, o
-ovo e os créditos — e a bruxa. Ainda não visto em aparelho. Segue o M17 no roteiro.
+ovo e os créditos — e a bruxa. Ainda não visto em aparelho. O **M17** (2026-09-25) abriu o jogo
+para quem não lê português: menu **Idioma** com inglês (segue o aparelho por padrão), uma dica na
+linha do alto do HUD que ensina do primeiro tronco à picareta de pedra com o gesto do aparelho na
+mão, e a seed em código curto (`03NQ-K8NH`) para copiar e colar. Fecha a lista M11–M17; ainda não
+visto em aparelho.
 
 - **M0 — esqueleto:** Vite + TypeScript strict, renderer WebGL2 próprio com fallback WebGL1,
   detecção de tier, loop de 20 Hz com interpolação, gerador procedural de texturas alimentando um
@@ -147,7 +151,7 @@ Abre em **4,5 s em 3G rápido** (critério: < 5 s) e aguentou **92 min de voo co
 erro**, com o heap estável e o anel de chunks fixo em 489 colunas ao longo de 67 mil blocos — os
 dois medidos por `npm run slow-network` e `npm run soak`, que dirigem um Chrome de verdade.
 
-**283 KB gzip** no total (código + worker + HTML + service worker), zero assets baixados
+**298 KB gzip** no total (código + worker + HTML + service worker, com o inglês), zero assets baixados
 além de dois ícones de PWA de 6,7 KB, gerados por código.
 
 Validado em aparelho alvo (**Galaxy J7 Metal**, Android 7, 2 GB, Mali-T830) em 2026-09-12:
@@ -160,7 +164,7 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 2235 testes (vitest)
+npm test           # 2271 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
 npm run smoke      # abre o jogo num Chrome headless e joga o roteiro do doc 14 (precisa do build)
@@ -239,7 +243,7 @@ src/
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      2235 testes, incluindo orçamento de performance e de luz
+tests/                      2271 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios
@@ -256,7 +260,7 @@ docs/
   11-persistencia-e-saves.md IndexedDB, formato de save, PWA
   12-multiplayer.md         ganchos de arquitetura, protocolo P2P
   13-assets-e-arte.md       texturas procedurais, sprites, fonte, licença
-  14-roadmap.md             marcos com checklist e critérios de aceite (M0–M16 feitos; M17 proposto)
+  14-roadmap.md             marcos com checklist e critérios de aceite (M0–M17 feitos)
   15-status.md              estado real: status por marco, pendências, próximo passo
   16-auditoria.md           histórico por sessão, com grid de arquivos
   mockups/                  14 wireframes SVG + generate.py

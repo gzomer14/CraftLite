@@ -9,23 +9,18 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-25 12:09 — **M16 fechado: um fim para a jornada.** Fortaleza do
-Nether com blaze, poções no suporte de preparo, olho do ender, fortaleza da superfície com a sala
-do portal, o End como terceira dimensão, o dragão com os cristais, o portal de saída, o ovo e os
-créditos. A cadeia do tronco ao dragão fecha sobre as tabelas (`tests/journey.test.ts`) e cada elo
-roda de verdade (`tests/theend.test.ts`); o dragão custa 0,04 ms por tick. Três defeitos antigos
-achados no caminho (§4): os marcos de estrutura não atravessavam o worker desde o M6 (baú de
-dungeon vazio), a tela da fornalha não se atualizava sozinha desde o M4, e uma malha pedida antes
-do portal podia marcar pronta a coluna da outra dimensão (M7). Antes, 15:40: **M15 validado em
-campo** (*"Tudo funcionando perfeitamente!"*). Antes, 15:28: **M15 no campo, primeira volta.** A mesa de
-encantamento e a bigorna não diziam qual slot recebia o quê (os rótulos existiam no DOM e nenhum
-CSS os mostrava), e o funil não entrava em cima do baú porque o toque abria o baú. Slots com nome
-embaixo, uma frase com o próximo passo e a regra de colocar funil colado em contêiner (§3, M15).
-Antes, 11:45: **M15 fechado: oficina.** Bigorna (consertar,
-juntar, livro encantado, nome), reparo na grade, livro encantado saído da mesa, funil,
-dispensador, liberador, comparador e observador — o circuito passou a mexer em item. Os dois
-critérios do doc 14 medidos. A memória de áudio saiu do teto (3,497 → 3,140 MB) sem tirar som, e
-três perdas de encantamento antigas foram corrigidas (§4). Antes, 11:03: M14 validado em campo.
+**Última atualização:** 2026-09-25 13:04 — **M17 fechado: alcance.** O jogo fala inglês: menu
+**Idioma** em Opções (doc 08 §3.11), que segue o aparelho por padrão, com ~500 textos de interface
+em `data/strings/pt.ts` e `en.ts` e os nomes de conteúdo em inglês ao lado das tabelas. Um teste
+varre o código atrás de português escrito direto na tela. **Primeira hora guiada**: a linha do alto
+do HUD ensina do primeiro tronco à picareta de pedra, com o gesto do aparelho na mão (teclado, toque
+A ou B, controle), e some quando o item aparece. **Seed compartilhável**: código curto `03NQ-K8NH`,
+copiar e colar na tela de mundos. Custou **15,9 KB** de bundle (298,4 de 350) e nenhum byte no
+worker. Três defeitos antigos achados no caminho (§4): a linha de objetivo **não mudava quando a
+conquista saía** (desde 2026-09-11), a primeira conquista só saía com tronco de carvalho, e a dica
+de toque descrevia o modo A com o B de padrão. Antes, 12:09: **M16 fechado: um fim para a
+jornada** (fortaleza do Nether, poções, End, dragão, créditos). Antes: M15 validado em campo
+(*"Tudo funcionando perfeitamente!"*).
 ---
 
 ## 1. Panorama
@@ -60,7 +55,7 @@ três perdas de encantamento antigas foram corrigidas (§4). Antes, 11:03: M14 v
 | **M14** Água e paisagem | visão submersa, rios, pesca, afogado, lua com fases, biomas por tint, selva | ✅ **validado em campo em 2026-09-24** | muda o terreno gerado: **mundo antigo ganha costura** (§3) |
 | **M15** Oficina | bigorna, reparo na grade, funil, dispensador, comparador, observador | ✅ **validado em campo em 2026-09-24** (depois da 1ª volta corrigida: telas e funil) | — |
 | **M16** Um fim para a jornada | fortaleza do Nether, blaze, poções, olho do ender, End, dragão, créditos, bruxa | ✅ concluído em 2026-09-24 | **não visto em aparelho**; End em T0 não medido (§6) |
-| **M17** Alcance | menu Idioma (doc 08 §3.11) com `en`, primeira hora guiada, seed compartilhável | ⬜ proposto (2026-09-22) | — |
+| **M17** Alcance | menu Idioma (doc 08 §3.11) com `en`, primeira hora guiada, seed compartilhável | ✅ concluído em 2026-09-25 | **não visto em aparelho** (visto no Chrome headless, em pt e en, desktop e celular emulado) |
 
 **O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
 ele irá pesar muito o jogo e trazer muita complexidade por enquanto desnecessária"*. O
@@ -73,14 +68,16 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-24 17:14, ao fechar o M16, com `npm test`, `npm run build`,
+Medidas em 2026-09-25 13:04, ao fechar o M17, com `npm test`, `npm run build`,
 `SIZE_BUDGET_KB=350 npm run size` e `npm run smoke`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **282,5 KB** (267,3 antes do M16; 265,7 ao fechar o M15; 257,9 antes do M15; 249,5 antes do M14; 240,0 antes do M10) | < 350 KB | `npm run size` |
-| Testes | **2235**, 113 arquivos (2164 antes do M16; 2156 ao fechar o M15; 2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **298,4 KB** (282,5 antes do M17: o inglês e as chaves custaram 15,9; o worker, 41,8, não mudou um byte; 267,3 antes do M16; 265,7 ao fechar o M15; 257,9 antes do M15; 249,5 antes do M14; 240,0 antes do M10) | < 350 KB | `npm run size` |
+| Testes | **2271**, 116 arquivos (2235 antes do M17; 2164 antes do M16; 2156 ao fechar o M15; 2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
 | Smoke test de navegador | **7 passos verdes**: carregar, criar, andar 10 s, quebrar, salvar, recarregar, conferir | verde | `npm run smoke` |
+| Textos de interface | **~500 chaves**, as mesmas em `pt` e `en` (o compilador cobra); **nenhum literal com cara de português** fora de `data/strings/pt.ts` e dos campos de nome das tabelas | varredura verde | `tests/i18n.test.ts` |
+| Primeira hora guiada | três troncos de bétula → **picareta de pedra**, só pelo livro de receitas, com a dica andando a cada passo | aceite do M17 | `tests/firsthour.test.ts` |
 | Camadas de atlas | **223** com o M16 (+11: verruga, suporte, pedra do End, moldura com e sem olho, portal do End, ovo); **212** com a oficina (+11: bigorna, funil, dispensador, liberador, comparador, observador); 201 com a selva; 194 antes do M14 | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
 | Memória de áudio | **3,442 MB** com as vozes do blaze, da bruxa, do dragão e do cristal (§5: perto do teto de novo); **3,140 MB** no M15 (3,497 no M14, colado no teto): degrau de ¼ da taxa para som grave, sem tirar nenhum (§4) | < 3,5 MB | `tests/audio.test.ts` |
 | Mapa explorado (M10) | **0,23 ms por segundo de jogo**; 500 blocos = 16 regiões, ~146 KB; voando a 20 blocos/s, zero buraco | < 1 ms/s; ≤ 64 regiões | `tests/journal.test.ts` |
@@ -1875,6 +1872,64 @@ vez de (100, 48, 0) (`end.ts`); cada poção é um item, não um item com o efei
 não quebra blocos, não sopra fogo e não tem animação de morte; o blaze atira uma bola por vez, não
 rajadas de três; beber usa o som de comer (a memória de áudio).
 
+### M17 — Alcance ✅ — 2026-09-25
+
+Pedido: *"Vamos seguir com o desenvolvimento do projeto. Acredito que o próximo marco seja M17"*.
+O que cada item virou:
+
+- **Idioma** (doc 08 §3.11). `core/i18n.ts` resolve o idioma **uma vez, na avaliação do módulo**:
+  a escolha guardada (`language` em `game/settings.ts`, lida direto do `localStorage`) ou, com
+  `auto` — o padrão —, o do aparelho (`pt-*` → português, o resto → inglês). Por isso as tabelas de
+  campos das telas continuam constantes de módulo e o `t('chave')` é uma leitura de objeto. Trocar
+  vale no próximo carregamento, como a qualidade e as texturas; a seção **Idioma** nas Opções tem
+  o seletor (cada idioma escrito nele mesmo) e um botão que recarrega na hora. Os ~500 textos de
+  interface saíram para `data/strings/pt.ts`, com `en.ts` do tipo `Record<StringKey, string>`:
+  faltar ou sobrar chave não compila. `tf('chave', …)` troca `{0}`, `{1}` — a ordem das palavras
+  muda de um idioma para o outro. Número decimal (`decimal`) e data da lista de mundos seguem o
+  idioma; a rosa dos ventos do mapa vira `E`/`W`. Erros que chegam à tela (zip, `.clw`, pacote,
+  banco) também foram.
+- **Nomes de conteúdo** (bloco, item, poção, mob, bioma, conquista, efeito, encantamento,
+  profissão, estatística, dimensão). **Desvio consciente do doc 14**, que pedia tudo em `pt.ts`: o
+  português continua na linha da tabela (`display: 'Pedra'`), onde o conteúdo nasce, e o inglês
+  mora em `data/strings/names.en.ts`, pelo `name` de cada linha. `data/strings/localize.ts` troca
+  o `display` no boot, importado antes de tudo pelo `main.ts`. As famílias que se repetem
+  (16 cores, 6 materiais × 9 peças) saem por laço. O worker não importa nada disso.
+- **A varredura** (`tests/i18n.test.ts`): chaves e marcadores iguais nos dois idiomas; nenhum
+  texto em inglês com acento ou palavra-função do português; toda linha de toda tabela com nome em
+  inglês; e **nenhum literal com cara de português no código** fora de `pt.ts`, dos campos de nome
+  das tabelas e das mensagens de invariante (`new Error` de programação). Texto novo escrito direto
+  na tela reprova o teste.
+- **Primeira hora guiada** (`data/guide.ts`, `game/guide.ts`, `ui/objectiveline.ts`). Seis passos
+  — tronco, tábuas, bancada, picareta de madeira, pedregulho, picareta de pedra —, cada um uma frase
+  na linha do alto do HUD (*"Dica — …"*), que some quando a mochila **tem** o item ou a conquista
+  correspondente sai. Nada pausa nem abre janela. A frase tem lacunas para o gesto, preenchidas
+  pelo aparelho na mão: botão do mouse e a tecla da mochila remapeada, `⛏`/`▣` no modo B, o dedo
+  no modo A, os rótulos da família do controle ligado. O progresso só anda para a frente e vai para
+  o save (`guide` no save do jogador). Desligável em Opções → Jogo; no Criativo não aparece. Ao
+  acabar, um aviso diz que a linha passa a mostrar o objetivo.
+- **Seed compartilhável** (`core/seedcode.ts`). O `seedHash` em base32 de Crockford, sete dígitos e
+  um de verificação: `03NQ-K8NH`. A lista de mundos mostra o código; **Copiar seed** o põe na área
+  de transferência (e escreve na tela, para quem vai ditar); o campo Seed ganhou **Colar** e aceita
+  o código com minúscula, sem hífen, e com O/I/L no lugar de 0/1. `seedFromString` entende o código
+  antes de cair no hash de texto: o mundo sai igual no outro aparelho.
+
+**Critérios de aceite.** *"O jogo inteiro em inglês sem um texto em português sobrando (teste que
+varre as chaves)"*: a varredura acima, verde. Visto no Chrome headless com `LANG=en_US`: título,
+Opções (com a seção Language), mundos, criação, pausa, mochila e HUD em inglês, sem nenhuma
+palavra em português; com `pt_BR`, tudo como antes. *"Um jogador novo chega à picareta de pedra
+sem ler nada fora do jogo"*: `tests/firsthour.test.ts` faz o caminho numa floresta de **bétula** —
+três troncos pegos do chão, e daí só receitas achadas no livro — e a dica anda a cada passo até
+acabar. **Gente de verdade não testou.** O teste achou um furo no texto: um tronco dá quatro tábuas
+e a bancada gasta as quatro, então a dica passou a pedir três troncos e "mais tábuas" antes dos
+gravetos.
+
+**Custo:** 15,9 KB de bundle (282,5 → 298,4), dos quais ~12 KB são o inglês em si; o resto é
+chave no lugar de texto e os módulos novos. O worker não mudou (mesmo hash).
+
+**Desvios conscientes, no comentário do módulo:** os nomes de conteúdo ficam na tabela e não em
+`pt.ts` (`names.en.ts`); o idioma não troca ao vivo, recarrega (`core/i18n.ts`); o inglês vai
+embutido e não sob demanda (§5).
+
 ## 4. Correções fora de marco
 
 Bugs anteriores encontrados durante o M5 e já corrigidos — ficam registrados porque explicam
@@ -1882,6 +1937,9 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-25 | `ui/objectiveline.ts`, `main.ts` | **A linha de objetivo do HUD não mudava quando a conquista saía** (desde que ela existe, 2026-09-11). Era calculada uma vez, ao entrar no mundo: quem pegava o primeiro tronco continuava lendo *"consiga Tronco de Carvalho"* até sair e voltar. Agora é conferida uma vez por segundo e o texto só é remontado quando muda. Regressão em `tests/firsthour.test.ts`. |
+| 2026-09-25 | `data/achievements.ts`, `game/achievements.ts` | **"Cortando Madeira" só saía com tronco de carvalho** (M6). Quem nascia entre bétulas, pinheiros ou na selva não ganhava a primeira medalha, e o objetivo ficava pedindo carvalho. O alvo aceita `#tag` (`#logs`), e o objetivo diz *"um tronco qualquer"*. Regressão em `tests/achievements.test.ts`. |
+| 2026-09-25 | `ui/controlhint.ts` | **A dica de toque descrevia o modo A** (*"toque longo quebra"*) desde que o B virou o padrão (2026-09-14): no B quem quebra é o botão ⛏. Agora a dica segue o modo escolhido. |
 | 2026-09-24 | `workers/genjob.ts`, `workers/protocol.ts`, `world/pipeline.ts` | **Os marcos de estrutura nunca atravessaram o worker** (M6). O gerador marcava o baú com a tabela de loot e o gerador de monstros com o mob, mas a resposta do worker levava só sections, altura e bioma: o baú de dungeon, de mina, de aldeia e de naufrágio **abria vazio**, e o gerador de monstros da dungeon era um bloco inerte. Os testes geravam a coluna direto, sem worker, e nunca viram. A geração do worker saiu para `genjob.ts` (testável) e a resposta leva os marcos. Achado porque a fortaleza do Nether ficaria sem blaze. Mundo antigo: coluna nunca modificada ganha o loot ao voltar; a gravada no save continua como está. Regressão em `tests/journeygen.test.ts`. |
 | 2026-09-24 | `ui/containers/screen.ts`, `main.ts` | **A tela da fornalha não andava sozinha** (M4). Nada redesenhava a tela de contêiner com o tick: a barra de progresso ficava parada e a saída pronta só aparecia no próximo toque. Agora a fornalha e o suporte de preparo se redesenham a cada 4 ticks com a tela aberta (`tickLive`). |
 | 2026-09-24 | `world/pipeline.ts`, `workers/meshjob.ts` | **Malha pedida antes do portal marcava pronta a coluna da outra dimensão** (M7). A resposta de meshing não dizia a dimensão: entregue depois da travessia, ela achava a coluna nova de mesma coordenada, marcava-a pronta com a geometria velha e apagava o registro do pedido novo. O pedido agora leva a dimensão, e a resposta de outra é descartada, como a geração já fazia. Regressão em `tests/journeygen.test.ts` (sem a guarda, o teste falha — conferido). |
@@ -2064,6 +2122,19 @@ tem **1116** linhas (981 antes; as contas novas foram para `redstoneparts.ts`, f
 callbacks; **930** depois que as ofertas da mesa foram para `enchantpanel.ts`, na volta de campo) e `session.ts` 816. O corte natural do circuito é por papel — pó e energia, componentes,
 pistão —, e o da tela, a grade de slots de um lado e os painéis do outro. Não depende de nada.
 
+**Pendências abertas em 2026-09-25 (M17):**
+
+- **Nada do M17 foi visto em aparelho, nem jogado por alguém novo.** O critério da primeira hora é
+  de gente, e o teste só prova que cada dica aponta para algo que o jogo oferece.
+- **O inglês vai embutido (~12 KB gzip).** O bundle está em 298,4 de 350. Se o orçamento apertar,
+  é o primeiro candidato a carregar sob demanda — o que pede o boot esperar o dicionário antes de
+  avaliar as telas, e o service worker guardar o pedaço para o offline.
+- **Conteúdo novo pede duas linhas**: a da tabela e a do `names.en.ts` (o teste cobra). Texto novo
+  de tela pede a chave nos dois dicionários (o compilador cobra).
+- **Módulos acima do teto:** `main.ts` **749** (741 antes; a linha de objetivo saiu para
+  `ui/objectiveline.ts`, entraram o idioma e o `import` do `localize`), `game/session.ts` **889**
+  (885). Os outros do M16 não mudaram de tamanho por causa do M17.
+
 **Pendências abertas em 2026-09-24 (M16):**
 
 - **Memória de áudio em 3,442 MB, com teto de 3,5.** As vozes dos quatro mobs novos custaram 300 KB
@@ -2239,7 +2310,23 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
 
 ## 6. Próximo passo recomendado
 
-0. **Jogar o M16 num aparelho**, num mundo novo, e depois o M17 (alcance), o último da lista.
+1. **Jogar o M17 num aparelho, num mundo novo** — e, se der, entregar o celular a alguém que nunca
+   jogou, sem explicar nada. O M17 fecha a lista M11–M17; depois dele não há marco proposto, e o
+   próximo passo é escolher um (ou declarar o MVP, doc 14 "Critérios de pronto"). Em ordem de
+   quanto pode estar errado:
+   - **a dica da primeira hora no celular**: a linha do alto cabe em duas linhas deitado, não briga
+     com a faixa de marcadores e com os botões ⏸ ▤? Os passos andam sozinhos — tronco, tábuas pelo
+     livro de Receitas, bancada, picareta de madeira na bancada, pedregulho, picareta de pedra — e
+     no fim aparece o aviso. Se alguém travar num passo, a frase é `guide.<passo>` em
+     `data/strings/pt.ts`;
+   - **inglês**: Opções → Idioma → English → *Aplicar agora*. O jogo recarrega em inglês, inclusive
+     os nomes dos itens, a pausa, as conquistas e as mensagens (morrer, dormir, a chuva). Qualquer
+     palavra em português que aparecer é bug — e o teste `i18n` devia ter pego; vale anotar onde;
+   - **seed**: Mundos → Copiar seed; criar outro mundo colando o código (botão Colar) e conferir
+     que é o mesmo lugar. No celular, o Colar pede permissão?
+   - **a dica de toque do modo B** ao entrar no mundo: *"segure ⛏ para quebrar, ▣ coloca e usa"*.
+
+0. **Jogar o M16 num aparelho**, num mundo novo — segue valendo; pode ir junto com o M17.
    O M16 só foi visto em testes e no Chrome headless. Em ordem de quanto pode estar errado:
    - **tela do suporte de preparo no celular**: Ingrediente, Combustível e os três Frasco, a barra
      andando com a tela aberta e a frase de cada passo. Encher o frasco de vidro na água; beber;

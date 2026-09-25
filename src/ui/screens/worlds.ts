@@ -5,12 +5,15 @@
  * vindo da URL e não havia como voltar para o de ontem.
  *
  * A criação segue o doc: nome, seed digitada (texto vira número por hash, então
- * "oi" é uma seed válida), modo e dificuldade. Apagar pede confirmação porque é
+ * "oi" é uma seed válida; o código curto de `core/seedcode.ts` vale pelo número
+ * que guarda), modo e dificuldade. Apagar pede confirmação porque é
  * a única ação irreversível do jogo inteiro.
  */
 
 import { menuButton, menuPanel, menuRoot, menuRow, messageOf, textField } from './menu';
 import type { WorldMeta } from '../../save/db';
+import { seedCode } from '../../core/seedcode';
+import { decimal, htmlLang, t, tf } from '../../core/i18n';
 
 export interface WorldsCallbacks {
   /** Lista os mundos salvos, mais recente primeiro. */
@@ -35,6 +38,7 @@ export class WorldsScreen {
   private readonly playButton: HTMLButtonElement;
   private readonly deleteButton: HTMLButtonElement;
   private readonly exportButton: HTMLButtonElement;
+  private readonly shareButton: HTMLButtonElement;
   private readonly fileInput: HTMLInputElement;
   private readonly status: HTMLParagraphElement;
   private readonly createForm: HTMLDivElement;
@@ -50,16 +54,16 @@ export class WorldsScreen {
   constructor(callbacks: WorldsCallbacks) {
     this.callbacks = callbacks;
     this.root = menuRoot('worlds-screen');
-    const { panel, body } = menuPanel('Seus mundos');
+    const { panel, body } = menuPanel(t('worlds.title'));
 
     this.list = document.createElement('div');
     this.list.className = 'menu-list';
     this.list.setAttribute('role', 'listbox');
 
-    this.playButton = menuButton('Jogar', () => this.playSelected(), 'primary');
-    this.deleteButton = menuButton('Apagar', () => void this.deleteSelected(), 'danger');
-    const newButton = menuButton('Criar novo', () => this.toggleCreate(true));
-    const back = menuButton('Voltar', () => this.callbacks.back());
+    this.playButton = menuButton(t('worlds.play'), () => this.playSelected(), 'primary');
+    this.deleteButton = menuButton(t('worlds.delete'), () => void this.deleteSelected(), 'danger');
+    const newButton = menuButton(t('worlds.create'), () => this.toggleCreate(true));
+    const back = menuButton(t('opt.back'), () => this.callbacks.back());
 
     /*
      * Levar mundo daqui para lá (M7).
@@ -68,8 +72,14 @@ export class WorldsScreen {
      * seletor nativo do navegador é a única forma de ler arquivo do disco sem
      * pedir permissão, e o dele é feio em toda plataforma.
      */
-    this.exportButton = menuButton('Exportar', () => void this.exportSelected());
-    const importButton = menuButton('Importar', () => this.fileInput.click());
+    this.exportButton = menuButton(t('worlds.export'), () => void this.exportSelected());
+    const importButton = menuButton(t('worlds.import'), () => this.fileInput.click());
+    /*
+     * Compartilhar a seed (M17): o código curto do mundo selecionado vai para
+     * a área de transferência, e fica escrito no retorno da tela para quem vai
+     * ditá-lo — nem todo navegador deixa a página escrever lá.
+     */
+    this.shareButton = menuButton(t('worlds.share_seed'), () => void this.shareSelected());
     this.fileInput = document.createElement('input');
     this.fileInput.type = 'file';
     this.fileInput.accept = '.clw';
@@ -85,31 +95,38 @@ export class WorldsScreen {
     this.createForm.className = 'menu-section';
     this.createForm.hidden = true;
 
-    const name = textField('Nome', '', 'Novo Mundo');
-    const seed = textField('Seed', '', 'deixe vazio para sortear');
+    const name = textField(t('worlds.name'), '', t('worlds.new_world'));
+    const seed = textField(t('worlds.seed'), '', t('worlds.seed_hint'));
     this.nameInput = name.input;
     this.seedInput = seed.input;
+    /*
+     * Colar a seed: o campo aceita o colar do teclado de sempre, e o botão
+     * existe para o celular, onde segurar o dedo num campo pequeno para achar
+     * "colar" é a parte difícil. Sem permissão de leitura, cai no campo.
+     */
+    const paste = menuButton(t('worlds.paste'), () => void this.pasteSeed());
+    seed.wrapper.appendChild(paste);
 
     this.modeSelect = select([
-      { value: 'survival', label: 'Sobrevivência' },
-      { value: 'creative', label: 'Criativo' },
+      { value: 'survival', label: t('mode.survival') },
+      { value: 'creative', label: t('mode.creative') },
     ]);
     this.difficultySelect = select([
-      { value: '0', label: 'Pacífico' },
-      { value: '1', label: 'Fácil' },
-      { value: '2', label: 'Normal' },
-      { value: '3', label: 'Difícil' },
+      { value: '0', label: t('opt.peaceful') },
+      { value: '1', label: t('opt.easy') },
+      { value: '2', label: t('opt.normal') },
+      { value: '3', label: t('opt.hard') },
     ]);
     this.difficultySelect.value = '2';
 
     this.createForm.append(
       name.wrapper,
       seed.wrapper,
-      labelled('Modo', this.modeSelect),
-      labelled('Dificuldade', this.difficultySelect),
+      labelled(t('worlds.mode'), this.modeSelect),
+      labelled(t('opt.difficulty'), this.difficultySelect),
       menuRow(
-        menuButton('Criar e jogar', () => void this.createWorld(), 'primary'),
-        menuButton('Cancelar', () => this.toggleCreate(false)),
+        menuButton(t('worlds.create_play'), () => void this.createWorld(), 'primary'),
+        menuButton(t('common.cancel'), () => this.toggleCreate(false)),
       ),
     );
 
@@ -118,6 +135,7 @@ export class WorldsScreen {
       menuRow(this.playButton, newButton),
       menuRow(this.deleteButton, back),
       menuRow(this.exportButton, importButton),
+      menuRow(this.shareButton),
       this.status,
       this.fileInput,
       this.createForm,
@@ -161,7 +179,7 @@ export class WorldsScreen {
     if (this.worlds.length === 0) {
       const empty = document.createElement('p');
       empty.className = 'menu-empty';
-      empty.textContent = 'Nenhum mundo ainda. Crie o primeiro.';
+      empty.textContent = t('worlds.empty');
       this.list.appendChild(empty);
       this.updateButtons();
       return;
@@ -193,8 +211,8 @@ export class WorldsScreen {
       name.textContent = world.name;
       const meta = document.createElement('span');
       meta.className = 'meta';
-      meta.textContent = `${world.gameMode === 'creative' ? 'Criativo' : 'Sobrevivência'}`
-        + ` · seed ${world.seed || world.seedHash}`
+      meta.textContent = `${world.gameMode === 'creative' ? t('mode.creative') : t('mode.survival')}`
+        + ` · ${t('worlds.seed')} ${seedCode(world.seedHash)}`
         + ` · ${formatDate(world.lastPlayed)}`
         + ` · ${formatSize(world.sizeBytes)}`;
       info.append(name, meta);
@@ -239,6 +257,7 @@ export class WorldsScreen {
     this.playButton.disabled = !has;
     this.deleteButton.disabled = !has;
     this.exportButton.disabled = !has || this.callbacks.exportWorld === undefined;
+    this.shareButton.disabled = !has;
   }
 
   /** Mensagem curta abaixo dos botões: é o retorno de exportar e importar. */
@@ -250,12 +269,12 @@ export class WorldsScreen {
   private async exportSelected(): Promise<void> {
     const world = this.worlds.find((w) => w.id === this.selected);
     if (world === undefined || this.callbacks.exportWorld === undefined) return;
-    this.setStatus('Empacotando…');
+    this.setStatus(t('worlds.packing'));
     try {
       await this.callbacks.exportWorld(world);
-      this.setStatus(`"${world.name}" exportado.`);
+      this.setStatus(tf('worlds.exported', world.name));
     } catch (error) {
-      this.setStatus(messageOf(error, 'Não deu para exportar.'));
+      this.setStatus(messageOf(error, t('worlds.export_failed')));
     }
   }
 
@@ -265,14 +284,45 @@ export class WorldsScreen {
     this.fileInput.value = '';
     if (file === undefined || this.callbacks.importWorld === undefined) return;
 
-    this.setStatus('Lendo o arquivo…');
+    this.setStatus(t('worlds.reading'));
     try {
       const name = await this.callbacks.importWorld(file);
-      this.setStatus(`"${name}" importado.`);
+      this.setStatus(tf('worlds.imported', name));
       await this.refresh();
     } catch (error) {
-      this.setStatus(messageOf(error, 'Não deu para importar.'));
+      this.setStatus(messageOf(error, t('worlds.import_failed')));
     }
+  }
+
+  /**
+   * Copia o código da seed do mundo selecionado.
+   *
+   * O texto copiado é **só o código**: é o que o campo de seed do outro lado
+   * aceita de volta, e colar uma frase inteira ali viraria uma seed de texto.
+   */
+  private async shareSelected(): Promise<void> {
+    const world = this.worlds.find((w) => w.id === this.selected);
+    if (world === undefined) return;
+    const code = seedCode(world.seedHash);
+    // O código aparece na hora: a escrita na área de transferência pode ficar
+    // pendurada numa permissão, e quem vai ditar o código não pode esperar.
+    this.setStatus(tf('worlds.seed_shown', code));
+    try {
+      await navigator.clipboard.writeText(code);
+      this.setStatus(tf('worlds.seed_copied', code));
+    } catch {
+      // Sem permissão: fica o código escrito na tela.
+    }
+  }
+
+  private async pasteSeed(): Promise<void> {
+    try {
+      const text = (await navigator.clipboard.readText()).trim();
+      if (text !== '') this.seedInput.value = text;
+    } catch {
+      // Sem permissão de leitura: o teclado do aparelho cola no campo.
+    }
+    this.seedInput.focus();
   }
 
   private toggleCreate(open: boolean): void {
@@ -289,14 +339,14 @@ export class WorldsScreen {
     const world = this.worlds.find((w) => w.id === this.selected);
     if (world === undefined) return;
     // Única ação irreversível do jogo: pede confirmação.
-    if (!confirm(`Apagar "${world.name}" para sempre?`)) return;
+    if (!confirm(tf('worlds.confirm_delete', world.name))) return;
     await this.callbacks.remove(world);
     this.selected = null;
     await this.refresh();
   }
 
   private async createWorld(): Promise<void> {
-    const name = this.nameInput.value.trim() || 'Novo Mundo';
+    const name = this.nameInput.value.trim() || t('worlds.new_world');
     const mode = this.modeSelect.value === 'creative' ? 'creative' : 'survival';
     const difficulty = Number(this.difficultySelect.value) as 0 | 1 | 2 | 3;
     const meta = await this.callbacks.create(name, this.seedInput.value.trim(), mode, difficulty);
@@ -337,12 +387,13 @@ export function formatSize(bytes: number): string {
   const kb = bytes / 1024;
   if (kb < 1024) return `${Math.round(kb)} KB`;
   const mb = kb / 1024;
-  return `${mb < 10 ? mb.toFixed(1).replace('.', ',') : Math.round(mb)} MB`;
+  return `${mb < 10 ? decimal(mb, 1) : Math.round(mb)} MB`;
 }
 
+/** Dia, mês e hora na ordem do idioma: 25/09 em português, 09/25 em inglês. */
 function formatDate(timestamp: number): string {
-  if (timestamp <= 0) return 'nunca jogado';
-  const date = new Date(timestamp);
-  const pad = (n: number): string => String(n).padStart(2, '0');
-  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  if (timestamp <= 0) return t('worlds.never_played');
+  return new Date(timestamp).toLocaleString(htmlLang(), {
+    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+  });
 }

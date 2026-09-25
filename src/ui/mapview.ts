@@ -9,6 +9,7 @@
  * coordenadas; é o certo para quem olha o mapa e depois olha o mundo.
  */
 
+import { t } from '../core/i18n';
 import { writeMapColor } from '../render/mapcolors';
 import type { WorldMap } from '../game/worldmap';
 
@@ -63,4 +64,5 @@ export function compassPoint(x: number, z: number, tx: number, tz: number): stri
   const index = Math.round(angle / (Math.PI / 4));
   return POINTS[(index % 8 + 8) % 8];
 }
-const POINTS: readonly string[] = ['N', 'NE', 'L', 'SE', 'S', 'SO', 'O', 'NO'];
+/** As oito pontas no idioma em uso: leste é `L` em português e `E` em inglês. */
+const POINTS: readonly string[] = t('map.compass').split(' ');

@@ -10,6 +10,7 @@
  * mesma lista serve o inventário 2×2 e a bancada 3×3.
  */
 
+import { t } from '../../core/i18n';
 import { itemDef } from '../../data/items';
 import type { RecipeEntry } from '../../game/crafting';
 import type { Inventory } from '../../game/inventory';
@@ -65,8 +66,8 @@ export class RecipeBookPanel {
 
     this.search = document.createElement('input');
     this.search.type = 'search';
-    this.search.placeholder = 'Buscar…';
-    this.search.setAttribute('aria-label', 'Buscar receita');
+    this.search.placeholder = t('book.search');
+    this.search.setAttribute('aria-label', t('book.search_aria'));
     this.search.addEventListener('input', () => this.render());
 
     const filter = document.createElement('label');
@@ -86,7 +87,7 @@ export class RecipeBookPanel {
     this.onlyAvailable.checked = false;
     this.onlyAvailable.addEventListener('change', () => this.render());
     const filterText = document.createElement('span');
-    filterText.textContent = 'só o que dá';
+    filterText.textContent = t('book.craftable');
     filter.append(this.onlyAvailable, filterText);
 
     header.append(this.search, filter);
@@ -150,7 +151,7 @@ export class RecipeBookPanel {
     if (entry.shapeless) {
       const note = document.createElement('div');
       note.className = 'note';
-      note.textContent = 'em qualquer posição';
+      note.textContent = t('book.shapeless');
       this.preview.appendChild(note);
     }
     this.preview.hidden = false;
@@ -217,8 +218,8 @@ export class RecipeBookPanel {
       const empty = document.createElement('p');
       empty.className = 'empty';
       empty.textContent = query === ''
-        ? 'Nada para fazer com o que você tem — desmarque "só o que dá" para ver tudo.'
-        : 'Nenhuma receita com esse nome.';
+        ? t('book.nothing')
+        : t('book.no_match');
       this.list.appendChild(empty);
     }
   }

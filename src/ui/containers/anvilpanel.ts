@@ -11,6 +11,7 @@
  * frase agora vem de `game/stationhelp.ts` e diz o próximo passo.
  */
 
+import { t } from '../../core/i18n';
 import { MAX_NAME_LENGTH } from '../../data/anvil';
 
 /** O estado da bigorna que o painel mostra. */
@@ -54,7 +55,7 @@ export class AnvilPanel {
     const label = document.createElement('label');
     label.className = 'station-note';
     label.htmlFor = 'anvil-name';
-    label.textContent = 'Novo nome';
+    label.textContent = t('anvil.new_name');
     this.help = document.createElement('div');
     this.help.className = 'station-help';
     this.help.setAttribute('role', 'status');

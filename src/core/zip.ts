@@ -17,6 +17,7 @@
  * ela não existe, só entram os arquivos guardados sem compressão — e quem
  * chama recebe o erro para mostrar ao jogador.
  */
+import { t, tf } from './i18n';
 
 /** Erro de formato, com frase pronta para a tela. */
 export class ZipError extends Error {}
@@ -48,14 +49,14 @@ export async function readZip(bytes: Uint8Array): Promise<Map<string, Uint8Array
 
   const total = view.getUint16(eocd + 10, true);
   const directory = view.getUint32(eocd + 16, true);
-  if (directory >= bytes.length) throw new ZipError('Arquivo zip corrompido.');
+  if (directory >= bytes.length) throw new ZipError(t('zip.corrupt'));
 
   const out = new Map<string, Uint8Array>();
   let cursor = directory;
   for (let i = 0; i < total; i++) {
-    if (cursor + 46 > bytes.length) throw new ZipError('Arquivo zip truncado.');
+    if (cursor + 46 > bytes.length) throw new ZipError(t('zip.truncated'));
     if (view.getUint32(cursor, true) !== SIG_CENTRAL) {
-      throw new ZipError('Arquivo zip corrompido.');
+      throw new ZipError(t('zip.corrupt'));
     }
     const flags = view.getUint16(cursor + 8, true);
     const method = view.getUint16(cursor + 10, true);
@@ -70,20 +71,20 @@ export async function readZip(bytes: Uint8Array): Promise<Map<string, Uint8Array
     // Pasta: entra no diretório com tamanho zero e nada a extrair.
     if (name.endsWith('/')) continue;
     if ((flags & FLAG_ENCRYPTED) !== 0) {
-      throw new ZipError(`O arquivo "${name}" está protegido por senha.`);
+      throw new ZipError(tf('zip.password', name));
     }
     if (compressed === ZIP64_MARK || localOffset === ZIP64_MARK) {
-      throw new ZipError('Zip grande demais (ZIP64) — recompacte com menos arquivos.');
+      throw new ZipError(t('zip.zip64'));
     }
 
     const start = dataStart(view, bytes.length, localOffset);
     const end = start + compressed;
-    if (end > bytes.length) throw new ZipError('Arquivo zip truncado.');
+    if (end > bytes.length) throw new ZipError(t('zip.truncated'));
     const raw = bytes.subarray(start, end);
 
     if (method === METHOD_STORED) out.set(name, raw.slice());
     else if (method === METHOD_DEFLATE) out.set(name, await inflateRaw(raw, name));
-    else throw new ZipError(`O arquivo "${name}" usa uma compressão que o jogo não lê.`);
+    else throw new ZipError(tf('zip.method', name));
   }
   return out;
 }
@@ -94,7 +95,7 @@ function findEndOfDirectory(view: DataView): number {
   for (let at = view.byteLength - EOCD_SIZE; at >= limit; at--) {
     if (view.getUint32(at, true) === SIG_EOCD) return at;
   }
-  throw new ZipError('Este arquivo não é um zip.');
+  throw new ZipError(t('zip.not_zip'));
 }
 
 /**
@@ -106,9 +107,9 @@ function findEndOfDirectory(view: DataView): number {
  * começar a descompressão alguns bytes fora do lugar.
  */
 function dataStart(view: DataView, length: number, localOffset: number): number {
-  if (localOffset + 30 > length) throw new ZipError('Arquivo zip truncado.');
+  if (localOffset + 30 > length) throw new ZipError(t('zip.truncated'));
   if (view.getUint32(localOffset, true) !== SIG_LOCAL) {
-    throw new ZipError('Arquivo zip corrompido.');
+    throw new ZipError(t('zip.corrupt'));
   }
   const nameLength = view.getUint16(localOffset + 26, true);
   const extraLength = view.getUint16(localOffset + 28, true);
@@ -125,7 +126,7 @@ function decodeName(bytes: Uint8Array): string {
 async function inflateRaw(data: Uint8Array, name: string): Promise<Uint8Array> {
   const global = globalThis as { DecompressionStream?: typeof DecompressionStream };
   if (global.DecompressionStream === undefined) {
-    throw new ZipError('Este navegador não descompacta zip. Recompacte "sem compressão".');
+    throw new ZipError(t('zip.no_inflate'));
   }
   const stream = new global.DecompressionStream('deflate-raw');
   const writer = stream.writable.getWriter();
@@ -145,7 +146,7 @@ async function inflateRaw(data: Uint8Array, name: string): Promise<Uint8Array> {
       }
     }
   } catch {
-    throw new ZipError(`O arquivo "${name}" está corrompido.`);
+    throw new ZipError(tf('zip.entry_corrupt', name));
   }
 
   const out = new Uint8Array(total);

@@ -13,6 +13,7 @@
 
 import { SOUNDS, buildGraph, durationOf, rateFor, type Recipe } from './synth';
 import { BUSES, busFor, type Bus } from '../data/soundbuses';
+import { t } from '../core/i18n';
 
 export type { Bus };
 
@@ -423,24 +424,24 @@ function getOfflineContext(): OfflineContextCtor | null {
 
 /** Legendas de som (doc 10 §4). Só os que importam para jogar sem ouvir. */
 export const SUBTITLES: Record<string, string> = {
-  'mob/zombie_ambient': 'Zumbi geme',
-  'mob/zombie_attack': 'Zumbi ataca',
-  'mob/skeleton_ambient': 'Esqueleto chacoalha',
-  'mob/skeleton_attack': 'Esqueleto atira',
-  'mob/creeper_ambient': 'Creeper se aproxima',
-  'mob/creeper_attack': 'Creeper chia',
-  'mob/spider_ambient': 'Aranha sibila',
-  'mob/enderman_ambient': 'Enderman resmunga',
-  'mob/enderman_teleport': 'Enderman teleporta',
-  'mob/wolf_ambient': 'Lobo rosna',
-  'mob/cow_ambient': 'Vaca muge',
-  'mob/pig_ambient': 'Porco grunhe',
-  'mob/sheep_ambient': 'Ovelha bale',
-  'mob/chicken_ambient': 'Galinha cacareja',
-  'mob/slime_ambient': 'Slime pula',
-  'mob/villager_ambient': 'Aldeão resmunga',
-  'player/explode': 'Explosão',
-  'player/hurt': 'Você se machuca',
-  'player/arrow': 'Flecha passa',
-  'player/levelup': 'Você subiu de nível',
+  'mob/zombie_ambient': t('sub.zombie_ambient'),
+  'mob/zombie_attack': t('sub.zombie_attack'),
+  'mob/skeleton_ambient': t('sub.skeleton_ambient'),
+  'mob/skeleton_attack': t('sub.skeleton_attack'),
+  'mob/creeper_ambient': t('sub.creeper_ambient'),
+  'mob/creeper_attack': t('sub.creeper_attack'),
+  'mob/spider_ambient': t('sub.spider_ambient'),
+  'mob/enderman_ambient': t('sub.enderman_ambient'),
+  'mob/enderman_teleport': t('sub.enderman_teleport'),
+  'mob/wolf_ambient': t('sub.wolf_ambient'),
+  'mob/cow_ambient': t('sub.cow_ambient'),
+  'mob/pig_ambient': t('sub.pig_ambient'),
+  'mob/sheep_ambient': t('sub.sheep_ambient'),
+  'mob/chicken_ambient': t('sub.chicken_ambient'),
+  'mob/slime_ambient': t('sub.slime_ambient'),
+  'mob/villager_ambient': t('sub.villager_ambient'),
+  'player/explode': t('sub.explode'),
+  'player/hurt': t('sub.hurt'),
+  'player/arrow': t('sub.arrow'),
+  'player/levelup': t('sub.levelup'),
 };

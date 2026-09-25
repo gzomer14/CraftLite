@@ -12,6 +12,68 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-25 12:20 → 13:04 · M17: alcance
+
+**Pedido:** *"Vamos seguir com o desenvolvimento do projeto. Acredito que o próximo marco seja
+M17"*.
+
+**Resultado:** M17 fechado, os três itens do doc 14. **Idioma**: menu nas Opções, idioma resolvido
+uma vez no boot (segue o aparelho por padrão), ~500 textos de interface em `data/strings/pt.ts` e
+`en.ts` com as mesmas chaves cobradas pelo compilador, nomes de conteúdo em inglês ao lado das
+tabelas e trocados no boot, e um teste que varre o código atrás de português escrito direto na
+tela. **Primeira hora guiada**: seis passos do tronco à picareta de pedra na linha do alto do HUD,
+com o gesto do aparelho na mão, no save e desligável. **Seed compartilhável**: código de oito
+letras com verificação, Copiar e Colar na tela de mundos. Três defeitos antigos corrigidos: a linha
+de objetivo que não mudava com a conquista (2026-09-11), a primeira conquista só com carvalho (M6)
+e a dica de toque do modo A com o B de padrão. Visto no Chrome headless em inglês e português,
+desktop e celular emulado. Ninguém novo jogou ainda.
+
+Portões: **2271 testes** em 116 arquivos, lint limpo, build ok, **298,4 KB** de 350 (+15,9; worker
+igual), smoke 7/7.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| **Idioma** | | |
+| `+` | `src/core/i18n.ts` | idioma resolvido na avaliação do módulo; `t`, `tf`, `decimal`, `htmlLang`, `setLanguage` para os testes |
+| `+` | `src/data/strings/pt.ts` | os ~500 textos de interface em português, por chave |
+| `+` | `src/data/strings/en.ts` | os mesmos em inglês, `Record<StringKey, string>` |
+| `+` | `src/data/strings/names.en.ts` | nomes em inglês de blocos, itens, mobs, biomas, conquistas, efeitos, encantamentos, profissões, estatísticas e dimensões |
+| `+` | `src/data/strings/localize.ts` | troca o `display` das tabelas no boot; `NAME_TABLES` para o teste |
+| `~` | `src/game/settings.ts` | `language` (`auto`/`pt`/`en`) e `guide`; `STORAGE_KEY` exportada |
+| `~` | `src/ui/screens/options.ts` | seção Idioma com o botão de recarregar; "Dicas da primeira hora" em Jogo; textos por chave |
+| `~` | `src/main.ts` | `localize` importado primeiro; `lang` do documento; textos do boot; a linha de objetivo saiu para `ui/objectiveline.ts` |
+| `~` | `src/ui/screens/*.ts` (título, mundos, pausa, morte, créditos, pacotes, placa, mapa, teste de controle, menu) | textos por chave |
+| `~` | `src/ui/containers/*.ts` (tela, criativo, mesa, troca, bigorna, preparo, receitas) | textos por chave |
+| `~` | `src/ui/hud.ts`, `effectsbar.ts`, `touchui.ts`, `debug.ts`, `debugsource.ts`, `bootscreen.ts`, `screenmode.ts`, `gameflow.ts`, `gamescreens.ts`, `menuflow.ts`, `mapview.ts` | textos por chave; a rosa dos ventos no idioma |
+| `~` | `src/game/stationhelp.ts`, `survival.ts`, `markers.ts`, `sessionwiring.ts`, `blockuse.ts`, `dragonfight.ts`, `session.ts`, `sleep.ts`, `travel.ts`, `village.ts` | mensagens de jogo por chave |
+| `~` | `src/data/keybinds.ts`, `gamepads.ts`, `soundbuses.ts`, `texturestyle.ts`, `anvil.ts`, `stats.ts` | rótulos por chave; número e milhar no idioma |
+| `~` | `src/audio/engine.ts` | legendas de som por chave |
+| `~` | `src/core/zip.ts`, `src/save/archive.ts`, `src/save/db.ts`, `src/render/pack.ts`, `src/core/pwa.ts`, `src/core/tier.ts` | erros e avisos que chegam à tela, por chave |
+| **Primeira hora** | | |
+| `+` | `src/data/guide.ts` | os seis passos: o que cumpre cada um e a frase |
+| `+` | `src/game/guide.ts` | o progresso, só para a frente, sem alocação |
+| `+` | `src/ui/objectiveline.ts` | a linha do alto: dica ou objetivo, o gesto do aparelho, conferida uma vez por segundo |
+| `~` | `src/game/session.ts`, `src/game/savegame.ts`, `src/save/db.ts` | `guide` na sessão e no save do jogador |
+| `~` | `src/data/achievements.ts`, `src/game/achievements.ts` | objetivos por chave; alvo por `#tag` (`get_wood` com `#logs`) |
+| `~` | `src/ui/controlhint.ts` | a dica de toque segue o modo A ou B |
+| **Seed** | | |
+| `+` | `src/core/seedcode.ts` | código de oito letras em base32 de Crockford com verificação |
+| `~` | `src/core/rng.ts` | `seedFromString` entende o código |
+| `~` | `src/ui/screens/worlds.ts` | Copiar seed, Colar, o código na lista, data no idioma |
+| **Testes e scripts** | | |
+| `+` | `tests/i18n.test.ts` | chaves, marcadores, nomes e a varredura do código |
+| `+` | `tests/firsthour.test.ts` | a dica, a linha do HUD e o caminho da bétula à picareta de pedra |
+| `+` | `tests/seedcode.test.ts` | ida e volta, tolerância, verificação, colar no campo |
+| `~` | `tests/achievements.test.ts`, `tests/settings.test.ts` | alvo por tag; `language` e `guide` |
+| `~` | `scripts/smoke.mjs` | Chrome em `pt_BR` pelo ambiente: os cliques acham os botões pelo texto |
+| **Docs** | | |
+| `~` | `docs/14-roadmap.md` | M17 marcado, com o que foi medido |
+| `~` | `docs/15-status.md` | M17 no §1 e §3, métricas, três correções no §4, pendências no §5, próximo passo |
+| `~` | `docs/16-auditoria.md` | esta sessão |
+| `~` | `README.md` | marco, testes e bundle |
+
+---
+
 ## 2026-09-24 15:40 → 2026-09-25 12:09 · M16: um fim para a jornada
 
 **Pedido:** *"Tudo funcionando perfeitamente! Agora vamos partir para implementação do M16"* — com o

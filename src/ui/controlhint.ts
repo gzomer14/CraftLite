@@ -4,16 +4,23 @@
  * 2026-09-22 (M13).
  */
 
+import { t, tf } from '../core/i18n';
 import type { Controls } from '../input/controls';
 import type { Gamepads } from '../input/gamepad';
+import type { TouchMode } from '../game/settings';
 
-export function showHint(controls: Controls, isTouch: boolean, gamepads: Gamepads): void {
+export function showHint(
+  controls: Controls, isTouch: boolean, gamepads: Gamepads, touchMode: TouchMode,
+): void {
   const hint = document.createElement('div');
   hint.id = 'hint';
-  const base = isTouch
-    ? 'Esquerda: joystick · Direita: arrastar para olhar, toque curto coloca, toque longo quebra'
-    : 'Clique para jogar · WASD mover · Espaço pular · Shift agachar · Ctrl correr · '
-      + 'botões do mouse quebrar/colocar · 1-9 e roda trocam de item · F3 debug';
+  /*
+   * O toque tem dois modos (doc 09 §2.2), e a dica descrevia só o A — "toque
+   * longo quebra" — desde que o B virou o padrão (2026-09-14). No B quem
+   * quebra é o botão ⛏, e o toque longo na tela não faz nada (M17).
+   */
+  const touchHint = touchMode === 'A' ? t('hint.touch') : t('hint.touch_b');
+  const base = isTouch ? touchHint : t('hint.keyboard');
   hint.textContent = base;
 
   /*
@@ -24,11 +31,9 @@ export function showHint(controls: Controls, isTouch: boolean, gamepads: Gamepad
   const showPadHint = (): void => {
     if (!gamepads.connected) return;
     const l = gamepads.labels;
-    hint.textContent = `${base}\n`
-      + `Controle: analógicos mover/olhar · ${l.faceDown} pular · ${l.faceRight} agachar · `
-      + `${l.l2} colocar · ${l.r2} quebrar · ${l.faceUp} largar · `
-      + `${l.l1}/${l.r1} ou direcional ←→ trocar item · ${l.start} pausa · `
-      + `${l.faceLeft} mochila`;
+    hint.textContent = `${base}\n${tf(
+      'hint.pad', l.faceDown, l.faceRight, l.l2, l.r2, l.faceUp, l.l1, l.r1, l.start, l.faceLeft,
+    )}`;
   };
   gamepads.onConnect(showPadHint);
   showPadHint();

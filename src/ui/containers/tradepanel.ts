@@ -9,6 +9,7 @@
  * `game/trading.ts`, direto no inventário.
  */
 
+import { t, tf } from '../../core/i18n';
 import { itemDef } from '../../data/items';
 import type { TradeOfferView, TradeResult } from '../../game/trading';
 
@@ -20,11 +21,11 @@ export interface TradePanelCallbacks {
 }
 
 const MESSAGES: Record<TradeResult, string> = {
-  ok: 'Negócio fechado!',
-  'no-offer': 'Oferta indisponível',
-  'no-items': 'Faltam itens para pagar',
-  'sold-out': 'Esgotado por hoje — volte amanhã',
-  closed: 'O aldeão foi embora',
+  ok: t('trade.ok'),
+  'no-offer': t('trade.no_offer'),
+  'no-items': t('trade.no_items'),
+  'sold-out': t('trade.sold_out'),
+  closed: t('trade.closed'),
 };
 
 export class TradePanel {
@@ -78,13 +79,16 @@ export class TradePanel {
       arrow.textContent = '→';
       const left = document.createElement('span');
       left.className = 'trade-left';
-      left.textContent = sold ? 'esgotado' : `restam ${offer.remaining}`;
+      left.textContent = sold ? t('trade.sold') : tf('trade.left', offer.remaining);
       button.append(
         this.icon(offer.wantItem, offer.wantCount), arrow, this.icon(offer.giveItem, offer.giveCount), left,
       );
       button.setAttribute(
         'aria-label',
-        `${offer.wantCount} ${want} por ${offer.giveCount} ${give}${sold ? ', esgotado' : `, restam ${offer.remaining}`}`,
+        tf(
+          'trade.aria', offer.wantCount, want, offer.giveCount, give,
+          sold ? t('trade.sold') : tf('trade.left', offer.remaining),
+        ),
       );
     }
   }

@@ -8,6 +8,7 @@
  * efeitos muda (`StatusEffects.version`) ou quando o segundo exibido vira.
  */
 
+import { tf } from '../core/i18n';
 import { EFFECTS } from '../data/effects';
 import type { StatusEffects } from '../game/effects';
 
@@ -52,7 +53,7 @@ export class EffectsBar {
       this.lastAbsorption = half;
       this.hearts.hidden = half <= 0;
       this.hearts.textContent = '♥'.repeat(Math.ceil(half / 2));
-      this.hearts.setAttribute('aria-label', `Vida extra: ${half}`);
+      this.hearts.setAttribute('aria-label', tf('hud.absorption', half));
     }
     if (effects.version !== this.lastVersion) {
       this.lastVersion = effects.version;

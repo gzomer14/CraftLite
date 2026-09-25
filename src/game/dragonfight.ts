@@ -29,6 +29,7 @@ import { END_ISLAND_Y, PILLAR_COUNT, endPillars } from '../world/gen/end';
 import { exitPortalOpen, openExitPortal, type BlockChanged } from './endportal';
 import type { Mobs } from '../entity/mobs';
 import type { World } from '../world/world';
+import { t } from '../core/i18n';
 
 const DRAGON = MOB_BY_NAME.get('ender_dragon')?.id ?? -1;
 const CRYSTAL = MOB_BY_NAME.get('end_crystal')?.id ?? -1;
@@ -166,7 +167,7 @@ export class DragonFight {
       if (this.state.dragonHealth > 0) store.health[placed] = this.state.dragonHealth;
       this.dragonPlaced = true;
       this.bossHealth = store.health[placed] / mobDef(DRAGON).health;
-      this.host.message('O dragão do End acordou');
+      this.host.message(t('msg.dragon_awake'));
       return;
     }
     const max = mobDef(DRAGON).health;
@@ -186,7 +187,7 @@ export class DragonFight {
     this.dragonPlaced = false;
     if (world.isLoaded(0, 0)) openExitPortal(world, this.host.blockChanged);
     this.host.sound('block/end_portal', 0.5, END_ISLAND_Y + 2, 0.5);
-    this.host.message('O dragão caiu. O portal de volta se abriu no centro da ilha.');
+    this.host.message(t('msg.dragon_down'));
     this.host.achievement('kill_dragon');
   }
 

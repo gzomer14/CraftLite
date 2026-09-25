@@ -3,6 +3,7 @@
  * do pipeline e do mundo. Saiu do `main.ts` em 2026-09-22 (M13).
  */
 
+import { t } from '../core/i18n';
 import { BIOMES } from '../data/biomes';
 import type { DebugSource } from './debug';
 import type { Renderer } from '../render/renderer';
@@ -33,6 +34,6 @@ export function updateDebugSource(
     const biome = BIOMES[chunk.biomeMap[((z & 15) << 4) | (x & 15)]];
     source.biome = biome !== undefined ? biome.display : '—';
   } else {
-    source.biome = 'carregando…';
+    source.biome = t('debug.loading');
   }
 }

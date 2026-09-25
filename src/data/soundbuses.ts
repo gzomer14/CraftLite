@@ -13,6 +13,7 @@
  */
 
 import { MOBS } from './mobs';
+import { t } from '../core/i18n';
 
 /** Barramentos do grafo. `master` não é barramento: é o ganho de saída. */
 export type Bus =
@@ -24,14 +25,14 @@ export const BUSES: readonly Bus[] = [
 
 /** Rótulo de cada barramento na tela de opções, na ordem do doc 08. */
 export const BUS_LABELS: Readonly<Record<Bus, string>> = {
-  music: 'Música',
-  block: 'Blocos',
-  hostile: 'Mobs hostis',
-  friendly: 'Mobs amigáveis',
-  player: 'Jogadores',
-  ambient: 'Ambiente',
-  weather: 'Clima',
-  ui: 'Interface',
+  music: t('bus.music'),
+  block: t('bus.block'),
+  hostile: t('bus.hostile'),
+  friendly: t('bus.friendly'),
+  player: t('bus.player'),
+  ambient: t('bus.ambient'),
+  weather: t('bus.weather'),
+  ui: t('bus.ui'),
 };
 
 /**

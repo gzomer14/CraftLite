@@ -454,17 +454,26 @@ precisa de mundo roda de verdade (`tests/theend.test.ts`); o dragão com os dez 
 
 > Quem ainda não joga. O jogo só fala português e não ensina nada.
 
-- [ ] **Idioma** (doc 08 §3.11: *"Menu raiz: Vídeo, Controles, Som, **Idioma**,
+- [x] **Idioma** (doc 08 §3.11: *"Menu raiz: Vídeo, Controles, Som, **Idioma**,
       Acessibilidade"*). O menu não existe (`ui/screens/options.ts:292–296` tem quatro seções). Os
       textos saem para `data/strings/pt.ts`, com um `t('chave')` barato, e entra `en` como segundo
-      idioma. O custo em bundle é para medir, não para supor.
-- [ ] **Primeira hora guiada**, por dica contextual e não por tutorial em pop-up: *"segure para
+      idioma. O custo em bundle é para medir, não para supor. (`core/i18n.ts`,
+      `data/strings/`; os nomes de conteúdo ficam na tabela e o inglês deles em
+      `names.en.ts` — desvio, doc 15 §3. **Medido: 15,9 KB**.)
+- [x] **Primeira hora guiada**, por dica contextual e não por tutorial em pop-up: *"segure para
       quebrar"* até o primeiro tronco, *"abra a mochila"* até a primeira bancada — cada dica some
       quando a conquista correspondente de `data/achievements.ts` sai. Desligável.
-- [ ] **Compartilhar seed** na tela do mundo: copiar, colar e um código curto.
+      (`data/guide.ts`, `ui/objectiveline.ts`: some pela conquista **ou** pelo item na mochila.)
+- [x] **Compartilhar seed** na tela do mundo: copiar, colar e um código curto.
+      (`core/seedcode.ts`: `03NQ-K8NH`.)
 
 **Critério de aceite:** o jogo inteiro em inglês sem um texto em português sobrando (teste que
 varre as chaves); um jogador novo chega à picareta de pedra sem ler nada fora do jogo.
+**Medido o que dá para medir sem gente:** `tests/i18n.test.ts` varre as chaves, os nomes de
+conteúdo e **o código-fonte** atrás de literal em português fora do lugar; o jogo foi visto em
+inglês no Chrome headless sem palavra em português. `tests/firsthour.test.ts` leva três troncos de
+bétula à picareta de pedra só pelo livro de receitas, com a dica andando a cada passo. Ninguém novo
+jogou ainda.
 
 ---
 

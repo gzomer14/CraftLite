@@ -12,6 +12,7 @@
  * Os nomes "Item", "Lápis" e "Material" são os rótulos embaixo dos slots.
  */
 
+import { t, tf } from '../core/i18n';
 import { isEnchantable } from '../data/enchants';
 import { ITEM_BY_NAME, itemDef, maxStackOf, type ItemStack } from '../data/items';
 import { repairMaterialName, repairsWith, type AnvilOutcome } from './anvil';
@@ -23,22 +24,22 @@ const ENCHANTED_BOOK = ITEM_BY_NAME.get('enchanted_book')?.id ?? -1;
 
 /** "1 nível", "5 níveis". */
 export function levels(n: number): string {
-  return n === 1 ? '1 nível' : `${n} níveis`;
+  return n === 1 ? t('station.level_one') : tf('station.levels', n);
 }
 
 /** O que a mesa diz, dado o que está nela. */
 export function enchantHelp(
   item: ItemStack | null, lapis: number, validOffers: number, level: number, creative: boolean,
 ): string {
-  if (item === null) return 'Ponha em Item a ferramenta, arma, armadura ou livro a encantar.';
+  if (item === null) return t('enchant.put_item');
   if (validOffers === 0) {
     return isEnchantable(item.item)
-      ? 'Este item já tem tudo o que a mesa pode dar.'
-      : 'Este item não pode ser encantado.';
+      ? t('enchant.maxed')
+      : t('enchant.cannot');
   }
-  if (creative) return 'Toque num encantamento. No Criativo não custa nada.';
-  if (lapis === 0) return 'Ponha lápis-lazúli em Lápis: cada encantamento gasta de 1 a 3.';
-  return `Toque num encantamento. Você tem ${levels(level)}.`;
+  if (creative) return t('enchant.creative');
+  if (lapis === 0) return t('enchant.put_lapis');
+  return tf('enchant.pick', levels(level));
 }
 
 /** Por que a bigorna não entrega o resultado, como devolve `Workbench.anvilBlocker`. */
@@ -49,31 +50,31 @@ export function anvilHelp(
   left: ItemStack | null, right: ItemStack | null, outcome: AnvilOutcome,
   blocker: AnvilBlocker, level: number, creative: boolean,
 ): string {
-  if (left === null) return 'Ponha em Item o que quer consertar, juntar, encantar ou renomear.';
+  if (left === null) return t('anvil.put_item');
   if (outcome.result !== null) {
-    if (blocker === 'expensive') return 'Caro demais!';
-    if (blocker === 'no-level') return `Custa ${levels(outcome.cost)} e você tem ${level}.`;
-    if (creative) return 'Pegue o resultado. No Criativo não custa nada.';
-    return `Custa ${levels(outcome.cost)}. Pegue o resultado.`;
+    if (blocker === 'expensive') return t('anvil.too_expensive');
+    if (blocker === 'no-level') return tf('anvil.no_level', levels(outcome.cost), level);
+    if (creative) return t('anvil.creative');
+    return tf('anvil.cost', levels(outcome.cost));
   }
   if (maxStackOf(left.item) > 1) {
-    return 'Na bigorna entram ferramentas, armas, armaduras e livros encantados.';
+    return t('anvil.only_gear');
   }
   const material = repairMaterialName(left.item);
   if (right === null) {
     if (left.item === ENCHANTED_BOOK) {
-      return 'Em Material: outro livro encantado, para juntar os dois. Ou escreva um nome.';
+      return t('anvil.book_material');
     }
-    if ((itemDef(left.item)?.durability ?? 0) <= 0) return 'Este item só pode ganhar um nome.';
-    const fix = material !== null ? `${material} para consertar, ` : '';
-    return `Em Material: ${fix}outro igual para juntar ou um livro encantado. Ou escreva um nome.`;
+    if ((itemDef(left.item)?.durability ?? 0) <= 0) return t('anvil.name_only');
+    const fix = material !== null ? tf('anvil.fix_with', material) : '';
+    return tf('anvil.material', fix);
   }
-  if (left.damage === 0 && repairsWith(left.item, right.item)) return 'Este item não está gasto.';
+  if (left.damage === 0 && repairsWith(left.item, right.item)) return t('anvil.not_worn');
   if (right.item === left.item || right.item === ENCHANTED_BOOK) {
-    return 'Juntar estes dois não muda nada.';
+    return t('anvil.no_change');
   }
-  const tail = material !== null ? ` Este item conserta com ${material}.` : '';
-  return `${itemDef(right.item)?.display ?? 'Isso'} não serve aqui.${tail}`;
+  const tail = material !== null ? tf('anvil.repairs_with', material) : '';
+  return tf('anvil.wrong', itemDef(right.item)?.display ?? t('station.that'), tail);
 }
 
 const WATER_BOTTLE = ITEM_BY_NAME.get('water_bottle')?.id ?? -1;
@@ -88,23 +89,23 @@ export function brewingHelp(stand: BrewingStand): string {
     bottles++;
     if (bottle.item === WATER_BOTTLE) water++;
   }
-  if (stand.brewTicks > 0) return 'Fervendo…';
-  if (bottles === 0) return 'Ponha em Frasco um frasco d\'água (frasco de vidro enchido na água).';
+  if (stand.brewTicks > 0) return t('brew.boiling');
+  if (bottles === 0) return t('brew.put_bottle');
   const ingredient = stand.get(BREW_INGREDIENT);
   if (ingredient === null) {
     return water === bottles
-      ? 'Ponha verruga do Nether em Ingrediente: é ela que começa toda poção.'
-      : 'Ponha em Ingrediente o que dá o efeito: pó de blaze, açúcar, cenoura dourada…';
+      ? t('brew.put_wart')
+      : t('brew.put_effect');
   }
   let fits = false;
   for (let i = 0; i < BREW_BOTTLE_COUNT && !fits; i++) {
     const bottle = stand.get(i);
     if (bottle !== null && brewResult(bottle.item, ingredient.item) >= 0) fits = true;
   }
-  if (!fits) return `${itemDef(ingredient.item)?.display ?? 'Isso'} não serve para estes frascos.`;
+  if (!fits) return tf('brew.wrong', itemDef(ingredient.item)?.display ?? t('station.that'));
   const fuel = stand.get(BREW_FUEL);
   if (stand.fuel === 0 && (fuel === null || !isBrewingFuel(fuel.item))) {
-    return 'Ponha pó de blaze em Combustível para ferver.';
+    return t('brew.put_fuel');
   }
-  return 'Fervendo…';
+  return t('brew.boiling');
 }

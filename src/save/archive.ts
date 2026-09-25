@@ -32,6 +32,7 @@
  * bytes, e é por isso que o formato é testável sem IndexedDB nenhum.
  */
 
+import { t, tf } from '../core/i18n';
 import { regionKey, regionOfKey } from '../game/worldmap';
 import { ByteReader, ByteWriter } from './serialize';
 import {
@@ -144,14 +145,14 @@ export function packArchive(archive: WorldArchive): Uint8Array {
 }
 
 export function unpackArchive(data: Uint8Array): WorldArchive {
-  if (data.length < MAGIC.length + 1) throw new ArchiveError('Arquivo curto demais.');
+  if (data.length < MAGIC.length + 1) throw new ArchiveError(t('archive.short'));
   const reader = new ByteReader(data);
   if (decoder.decode(reader.bytes(MAGIC.length)) !== MAGIC) {
-    throw new ArchiveError('Este arquivo não é um mundo do CraftLite.');
+    throw new ArchiveError(t('archive.not_world'));
   }
   const version = reader.u8();
   if (version > ARCHIVE_VERSION) {
-    throw new ArchiveError(`Arquivo da versão ${version}; este jogo lê até ${ARCHIVE_VERSION}.`);
+    throw new ArchiveError(tf('archive.version', version, ARCHIVE_VERSION));
   }
 
   const meta = readJson<WorldMeta>(reader);
@@ -169,7 +170,7 @@ export function unpackArchive(data: Uint8Array): WorldArchive {
       const cx = reader.i32();
       const cz = reader.i32();
       const length = reader.varint();
-      if (length > reader.remaining) throw new ArchiveError('Arquivo truncado.');
+      if (length > reader.remaining) throw new ArchiveError(t('archive.truncated'));
       // `slice`, não `subarray`: o pedaço vai para o banco e não pode ficar
       // preso ao buffer inteiro do arquivo.
       chunks.push({ cx, cz, data: reader.bytes(length).slice() });
@@ -184,7 +185,7 @@ export function unpackArchive(data: Uint8Array): WorldArchive {
   const archive: WorldArchive = { version, meta, players, dimensions };
   if (version < VERSION_WITH_THUMBNAIL || reader.remaining === 0) return archive;
   const thumbLength = reader.varint();
-  if (thumbLength > reader.remaining) throw new ArchiveError('Arquivo truncado.');
+  if (thumbLength > reader.remaining) throw new ArchiveError(t('archive.truncated'));
   if (thumbLength > 0) archive.thumbnail = reader.bytes(thumbLength).slice();
 
   if (version < VERSION_WITH_JOURNAL || reader.remaining === 0) return archive;
@@ -195,7 +196,7 @@ export function unpackArchive(data: Uint8Array): WorldArchive {
     const rx = reader.i32();
     const rz = reader.i32();
     const length = reader.varint();
-    if (length > reader.remaining) throw new ArchiveError('Arquivo truncado.');
+    if (length > reader.remaining) throw new ArchiveError(t('archive.truncated'));
     regions.push({ rx, rz, data: reader.bytes(length).slice() });
   }
   archive.map = regions;
@@ -210,11 +211,11 @@ function writeJson(writer: ByteWriter, value: unknown): void {
 
 function readJson<T>(reader: ByteReader): T {
   const length = reader.varint();
-  if (length > reader.remaining) throw new ArchiveError('Arquivo truncado.');
+  if (length > reader.remaining) throw new ArchiveError(t('archive.truncated'));
   try {
     return JSON.parse(decoder.decode(reader.bytes(length))) as T;
   } catch {
-    throw new ArchiveError('Arquivo corrompido.');
+    throw new ArchiveError(t('archive.corrupt'));
   }
 }
 
@@ -229,7 +230,7 @@ function readJson<T>(reader: ByteReader): T {
 export async function exportWorld(db: SaveDatabase, worldId: string): Promise<Uint8Array> {
   const metas = await db.getAll<WorldMeta>(STORE_WORLDS);
   const meta = metas.find((m) => m.id === worldId);
-  if (meta === undefined) throw new ArchiveError('Mundo não encontrado.');
+  if (meta === undefined) throw new ArchiveError(t('archive.no_world'));
 
   const allPlayers = await db.getAll<PlayerSave>(STORE_PLAYERS);
   const players = allPlayers.filter((p) => p.worldId === worldId);

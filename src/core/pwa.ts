@@ -6,6 +6,8 @@
  * da primeira, que é o número que o orçamento cobra.
  */
 
+import { t } from './i18n';
+
 export interface PwaHandle {
   /** true se o jogo está rodando a partir do cache do SW. */
   offlineReady: boolean;
@@ -72,7 +74,7 @@ export function showUpdateToast(): void {
   const toast = document.createElement('div');
   toast.id = 'update-toast';
   toast.setAttribute('role', 'status');
-  toast.textContent = 'Atualização disponível — toque para recarregar';
+  toast.textContent = t('pwa.update');
   toast.addEventListener('click', () => location.reload());
 
   const style = document.createElement('style');

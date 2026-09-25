@@ -30,6 +30,8 @@
  * e `PAD_BINDINGS` diz **o que ele faz**. Remapear é uma linha na segunda.
  */
 
+import { t } from '../core/i18n';
+
 /**
  * Os botões de um controle, **pela posição**. Nenhum destes nomes carrega o
  * que o botão faz no jogo: `faceLeft` é o □ do DualSense e o X do Xbox, e o
@@ -269,7 +271,7 @@ export const GENERIC_PROFILE: PadProfile = {
     faceDown: 'A', faceRight: 'B', faceLeft: 'X', faceUp: 'Y',
     l1: 'LB', r1: 'RB', l2: 'LT', r2: 'RT',
     start: 'Start', select: 'Select',
-    family: 'Controle genérico',
+    family: t('pad.generic'),
   },
   match: /.^/,
 };

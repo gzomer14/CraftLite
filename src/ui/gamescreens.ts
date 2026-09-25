@@ -5,6 +5,7 @@
  * Saiu do `main.ts` em 2026-09-22 (M13).
  */
 
+import { t, tf } from '../core/i18n';
 import { professionOf } from '../data/villagers';
 import { itemDef, maxStackOf } from '../data/items';
 import { ContainerScreen } from './containers/screen';
@@ -68,7 +69,7 @@ export function createGameScreens(deps: GameScreensDeps): {
     tradeTitle: () => {
       const s = session();
       const i = s.villages.trader();
-      return i < 0 ? 'Aldeão' : `Aldeão — ${professionOf(s.mobs.store.variant[i]).display}`;
+      return i < 0 ? t('trade.villager') : tf('trade.villager_of', professionOf(s.mobs.store.variant[i]).display);
     },
     onFurnaceOutput: (furnace, item) => session().workbench.collectFurnaceXp(furnace, item),
     // Bigorna (M15).

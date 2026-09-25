@@ -9,6 +9,7 @@
  */
 
 import { STATS, formatStat } from '../../data/stats';
+import { t, tf } from '../../core/i18n';
 
 export interface CreditsData {
   /** Valor de cada estatística, na ordem de `STATS`. */
@@ -33,7 +34,7 @@ export class CreditsScreen {
     this.root.hidden = true;
     this.root.setAttribute('role', 'dialog');
     this.root.setAttribute('aria-modal', 'true');
-    this.root.setAttribute('aria-label', 'Créditos');
+    this.root.setAttribute('aria-label', t('credits.title'));
 
     this.roll = document.createElement('div');
     this.roll.className = 'roll';
@@ -42,7 +43,7 @@ export class CreditsScreen {
 
     this.closeButton = document.createElement('button');
     this.closeButton.type = 'button';
-    this.closeButton.textContent = 'Continuar';
+    this.closeButton.textContent = t('common.continue');
     this.closeButton.addEventListener('click', () => this.hide());
 
     this.root.append(this.roll, this.closeButton);
@@ -61,21 +62,21 @@ export class CreditsScreen {
       el.textContent = text;
       this.body.appendChild(el);
     };
-    line('FIM', 'big');
-    line('O dragão do End caiu.');
-    line('O mundo continua seu: a ilha, o Nether e tudo o que ainda não foi visto.');
-    line('A jornada', 'head');
-    line(`${data.days} ${data.days === 1 ? 'dia' : 'dias'} no mundo`);
+    line(t('credits.end'), 'big');
+    line(t('credits.dragon'));
+    line(t('credits.world'));
+    line(t('credits.journey'), 'head');
+    line(tf(data.days === 1 ? 'credits.day' : 'credits.days', data.days));
     for (let i = 0; i < STATS.length; i++) {
       const value = data.stats[i] ?? 0;
       if (value <= 0) continue;
       line(`${STATS[i].display}: ${formatStat(STATS[i].unit, value)}`);
     }
-    line(`Conquistas: ${data.achievements} de ${data.achievementTotal}`);
+    line(tf('credits.achievements', data.achievements, data.achievementTotal));
     line('CraftLite', 'head');
-    line('Um jogo de blocos em TypeScript e WebGL, sem nenhum arquivo de terceiros:');
-    line('cada textura, cada som, cada criatura e cada letra foi gerada por código.');
-    line('Obrigado por jogar.', 'head');
+    line(t('credits.about1'));
+    line(t('credits.about2'));
+    line(t('credits.thanks'), 'head');
     // Recomeça a subida do topo a cada abertura.
     this.roll.classList.remove('rolling');
     void this.roll.offsetWidth;

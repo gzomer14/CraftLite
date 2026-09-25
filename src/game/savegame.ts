@@ -267,6 +267,7 @@ export class SaveGame {
       names,
       xp: this.session.xp.total,
       achievements: this.session.achievements.mask,
+      guide: this.session.guide.stepsDone,
       effects: this.session.survival.effects.snapshot(),
       absorption: this.session.survival.absorption,
       bedSpawn: this.session.spawnY >= 0
@@ -301,6 +302,7 @@ export class SaveGame {
     this.session.inventory.select(saved.selected);
     this.session.xp.setTotal(saved.xp ?? 0);
     this.session.achievements.setMask(saved.achievements ?? 0);
+    this.session.guide.restore(saved.guide);
 
     for (let i = 0; i < INVENTORY_SIZE; i++) {
       const item = saved.inventory[i * 3] ?? 0;

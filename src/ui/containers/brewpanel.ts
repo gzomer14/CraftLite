@@ -7,6 +7,7 @@
  * sabe desenhar. Módulo à parte como a bigorna e a mesa.
  */
 
+import { tf } from '../../core/i18n';
 import type { BrewingStand } from '../../game/brewing';
 import { brewingHelp } from '../../game/stationhelp';
 import { BREWS_PER_FUEL } from '../../data/potions';
@@ -34,7 +35,7 @@ export class BrewPanel {
 
   refresh(stand: BrewingStand): void {
     this.bar.style.transform = `scaleX(${stand.progress.toFixed(3)})`;
-    this.fuel.textContent = `Combustível: ${stand.fuel} de ${BREWS_PER_FUEL} preparos`;
+    this.fuel.textContent = tf('brew.fuel', stand.fuel, BREWS_PER_FUEL);
     this.help.textContent = brewingHelp(stand);
   }
 }

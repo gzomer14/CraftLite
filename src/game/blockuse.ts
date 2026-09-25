@@ -19,6 +19,7 @@ import type { DayNight } from './daynight';
 import type { Survival } from './survival';
 import type { MobStore } from '../entity/mobstore';
 import type { World } from '../world/world';
+import { t } from '../core/i18n';
 
 const CAKE = BLOCK_BY_NAME.get('cake')?.id ?? -1;
 /** Uma fatia de bolo (doc 05 §4). */
@@ -65,7 +66,7 @@ export class BlockUse {
     }
     host.dayNight.setTimeOfDay(result.wakeTime);
     host.survival.health = Math.min(20, host.survival.health + 1);
-    host.message('Bom dia');
+    host.message(t('msg.good_morning'));
     host.sound('ui/sleep', x, y, z);
     host.achievements.event('sleep');
     return true;

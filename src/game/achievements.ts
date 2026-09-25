@@ -13,6 +13,7 @@
  * Os índices vão para o save: a tabela nunca reordena, só cresce.
  */
 
+import { TAGS } from '../data/recipes';
 import { ACHIEVEMENTS, type AchievementDef, type TriggerKind } from '../data/achievements';
 
 /** Quantas conquistas cabem numa máscara de 32 bits com segurança. */
@@ -47,9 +48,12 @@ export class Achievements {
     return total;
   }
 
-  /** Pegou um item — coleta, craft ou saída da fornalha. */
+  /** Pegou um item — coleta, craft ou saída da fornalha. Vale também pelas tags dele. */
   obtain(itemName: string): void {
     this.fire('obtain', itemName);
+    const tags = TAGS_OF.get(itemName);
+    if (tags === undefined) return;
+    for (const tag of tags) this.fire('obtain', tag);
   }
 
   /** Matou um mob. */
@@ -102,6 +106,19 @@ export class Achievements {
     if (def !== undefined) this.onUnlock?.(def);
   }
 }
+
+/** Item → as `#tag` em que ele está, para `obtain('birch_log')` valer por `#logs`. */
+const TAGS_OF: ReadonlyMap<string, readonly string[]> = (() => {
+  const out = new Map<string, string[]>();
+  for (const [tag, names] of Object.entries(TAGS)) {
+    for (const name of names) {
+      const list = out.get(name);
+      if (list === undefined) out.set(name, [`#${tag}`]);
+      else list.push(`#${tag}`);
+    }
+  }
+  return out;
+})();
 
 /** `"kind:target"` → ids, para o disparo ser uma consulta e não uma varredura. */
 function buildIndex(): Map<string, number[]> {

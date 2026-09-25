@@ -13,6 +13,7 @@
 import type { Settings, SettingsStore } from '../../game/settings';
 import { KEYBINDS, keyLabel, type ActionId } from '../../data/keybinds';
 import type { Keybinds } from '../../input/keybinds';
+import { t } from '../../core/i18n';
 
 /** Um campo de opção ligado a uma chave de `Settings`. */
 export type Field =
@@ -165,13 +166,13 @@ export function buildKeybinds(target: HTMLElement, keybinds: Keybinds): void {
   const refresh = (): void => {
     for (const [id, button] of buttons) {
       const conflicted = keybinds.conflicts(id).length > 0;
-      button.textContent = id === listening ? 'pressione…' : keyLabel(keybinds.codeFor(id));
+      button.textContent = id === listening ? t('menu.press_key') : keyLabel(keybinds.codeFor(id));
       button.classList.toggle('conflict', conflicted && id !== listening);
       button.classList.toggle('listening', id === listening);
       button.setAttribute(
         'aria-label',
         `${KEYBINDS.find((b) => b.id === id)?.label ?? id}: ${keyLabel(keybinds.codeFor(id))}`
-        + (conflicted ? ' (em conflito)' : ''),
+        + (conflicted ? t('menu.in_conflict') : ''),
       );
     }
   };
@@ -212,7 +213,7 @@ export function buildKeybinds(target: HTMLElement, keybinds: Keybinds): void {
     target.appendChild(row);
   }
 
-  const reset = menuButton('Restaurar teclas', () => { cancel(); keybinds.reset(); }, 'normal');
+  const reset = menuButton(t('menu.reset_keys'), () => { cancel(); keybinds.reset(); }, 'normal');
   target.appendChild(menuRow(reset));
 
   keybinds.onChange(refresh);

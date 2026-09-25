@@ -102,8 +102,15 @@ const chrome = spawn(chromeBin(), [
   '--headless=new', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
   `--remote-debugging-port=${PORTA_CDP}`, `--user-data-dir=${perfil}`,
   '--no-first-run', '--no-default-browser-check', '--window-size=1280,720',
-  '--autoplay-policy=no-user-gesture-required', url,
-], { stdio: 'ignore' });
+  '--autoplay-policy=no-user-gesture-required',
+  '--lang=pt-BR', url,
+  /*
+   * Os cliques acham os botões pelo texto em português, e o idioma do jogo
+   * segue o do navegador (M17): numa máquina em inglês ele abriria em inglês.
+   * No Linux, quem decide o `navigator.language` do Chrome é o `LANG` do
+   * ambiente — o `--lang` sozinho não basta.
+   */
+], { stdio: 'ignore', env: { ...process.env, LANG: 'pt_BR.UTF-8', LANGUAGE: 'pt_BR' } });
 
 let cdp;
 try {

@@ -6,6 +6,7 @@
  */
 
 import type { GlCaps } from '../render/gl';
+import { t } from './i18n';
 
 export type Tier = 0 | 1 | 2;
 
@@ -44,7 +45,7 @@ export interface Preset {
 const PRESETS: Record<Tier, Preset> = {
   0: {
     tier: 0,
-    label: 'Baixo',
+    label: t('tier.low'),
     renderDistance: 4,
     simulationDistance: 3,
     maxDpr: 1,
@@ -71,7 +72,7 @@ const PRESETS: Record<Tier, Preset> = {
   },
   1: {
     tier: 1,
-    label: 'Médio',
+    label: t('tier.medium'),
     renderDistance: 8,
     simulationDistance: 4,
     maxDpr: 1.5,
@@ -88,7 +89,7 @@ const PRESETS: Record<Tier, Preset> = {
   },
   2: {
     tier: 2,
-    label: 'Alto',
+    label: t('tier.high'),
     renderDistance: 12,
     simulationDistance: 6,
     maxDpr: 2,

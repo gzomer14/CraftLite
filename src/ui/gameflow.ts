@@ -5,6 +5,7 @@
  * Saiu do `main.ts` em 2026-09-22 (M13).
  */
 
+import { t } from '../core/i18n';
 import { PauseMenu } from './screens/pause';
 import type { Controls } from '../input/controls';
 import type { Player, GameMode } from '../entity/player';
@@ -107,7 +108,7 @@ export class GameFlow {
     if (this.mapScreen?.isOpen === true) { this.mapScreen.close(); return; }
     const { player, session, hud } = this.d;
     if (player.mode !== 'creative' && session.inventory.countOf(MAP_ITEM) === 0) {
-      hud.showMessage('Você precisa de um mapa (papel e bússola)', 60);
+      hud.showMessage(t('hud.need_map'), 60);
       return;
     }
     this.openMap();
@@ -155,7 +156,7 @@ export class GameFlow {
     if (creativeScreen.isOpen) creativeScreen.close();
     if (containerScreen.isOpen) session.workbench.closeScreen();
     this.applyGameMode();
-    hud.showMessage(next === 'creative' ? 'Modo Criativo' : 'Modo Sobrevivência', 60);
+    hud.showMessage(next === 'creative' ? t('hud.mode_creative') : t('hud.mode_survival'), 60);
     void this.d.saveAll();
   }
 
@@ -172,7 +173,7 @@ export class GameFlow {
     player.flying = true;
     player.vy = 0;
     this.applyGameMode();
-    hud.showMessage(on ? 'Espectador: atravessa blocos' : 'Espectador desligado', 60);
+    hud.showMessage(on ? t('hud.spectator_on') : t('hud.spectator_off'), 60);
   }
 
   /** Põe a interface de acordo com o modo atual. */

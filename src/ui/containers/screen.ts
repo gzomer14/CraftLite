@@ -8,6 +8,7 @@
  * reescritos (doc 08 §4.6: nada de layout thrash).
  */
 
+import { t } from '../../core/i18n';
 import { itemDef, type ItemStack } from '../../data/items';
 import { describeEnchants, type EnchantOffer } from '../../game/enchanting';
 import {
@@ -233,7 +234,7 @@ export class ContainerScreen {
     const bookToggle = document.createElement('button');
     bookToggle.type = 'button';
     bookToggle.className = 'book-toggle';
-    bookToggle.textContent = 'Receitas';
+    bookToggle.textContent = t('screen.recipes');
     bookToggle.addEventListener('click', () => {
       this.book?.toggle();
       this.syncBookLayout();
@@ -252,7 +253,7 @@ export class ContainerScreen {
     const closeButton = document.createElement('button');
     closeButton.type = 'button';
     closeButton.className = 'close';
-    closeButton.textContent = 'Fechar';
+    closeButton.textContent = t('common.close');
     closeButton.addEventListener('click', () => this.close());
     this.footer = document.createElement('div');
     this.footer.className = 'footer';
@@ -296,7 +297,7 @@ export class ContainerScreen {
      */
     const touchHint = document.createElement('div');
     touchHint.className = 'touch-hint';
-    touchHint.textContent = 'Toque longo num slot: pega metade · solta 1 de cada vez';
+    touchHint.textContent = t('screen.touch_hint');
     touchHint.hidden = !coarsePointer();
 
     this.panel.append(header, this.body, touchHint, this.footer);
@@ -381,10 +382,10 @@ export class ContainerScreen {
     this.column = this.sideColumn;
 
     const titles: Record<ScreenKind, string> = {
-      none: '', inventory: 'Inventário', crafting: 'Bancada',
-      furnace: 'Fornalha', chest: 'Baú', enchanting: 'Mesa de Encantamento', anvil: 'Bigorna',
-      brewing: 'Suporte de Preparo',
-      trading: this.callbacks.tradeTitle?.() ?? 'Aldeão',
+      none: '', inventory: t('touch.inventory'), crafting: t('screen.crafting'),
+      furnace: t('screen.furnace'), chest: t('screen.chest'), enchanting: t('screen.enchanting'),
+      anvil: t('screen.anvil'), brewing: t('screen.brewing'),
+      trading: this.callbacks.tradeTitle?.() ?? t('trade.villager'),
     };
     this.title.textContent = titles[this.kind];
 
@@ -398,26 +399,26 @@ export class ContainerScreen {
        * peça: sem ícone fantasma, é o que diz ao jogador o que vai ali.
        */
       this.addSection(
-        'Equipamento', 5,
+        t('screen.equipment'), 5,
         [ARMOR_START, ARMOR_START + 1, ARMOR_START + 2, ARMOR_START + 3, OFFHAND],
         'inv', undefined,
-        ['Elmo', 'Peito', 'Calça', 'Bota', 'Mão'],
+        [t('screen.helmet'), t('screen.chest_armor'), t('screen.legs'), t('screen.boots'), t('screen.offhand')],
       );
       this.addPaperDoll();
-      this.addSection('Criação', 2, [CRAFT_START, CRAFT_START + 1, CRAFT_START + 2, CRAFT_START + 3], 'inv');
+      this.addSection(t('screen.crafting_grid'), 2, [CRAFT_START, CRAFT_START + 1, CRAFT_START + 2, CRAFT_START + 3], 'inv');
       this.addResultSlot();
     } else if (this.kind === 'crafting') {
       const indices: number[] = [];
       for (let i = 0; i < 9; i++) indices.push(i);
-      this.addSection('Criação', 3, indices, 'cont');
+      this.addSection(t('screen.crafting_grid'), 3, indices, 'cont');
       this.addResultSlot();
     } else if (this.kind === 'furnace') {
-      this.addSection('Fornalha', 1, [0], 'cont', 'Entrada');
-      this.addSection('', 1, [1], 'cont', 'Combustível');
-      this.addSection('', 1, [2], 'cont', 'Saída');
+      this.addSection(t('screen.furnace'), 1, [0], 'cont', t('screen.input'));
+      this.addSection('', 1, [1], 'cont', t('screen.fuel'));
+      this.addSection('', 1, [2], 'cont', t('screen.output'));
       this.addFurnaceProgress();
     } else if (this.kind === 'enchanting') {
-      this.addStation([[ENCHANT_ITEM, 'Item'], [ENCHANT_LAPIS, 'Lápis']]);
+      this.addStation([[ENCHANT_ITEM, t('screen.slot_item')], [ENCHANT_LAPIS, t('screen.slot_lapis')]]);
       this.enchantPanel ??= new EnchantPanel({
         offers: () => this.callbacks.enchantOffers?.() ?? [],
         status: () => this.callbacks.enchantStatus?.()
@@ -444,17 +445,20 @@ export class ContainerScreen {
       this.trades.reset();
       this.column.appendChild(this.trades.element);
     } else if (this.kind === 'anvil') {
-      this.addStation([[0, 'Item'], '+', [1, 'Material'], '→', [2, 'Resultado']]);
+      this.addStation([
+        [0, t('screen.slot_item')], '+', [1, t('screen.slot_material')], '→', [2, t('screen.slot_result')],
+      ]);
       this.anvilPanel ??= new AnvilPanel({
         onName: (name) => { this.callbacks.onAnvilChange?.(name); this.refresh(); },
       });
       this.anvilPanel.reset();
       this.column.appendChild(this.anvilPanel.element);
     } else if (this.kind === 'brewing') {
-      this.addStation([[BREW_INGREDIENT, 'Ingrediente'], [BREW_FUEL, 'Combustível']]);
+      this.addStation([[BREW_INGREDIENT, t('screen.slot_ingredient')], [BREW_FUEL, t('screen.fuel')]]);
       this.brewPanel ??= new BrewPanel();
       this.column.appendChild(this.brewPanel.element);
-      this.addStation([[0, 'Frasco'], [1, 'Frasco'], [2, 'Frasco']]);
+      const bottle = t('screen.slot_bottle');
+      this.addStation([[0, bottle], [1, bottle], [2, bottle]]);
     } else if (this.kind === 'chest') {
       // Baú, e desde o M15 também funil, dispensador e liberador: a mesma
       // grade, com a largura e o título do contêiner.
@@ -462,8 +466,8 @@ export class ContainerScreen {
       const indices: number[] = [];
       for (let i = 0; i < size; i++) indices.push(i);
       const kind = this.container?.kind;
-      const title = kind === 'hopper' ? 'Funil' : kind === 'dispenser' ? 'Dispensador'
-        : kind === 'dropper' ? 'Liberador' : size > 27 ? 'Baú Duplo' : 'Baú';
+      const title = kind === 'hopper' ? t('screen.hopper') : kind === 'dispenser' ? t('screen.dispenser')
+        : kind === 'dropper' ? t('screen.dropper') : size > 27 ? t('screen.double_chest') : t('screen.chest');
       const columns = kind === 'hopper' ? 5 : kind === 'dispenser' || kind === 'dropper' ? 3 : 9;
       this.addSection(title, columns, indices, 'cont');
     }
@@ -472,7 +476,7 @@ export class ContainerScreen {
     this.column = this.mainColumn;
     const main: number[] = [];
     for (let i = MAIN_START; i < MAIN_END; i++) main.push(i);
-    this.addSection('Inventário', 9, main, 'inv');
+    this.addSection(t('touch.inventory'), 9, main, 'inv');
 
     const hotbar: number[] = [];
     for (let i = HOTBAR_START; i < HOTBAR_END; i++) hotbar.push(i);
@@ -615,7 +619,7 @@ export class ContainerScreen {
     // Rótulo inicial: `renderSlot` sai cedo quando a chave não mudou, e para um
     // slot que nasce vazio a chave inicial já é a final — sem isto o leitor de
     // tela encontraria um botão sem nome.
-    el.setAttribute('aria-label', placeholder ?? 'Vazio');
+    el.setAttribute('aria-label', placeholder ?? t('screen.empty'));
 
     const label = document.createElement('span');
     if (placeholder !== undefined) {
@@ -873,7 +877,7 @@ export class ContainerScreen {
       view.el.classList.toggle('ghost', view.placeholder !== undefined);
       view.el.style.removeProperty('--item-color');
       view.el.style.removeProperty('background-position');
-      view.el.setAttribute('aria-label', view.placeholder ?? 'Vazio');
+      view.el.setAttribute('aria-label', view.placeholder ?? t('screen.empty'));
       return;
     }
     view.el.classList.remove('ghost');

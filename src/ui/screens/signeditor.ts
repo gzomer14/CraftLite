@@ -26,6 +26,7 @@ import {
   SIGN_COLUMNS, SIGN_LINES, signTextToInput, wrapSignText,
 } from '../../game/signs';
 import { menuButton, menuPanel, menuRoot, menuRow } from './menu';
+import { t, tf } from '../../core/i18n';
 
 /** Teto do que se aceita digitar: quatro linhas cheias, com folga para espaços. */
 const MAX_INPUT = SIGN_LINES * SIGN_COLUMNS * 2;
@@ -54,7 +55,7 @@ export class SignEditor {
     this.callbacks = callbacks;
     injectStyle();
     this.root = menuRoot('sign-editor');
-    const { panel, body } = menuPanel('Escrever na Placa');
+    const { panel, body } = menuPanel(t('sign.title'));
 
     this.input = document.createElement('textarea');
     this.input.className = 'sign-input';
@@ -62,7 +63,7 @@ export class SignEditor {
     this.input.maxLength = MAX_INPUT;
     this.input.autocomplete = 'off';
     this.input.spellcheck = false;
-    this.input.setAttribute('aria-label', 'Texto da placa');
+    this.input.setAttribute('aria-label', t('sign.aria'));
     this.input.addEventListener('input', () => this.refresh());
     // Ctrl+Enter confirma: `Enter` sozinho é quebra de linha, que é o ponto
     // de ter um campo só.
@@ -84,18 +85,17 @@ export class SignEditor {
 
     const hint = document.createElement('p');
     hint.className = 'menu-hint';
-    hint.textContent = `${SIGN_LINES} linhas de até ${SIGN_COLUMNS} letras, `
-      + 'em maiúsculas. Enter quebra a linha; o resto desce sozinho.';
+    hint.textContent = tf('sign.hint', SIGN_LINES, SIGN_COLUMNS);
 
     this.overflow = document.createElement('p');
     this.overflow.className = 'menu-hint sign-overflow';
     this.overflow.hidden = true;
-    this.overflow.textContent = 'O que passou das quatro linhas não vai caber.';
+    this.overflow.textContent = t('sign.overflow');
 
     body.append(this.input, hint, this.preview, this.overflow);
     body.append(menuRow(
-      menuButton('Pronto', () => this.confirm(), 'primary'),
-      menuButton('Cancelar', () => this.close()),
+      menuButton(t('common.done'), () => this.confirm(), 'primary'),
+      menuButton(t('common.cancel'), () => this.close()),
     ));
 
     this.root.append(panel);

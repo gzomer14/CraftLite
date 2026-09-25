@@ -10,6 +10,7 @@
  * É a mesma escolha de `input/keyboard.ts`, e é por isso que o rótulo mostrado
  * ao jogador passa por `keyLabel`.
  */
+import { t, tf } from '../core/i18n';
 
 export type ActionId =
   | 'forward' | 'back' | 'left' | 'right'
@@ -33,18 +34,18 @@ export interface KeybindDef {
  * qualquer outra coisa que alguém pusesse ali.
  */
 export const KEYBINDS: readonly KeybindDef[] = [
-  { id: 'forward', label: 'Andar para frente', code: 'KeyW' },
-  { id: 'back', label: 'Andar para trás', code: 'KeyS' },
-  { id: 'left', label: 'Andar para a esquerda', code: 'KeyA' },
-  { id: 'right', label: 'Andar para a direita', code: 'KeyD' },
-  { id: 'jump', label: 'Pular', code: 'Space' },
-  { id: 'sneak', label: 'Agachar', code: 'ShiftLeft' },
-  { id: 'sprint', label: 'Correr', code: 'ControlLeft' },
-  { id: 'inventory', label: 'Inventário', code: 'KeyE' },
-  { id: 'drop', label: 'Largar item', code: 'KeyQ' },
-  { id: 'debug', label: 'Tela de depuração', code: 'F3' },
+  { id: 'forward', label: t('key.forward'), code: 'KeyW' },
+  { id: 'back', label: t('key.back'), code: 'KeyS' },
+  { id: 'left', label: t('key.left_move'), code: 'KeyA' },
+  { id: 'right', label: t('key.right_move'), code: 'KeyD' },
+  { id: 'jump', label: t('touch.jump'), code: 'Space' },
+  { id: 'sneak', label: t('touch.sneak'), code: 'ShiftLeft' },
+  { id: 'sprint', label: t('key.sprint'), code: 'ControlLeft' },
+  { id: 'inventory', label: t('touch.inventory'), code: 'KeyE' },
+  { id: 'drop', label: t('key.drop'), code: 'KeyQ' },
+  { id: 'debug', label: t('key.debug'), code: 'F3' },
   // M10: o mapa explorado (precisa de um mapa no inventário, ou do Criativo).
-  { id: 'map', label: 'Mapa', code: 'KeyM' },
+  { id: 'map', label: t('map.title'), code: 'KeyM' },
 ];
 
 /** Teclas que nenhuma ação pode tomar: elas são a saída de toda tela. */
@@ -65,10 +66,10 @@ export function keyLabel(code: string): string {
   if (code.startsWith('Digit')) return code.slice(5);
   if (code.startsWith('Numpad')) return `Num ${code.slice(6)}`;
   const named: Record<string, string> = {
-    Space: 'Espaço',
-    ShiftLeft: 'Shift esq.', ShiftRight: 'Shift dir.',
-    ControlLeft: 'Ctrl esq.', ControlRight: 'Ctrl dir.',
-    AltLeft: 'Alt esq.', AltRight: 'Alt dir.',
+    Space: t('key.space'),
+    ShiftLeft: tf('key.left', 'Shift'), ShiftRight: tf('key.right', 'Shift'),
+    ControlLeft: tf('key.left', 'Ctrl'), ControlRight: tf('key.right', 'Ctrl'),
+    AltLeft: tf('key.left', 'Alt'), AltRight: tf('key.right', 'Alt'),
     ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→',
     Enter: 'Enter', Backspace: 'Backspace', CapsLock: 'Caps Lock',
     Backquote: '`', Minus: '−', Equal: '=', BracketLeft: '[', BracketRight: ']',

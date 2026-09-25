@@ -6,6 +6,7 @@
  * conquistas. Quem conta é `game/stats.ts`, chamado pelos mesmos pontos que
  * avisam as conquistas.
  */
+import { decimal, htmlLang } from '../core/i18n';
 
 /** Como o número aparece: contagem, metros (blocos) ou tempo (ticks). */
 export type StatUnit = 'count' | 'distance' | 'time';
@@ -42,7 +43,7 @@ export const STAT_INDEX: ReadonlyMap<string, number> = new Map(STATS.map((s, i) 
 /** O valor como a tela mostra: "1 234", "5,2 km", "3 h 12 min". */
 export function formatStat(unit: StatUnit, value: number): string {
   if (unit === 'distance') {
-    if (value >= 1000) return `${(value / 1000).toFixed(1).replace('.', ',')} km`;
+    if (value >= 1000) return `${decimal(value / 1000, 1)} km`;
     return `${Math.floor(value)} m`;
   }
   if (unit === 'time') {
@@ -50,5 +51,5 @@ export function formatStat(unit: StatUnit, value: number): string {
     const hours = Math.floor(minutes / 60);
     return hours > 0 ? `${hours} h ${minutes % 60} min` : `${minutes} min`;
   }
-  return Math.floor(value).toLocaleString('pt-BR');
+  return Math.floor(value).toLocaleString(htmlLang());
 }

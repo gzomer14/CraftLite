@@ -22,6 +22,7 @@ import { WorldsScreen } from './screens/worlds';
 import type { SettingsStore } from '../game/settings';
 import type { Keybinds } from '../input/keybinds';
 import type { Gamepads } from '../input/gamepad';
+import { t } from '../core/i18n';
 
 export interface MenuFlowCallbacks {
   /** Chamado quando o jogador escolhe um mundo para jogar. */
@@ -130,7 +131,7 @@ export class MenuFlow {
    * inventar convenção nova.
    */
   private async installPack(file: File): Promise<PackSummary> {
-    if (this.db === null) throw new Error('Sem armazenamento: não dá para guardar o pacote.');
+    if (this.db === null) throw new Error(t('store.no_pack'));
     const bytes = new Uint8Array(await file.arrayBuffer());
     const name = file.name.replace(/\.zip$/i, '');
     const { pack, ignored } = await readPack(name, bytes, decodeImage);
@@ -155,7 +156,7 @@ export class MenuFlow {
    * o arquivo inteiro fica preso na memória da aba.
    */
   private async exportWorld(meta: WorldMeta): Promise<void> {
-    if (this.db === null) throw new Error('Sem armazenamento: não há o que exportar.');
+    if (this.db === null) throw new Error(t('store.no_export'));
     const bytes = await exportWorld(this.db, meta.id);
     const blob = new Blob([bytes as BlobPart], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
@@ -170,7 +171,7 @@ export class MenuFlow {
 
   /** Lê o arquivo escolhido e cria o mundo. Devolve o nome que ele ganhou. */
   private async importWorld(file: File): Promise<string> {
-    if (this.db === null) throw new Error('Sem armazenamento: não dá para importar.');
+    if (this.db === null) throw new Error(t('store.no_import'));
     const bytes = new Uint8Array(await file.arrayBuffer());
     const meta = await importWorld(this.db, bytes);
     return meta.name;
@@ -220,7 +221,7 @@ export function newWorldMeta(
 ): WorldMeta {
   return {
     id: newWorldId(),
-    name: name.trim() === '' ? 'Novo Mundo' : name.trim(),
+    name: name.trim() === '' ? t('worlds.new_world') : name.trim(),
     seed,
     seedHash: seedFromString(seed),
     version: 1,

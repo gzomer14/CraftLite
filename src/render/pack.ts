@@ -36,6 +36,7 @@
  * invalidação inteiro para um botão que se aperta uma vez por mês.
  */
 
+import { t, tf } from '../core/i18n';
 import { SOUNDS as SOUND_RECIPES } from '../audio/synth';
 import { TEXTURES } from '../data/textures';
 import { ITEM_BY_NAME } from '../data/items';
@@ -129,9 +130,7 @@ export async function readPack(
       }
       soundBytes += data.length;
       if (soundBytes > MAX_SOUND_BYTES) {
-        throw new PackError(
-          `Pack com som demais: mais de ${Math.round(MAX_SOUND_BYTES / 1024)} KB de áudio.`,
-        );
+        throw new PackError(tf('pack.too_much_sound', Math.round(MAX_SOUND_BYTES / 1024)));
       }
       sounds.set(canonical.slice(6), data);
       continue;
@@ -143,7 +142,7 @@ export async function readPack(
       continue;
     }
     if (textures.size >= MAX_IMAGES) {
-      throw new PackError(`Pack grande demais: mais de ${MAX_IMAGES} imagens.`);
+      throw new PackError(tf('pack.too_many', MAX_IMAGES));
     }
     let image: PackImage;
     try {
@@ -156,7 +155,7 @@ export async function readPack(
   }
 
   if (textures.size === 0 && sounds.size === 0) {
-    throw new PackError('Nada reconhecido no arquivo. Veja a convenção de nomes.');
+    throw new PackError(t('pack.nothing'));
   }
   return { pack: { name, importedAt: Date.now(), textures, sounds }, ignored };
 }
@@ -324,7 +323,7 @@ export async function decodeImage(bytes: Uint8Array): Promise<PackImage> {
   canvas.width = source.width;
   canvas.height = source.height;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  if (ctx === null) throw new PackError('Sem canvas 2D para ler as imagens.');
+  if (ctx === null) throw new PackError(t('pack.no_canvas'));
   ctx.drawImage(source as CanvasImageSource, 0, 0);
   const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
   if ('close' in source) source.close();
@@ -341,7 +340,7 @@ function toDrawable(blob: Blob): Promise<Drawable> {
     const url = URL.createObjectURL(blob);
     const img = new Image();
     img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new PackError('PNG inválido.')); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new PackError(t('pack.bad_png'))); };
     img.src = url;
   });
 }

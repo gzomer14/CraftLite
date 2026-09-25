@@ -20,6 +20,7 @@ import {
 import { menuButton, menuPanel, menuRoot, menuRow } from './menu';
 import type { Journal } from '../../game/journal';
 import type { Player } from '../../entity/player';
+import { t, tf } from '../../core/i18n';
 
 export interface MapScreenDeps {
   journal: Journal;
@@ -69,7 +70,7 @@ export class MapScreen {
     this.d = deps;
     injectStyle();
     this.root = menuRoot('map-screen');
-    const { panel, body } = menuPanel('Mapa');
+    const { panel, body } = menuPanel(t('map.title'));
     panel.classList.add('map-panel');
 
     this.canvas = document.createElement('canvas');
@@ -77,7 +78,7 @@ export class MapScreen {
     this.canvas.height = MAP_VIEW;
     this.canvas.className = 'map-canvas';
     this.canvas.setAttribute('role', 'img');
-    this.canvas.setAttribute('aria-label', 'Mapa do que já foi explorado');
+    this.canvas.setAttribute('aria-label', t('map.aria'));
     this.context = this.canvas.getContext('2d');
     this.image = this.context?.createImageData(MAP_VIEW, MAP_VIEW) ?? null;
     this.bindPointer();
@@ -87,13 +88,13 @@ export class MapScreen {
     this.notice = document.createElement('p');
     this.notice.className = 'menu-hint';
     this.notice.hidden = true;
-    this.notice.textContent = 'O mapa não funciona aqui: não há céu para se orientar.';
+    this.notice.textContent = t('map.no_sky');
 
-    this.addButton = menuButton('Marcar aqui', () => this.markHere(), 'primary');
+    this.addButton = menuButton(t('map.mark_here'), () => this.markHere(), 'primary');
     const tools = menuRow(
       menuButton('−', () => this.zoom(-1)),
       menuButton('+', () => this.zoom(1)),
-      menuButton('Centralizar', () => { this.following = true; this.redraw(); }),
+      menuButton(t('map.center'), () => { this.following = true; this.redraw(); }),
       this.addButton,
     );
     tools.classList.add('map-tools');
@@ -103,10 +104,10 @@ export class MapScreen {
 
     const hint = document.createElement('p');
     hint.className = 'menu-hint';
-    hint.textContent = 'Arraste para mover. Toque duas vezes num ponto para marcá-lo.';
+    hint.textContent = t('map.hint');
 
     body.append(this.canvas, this.coords, this.notice, tools, hint, this.list,
-      menuRow(menuButton('Fechar', () => this.close())));
+      menuRow(menuButton(t('common.close'), () => this.close())));
     this.root.append(panel);
     this.root.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') { event.preventDefault(); this.close(); }
@@ -250,7 +251,7 @@ export class MapScreen {
     if (markers.list.length === 0) {
       const empty = document.createElement('p');
       empty.className = 'menu-hint';
-      empty.textContent = 'Nenhum marcador ainda.';
+      empty.textContent = t('map.no_markers');
       this.list.append(empty);
       return;
     }
@@ -269,7 +270,7 @@ export class MapScreen {
     name.type = 'text';
     name.value = marker.name;
     name.maxLength = MARKER_NAME_MAX;
-    name.setAttribute('aria-label', 'Nome do marcador');
+    name.setAttribute('aria-label', t('map.marker_name'));
     name.addEventListener('change', () => {
       this.d.journal.markers.rename(marker.id, name.value);
       this.listVersion = this.d.journal.markers.version;
@@ -280,7 +281,7 @@ export class MapScreen {
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.textContent = '×';
-    remove.setAttribute('aria-label', `Apagar ${marker.name}`);
+    remove.setAttribute('aria-label', tf('map.delete_marker', marker.name));
     remove.addEventListener('click', () => {
       this.d.journal.markers.remove(marker.id);
       this.redraw();
@@ -299,7 +300,7 @@ export class MapScreen {
       const where = row.querySelector<HTMLSpanElement>('.where');
       if (marker === undefined || where === null) return;
       if (marker.dimension !== dimension) {
-        where.textContent = 'outra dimensão';
+        where.textContent = t('map.other_dimension');
         return;
       }
       const distance = Math.round(Math.hypot(marker.x + 0.5 - p.x, marker.z + 0.5 - p.z));

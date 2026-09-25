@@ -8,6 +8,8 @@
  * chama agenda pelo `SaveManager`.
  */
 
+import { t } from '../core/i18n';
+
 export const DB_NAME = 'craftlite';
 export const DB_VERSION = 1;
 
@@ -96,6 +98,12 @@ export interface PlayerSave {
   /** Conquistas como máscara de bits (doc 08 §3.4). Ausente = nenhuma. */
   achievements?: number;
   /**
+   * Passos feitos da primeira hora guiada (M17, `game/guide.ts`). Ausente =
+   * nenhum; num save antigo o primeiro segundo de jogo avança o que o
+   * inventário e as conquistas já cumprem.
+   */
+  guide?: number;
+  /**
    * Efeitos ativos como triplas `[id, nível, ticks]`, e a vida extra da
    * Absorção (2026-09-22). Ausentes = nenhum, que é o que todo save anterior
    * significa.
@@ -141,7 +149,7 @@ export class SaveDatabase {
 
     this.opening = new Promise<IDBDatabase>((resolve, reject) => {
       if (!isAvailable()) {
-        reject(new Error('IndexedDB indisponível neste navegador.'));
+        reject(new Error(t('db.unavailable')));
         return;
       }
       const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -172,7 +180,7 @@ export class SaveDatabase {
         this.db.onversionchange = () => this.close();
         resolve(this.db);
       };
-      request.onerror = () => reject(request.error ?? new Error('Falha ao abrir o banco.'));
+      request.onerror = () => reject(request.error ?? new Error(t('db.open_failed')));
     });
 
     return this.opening;
@@ -375,7 +383,7 @@ function sumByteLength(store: IDBObjectStore, prefix: string): Promise<number> {
       else if (ArrayBuffer.isView(value)) total += value.byteLength;
       cursor.continue();
     };
-    request.onerror = () => reject(request.error ?? new Error('Erro ao medir o mundo.'));
+    request.onerror = () => reject(request.error ?? new Error(t('db.measure_failed')));
   });
 }
 
@@ -388,15 +396,15 @@ function deleteByPrefix(store: IDBObjectStore, prefix: string): void {
 function wrap<T>(request: IDBRequest): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     request.onsuccess = () => resolve(request.result as T);
-    request.onerror = () => reject(request.error ?? new Error('Erro no IndexedDB.'));
+    request.onerror = () => reject(request.error ?? new Error(t('db.error')));
   });
 }
 
 function done(tx: IDBTransaction): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error ?? new Error('Transação falhou.'));
-    tx.onabort = () => reject(tx.error ?? new Error('Transação abortada.'));
+    tx.onerror = () => reject(tx.error ?? new Error(t('db.tx_failed')));
+    tx.onabort = () => reject(tx.error ?? new Error(t('db.tx_aborted')));
   });
 }
 

@@ -232,3 +232,18 @@ describe('opções de controle', () => {
     expect(new SettingsStore().get('padProfile')).toBe('dualsense');
   });
 });
+
+describe('idioma e dicas (M17)', () => {
+  it('o padrão é seguir o aparelho, com as dicas da primeira hora ligadas', () => {
+    const s = new SettingsStore();
+    expect(s.get('language')).toBe('auto');
+    expect(s.get('guide')).toBe(true);
+  });
+
+  it('idioma escolhido sobrevive; idioma que o jogo não tem é descartado', () => {
+    store['craftlite.settings.v1'] = JSON.stringify({ language: 'en' });
+    expect(new SettingsStore().get('language')).toBe('en');
+    store['craftlite.settings.v1'] = JSON.stringify({ language: 'fr' });
+    expect(new SettingsStore().get('language')).toBe('auto');
+  });
+});

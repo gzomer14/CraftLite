@@ -2,6 +2,7 @@
  * A tela de carregamento do boot: barra de progresso, sumir e mostrar o erro
  * quando o jogo não consegue subir. Saiu do `main.ts` em 2026-09-22 (M13).
  */
+import { t } from '../core/i18n';
 
 export function progress(value: number, message: string): void {
   const bar = document.getElementById('boot-bar');
@@ -24,7 +25,7 @@ export function fail(error: unknown): void {
     boot.classList.remove('hidden');
     boot.innerHTML = '';
     const h = document.createElement('h1');
-    h.textContent = 'Não foi possível iniciar';
+    h.textContent = t('boot.failed');
     const p = document.createElement('p');
     p.textContent = msg;
     boot.append(h, p);

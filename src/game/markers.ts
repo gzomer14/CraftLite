@@ -10,6 +10,7 @@
  * Vão no registro do jogador (`PlayerSave.markers`): são do jogador, não do
  * mundo, e assim viajam também no arquivo exportado.
  */
+import { t, tf } from '../core/i18n';
 
 /** Teto: uma borda de tela com mais que isto é ruído, não navegação. */
 export const MAX_MARKERS = 24;
@@ -47,7 +48,7 @@ export class Markers {
     if (users >= MAX_MARKERS) return null;
     const marker: Marker = {
       id: this.nextId++,
-      name: cleanName(name) || `Marcador ${users + 1}`,
+      name: cleanName(name) || tf('marker.numbered', users + 1),
       x: Math.floor(x), y: Math.floor(y), z: Math.floor(z), dimension,
       color: MARKER_COLORS[users % MARKER_COLORS.length],
       kind: 'user',
@@ -77,7 +78,7 @@ export class Markers {
     const old = this.list.findIndex((m) => m.kind === 'death');
     if (old >= 0) this.list.splice(old, 1);
     this.list.push({
-      id: this.nextId++, name: 'Última morte',
+      id: this.nextId++, name: t('marker.last_death'),
       x: Math.floor(x), y: Math.floor(y), z: Math.floor(z), dimension,
       color: DEATH_COLOR, kind: 'death',
     });
@@ -97,7 +98,7 @@ export class Markers {
       const kind: MarkerKind = m.kind === 'death' ? 'death' : 'user';
       this.list.push({
         id: this.nextId++,
-        name: cleanName(m.name) || 'Marcador',
+        name: cleanName(m.name) || t('marker.default'),
         x: m.x, y: typeof m.y === 'number' ? m.y : 64, z: m.z,
         dimension: typeof m.dimension === 'number' ? m.dimension : 0,
         color: typeof m.color === 'string' ? m.color : kind === 'death' ? DEATH_COLOR : MARKER_COLORS[0],

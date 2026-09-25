@@ -7,8 +7,9 @@
  */
 
 import type { TextureStyleId } from '../data/texturestyle';
+import type { LangSetting } from '../core/i18n';
 
-const STORAGE_KEY = 'craftlite.settings.v1';
+export const STORAGE_KEY = 'craftlite.settings.v1';
 
 /**
  * Modo de interação por toque (doc 09 §2.2).
@@ -177,6 +178,14 @@ export interface Settings {
   hideSkyFlashes: boolean;
   /** Intensidade dos efeitos de distorção de câmera, 0–100 (doc 08 §6). */
   distortion: number;
+  /**
+   * Idioma (doc 08 §3.11, M17). `auto` segue o aparelho. Vale no próximo
+   * carregamento: quem lê esta chave é `core/i18n.ts`, direto do
+   * `localStorage`, antes de este store existir.
+   */
+  language: LangSetting;
+  /** Dicas da primeira hora (M17, `game/guide.ts`); desligável. */
+  guide: boolean;
 }
 
 const DEFAULTS: Settings = {
@@ -231,6 +240,8 @@ const DEFAULTS: Settings = {
   highContrastOutline: false,
   hideSkyFlashes: false,
   distortion: 100,
+  language: 'auto',
+  guide: true,
 };
 
 /**
@@ -249,6 +260,7 @@ const CHOICES: Partial<Record<keyof Settings, readonly string[]>> = {
   fog: ['off', 'near', 'far'],
   colorBlind: ['off', 'protanopia', 'deuteranopia', 'tritanopia'],
   padProfile: ['auto', 'dualsense', 'dualshock4', 'xbox', 'switch', 'generic'],
+  language: ['auto', 'pt', 'en'],
 };
 
 /**

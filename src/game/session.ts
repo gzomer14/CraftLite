@@ -5,6 +5,7 @@
  * que o loop de sobrevivência inteiro possa ser testado sem GL nem DOM.
  */
 
+import { Guide } from './guide';
 import { Journal } from './journal';
 import { freeStandY } from './spawnplacement';
 import { AIR, BLOCK_BY_NAME, blockIdOf, defOf } from '../data/blocks';
@@ -60,6 +61,7 @@ import { DIM_OVERWORLD, dimensionOf } from '../data/dimensions';
 import { Lighting } from '../world/lighting';
 import { WORLD_HEIGHT, type ChunkColumn } from '../world/chunk';
 import type { World } from '../world/world';
+import { t } from '../core/i18n';
 
 /** A vara de pesca (M14): a linha só vive com ela na mão. */
 const FISHING_ROD = ITEM_BY_NAME.get('fishing_rod')?.id ?? -1;
@@ -127,6 +129,8 @@ export class Session {
   readonly dayNight = new DayNight();
   readonly weather = new Weather();
   readonly achievements = new Achievements();
+  /** A primeira hora guiada (M17); a frase vai para o HUD por `ui/objectiveline.ts`. */
+  readonly guide = new Guide();
   readonly lighting: Lighting;
   readonly fluids: Fluids;
   readonly growth: Growth;
@@ -306,7 +310,7 @@ export class Session {
     this.weather.hasSky = dimensionOf(world.dimension).hasSky;
     this.weather.onChange = (kind) => {
       if (kind === 'thunder') this.events.onMessage?.('A tempestade chegou');
-      else if (kind === 'rain') this.events.onMessage?.('Começou a chover');
+      else if (kind === 'rain') this.events.onMessage?.(t('msg.rain'));
     };
 
     this.itemUser = new ItemUser({
@@ -545,7 +549,7 @@ export class Session {
     const tame = this.mobs.tryTame(index, name);
     if (tame !== 'none') {
       if (this.player.mode === 'survival') this.inventory.consumeHeld();
-      this.events.onMessage?.(tame === 'tamed' ? 'Domado!' : 'Não foi dessa vez');
+      this.events.onMessage?.(tame === 'tamed' ? t('msg.tamed') : t('msg.not_tamed'));
       return true;
     }
 
@@ -562,7 +566,7 @@ export class Session {
   private talkTo(index: number): boolean {
     const store = this.mobs.store;
     if (this.villages.isBanned(index)) {
-      this.events.onMessage?.('O aldeão não quer negociar com você');
+      this.events.onMessage?.(t('msg.no_trade'));
       this.events.onSound?.('mob/villager_hurt', store.x[index], store.centerY(index), store.z[index]);
       return true;
     }

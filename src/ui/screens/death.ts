@@ -6,6 +6,8 @@
  * de voltar ao jogo.
  */
 
+import { t } from '../../core/i18n';
+
 export interface DeathScreenCallbacks {
   onRespawn: () => void;
   onQuit: () => void;
@@ -25,12 +27,12 @@ export class DeathScreen {
     this.root.setAttribute('aria-modal', 'true');
 
     const title = document.createElement('h1');
-    title.textContent = 'Você morreu!';
+    title.textContent = t('death.title');
 
     this.message = document.createElement('p');
 
-    this.respawnButton = button('Reaparecer', callbacks.onRespawn);
-    const quit = button('Sair do Mundo', callbacks.onQuit);
+    this.respawnButton = button(t('death.respawn'), callbacks.onRespawn);
+    const quit = button(t('death.quit'), callbacks.onQuit);
 
     const actions = document.createElement('div');
     actions.className = 'actions';

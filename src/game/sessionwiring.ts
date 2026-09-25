@@ -8,6 +8,7 @@
  * montou, e nenhuma guarda estado.
  */
 
+import { tf } from '../core/i18n';
 import { MOB_BY_NAME, type ShotKind } from '../data/mobs';
 import { ITEM_BY_NAME, itemDef } from '../data/items';
 import { EFFECT_BY_NAME } from '../data/effects';
@@ -100,7 +101,7 @@ export function wireInventory(
   s.xp.onLevelUp = (level) => {
     s.achievements.level(level);
     events.onSound?.('player/levelup', s.player.x, s.player.y, s.player.z);
-    events.onMessage?.(`Nível ${level}`);
+    events.onMessage?.(tf('hud.level', level));
   };
 }
 

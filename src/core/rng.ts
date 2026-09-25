@@ -6,6 +6,8 @@
  * seed precisa produzir o mesmo mundo sempre.
  */
 
+import { parseSeedCode } from './seedcode';
+
 /** Estado de 128 bits guardado como 4 lanes de 32 bits (evita BigInt, que é lento). */
 export class Rng {
   private s0 = 0;
@@ -100,10 +102,17 @@ export function rngAt(seed: number, x: number, z: number, salt = 0): Rng {
   return new Rng(hash2(seed, x, z, salt), salt);
 }
 
-/** Converte uma seed digitada pelo jogador em uint32 estável. */
+/**
+ * Converte uma seed digitada pelo jogador em uint32 estável.
+ *
+ * Um código curto (`core/seedcode.ts`, M17) vale pelo número que ele guarda:
+ * é assim que o mundo de quem compartilhou chega igual em outro aparelho.
+ */
 export function seedFromString(text: string): number {
   const trimmed = text.trim();
   if (trimmed === '') return (Math.random() * 4294967296) >>> 0;
+  const code = parseSeedCode(trimmed);
+  if (code !== null) return code;
   const asNumber = Number(trimmed);
   if (Number.isFinite(asNumber) && trimmed.match(/^-?\d+$/)) return asNumber >>> 0;
   let h = 0x811c9dc5;

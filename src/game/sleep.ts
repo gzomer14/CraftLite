@@ -12,6 +12,7 @@
  */
 
 import { TICKS_PER_DAY } from './daynight';
+import { t } from '../core/i18n';
 
 /** Início da noite, em ticks do dia. Antes disso não dá para dormir. */
 export const NIGHT_FROM = 12541;
@@ -29,8 +30,8 @@ export type SleepResult =
   | { ok: false; reason: SleepDenial; message: string };
 
 const MESSAGES: Record<SleepDenial, string> = {
-  day: 'Você só pode dormir à noite',
-  monsters: 'Há monstros por perto',
+  day: t('msg.sleep_night'),
+  monsters: t('msg.sleep_monsters'),
 };
 
 /** true se `time` está dentro da janela de sono. */

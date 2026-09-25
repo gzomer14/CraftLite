@@ -4,6 +4,7 @@
  * Duas coisas precisam ficar de pé: a medalha dispara **uma vez só**, e o
  * estado cabe na máscara de bits que vai para o save.
  */
+import { TAGS } from '../src/data/recipes';
 import { describe, expect, it } from 'vitest';
 import { Achievements, MAX_ACHIEVEMENTS } from '../src/game/achievements';
 import { ACHIEVEMENTS, ACHIEVEMENT_BY_NAME } from '../src/data/achievements';
@@ -31,7 +32,10 @@ describe('tabela de conquistas', () => {
 
   it('todo alvo aponta para algo que existe', () => {
     for (const def of ACHIEVEMENTS) {
-      if (def.trigger === 'obtain') {
+      if (def.trigger === 'obtain' && def.target.startsWith('#')) {
+        // Tag (M17): tem de existir e ter item.
+        expect(TAGS[def.target.slice(1)]?.length ?? 0, def.name).toBeGreaterThan(0);
+      } else if (def.trigger === 'obtain') {
         expect(ITEM_BY_NAME.get(def.target), def.name).toBeDefined();
       } else if (def.trigger === 'place') {
         expect(BLOCK_BY_NAME.get(def.target), def.name).toBeDefined();
@@ -162,5 +166,17 @@ describe('na sessão', () => {
     session.player.setPosition(8.5, 10, 8.5);
     session.tick();
     expect(toasts).toContain('on_a_rail');
+  });
+});
+
+describe('alvo por tag (M17)', () => {
+  it('qualquer tronco vale a primeira medalha, não só o de carvalho', () => {
+    for (const log of ['birch_log', 'spruce_log', 'jungle_log', 'acacia_log', 'oak_log']) {
+      const tracker = new Achievements();
+      const unlocked: string[] = [];
+      tracker.onUnlock = (def) => unlocked.push(def.name);
+      tracker.obtain(log);
+      expect(unlocked, log).toEqual(['get_wood']);
+    }
   });
 });

@@ -9,6 +9,12 @@
  *   4. loop 20 Hz + rAF
  */
 
+/*
+ * Primeiro de tudo: os nomes de conteúdo no idioma em uso, antes de qualquer
+ * módulo de interface montar lista com eles (`data/strings/localize.ts`).
+ */
+import './data/strings/localize';
+import { htmlLang, t, tf } from './core/i18n';
 import { AudioEngine } from './audio/engine';
 import { AudioStart } from './audio/audiostart';
 import { dyeRgbOf } from './data/tints';
@@ -24,11 +30,6 @@ import { DEG2RAD } from './core/math';
 import { BLOCK_BY_NAME, defOf, texOf } from './data/blocks';
 import { ITEM_BY_NAME, makeStack } from './data/items';
 import { MOB_BY_NAME } from './data/mobs';
-import { nextObjective, objectiveFor } from './data/achievements';
-
-/** Nome legível do alvo de uma conquista, item ou mob. */
-const displayOfTarget = (target: string): string =>
-  ITEM_BY_NAME.get(target)?.display ?? MOB_BY_NAME.get(target)?.display ?? target;
 import { Player } from './entity/player';
 import { SaveGame } from './game/savegame';
 import { SettingsStore } from './game/settings';
@@ -76,6 +77,7 @@ import { ChunkPipeline, type MeshResult } from './world/pipeline';
 import { World } from './world/world';
 import { MapScreen } from './ui/screens/mapscreen';
 import { MarkerBar } from './ui/markerbar';
+import { ObjectiveLine } from './ui/objectiveline';
 import { buildMapPalette } from './render/mapcolors';
 
 /** Blocos que aparecem na hotbar inicial, até o inventário existir (M4). */
@@ -92,6 +94,10 @@ async function boot(): Promise<void> {
   // Cópia não-nula: o `startGame` é uma função aninhada e o TypeScript não
   // carrega o estreitamento do `if` para dentro dela.
   const canvas: HTMLCanvasElement = view;
+  // O HTML nasce em português; o que ele diz antes do JS vira o idioma em uso.
+  document.documentElement.lang = htmlLang();
+  canvas.setAttribute('aria-label', t('boot.canvas'));
+  progress(0.05, t('boot.starting'));
 
   const settings = new SettingsStore();
   /*
@@ -111,7 +117,7 @@ async function boot(): Promise<void> {
   const pwa = registerServiceWorker();
   pwa.onUpdateAvailable = showUpdateToast;
 
-  progress(0.1, 'criando contexto gráfico…');
+  progress(0.1, t('boot.context'));
   const ctx = createContext(canvas, settings.get('vsync'));
 
   const device = readDeviceInfo(ctx.caps);
@@ -150,7 +156,7 @@ async function boot(): Promise<void> {
   void db?.requestPersistence();
   const pack = await loadPack(db);
 
-  progress(0.35, 'gerando texturas…');
+  progress(0.35, t('boot.textures'));
   /*
    * Estilo de textura (`data/texturestyle.ts`), lido uma vez e só aqui.
    *
@@ -169,7 +175,7 @@ async function boot(): Promise<void> {
   });
   itemSprites.installCssVariables();
 
-  progress(0.65, 'preparando renderizador…');
+  progress(0.65, t('boot.renderer'));
   const renderer = new Renderer(ctx, atlas, preset);
   const mobRenderer = new MobRenderer(ctx, entityAtlas, preset.tier === 0 ? 320 : 768);
   renderer.mobRenderer = mobRenderer;
@@ -184,7 +190,7 @@ async function boot(): Promise<void> {
   dynamicScale.enabled = settings.get('dynamicResolution');
   const debug = new DebugOverlay(tier, preset, ctx.caps, device, atlas.layerCount, atlas.buildMs);
 
-  progress(1, 'pronto');
+  progress(1, t('boot.ready'));
   hideBootScreen();
 
   // --- fluxo de menus: título → mundos → jogo ------------------------------
@@ -196,7 +202,7 @@ async function boot(): Promise<void> {
   if (params.has('seed') || params.has('mode')) {
     // Atalho de desenvolvimento: `?seed=` entra direto, sem passar pelo menu.
     void startGame(newWorldMeta(
-      'Mundo rápido',
+      t('worlds.quick'),
       params.get('seed') ?? '',
       params.get('mode') === 'creative' ? 'creative' : 'survival',
       settings.get('difficulty') as 0 | 1 | 2 | 3,
@@ -239,7 +245,7 @@ async function boot(): Promise<void> {
   const effectsBar = new EffectsBar();
   hud.mount(effectsBar.el);
   // A vida do dragão, no alto da tela, só no End (M16).
-  const bossBar = new BossBar('Dragão do End');
+  const bossBar = new BossBar(MOB_BY_NAME.get('ender_dragon')?.display ?? '');
   hud.mount(bossBar.element);
   // Marcadores na borda de cima (M10).
   const markerBar = new MarkerBar();
@@ -252,13 +258,13 @@ async function boot(): Promise<void> {
    * construção é tarde demais.
    */
   if (db === null) {
-    hud.showMessage('Sem armazenamento neste navegador: o progresso não será salvo.', 400);
+    hud.showMessage(t('store.none'), 400);
   } else {
     void db.estimate().then((estimate) => {
       if (estimate === null || estimate.quota <= 0) return;
       if (estimate.usage / estimate.quota <= QUOTA_WARN_RATIO) return;
       const used = Math.round((estimate.usage / estimate.quota) * 100);
-      hud.showMessage(`Armazenamento em ${used}% — apague mundos antigos.`, 400);
+      hud.showMessage(tf('store.almost_full', used), 400);
     });
   }
   const screenMode = new ScreenMode();
@@ -381,7 +387,7 @@ async function boot(): Promise<void> {
   const save = db === null
     ? null
     : new SaveGame(new SaveManager(db, meta.id), session, player, meta, {
-      onError: (message) => hud.showMessage(`Falha ao salvar: ${message}`, 120),
+      onError: (message) => hud.showMessage(tf('store.save_failed', message), 120),
       captureThumbnail: () => thumbnail.bytes(),
     });
 
@@ -537,15 +543,27 @@ async function boot(): Promise<void> {
      * na mão jogaria mudo sem entender por quê, então o jogo avisa o que fazer.
      */
     if (!sound.started) {
-      hud.showMessage('Toque na tela ou aperte uma tecla uma vez para ligar o som.', 120);
+      hud.showMessage(t('hud.sound_gesture'), 120);
     }
   });
   audio.onSubtitle = (text, direction) => hud.showSubtitle(text, direction);
   // Primeiro toque: tela cheia + trava de orientação (precisa de gesto).
   controls.touch.onFirstTouch = () => screenMode.enter();
 
-  showHint(controls, isTouchDevice, gamepads);
+  showHint(controls, isTouchDevice, gamepads, settings.get('touchMode'));
 
+  /*
+   * A linha do alto do HUD: dica da primeira hora e, depois dela, o próximo
+   * objetivo (M17). É o único lugar onde o jogo diz o que fazer — a dica de
+   * teclas some ao travar o ponteiro, e a tela de conquistas está atrás de
+   * duas telas.
+   */
+  const objectiveLine = new ObjectiveLine({
+    hud, guide: session.guide, settings, gamepads, keybinds, isTouch: isTouchDevice,
+    slots: () => session.inventory.slots,
+    achievementMask: () => session.achievements.mask,
+    survival: () => player.mode === 'survival',
+  });
   const hudFeed = new HudFeed({
     hud, effectsBar, touchUi: isTouchDevice ? touchUi : null, debug, session, controls, settings,
     renderer, pipeline, audio, itemSprites, markerBar, bossBar,
@@ -689,27 +707,17 @@ async function boot(): Promise<void> {
       }
 
       hudFeed.frame(loop);
+      objectiveLine.frame();
     },
   });
   loop.maxFps = settings.get('maxFps');
-  /**
-   * A linha de objetivo do HUD: o próximo passo da árvore de conquistas.
-   *
-   * É o único lugar onde o jogo diz o que fazer. A dica de teclas some ao
-   * travar o ponteiro, e a tela de conquistas está atrás de duas telas — quem
-   * entra pela primeira vez precisa de uma frase visível.
-   */
-  function refreshObjective(): void {
-    const next = nextObjective(session.achievements.mask);
-    hud.setObjective(next === undefined ? null : objectiveFor(next, displayOfTarget));
-  }
 
   const playfield = new Playfield({
     settings, preset, pipeline, renderer, debug, player, hud, session, gamepads,
     touchAimMode: isTouchDevice,
   });
   playfield.apply();
-  refreshObjective();
+  objectiveLine.refresh();
   settings.onChange((next) => {
     loop.maxFps = next.maxFps;
     sound.applyVolumes();

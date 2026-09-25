@@ -10,6 +10,7 @@
 import { reduceByArmor } from './combat';
 import { reduceByProtection, reduceFallDamage } from './enchanting';
 import { StatusEffects, type EffectTarget } from './effects';
+import { t } from '../core/i18n';
 
 export const MAX_HEALTH = 20;
 export const MAX_HUNGER = 20;
@@ -48,20 +49,20 @@ export type DamageCause =
   | 'arrow' | 'explosion' | 'poison';
 
 const CAUSE_MESSAGES: Record<DamageCause, string> = {
-  fall: 'Você caiu de um lugar alto',
-  drown: 'Você se afogou',
-  suffocate: 'Você sufocou numa parede',
-  fire: 'Você virou churrasco',
-  lava: 'Você tentou nadar na lava',
-  cactus: 'Você foi espetado até a morte',
-  void: 'Você caiu para fora do mundo',
-  starve: 'Você morreu de fome',
-  mob: 'Você foi morto',
-  arrow: 'Você foi flechado',
-  explosion: 'Você explodiu',
+  fall: t('death.fall'),
+  drown: t('death.drown'),
+  suffocate: t('death.suffocate'),
+  fire: t('death.fire'),
+  lava: t('death.lava'),
+  cactus: t('death.cactus'),
+  void: t('death.void'),
+  starve: t('death.starve'),
+  mob: t('death.mob'),
+  arrow: t('death.arrow'),
+  explosion: t('death.explosion'),
   // O veneno para em meio coração e nunca é a causa da morte; a mensagem
   // existe porque o tipo pede uma para cada causa.
-  poison: 'Você foi envenenado',
+  poison: t('death.poison'),
 };
 
 /**
@@ -145,7 +146,7 @@ export class Survival implements EffectTarget {
 
   /** Mensagem da tela de morte. */
   get deathMessage(): string {
-    return this.lastCause === null ? 'Você morreu' : CAUSE_MESSAGES[this.lastCause];
+    return this.lastCause === null ? t('death.generic') : CAUSE_MESSAGES[this.lastCause];
   }
 
   /** Põe o jogador para arder por `ticks` (M16: bola de fogo do blaze). */

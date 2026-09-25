@@ -6,6 +6,7 @@
  * `iron`), que é como `data/items.ts` monta ferramenta e armadura. Material
  * novo é uma linha aqui.
  */
+import { t } from '../core/i18n';
 
 /** Prefixo de material → item que o conserta (`#tag` vale para a madeira). */
 export const REPAIR_MATERIAL: Readonly<Record<string, string>> = {
@@ -19,7 +20,7 @@ export const REPAIR_MATERIAL: Readonly<Record<string, string>> = {
 
 /** Como a tela chama o material que é uma tag (a madeira conserta com qualquer tábua). */
 export const REPAIR_TAG_DISPLAY: Readonly<Record<string, string>> = {
-  planks: 'tábuas',
+  planks: t('anvil.planks'),
 };
 
 /** Cada unidade de material devolve um quarto da durabilidade (o do gênero). */

@@ -10,6 +10,7 @@
  * o que faltou, em vez de não fazer nada.
  */
 
+import { t, tf } from '../../core/i18n';
 import { enchantDef } from '../../data/enchants';
 import { MAX_BOOKSHELVES, type EnchantOffer } from '../../game/enchanting';
 import { levels } from '../../game/stationhelp';
@@ -35,10 +36,10 @@ export interface EnchantPanelCallbacks {
 }
 
 const RESULT_MESSAGES: Readonly<Record<EnchantResult, string>> = {
-  ok: 'Encantado!',
-  'no-offer': 'Nada para encantar.',
-  'no-level': 'Faltam níveis de experiência.',
-  'no-lapis': 'Falta lápis-lazúli.',
+  ok: t('enchant.ok'),
+  'no-offer': t('enchant.no_offer'),
+  'no-level': t('enchant.no_level'),
+  'no-lapis': t('enchant.no_lapis'),
 };
 
 export class EnchantPanel {
@@ -89,7 +90,7 @@ export class EnchantPanel {
     const status = this.callbacks.status();
     const offers = this.callbacks.offers();
     this.help.textContent = status.help;
-    this.shelves.textContent = `Estantes em volta: ${status.shelves} de ${MAX_BOOKSHELVES}`;
+    this.shelves.textContent = tf('enchant.shelves', status.shelves, MAX_BOOKSHELVES);
 
     for (let slot = 0; slot < this.buttons.length; slot++) {
       const button = this.buttons[slot];
@@ -98,21 +99,21 @@ export class EnchantPanel {
         button.disabled = true;
         button.textContent = '—';
         button.classList.remove('affordable', 'short');
-        button.setAttribute('aria-label', `Oferta ${slot + 1}: nenhuma`);
+        button.setAttribute('aria-label', tf('enchant.offer_none', slot + 1));
         continue;
       }
       const name = `${enchantDef(offer.enchant)?.display ?? '?'} ${offer.level}`;
       const noLevel = !status.creative && status.level < offer.cost;
       const noLapis = !status.creative && status.lapis < offer.lapis;
-      const price = `${levels(offer.cost)} · ${offer.lapis} lápis`;
-      const missing = noLevel ? ' · falta nível' : noLapis ? ' · falta lápis' : '';
+      const price = tf('enchant.price', levels(offer.cost), offer.lapis);
+      const missing = noLevel ? t('enchant.missing_level') : noLapis ? t('enchant.missing_lapis') : '';
       button.disabled = false;
       button.classList.toggle('affordable', !noLevel && !noLapis);
       button.classList.toggle('short', noLevel || noLapis);
       button.textContent = `${name}\n${price}${missing}`;
       button.setAttribute(
         'aria-label',
-        `${name}, custa ${levels(offer.cost)} e ${offer.lapis} lápis-lazúli${missing}`,
+        tf('enchant.offer_aria', name, levels(offer.cost), offer.lapis, missing),
       );
     }
   }

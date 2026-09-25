@@ -13,6 +13,7 @@ import { ACHIEVEMENTS, isUnlocked, objectiveFor } from '../../data/achievements'
 import { ITEM_BY_NAME } from '../../data/items';
 import { MOB_BY_NAME } from '../../data/mobs';
 import { STATS, formatStat } from '../../data/stats';
+import { t, tf } from '../../core/i18n';
 
 export interface PauseMenuCallbacks {
   onResume: () => void;
@@ -53,7 +54,7 @@ export class PauseMenu {
     this.root.setAttribute('aria-modal', 'true');
 
     const title = document.createElement('h1');
-    title.textContent = 'Pausado';
+    title.textContent = t('pause.title');
 
     this.status = document.createElement('p');
 
@@ -64,9 +65,9 @@ export class PauseMenu {
     this.statsList.className = 'achievements stats';
     this.statsList.hidden = true;
 
-    this.resumeButton = button('Voltar ao Jogo', callbacks.onResume);
-    const options = button('Opções', callbacks.onOptions);
-    const quit = button('Salvar e Sair', callbacks.onSaveAndQuit);
+    this.resumeButton = button(t('pause.resume'), callbacks.onResume);
+    const options = button(t('opt.title'), callbacks.onOptions);
+    const quit = button(t('pause.save_quit'), callbacks.onSaveAndQuit);
 
     /*
      * Trocar de modo **no mesmo mundo** (pedido de campo 2026-09-14).
@@ -78,22 +79,22 @@ export class PauseMenu {
     const toggle = callbacks.onToggleMode;
     this.modeButton = toggle === undefined || callbacks.gameMode === undefined
       ? null
-      : button('Modo', () => { toggle(); this.refreshMode(); });
+      : button(t('pause.mode'), () => { toggle(); this.refreshMode(); });
 
     const actions = document.createElement('div');
     actions.className = 'actions';
     actions.append(this.resumeButton);
     if (callbacks.achievements !== undefined) {
-      actions.appendChild(button('Conquistas', () => this.toggleAchievements()));
+      actions.appendChild(button(t('pause.achievements'), () => this.toggleAchievements()));
     }
     if (callbacks.stats !== undefined) {
-      actions.appendChild(button('Estatísticas', () => this.toggleStats()));
+      actions.appendChild(button(t('pause.stats'), () => this.toggleStats()));
     }
     if (this.modeButton !== null) actions.appendChild(this.modeButton);
     const spectate = callbacks.onToggleSpectator;
     this.spectatorButton = spectate === undefined || callbacks.spectator === undefined
       ? null
-      : button('Espectador', () => { spectate(); this.refreshMode(); });
+      : button(t('mode.spectator'), () => { spectate(); this.refreshMode(); });
     if (this.spectatorButton !== null) actions.appendChild(this.spectatorButton);
     actions.append(options, quit);
 
@@ -184,17 +185,17 @@ export class PauseMenu {
     if (spectator !== null) {
       spectator.hidden = this.callbacks.gameMode?.() !== 'creative';
       const on = this.callbacks.spectator?.() === true;
-      spectator.textContent = on ? 'Sair do Espectador' : 'Espectador';
+      spectator.textContent = on ? t('pause.leave_spectator') : t('mode.spectator');
       spectator.setAttribute('aria-pressed', on ? 'true' : 'false');
     }
     const button = this.modeButton;
     const mode = this.callbacks.gameMode?.();
     if (button === null || mode === undefined) return;
-    const next = mode === 'creative' ? 'Sobrevivência' : 'Criativo';
-    button.textContent = `Mudar para ${next}`;
+    const next = mode === 'creative' ? t('mode.survival') : t('mode.creative');
+    button.textContent = tf('pause.switch_to', next);
     button.setAttribute(
       'aria-label',
-      `Modo atual: ${mode === 'creative' ? 'Criativo' : 'Sobrevivência'}. Mudar para ${next}.`,
+      tf('pause.mode_aria', mode === 'creative' ? t('mode.creative') : t('mode.survival'), next),
     );
   }
 
@@ -217,12 +218,12 @@ function capitalize(text: string): string {
 }
 
 function hintFor(trigger: string): string {
-  if (trigger === 'obtain') return 'Consiga um certo item.';
-  if (trigger === 'kill') return 'Derrube uma certa criatura.';
-  if (trigger === 'place') return 'Coloque um certo bloco.';
-  if (trigger === 'depth') return 'Desça mais fundo.';
-  if (trigger === 'level') return 'Acumule experiência.';
-  return 'Faça algo novo.';
+  if (trigger === 'obtain') return t('pause.hint_obtain');
+  if (trigger === 'kill') return t('pause.hint_kill');
+  if (trigger === 'place') return t('pause.hint_place');
+  if (trigger === 'depth') return t('pause.hint_depth');
+  if (trigger === 'level') return t('pause.hint_level');
+  return t('pause.hint_event');
 }
 
 function button(label: string, onClick: () => void): HTMLButtonElement {

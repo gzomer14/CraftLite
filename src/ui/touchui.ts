@@ -9,6 +9,7 @@
  * sobe para 90% no toque, e `env(safe-area-inset-*)` para o notch.
  */
 
+import { t } from '../core/i18n';
 import type { SettingsStore } from '../game/settings';
 import type { TouchButtons } from '../input/touch';
 
@@ -57,30 +58,30 @@ export class TouchUi {
     // --- botões de ação, lado direito ---
     const right = document.createElement('div');
     right.className = 'pad right';
-    right.appendChild(this.holdButton('▲', 'Pular', (down) => { buttons.jump = down; }));
-    right.appendChild(this.holdButton('▼', 'Agachar', (down) => { buttons.sneak = down; }));
+    right.appendChild(this.holdButton('▲', t('touch.jump'), (down) => { buttons.jump = down; }));
+    right.appendChild(this.holdButton('▼', t('touch.sneak'), (down) => { buttons.sneak = down; }));
     /*
      * O voo só existe no criativo — `onFlyToggle` devolve cedo em qualquer
      * outro modo. Desenhar o botão sempre dava ao jogador de sobrevivência um
      * controle em posição nobre que não fazia nada e não explicava por quê.
      */
-    this.flyButton = this.tapButton('✈', 'Alternar voo', callbacks.onFlyToggle);
+    this.flyButton = this.tapButton('✈', t('touch.fly'), callbacks.onFlyToggle);
     this.flyButton.hidden = true;
     right.appendChild(this.flyButton);
 
     // --- botões do modo B, acima dos de movimento ---
     const modeB = document.createElement('div');
     modeB.className = 'pad modeb';
-    const breakBtn = this.holdButton('⛏', 'Quebrar', callbacks.onBreakDown);
-    const placeBtn = this.tapButton('▣', 'Colocar', callbacks.onPlace);
+    const breakBtn = this.holdButton('⛏', t('touch.break'), callbacks.onBreakDown);
+    const placeBtn = this.tapButton('▣', t('touch.place'), callbacks.onPlace);
     modeB.append(breakBtn, placeBtn);
     this.modeBButtons.push(modeB);
 
     // --- canto superior direito ---
     const top = document.createElement('div');
     top.className = 'pad top';
-    top.appendChild(this.tapButton('⏸', 'Pausa', callbacks.onPause));
-    top.appendChild(this.tapButton('▤', 'Inventário', callbacks.onInventory));
+    top.appendChild(this.tapButton('⏸', t('touch.pause'), callbacks.onPause));
+    top.appendChild(this.tapButton('▤', t('touch.inventory'), callbacks.onInventory));
 
     this.root.append(right, modeB, top);
     document.body.appendChild(this.root);

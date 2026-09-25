@@ -16,14 +16,15 @@
  * Nenhum pixel vem de fora: tudo continua gerado por código (PROMPT.md §6).
  */
 
+import { t } from '../core/i18n';
 import { NO_FINISH, type FinishStyle } from '../render/texfinish';
 
 export type TextureStyleId = 'classico' | 'nitido';
 
 /** Nome legível de cada estilo, para a tela de opções. */
 export const TEXTURE_STYLE_LABEL: Record<TextureStyleId, string> = {
-  classico: 'Clássico',
-  nitido: 'Nítido',
+  classico: t('opt.tex_classic_short'),
+  nitido: t('opt.tex_sharp_short'),
 };
 
 /**

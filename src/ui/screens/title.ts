@@ -8,6 +8,7 @@
  */
 
 import { menuButton, menuPanel, menuRoot } from './menu';
+import { t } from '../../core/i18n';
 
 export interface TitleCallbacks {
   onPlay: () => void;
@@ -26,15 +27,15 @@ export class TitleScreen {
 
     const tagline = document.createElement('p');
     tagline.className = 'tagline';
-    tagline.textContent = 'minerar · craftar · sobreviver';
+    tagline.textContent = t('title.tagline');
 
-    this.playButton = menuButton('Jogar', callbacks.onPlay, 'primary');
-    const options = menuButton('Opções', callbacks.onOptions);
-    const packs = menuButton('Texturas', callbacks.onPacks);
+    this.playButton = menuButton(t('worlds.play'), callbacks.onPlay, 'primary');
+    const options = menuButton(t('opt.title'), callbacks.onOptions);
+    const packs = menuButton(t('title.packs'), callbacks.onPacks);
 
     const footer = document.createElement('p');
     footer.className = 'footer';
-    footer.textContent = 'Projeto independente, sem afiliação com nenhuma empresa de jogos.';
+    footer.textContent = t('title.footer');
 
     body.append(tagline, this.playButton, options, packs, footer);
     this.root.appendChild(panel);

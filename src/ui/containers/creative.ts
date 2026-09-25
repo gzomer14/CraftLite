@@ -10,6 +10,7 @@
  * uma segunda verdade para manter em dia.
  */
 
+import { t, tf } from '../../core/i18n';
 import { ITEMS, itemDef, maxStackOf, type ItemDef } from '../../data/items';
 import { HOTBAR_END, HOTBAR_START, type Inventory } from '../../game/inventory';
 import { ItemTooltip } from './tooltip';
@@ -27,11 +28,11 @@ export interface CreativeCallbacks {
 type TabId = 'blocks' | 'tools' | 'combat' | 'food' | 'materials';
 
 const TABS: readonly { id: TabId; label: string }[] = [
-  { id: 'blocks', label: 'Blocos' },
-  { id: 'tools', label: 'Ferramentas' },
-  { id: 'combat', label: 'Combate' },
-  { id: 'food', label: 'Comida' },
-  { id: 'materials', label: 'Materiais' },
+  { id: 'blocks', label: t('creative.blocks') },
+  { id: 'tools', label: t('creative.tools') },
+  { id: 'combat', label: t('creative.combat') },
+  { id: 'food', label: t('creative.food') },
+  { id: 'materials', label: t('creative.materials') },
 ];
 
 /** Em qual aba o item cai. */
@@ -82,12 +83,12 @@ export class CreativeScreen {
 
     const title = document.createElement('div');
     title.className = 'title';
-    title.textContent = 'Inventário criativo';
+    title.textContent = t('creative.title');
 
     this.search = document.createElement('input');
     this.search.type = 'search';
-    this.search.placeholder = 'Buscar item…';
-    this.search.setAttribute('aria-label', 'Buscar item');
+    this.search.placeholder = t('creative.search');
+    this.search.setAttribute('aria-label', t('creative.search_aria'));
     this.search.addEventListener('input', () => this.render());
 
     this.tabRow = document.createElement('div');
@@ -112,14 +113,14 @@ export class CreativeScreen {
 
     const hotbarLabel = document.createElement('div');
     hotbarLabel.className = 'section-title';
-    hotbarLabel.textContent = 'Barra rápida — clique para substituir';
+    hotbarLabel.textContent = t('creative.hotbar');
     this.hotbarRow = document.createElement('div');
     this.hotbarRow.className = 'hotbar';
 
     const close = document.createElement('button');
     close.type = 'button';
     close.className = 'close';
-    close.textContent = 'Fechar';
+    close.textContent = t('common.close');
     close.addEventListener('click', () => this.close());
 
     /*
@@ -132,7 +133,7 @@ export class CreativeScreen {
     const backpack = document.createElement('button');
     backpack.type = 'button';
     backpack.className = 'close backpack';
-    backpack.textContent = 'Mochila e armadura';
+    backpack.textContent = t('creative.backpack');
     backpack.addEventListener('click', () => {
       this.close();
       this.callbacks.onOpenInventory?.();
@@ -263,7 +264,7 @@ export class CreativeScreen {
           el.textContent = (def?.display ?? '?').slice(0, 2);
         }
       } else {
-        el.setAttribute('aria-label', `Espaço ${i + 1}: vazio`);
+        el.setAttribute('aria-label', tf('hud.slot_empty', i + 1));
       }
 
       // Clicar na hotbar esvazia o slot: é como se joga fora no criativo.

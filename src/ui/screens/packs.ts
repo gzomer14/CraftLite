@@ -12,14 +12,15 @@
  */
 
 import { menuButton, menuPanel, menuRoot, menuRow, messageOf } from './menu';
+import { t, tf } from '../../core/i18n';
 
 /** "12 imagens e 3 sons", ou só a metade que existe. */
 function describeContents(summary: PackSummary): string {
-  const images = `${summary.accepted} ${summary.accepted === 1 ? 'imagem' : 'imagens'}`;
+  const images = tf(summary.accepted === 1 ? 'packs.image' : 'packs.images', summary.accepted);
   const count = summary.sounds ?? 0;
   if (count === 0) return images;
-  const sounds = `${count} ${count === 1 ? 'som' : 'sons'}`;
-  return summary.accepted === 0 ? sounds : `${images} e ${sounds}`;
+  const sounds = tf(count === 1 ? 'packs.sound' : 'packs.sounds', count);
+  return summary.accepted === 0 ? sounds : tf('packs.and', images, sounds);
 }
 
 /** Resumo de uma importação, para a tela contar ao jogador. */
@@ -54,15 +55,11 @@ export class PacksScreen {
   constructor(callbacks: PacksCallbacks) {
     this.callbacks = callbacks;
     this.root = menuRoot('packs-screen');
-    const { panel, body } = menuPanel('Pacote de texturas');
+    const { panel, body } = menuPanel(t('packs.title'));
 
     const intro = document.createElement('p');
     intro.className = 'menu-empty';
-    intro.textContent = 'O jogo desenha tudo por código. Um pacote troca essa arte '
-      + 'pela sua: um .zip com PNGs em block/, item/ e entity/ — por exemplo '
-      + 'block/stone.png, item/diamond.png, entity/zombie.png. Os nomes são os '
-      + 'internos, em inglês, e o que não bater é ignorado. O arquivo fica só '
-      + 'neste aparelho: nada é enviado para lugar nenhum.';
+    intro.textContent = t('packs.intro');
 
     this.current = document.createElement('p');
     this.current.className = 'menu-empty';
@@ -77,17 +74,17 @@ export class PacksScreen {
      * atrás de um botão, porque o seletor nativo é o único jeito de ler arquivo
      * do disco sem permissão — e é feio em toda plataforma.
      */
-    const choose = menuButton('Escolher .zip', () => this.fileInput.click(), 'primary');
+    const choose = menuButton(t('packs.choose'), () => this.fileInput.click(), 'primary');
     this.fileInput = document.createElement('input');
     this.fileInput.type = 'file';
     this.fileInput.accept = '.zip';
     this.fileInput.hidden = true;
     this.fileInput.addEventListener('change', () => void this.installPicked());
 
-    this.removeButton = menuButton('Remover', () => void this.removePack(), 'danger');
-    this.applyButton = menuButton('Recarregar para aplicar', () => this.callbacks.apply());
+    this.removeButton = menuButton(t('packs.remove'), () => void this.removePack(), 'danger');
+    this.applyButton = menuButton(t('packs.apply'), () => this.callbacks.apply());
     this.applyButton.hidden = true;
-    this.backButton = menuButton('Voltar', () => this.callbacks.back());
+    this.backButton = menuButton(t('opt.back'), () => this.callbacks.back());
 
     body.append(
       intro, this.current, this.status,
@@ -125,8 +122,8 @@ export class PacksScreen {
       // Sem banco ou banco quebrado: a tela continua servindo para importar.
     }
     this.current.textContent = pack === null
-      ? 'Nenhum pacote — o jogo está usando a arte que ele mesmo gera.'
-      : `Pacote atual: "${pack.name}", ${describeContents(pack)}.`;
+      ? t('packs.none')
+      : tf('packs.current', pack.name, describeContents(pack));
     this.removeButton.hidden = pack === null;
   }
 
@@ -136,30 +133,30 @@ export class PacksScreen {
     this.fileInput.value = '';
     if (file === undefined) return;
 
-    this.setStatus('Lendo o pacote…');
+    this.setStatus(t('packs.reading'));
     try {
       const summary = await this.callbacks.install(file);
       const ignored = summary.ignored > 0
-        ? ` ${summary.ignored} ignoradas (nome sem correspondente no jogo).`
+        ? tf('packs.ignored', summary.ignored)
         : '';
-      this.setStatus(`${describeContents(summary)} aceitos.${ignored}`);
+      this.setStatus(tf('packs.accepted', describeContents(summary), ignored));
       this.applyButton.hidden = false;
       this.applyButton.focus();
       await this.refresh();
     } catch (error) {
-      this.setStatus(messageOf(error, 'Não deu para ler o pacote.'));
+      this.setStatus(messageOf(error, t('packs.read_failed')));
     }
   }
 
   private async removePack(): Promise<void> {
-    this.setStatus('Removendo…');
+    this.setStatus(t('packs.removing'));
     try {
       await this.callbacks.remove();
-      this.setStatus('Pacote removido.');
+      this.setStatus(t('packs.removed'));
       this.applyButton.hidden = false;
       await this.refresh();
     } catch (error) {
-      this.setStatus(messageOf(error, 'Não deu para remover.'));
+      this.setStatus(messageOf(error, t('packs.remove_failed')));
     }
   }
 

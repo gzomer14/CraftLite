@@ -29,6 +29,7 @@ import { WORLD_HEIGHT, type ChunkColumn } from '../world/chunk';
 import { houseSlot, isVillageAnchor, slotOrigin, type HouseSlot } from '../world/gen/village';
 import type { MobStore } from '../entity/mobstore';
 import type { World } from '../world/world';
+import { t } from '../core/i18n';
 
 const VILLAGER = MOB_BY_NAME.get('villager')?.id ?? -1;
 const GOLEM = MOB_BY_NAME.get('iron_golem')?.id ?? -1;
@@ -215,7 +216,7 @@ export class Villages {
     if (blockIdOf(this.host.world.getBlock(x, y, z)) !== BELL) return false;
     this.host.sound('block/bell', x + 0.5, y + 0.5, z + 0.5);
     const count = ringAlarm(this.host.mobs, x + 0.5, z + 0.5, BELL_RADIUS);
-    if (count > 0) this.host.message('Os aldeões correm para casa');
+    if (count > 0) this.host.message(t('msg.villagers_home'));
     return true;
   }
 

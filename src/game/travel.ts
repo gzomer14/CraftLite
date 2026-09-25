@@ -14,8 +14,12 @@
  * troca pipeline, save e céu é o `main.ts`, e isso entra aqui como um callback.
  */
 
-import { DIM_OVERWORLD } from '../data/dimensions';
+import { DIM_END, DIM_OVERWORLD } from '../data/dimensions';
 import { arriveAt, destinationOf, isPortalBlock } from './portal';
+import { buildEndPlatform, isEndPortal, type BlockChanged } from './endportal';
+import { END_SPAWN_Z, endArrivalX } from '../world/gen/end';
+import { freeStandY } from './spawnplacement';
+import { WORLD_HEIGHT } from '../world/chunk';
 import type { World } from '../world/world';
 
 /**
@@ -35,6 +39,12 @@ export const LOAD_TIMEOUT_TICKS = 600;
 
 export type TravelPhase = 'idle' | 'loading' | 'done';
 
+/**
+ * Por onde se viaja (M16): o portal do Nether (ida e volta), o do End que
+ * leva à ilha, e o portal de saída que traz para casa depois do dragão.
+ */
+export type TravelRoute = 'nether' | 'end_in' | 'end_out';
+
 export interface TravelEvents {
   /**
    * A dimensão mudou: quem ouve troca o pipeline, o destino do save e o céu,
@@ -46,10 +56,17 @@ export interface TravelEvents {
    * destino e o chunk esperado não chega nunca. Ver `begin`.
    */
   onDimensionChange(dimension: number, x: number, z: number): void;
-  /** O jogador saiu do outro lado, nestas coordenadas. */
-  onArrive(x: number, y: number, z: number): void;
+  /** O jogador saiu do outro lado, nestas coordenadas, pela rota dada. */
+  onArrive(x: number, y: number, z: number, route: TravelRoute): void;
   /** Aviso curto para o HUD. */
   onMessage?(text: string): void;
+  /**
+   * Para onde o portal de saída do End leva (M16): a cama, com o Y dela, ou o
+   * nascimento do mundo com Y −1 (o chão é procurado quando a coluna chegar).
+   */
+  homePoint?(): readonly [number, number, number];
+  /** Um bloco mudou pela viagem (a plataforma do End): luz e fluidos. */
+  blockChanged?: BlockChanged;
 }
 
 export class Travel {
@@ -63,6 +80,9 @@ export class Travel {
   /** Destino pendente enquanto o chunk não chega. */
   private targetX = 0;
   private targetZ = 0;
+  /** Y de chegada já sabido (a cama), ou −1. */
+  private targetY = -1;
+  private route: TravelRoute = 'nether';
 
   phase: TravelPhase = 'idle';
 
@@ -94,14 +114,18 @@ export class Travel {
       return true;
     }
 
-    if (this.cooldown > 0 || !this.insidePortal(x, y, z)) {
+    let kind = this.cooldown > 0 ? null : this.portalAt(x, y, z);
+    // No End o portal de obsidiana não leva a lugar nenhum, como no gênero.
+    if (kind === 'nether' && this.world.dimension === DIM_END) kind = null;
+    if (kind === null) {
       this.charge = 0;
       return false;
     }
     this.charge++;
-    if (this.charge < PORTAL_TICKS) return false;
+    // O do End leva na hora, como no gênero; o do Nether carrega um segundo.
+    if (kind === 'nether' && this.charge < PORTAL_TICKS) return false;
 
-    this.begin(Math.floor(x), Math.floor(z));
+    this.begin(Math.floor(x), Math.floor(z), kind);
     return true;
   }
 
@@ -118,17 +142,38 @@ export class Travel {
    * distance. A física está congelada enquanto isto dura, então mover antes de
    * haver chão é seguro — o Y certo sai de `arriveAt` na chegada.
    */
-  begin(x: number, z: number): void {
-    const destination = destinationOf(x, z, this.world.dimension);
-    this.targetX = destination.x;
-    this.targetZ = destination.z;
+  begin(x: number, z: number, kind: 'nether' | 'end' = 'nether'): void {
+    let dimension: number;
+    let message: string;
+    this.targetY = -1;
+    if (kind === 'end' && this.world.dimension === DIM_END) {
+      // Portal de saída: para casa, na cama ou no nascimento do mundo.
+      const home = this.events.homePoint?.() ?? [0, -1, 0];
+      this.route = 'end_out';
+      this.targetX = Math.floor(home[0]);
+      this.targetY = home[1];
+      this.targetZ = Math.floor(home[2]);
+      dimension = DIM_OVERWORLD;
+      message = 'Voltando para casa…';
+    } else if (kind === 'end') {
+      this.route = 'end_in';
+      this.targetX = endArrivalX(this.world.seed);
+      this.targetZ = END_SPAWN_Z;
+      dimension = DIM_END;
+      message = 'Entrando no End…';
+    } else {
+      const destination = destinationOf(x, z, this.world.dimension);
+      this.route = 'nether';
+      this.targetX = destination.x;
+      this.targetZ = destination.z;
+      dimension = destination.dimension;
+      message = dimension === DIM_OVERWORLD ? 'Voltando à superfície…' : 'Entrando no Nether…';
+    }
     this.charge = 0;
     this.waiting = 0;
     this.phase = 'loading';
-    this.events.onDimensionChange(destination.dimension, destination.x, destination.z);
-    this.events.onMessage?.(
-      destination.dimension === DIM_OVERWORLD ? 'Voltando à superfície…' : 'Entrando no Nether…',
-    );
+    this.events.onDimensionChange(dimension, this.targetX, this.targetZ);
+    this.events.onMessage?.(message);
   }
 
   /**
@@ -144,15 +189,32 @@ export class Travel {
       return;
     }
 
-    const spot = arriveAt(this.world, this.targetX, this.targetZ, this.world.dimension);
+    const spot = this.arrival();
     if (spot === null) {
       this.fail();
       return;
     }
     this.phase = 'done';
     this.cooldown = COOLDOWN_TICKS;
-    this.events.onArrive(spot.x, spot.y, spot.z);
+    this.events.onArrive(spot.x, spot.y, spot.z, this.route);
     this.phase = 'idle';
+  }
+
+  /** Onde a rota põe o jogador, com o chunk de destino já carregado. */
+  private arrival(): { x: number; y: number; z: number } | null {
+    if (this.route === 'end_in') {
+      return buildEndPlatform(this.world, this.events.blockChanged ?? noChange);
+    }
+    if (this.route === 'end_out') {
+      const x = this.targetX;
+      const z = this.targetZ;
+      if (this.targetY >= 0) return { x: x + 0.5, y: this.targetY, z: z + 0.5 };
+      const chunk = this.world.getChunk(x >> 4, z >> 4);
+      const height = chunk?.heightMap[((z & 15) << 4) | (x & 15)] ?? 70;
+      const y = freeStandY(this.world, x, Math.min(height + 1, WORLD_HEIGHT - 2), z);
+      return { x: x + 0.5, y, z: z + 0.5 };
+    }
+    return arriveAt(this.world, this.targetX, this.targetZ, this.world.dimension);
   }
 
   private fail(): void {
@@ -161,12 +223,18 @@ export class Travel {
     this.events.onMessage?.('O portal não encontrou saída.');
   }
 
-  /** true se algum dos dois blocos ocupados pelo jogador é portal. */
-  private insidePortal(x: number, y: number, z: number): boolean {
+  /** Que portal ocupa um dos dois blocos do jogador, ou `null`. */
+  private portalAt(x: number, y: number, z: number): 'nether' | 'end' | null {
     const bx = Math.floor(x);
     const bz = Math.floor(z);
     const by = Math.floor(y + 0.1);
-    return isPortalBlock(this.world.getBlock(bx, by, bz))
-      || isPortalBlock(this.world.getBlock(bx, by + 1, bz));
+    for (let dy = 0; dy <= 1; dy++) {
+      const state = this.world.getBlock(bx, by + dy, bz);
+      if (isPortalBlock(state)) return 'nether';
+      if (isEndPortal(state)) return 'end';
+    }
+    return null;
   }
 }
+
+function noChange(): void { /* ninguém ouve */ }

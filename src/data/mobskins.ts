@@ -271,6 +271,46 @@ export const MOB_SKINS: Record<string, SkinRecipe> = {
       { kind: 'mouth', part: 'head', color: [92, 58, 60], y: 0.66, w: 4, h: 2 },
     ],
   },
+  // --- M16 --------------------------------------------------------------------
+  // Blaze: cabeça de brasa com olhos escuros, varas amarelas.
+  blaze: {
+    base: [226, 150, 36], noise: 0.14,
+    parts: { head: [236, 176, 58], rod: [252, 206, 76] },
+    details: [
+      { kind: 'eyes', part: 'head', color: [70, 34, 12], y: 0.42, size: 2, gap: 2 },
+      { kind: 'patch', part: 'head', color: [250, 214, 110], count: 3, radius: 1.5 },
+    ],
+  },
+  // Bruxa: túnica roxa, pele esverdeada, chapéu escuro com a faixa.
+  witch: {
+    base: [70, 44, 82], noise: 0.08,
+    parts: {
+      head: [148, 170, 118], nose: [138, 160, 104], arm: [70, 44, 82], leg: [52, 34, 62],
+      hat: [34, 28, 40],
+    },
+    details: [
+      { kind: 'eyes', part: 'head', color: [92, 36, 110], y: 0.36, size: 2, gap: 3 },
+      { kind: 'mouth', part: 'head', color: [90, 108, 72], y: 0.72, w: 4, h: 1 },
+      { kind: 'band', part: 'hatCone', color: [96, 148, 60], y: 0.8, h: 1 },
+      { kind: 'band', part: 'body', color: [96, 148, 60], y: 0.1, h: 1 },
+    ],
+  },
+  // Dragão: quase preto, asas um tom acima, olhos roxos.
+  dragon: {
+    base: [26, 22, 32], noise: 0.12,
+    parts: { wing: [44, 38, 54], head: [32, 26, 40], tail: [30, 26, 36] },
+    details: [
+      { kind: 'eyes', part: 'head', color: [214, 110, 246], y: 0.3, size: 1, gap: 2 },
+      { kind: 'shade', part: 'body', amount: 0.2 },
+    ],
+  },
+  // Cristal do End: vidro rosado por fora, núcleo magenta.
+  end_crystal: {
+    base: [226, 188, 236], noise: 0.1,
+    parts: { inner: [206, 64, 196] },
+    details: [{ kind: 'patch', part: 'outer', color: [246, 226, 250], count: 4, radius: 1.5 }],
+  },
+
   // Branco pálido com a boca aberta: o ghast é reconhecido pela cara.
   ghast: {
     base: [234, 234, 236], noise: 0.08,

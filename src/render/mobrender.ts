@@ -186,6 +186,13 @@ export class MobRenderer {
         case 'stiff':
           rx += Math.sin(age * 0.09) * STIFF_TREMOR;
           break;
+        case 'spin': {
+          const value = age * amp + phase;
+          if (part.axis === 0) rx += value;
+          else if (part.axis === 2) rz += value;
+          else ry += value;
+          break;
+        }
         default:
           break;
       }

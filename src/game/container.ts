@@ -27,7 +27,9 @@ export const ENCHANT_LAPIS = 1;
 export type ContainerKind =
   | 'chest' | 'double_chest' | 'furnace' | 'enchanting'
   // M15: a bigorna (tela, sem posição) e os três que movem item no mundo.
-  | 'anvil' | 'hopper' | 'dispenser' | 'dropper';
+  | 'anvil' | 'hopper' | 'dispenser' | 'dropper'
+  // M16: o suporte de preparo (`game/brewing.ts`).
+  | 'brewing';
 
 /** Slots da bigorna (M15): 0 peça, 1 material ou segunda peça, 2 resultado. */
 export const ANVIL_LEFT = 0;

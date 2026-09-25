@@ -164,6 +164,37 @@ const SPECS: readonly Omit<AchievementDef, 'id'>[] = [
     description: 'Um peixe no anzol, e o jantar garantido.',
     trigger: 'obtain', target: 'cod',
   },
+  // --- M16: o caminho até o dragão ------------------------------------------
+  {
+    name: 'into_fortress', display: 'Na Brasa',
+    description: 'Uma vara de blaze, arrancada da fortaleza do Nether.',
+    trigger: 'obtain', target: 'blaze_rod', parent: 'nether',
+  },
+  {
+    name: 'local_brewery', display: 'Alquimista',
+    description: 'A primeira poção saiu do suporte de preparo.',
+    trigger: 'obtain', target: 'awkward_potion', parent: 'into_fortress',
+  },
+  {
+    name: 'eye_spy', display: 'Olho Vivo',
+    description: 'O olho do ender voou na direção da fortaleza.',
+    trigger: 'event', target: 'ender_eye', parent: 'into_fortress',
+  },
+  {
+    name: 'end_portal', display: 'O Fim?',
+    description: 'Doze olhos, e o portal do End acendeu.',
+    trigger: 'event', target: 'end_portal', parent: 'eye_spy',
+  },
+  {
+    name: 'the_end', display: 'O End',
+    description: 'Você pisou na ilha do dragão.',
+    trigger: 'event', target: 'enter_end', parent: 'end_portal',
+  },
+  {
+    name: 'free_the_end', display: 'Liberte o End',
+    description: 'O dragão caiu. A jornada tem um fim.',
+    trigger: 'event', target: 'kill_dragon', parent: 'the_end',
+  },
 ];
 
 export const ACHIEVEMENTS: readonly AchievementDef[] = SPECS.map((spec, id) => ({ ...spec, id }));
@@ -184,6 +215,10 @@ const EVENT_OBJECTIVES: Record<string, string> = {
   enter_nether: 'atravesse o portal para o Nether',
   return_overworld: 'volte do Nether para a superfície',
   minecart: 'entre num carrinho de mina',
+  ender_eye: 'arremesse um olho do ender',
+  end_portal: 'acenda o portal do End com os doze olhos',
+  enter_end: 'atravesse o portal do End',
+  kill_dragon: 'derrote o dragão do End',
 };
 
 /**

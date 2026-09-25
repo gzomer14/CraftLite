@@ -135,6 +135,19 @@ export const RECIPES: readonly Recipe[] = [
   { type: 'shaped', pattern: ['CCC', 'C.C', 'CRC'], key: { C: 'cobblestone', R: 'redstone' }, result: { item: 'dropper', count: 1 } },
   { type: 'shaped', pattern: ['.T.', 'TQT', 'SSS'], key: { T: 'redstone_torch', Q: 'nether_quartz', S: 'stone' }, result: { item: 'comparator', count: 1 } },
   { type: 'shaped', pattern: ['CCC', 'RRQ', 'CCC'], key: { C: 'cobblestone', R: 'redstone', Q: 'nether_quartz' }, result: { item: 'observer', count: 1 } },
+  // --- um fim para a jornada (M16) ---------------------------------------
+  // A vara de blaze é a chave de tudo: o pó ferve a poção e acorda o olho.
+  { type: 'shapeless', ingredients: ['blaze_rod'], result: { item: 'blaze_powder', count: 2 } },
+  { type: 'shaped', pattern: ['.B.', 'CCC'], key: { B: 'blaze_rod', C: '#stone_crafting' }, result: { item: 'brewing_stand', count: 1 } },
+  { type: 'shaped', pattern: ['G.G', '.G.'], key: { G: 'glass' }, result: { item: 'glass_bottle', count: 3 } },
+  { type: 'shapeless', ingredients: ['ender_pearl', 'blaze_powder'], result: { item: 'ender_eye', count: 1 } },
+  { type: 'shapeless', ingredients: ['slime_ball', 'blaze_powder'], result: { item: 'magma_cream', count: 1 } },
+  { type: 'shapeless', ingredients: ['gold_ingot'], result: { item: 'gold_nugget', count: 9 } },
+  { type: 'shaped', pattern: ['NNN', 'NNN', 'NNN'], key: { N: 'gold_nugget' }, result: { item: 'gold_ingot', count: 1 } },
+  { type: 'shaped', pattern: ['NNN', 'NMN', 'NNN'], key: { N: 'gold_nugget', M: 'melon_slice' }, result: { item: 'glistering_melon_slice', count: 1 } },
+  { type: 'shaped', pattern: ['NNN', 'NCN', 'NNN'], key: { N: 'gold_nugget', C: 'carrot' }, result: { item: 'golden_carrot', count: 1 } },
+  { type: 'shapeless', ingredients: ['spider_eye', 'brown_mushroom', 'sugar'], result: { item: 'fermented_spider_eye', count: 1 } },
+  { type: 'shaped', pattern: ['BNB', 'BNB'], key: { B: 'nether_bricks', N: 'nether_brick' }, result: { item: 'nether_brick_fence', count: 6 } },
   // Vara de pesca (M14): gravetos na diagonal e a linha caindo da ponta.
   { type: 'shaped', pattern: ['..S', '.SL', 'S.L'], key: { S: 'stick', L: 'string' }, result: { item: 'fishing_rod', count: 1 } },
   // O bolo devolve os três baldes vazios na grade (`consumeGrid`).

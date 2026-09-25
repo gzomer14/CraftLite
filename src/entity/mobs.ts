@@ -11,10 +11,11 @@
 import { LAVA, blockIdOf } from '../data/blocks';
 import { ITEM_BY_NAME } from '../data/items';
 import { lootingBonus } from '../game/enchanting';
-import { MOBS, mobDef, type GoalName, type MobDef } from '../data/mobs';
+import { MOBS, mobDef, type GoalName, type MobDef, type ShotKind } from '../data/mobs';
 import { raycast } from '../world/raycast';
 import { GOALS, type AiContext, type Goal } from './ai/goals';
 import { VILLAGE_GOALS } from './ai/villagegoals';
+import { DRAGON_GOALS } from './ai/dragongoals';
 import { babyVariant, deathDrops, tickHusbandry } from './husbandry';
 import { Pathfinder, REQUESTS_PER_TICK, standHeight } from './ai/pathfinder';
 import {
@@ -75,10 +76,14 @@ export interface MobEvents {
    * e pondo (`entity/husbandry.ts`). Quem ouve atualiza a luz.
    */
   onBlockChanged?(x: number, y: number, z: number, previous: number, state: number): void;
-  /** `fireball` = bola de fogo do ghast: voa reto e explode onde parar. */
+  /**
+   * Um tiro de mob, na direção normalizada. `kind` diz o quê: flecha, bola de
+   * fogo do ghast (voa reto e explode), a do blaze (incendeia) ou o frasco da
+   * bruxa (M16).
+   */
   onArrow(
     x: number, y: number, z: number,
-    dx: number, dy: number, dz: number, damage: number, fireball?: boolean,
+    dx: number, dy: number, dz: number, damage: number, kind?: ShotKind,
   ): void;
   /** Um aldeão abriu ou fechou a porta de casa (M9). Quem ouve troca as duas folhas. */
   onDoor?(x: number, y: number, z: number, open: boolean): void;
@@ -133,6 +138,8 @@ export class Mobs {
   private readonly ctx: AiContext;
   private readonly player: PlayerView = { x: 0, y: 0, z: 0, eyeY: 0, held: -1, alive: true };
   private tickCount = 0;
+  /** Explosões de morte a disparar no próximo tick: `[x, y, z, força, …]` (M16). */
+  private readonly pendingExplosions: number[] = [];
   /**
    * Slot que um goal pediu para remover neste tick (creeper que explodiu).
    *
@@ -247,7 +254,20 @@ export class Mobs {
     return true;
   }
 
+  /** Dispara as explosões de morte pendentes (ver `die`). */
+  private flushExplosions(): void {
+    const list = this.pendingExplosions;
+    if (list.length === 0) return;
+    // Copia os números antes: a explosão pode matar outro cristal e empilhar mais.
+    const count = list.length;
+    for (let k = 0; k < count; k += 4) {
+      this.events.onExplode(list[k], list[k + 1], list[k + 2], list[k + 3]);
+    }
+    list.splice(0, count);
+  }
+
   clear(): void {
+    this.pendingExplosions.length = 0;
     this.store.clear();
     this.pathQueue.length = 0;
   }
@@ -272,6 +292,7 @@ export class Mobs {
     ctx.isDay = this.isDay;
     ctx.dayTime = this.dayTime;
 
+    this.flushExplosions();
     const s = this.store;
     for (let i = 0; i < s.active; i++) {
       /*
@@ -280,7 +301,9 @@ export class Mobs {
        * caía até o fundo do mundo e morria de "void" — os aldeões de uma
        * aldeia de que o jogador se afastava inclusive.
        */
-      if (!this.world.isLoaded(Math.floor(s.x[i]), Math.floor(s.z[i]))) continue;
+      // Quem atravessa blocos (o dragão, M16) não depende do chão carregado.
+      if (!this.world.isLoaded(Math.floor(s.x[i]), Math.floor(s.z[i]))
+        && mobDef(s.type[i]).traits.noClip !== true) continue;
       // Morto por outro mob no tick (ver `hitMob`): morre agora, no próprio slot.
       if (s.health[i] <= 0) { this.die(i, mobDef(s.type[i])); i--; continue; }
       s.age[i]++;
@@ -515,18 +538,19 @@ export class Mobs {
     let dy = this.player.y + 1.2 - oy;
     let dz = this.player.z - oz;
     const distance = Math.hypot(dx, dy, dz) || 1;
-    // Compensa a gravidade da flecha mirando um pouco acima.
-    dy += distance * 0.08;
+    const def = mobDef(s.type[i]);
+    const kind = def.traits.shoots ?? 'arrow';
+    // Compensa a queda mirando acima: a flecha cai pouco, o frasco da bruxa é
+    // lançado devagar e cai muito. As bolas de fogo voam reto.
+    if (kind === 'arrow') dy += distance * 0.08;
+    else if (kind === 'potion') dy += distance * 0.18;
     const length = Math.hypot(dx, dy, dz) || 1;
     dx /= length; dy /= length; dz /= length;
 
-    const def = mobDef(s.type[i]);
     const damage = def.attack === undefined
       ? 2
       : def.attack.damage[Math.min(2, Math.max(0, this.difficulty - 1))];
-    // A bola de fogo voa reto: mirar acima compensaria uma queda que não há.
-    const fireball = def.traits.shootsFireball === true;
-    this.events.onArrow(ox, oy, oz, dx, fireball ? dy - distance * 0.08 : dy, dz, damage, fireball);
+    this.events.onArrow(ox, oy, oz, dx, dy, dz, damage, kind);
     this.emitSound(i, 'attack');
   }
 
@@ -591,6 +615,11 @@ export class Mobs {
     if (xp > 0 && !baby) this.events.onXp(xp, x, y, z);
 
     this.store.removeAt(i);
+    // O cristal do End (M16) explode — no começo do próximo tick, e não aqui:
+    // a explosão fere outros mobs, e quem chamou `die` pode estar no meio de
+    // uma volta pelo pool (a própria explosão de outro cristal, o golpe).
+    const blast = def.traits.explodesOnDeath;
+    if (blast !== undefined) this.pendingExplosions.push(x, y, z, blast);
 
     if (splitSize >= 1) {
       for (let n = 0; n < 2; n++) {
@@ -830,7 +859,7 @@ export class Mobs {
 export const MOB_TYPES = MOBS.length;
 
 /** Todos os goals: os de sempre e os da aldeia (M9). */
-const ALL_GOALS: Record<GoalName, Goal> = { ...GOALS, ...VILLAGE_GOALS };
+const ALL_GOALS: Record<GoalName, Goal> = { ...GOALS, ...VILLAGE_GOALS, ...DRAGON_GOALS };
 
 /**
  * Distância do raio até a AABB, ou −1 se não acerta (slab method).

@@ -52,7 +52,9 @@ describe('tints de corante', () => {
       else for (const t of [tex.top, tex.side, tex.bottom]) if (t !== undefined) layers.add(t);
     }
     expect(layers.size).toBe(4);
-    expect(buildLayerIndex().count).toBeLessThan(222);
+    // O teto do doc 02 §3. O limite antigo (< 222) era a foto do M15; o M16
+    // somou 11 camadas (poção, End, fortaleza).
+    expect(buildLayerIndex().count).toBeLessThanOrEqual(256);
   });
 
   it('a cama marca madeira e travesseiro como não-tingíveis (alfa 0,75)', () => {

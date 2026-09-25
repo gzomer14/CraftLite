@@ -19,6 +19,7 @@ import { decorate } from './decorate';
 import { HeightField } from './heightfield';
 import { SALT_HUMIDITY, SALT_TEMPERATURE } from './climate';
 import { placeStructures } from './structures';
+import { placeStrongholds } from './stronghold';
 import { ChunkColumn, SEA_LEVEL, SECTION_SIZE, WORLD_HEIGHT } from '../chunk';
 
 /**
@@ -186,7 +187,11 @@ export function generateChunk(
 
   // 9. estruturas — depois da decoração, para a casa não nascer com árvore
   // dentro; antes do heightmap e da luz, que precisam vê-las (doc 03 §7).
-  if (withStructures) placeStructures(chunk, seed, field);
+  if (withStructures) {
+    placeStructures(chunk, seed, field);
+    // A fortaleza da superfície (M16) por último: ela cava o que achar.
+    placeStrongholds(chunk, seed, field);
+  }
 
   chunk.recomputeHeightMap();
   computeChunkLight(chunk);

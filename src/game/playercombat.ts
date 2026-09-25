@@ -93,7 +93,10 @@ export class PlayerCombat {
     const held = inventory.held;
     // No criativo o golpe mata de uma vez, como manda o modo: o jogador ali
     // está editando o mundo, não lutando com ele.
-    const damage = player.mode === 'creative' ? CREATIVE_ATTACK_DAMAGE : attackDamageOf(held);
+    // Força e Fraqueza (M16) somam ao golpe; o golpe nunca fica negativo.
+    const damage = player.mode === 'creative'
+      ? CREATIVE_ATTACK_DAMAGE
+      : Math.max(0, attackDamageOf(held) + this.host.survival.effects.attackBonus());
     this.cooldown = attackCooldownOf(held);
     this.host.survival.addExhaustion(EXHAUSTION.attack);
 
@@ -113,7 +116,7 @@ export class PlayerCombat {
       this.host.achievements.kill(mobDef(type).name);
       this.host.stats?.add('mobs_killed');
     }
-    if (!died) {
+    if (!died && mobDef(type).traits.noKnockback !== true) {
       // Empurrão só depois do dano: se ele morreu, este índice já é outro mob.
       store.vx[index] += (px / length) * HIT_KNOCKBACK;
       store.vz[index] += (pz / length) * HIT_KNOCKBACK;

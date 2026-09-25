@@ -95,6 +95,7 @@ const SHOOT_MIN = 5;
 /** Os goals daqui; os da aldeia estão em `villagegoals.ts` e o `Mobs` junta os dois. */
 export type BaseGoalName = Exclude<
   GoalName, 'trade' | 'avoidHostile' | 'goHome' | 'work' | 'stayInVillage' | 'patrol' | 'defendVillage'
+  | 'dragon'
 >;
 
 export const GOALS: Record<BaseGoalName, Goal> = {
@@ -175,7 +176,7 @@ export const GOALS: Record<BaseGoalName, Goal> = {
 
     // Voador mantém altitude sobre o alvo em vez de recuar rasteiro.
     if (def.traits.flies === true) {
-      s.setMoveTarget(i, s.x[i], ctx.playerY + FLIGHT_HOVER, s.z[i], 0.6);
+      s.setMoveTarget(i, s.x[i], ctx.playerY + (def.traits.hoverHeight ?? FLIGHT_HOVER), s.z[i], 0.6);
       if (s.attackCooldown[i] <= 0) {
         s.attackCooldown[i] = def.attack.cooldownTicks;
         ctx.shootArrow(i);

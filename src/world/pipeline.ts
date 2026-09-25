@@ -421,7 +421,7 @@ export class ChunkPipeline {
     // ser reusada no despacho seguinte.
     this.send({
       type: 'mesh', cx: job.cx, cz: job.cz, mask: job.mask, syMin, span,
-      sections: SECTION_SCRATCH,
+      sections: SECTION_SCRATCH, dim: this.dimension,
     });
     return MESH_SENT;
   }
@@ -481,6 +481,8 @@ export class ChunkPipeline {
     }
     chunk.heightMap.set(response.heightMap);
     chunk.biomeMap.set(response.biomeMap);
+    // Os marcos de estrutura (M16: corrigido — ver `workers/genjob.ts`).
+    if (response.structures !== undefined) chunk.structures = response.structures;
     this.acceptChunk(chunk);
   }
 
@@ -539,6 +541,8 @@ export class ChunkPipeline {
   }
 
   private onMeshed(response: MeshResponse): void {
+    // Malha da dimensão de antes do portal: não é desta coluna (M16).
+    if (response.dim !== undefined && response.dim !== this.dimension) return;
     this.meshing.delete(chunkKey(response.cx, response.cz));
     const count = response.sections.length;
     if (count > 0) this.stats.meshMs += (response.ms / count - this.stats.meshMs) * 0.1;

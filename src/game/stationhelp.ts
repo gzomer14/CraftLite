@@ -15,6 +15,9 @@
 import { isEnchantable } from '../data/enchants';
 import { ITEM_BY_NAME, itemDef, maxStackOf, type ItemStack } from '../data/items';
 import { repairMaterialName, repairsWith, type AnvilOutcome } from './anvil';
+import {
+  BREW_BOTTLE_COUNT, BREW_FUEL, BREW_INGREDIENT, brewResult, isBrewingFuel, type BrewingStand,
+} from './brewing';
 
 const ENCHANTED_BOOK = ITEM_BY_NAME.get('enchanted_book')?.id ?? -1;
 
@@ -71,4 +74,37 @@ export function anvilHelp(
   }
   const tail = material !== null ? ` Este item conserta com ${material}.` : '';
   return `${itemDef(right.item)?.display ?? 'Isso'} não serve aqui.${tail}`;
+}
+
+const WATER_BOTTLE = ITEM_BY_NAME.get('water_bottle')?.id ?? -1;
+
+/** O que o suporte de preparo diz (M16), dado o que está nele. */
+export function brewingHelp(stand: BrewingStand): string {
+  let bottles = 0;
+  let water = 0;
+  for (let i = 0; i < BREW_BOTTLE_COUNT; i++) {
+    const bottle = stand.get(i);
+    if (bottle === null) continue;
+    bottles++;
+    if (bottle.item === WATER_BOTTLE) water++;
+  }
+  if (stand.brewTicks > 0) return 'Fervendo…';
+  if (bottles === 0) return 'Ponha em Frasco um frasco d\'água (frasco de vidro enchido na água).';
+  const ingredient = stand.get(BREW_INGREDIENT);
+  if (ingredient === null) {
+    return water === bottles
+      ? 'Ponha verruga do Nether em Ingrediente: é ela que começa toda poção.'
+      : 'Ponha em Ingrediente o que dá o efeito: pó de blaze, açúcar, cenoura dourada…';
+  }
+  let fits = false;
+  for (let i = 0; i < BREW_BOTTLE_COUNT && !fits; i++) {
+    const bottle = stand.get(i);
+    if (bottle !== null && brewResult(bottle.item, ingredient.item) >= 0) fits = true;
+  }
+  if (!fits) return `${itemDef(ingredient.item)?.display ?? 'Isso'} não serve para estes frascos.`;
+  const fuel = stand.get(BREW_FUEL);
+  if (stand.fuel === 0 && (fuel === null || !isBrewingFuel(fuel.item))) {
+    return 'Ponha pó de blaze em Combustível para ferver.';
+  }
+  return 'Fervendo…';
 }

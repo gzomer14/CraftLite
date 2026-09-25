@@ -46,6 +46,7 @@ export class MeshJobRunner {
     }
     return {
       type: 'mesh', cx: request.cx, cz: request.cz,
+      ...(request.dim !== undefined ? { dim: request.dim } : {}),
       sections, quads, ms: performance.now() - t0,
     };
   }

@@ -67,6 +67,9 @@ export const PROFESSIONS: readonly ProfessionDef[] = [
       { want: ['book', 4], give: ['emerald', 1], maxUses: 12 },
       { want: ['emerald', 1], give: ['glass', 4], maxUses: 12 },
       { want: ['emerald', 6], give: ['bookshelf', 1], maxUses: 6 },
+      // M16: a pérola que o enderman nem sempre dá — o olho do ender não pode
+      // depender só de caçar à noite.
+      { want: ['emerald', 4], give: ['ender_pearl', 1], maxUses: 6 },
     ],
   },
 ];

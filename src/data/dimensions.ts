@@ -14,6 +14,8 @@
 
 export const DIM_OVERWORLD = 0;
 export const DIM_NETHER = 1;
+/** O End (M16): a ilha do dragão. */
+export const DIM_END = 2;
 
 export interface DimensionDef {
   id: number;
@@ -73,6 +75,25 @@ export const DIMENSIONS: readonly DimensionDef[] = [
     waterEvaporates: true,
     lavaRange: 4,
     solidCeiling: true,
+  },
+  /*
+   * O End (M16). Sem céu e sem ciclo: a névoa roxa-escura de tabela e uma luz
+   * ambiente alta — a ilha é pálida e se enxerga de ponta a ponta, que é o
+   * que a luta contra o dragão pede. Escala 1: não é atalho de viagem.
+   */
+  {
+    id: DIM_END,
+    name: 'end',
+    display: 'O End',
+    // Número arbitrário e fixo: mudá-lo regenera todo End já salvo.
+    salt: 0x454e4421,
+    hasSky: false,
+    ambientLight: 9,
+    fog: [0.06, 0.03, 0.09],
+    blockScale: 1,
+    waterEvaporates: false,
+    lavaRange: 3,
+    solidCeiling: false,
   },
 ];
 

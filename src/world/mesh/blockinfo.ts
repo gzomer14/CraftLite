@@ -12,6 +12,7 @@ import {
   SHAPE_LADDER, SHAPE_LEVER, SHAPE_NONE, SHAPE_PAINTING, SHAPE_PANE, SHAPE_PISTON,
   SHAPE_BED, SHAPE_BELL, SHAPE_CAKE, SHAPE_CHEST, SHAPE_PISTON_HEAD, SHAPE_PLATE, SHAPE_RAIL, SHAPE_REPEATER, SHAPE_SIGN, SHAPE_SLAB,
   SHAPE_STAIRS, SHAPE_TORCH, SHAPE_TRAPDOOR, SHAPE_ANVIL, SHAPE_HOPPER, SHAPE_COMPARATOR,
+  SHAPE_BREWING_STAND, SHAPE_PORTAL_FRAME, SHAPE_PORTAL_FRAME_EYE, SHAPE_PORTAL_PLANE, SHAPE_EGG,
 } from './shapes';
 import { layerOf, type LayerIndex } from '../../render/layers';
 import { tintIndexOf } from '../../data/tints';
@@ -81,6 +82,11 @@ const COMPLEX_BY_SHAPE: Record<string, number> = {
   anvil: CPLX_BOXES,
   hopper: CPLX_BOXES,
   comparator: CPLX_BOXES,
+  brewing_stand: CPLX_BOXES,
+  portal_frame: CPLX_BOXES,
+  portal_frame_eye: CPLX_BOXES,
+  portal_plane: CPLX_BOXES,
+  egg: CPLX_BOXES,
   slab: CPLX_BOXES,
   carpet: CPLX_BOXES,
   flat: CPLX_BOXES,
@@ -113,6 +119,11 @@ const SHAPE_ID_BY_NAME: Record<string, number> = {
   anvil: SHAPE_ANVIL,
   hopper: SHAPE_HOPPER,
   comparator: SHAPE_COMPARATOR,
+  brewing_stand: SHAPE_BREWING_STAND,
+  portal_frame: SHAPE_PORTAL_FRAME,
+  portal_frame_eye: SHAPE_PORTAL_FRAME_EYE,
+  portal_plane: SHAPE_PORTAL_PLANE,
+  egg: SHAPE_EGG,
   slab: SHAPE_SLAB,
   carpet: SHAPE_CARPET,
   flat: SHAPE_FLAT,

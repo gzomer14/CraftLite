@@ -62,6 +62,15 @@ export const SHAPE_ANVIL = 26;
 export const SHAPE_HOPPER = 27;
 /** Comparador (M15): o tampo do repetidor com três tochinhas. */
 export const SHAPE_COMPARATOR = 28;
+/** Suporte de preparo (M16): a base, a haste e a travessa dos frascos. */
+export const SHAPE_BREWING_STAND = 29;
+/** Moldura do portal do End (M16), sem olho e com. */
+export const SHAPE_PORTAL_FRAME = 30;
+export const SHAPE_PORTAL_FRAME_EYE = 31;
+/** Placa do portal do End (M16): fina, a 3/4 da altura, como a água parada. */
+export const SHAPE_PORTAL_PLANE = 32;
+/** Ovo do dragão (M16): quatro fatias que afinam para cima. */
+export const SHAPE_EGG = 33;
 
 /**
  * Formas de trilho nos bits 0..3 do estado (M7), na codificação do gênero.
@@ -144,6 +153,11 @@ export const SHAPE_BY_NAME: Readonly<Record<string, number>> = {
   anvil: SHAPE_ANVIL,
   hopper: SHAPE_HOPPER,
   comparator: SHAPE_COMPARATOR,
+  brewing_stand: SHAPE_BREWING_STAND,
+  portal_frame: SHAPE_PORTAL_FRAME,
+  portal_frame_eye: SHAPE_PORTAL_FRAME_EYE,
+  portal_plane: SHAPE_PORTAL_PLANE,
+  egg: SHAPE_EGG,
   slab: SHAPE_SLAB,
   carpet: SHAPE_CARPET,
   flat: SHAPE_FLAT,
@@ -293,6 +307,23 @@ export function boxesFor(
       return hopper(state & 7, out);
     case SHAPE_COMPARATOR:
       return comparator(state & 3, out);
+    case SHAPE_BREWING_STAND:
+      one(out, 0, 1 / 16, 0, 1 / 16, 15 / 16, 2 / 16, 15 / 16);
+      one(out, 1, 7 / 16, 2 / 16, 7 / 16, 9 / 16, 14 / 16, 9 / 16);
+      return one(out, 2, 2 / 16, 10 / 16, 7.5 / 16, 14 / 16, 11 / 16, 8.5 / 16);
+    case SHAPE_PORTAL_FRAME:
+      return one(out, 0, 0, 0, 0, 1, 13 / 16, 1);
+    case SHAPE_PORTAL_FRAME_EYE:
+      one(out, 0, 0, 0, 0, 1, 13 / 16, 1);
+      return one(out, 1, 4 / 16, 13 / 16, 4 / 16, 12 / 16, 1, 12 / 16);
+    case SHAPE_PORTAL_PLANE:
+      return one(out, 0, 0, 11 / 16, 0, 1, 12 / 16, 1);
+    case SHAPE_EGG:
+      one(out, 0, 5 / 16, 0, 5 / 16, 11 / 16, 1 / 16, 11 / 16);
+      one(out, 1, 3 / 16, 1 / 16, 3 / 16, 13 / 16, 7 / 16, 13 / 16);
+      one(out, 2, 2 / 16, 7 / 16, 2 / 16, 14 / 16, 11 / 16, 14 / 16);
+      one(out, 3, 3 / 16, 11 / 16, 3 / 16, 13 / 16, 14 / 16, 13 / 16);
+      return one(out, 4, 5 / 16, 14 / 16, 5 / 16, 11 / 16, 1, 11 / 16);
     case SHAPE_RAIL:
       // O desenho é um quad só (ver `mesh/complex.ts`); a caixa existe para
       // quem pergunta pela forma — hoje ninguém, porque trilho não colide.

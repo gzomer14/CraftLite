@@ -13,6 +13,7 @@
  */
 
 import type { SectionView } from '../world/neighborhood';
+import type { StructureMark } from '../world/chunk';
 
 /** Section serializada: exatamente os campos que a paleta precisa. */
 export interface SerializedSection {
@@ -86,6 +87,11 @@ export interface MeshRequest {
   span: number;
   /** `9 × span` sections: coluna `(dz+1)*3 + (dx+1)`, depois `sy − syMin`. */
   sections: SectionView[];
+  /**
+   * Dimensão da coluna (M16), devolvida na resposta. Ver `MeshResponse.dim`.
+   * Ausente em pedidos de teste antigos.
+   */
+  dim?: number;
 }
 
 /** Onde nasce o jogador num mundo novo (`world/gen/spawnsearch.ts`). */
@@ -104,6 +110,12 @@ export interface GenResponse {
   sections: SerializedSection[];
   heightMap: Uint8Array;
   biomeMap: Uint8Array;
+  /**
+   * Marcos de estrutura da coluna: baú com loot, gerador de monstros, mob a
+   * nascer. Faltava até 2026-09-24 (ver `workers/genjob.ts`). São poucos
+   * objetos pequenos: vão por cópia, sem transferable.
+   */
+  structures?: StructureMark[];
   /** ms gastos na geração — alimenta o overlay de debug. */
   ms: number;
 }
@@ -125,6 +137,14 @@ export interface MeshResponse {
   type: 'mesh';
   cx: number;
   cz: number;
+  /**
+   * Dimensão do pedido (M16). A malha pedida antes do portal e entregue
+   * depois é da coluna de **mesma coordenada da outra dimensão**: o pipeline
+   * a descarta, como já fazia com a geração. Sem isto ela marcava a coluna
+   * nova como pronta e apagava o registro do pedido novo — no End, a borda da
+   * ilha ficava invisível onde a superfície estivera carregada.
+   */
+  dim?: number;
   sections: SectionMeshResult[];
   quads: number;
   ms: number;

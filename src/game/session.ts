@@ -48,7 +48,8 @@ import { Fire } from '../world/fire';
 import { FallingBlocks } from '../world/falling';
 import { Redstone } from '../world/redstone';
 import { WorldSystems } from './worldsystems';
-import { Travel } from './travel';
+import { Travel, type TravelRoute } from './travel';
+import { DragonFight } from './dragonfight';
 import { breakPortalNear } from './portal';
 import { BlockUse } from './blockuse';
 import { TRADE_REACH, Villages } from './village';
@@ -93,6 +94,8 @@ export interface SessionEvents {
   onDimensionChange?: (dimension: number) => void;
   /** O jogador usou o mapa (M10): quem ouve abre a tela do mapa. */
   onOpenMap?: () => void;
+  /** O jogador voltou do End pela primeira vez depois do dragão (M16): os créditos. */
+  onCredits?: () => void;
 }
 
 export interface SessionOptions {
@@ -134,6 +137,14 @@ export class Session {
   readonly redstone: Redstone;
   readonly rails: Rails;
   readonly travel: Travel;
+  /** A luta contra o dragão do End (M16, `game/dragonfight.ts`). */
+  readonly dragonFight: DragonFight;
+  /**
+   * Nascimento do mundo, para onde o portal de saída do End leva quem não
+   * tem cama (M16). Quem sabe é o `main.ts`, que o procura; escreve aqui.
+   */
+  worldSpawnX = 0;
+  worldSpawnZ = 0;
   readonly interaction: Interaction;
   readonly recipes = new RecipeBook();
 
@@ -200,15 +211,17 @@ export class Session {
     this.travel = new Travel(world, {
       // A travessia entra pelo mesmo caminho que o save e o renascimento.
       onDimensionChange: (dimension, x, z) => { this.enterDimension(dimension, x, z); },
-      onArrive: (x, y, z) => {
+      onArrive: (x, y, z, route) => {
         this.player.setPosition(x, y, z);
         this.player.vx = 0; this.player.vy = 0; this.player.vz = 0;
         this.player.fallDistance = 0;
-        this.achievements.event(
-          this.world.dimension === DIM_OVERWORLD ? 'return_overworld' : 'enter_nether',
-        );
+        this.arrived(route);
       },
       onMessage: (text) => this.events.onMessage?.(text),
+      homePoint: () => (this.spawnY >= 0
+        ? [this.spawnX, this.spawnY, this.spawnZ]
+        : [this.worldSpawnX, -1, this.worldSpawnZ]),
+      blockChanged: (x, y, z, previous, state) => { this.lighting.onBlockChanged(x, y, z, previous, state); },
     });
     this.interaction = new Interaction(world, player, this.lighting);
     this.tiles = new Tiles(world, {
@@ -236,6 +249,13 @@ export class Session {
 
     const maxMobs = options.maxMobs ?? 70;
     this.mobs = new Mobs(world, mobEvents(this, events), Math.max(32, maxMobs * 2));
+    this.dragonFight = new DragonFight({
+      world, mobs: this.mobs,
+      blockChanged: (x, y, z, previous, state) => { this.lighting.onBlockChanged(x, y, z, previous, state); },
+      sound: (name, x, y, z) => { this.events.onSound?.(name, x, y, z); },
+      message: (text) => { this.events.onMessage?.(text); },
+      achievement: (name) => { this.achievements.event(name); },
+    });
     this.spawners = new SpawnerBlocks(this.mobs.store, world.seed, (x, y, z) => {
       this.events.onSound?.('block/furnace', x, y, z);
     });
@@ -366,6 +386,7 @@ export class Session {
     const bz = Math.floor(this.player.z);
     const headBlock = defOf(this.world.getBlock(bx, head, bz));
 
+    this.player.speedFactor = this.survival.effects.speedMultiplier();
     if (this.player.mode === 'survival') {
       // Pés ou cabeça dentro da chama: o corpo inteiro conta, senão dava para
       // atravessar o incêndio agachado.
@@ -374,6 +395,7 @@ export class Session {
         submerged: headBlock.name === 'water',
         inLava: this.player.inLava,
         onFire: feet.name === 'fire' || headBlock.name === 'fire',
+        inWater: this.player.inWater,
         suffocating: headBlock.opaque && headBlock.solid,
         y: this.player.y,
       });
@@ -392,6 +414,7 @@ export class Session {
     this.tickRedstone();
     this.travel.tick(this.player.x, this.player.y, this.player.z);
     this.tiles.tick();
+    this.dragonFight.tick();
     this.itemFlow.tick();
     this.spawners.tick(this.player.x, this.player.y, this.player.z);
     this.tickMobs();
@@ -561,6 +584,9 @@ export class Session {
      * ordem, o save encontraria as listas já vazias — e todo baú do Nether
      * sumiria ao voltar para casa.
      */
+    // A vida do dragão fica guardada antes de os mobs do End saírem (M16).
+    this.dragonFight.remember();
+    this.dragonFight.onDimensionChange();
     this.events.onDimensionChange?.(dimension);
     this.clearForDimension();
     this.world.dimension = dimension;
@@ -622,6 +648,27 @@ export class Session {
     const heldBlock = blockIdForItem(held.item);
     return heldBlock !== undefined
       && placesOnContainer(heldBlock, blockIdOf(this.world.getBlock(x, y, z)));
+  }
+
+  /** O jogador saiu do outro lado de um portal: conquista e, na volta do End, créditos. */
+  private arrived(route: TravelRoute): void {
+    if (route === 'end_in') {
+      // A plataforma fica a leste da ilha: chega olhando para ela.
+      this.player.yaw = -Math.PI / 2;
+      this.player.pitch = 0;
+      this.achievements.event('enter_end');
+      return;
+    }
+    if (route === 'end_out') {
+      if (this.dragonFight.state.killed && !this.dragonFight.state.creditsSeen) {
+        this.dragonFight.state.creditsSeen = true;
+        this.events.onCredits?.();
+      }
+      return;
+    }
+    this.achievements.event(
+      this.world.dimension === DIM_OVERWORLD ? 'return_overworld' : 'enter_nether',
+    );
   }
 
   /** Quantos hostis existem num raio de 8 blocos (dormir exige abrigo). */

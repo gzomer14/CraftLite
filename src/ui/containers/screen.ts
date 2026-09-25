@@ -23,13 +23,15 @@ import { injectStyle } from './screenstyle';
 import { TradePanel } from './tradepanel';
 import { AnvilPanel, type AnvilStatus } from './anvilpanel';
 import { EnchantPanel, type EnchantResult, type EnchantStatus } from './enchantpanel';
+import { BrewPanel } from './brewpanel';
+import { BREW_FUEL, BREW_INGREDIENT, BrewingStand } from '../../game/brewing';
 import type { TradeOfferView, TradeResult } from '../../game/trading';
 import type { RecipeEntry } from '../../game/crafting';
 
 /** Qual tela está aberta. */
 export type ScreenKind =
   | 'none' | 'inventory' | 'crafting' | 'furnace' | 'chest' | 'enchanting' | 'trading'
-  | 'anvil';
+  | 'anvil' | 'brewing';
 
 export type { EnchantResult } from './enchantpanel';
 
@@ -163,6 +165,8 @@ export class ContainerScreen {
   private column!: HTMLDivElement;
   /** Ofertas e frase da mesa de encantamento, criadas na primeira abertura. */
   private enchantPanel: EnchantPanel | null = null;
+  /** Barra e frase do suporte de preparo (M16). */
+  private brewPanel: BrewPanel | null = null;
 
   private inventory: Inventory | null = null;
   private container: ContainerView | null = null;
@@ -316,6 +320,16 @@ export class ContainerScreen {
     return this.kind;
   }
 
+  /**
+   * Redesenha a tela que muda sozinha: fornalha e suporte de preparo, cujo
+   * conteúdo anda no tick do mundo. Até 2026-09-24 nada chamava isto — a
+   * barra da fornalha ficava parada e a saída pronta só aparecia no próximo
+   * toque (M4). O `main.ts` chama a cada poucos ticks com a tela aberta.
+   */
+  tickLive(): void {
+    if (this.kind === 'furnace' || this.kind === 'brewing') this.refresh();
+  }
+
   /** Abre uma tela. `container` só é usado por fornalha, baú e bancada. */
   open(kind: ScreenKind, inventory: Inventory, container: ContainerView | null = null): void {
     if (kind === 'none') { this.close(); return; }
@@ -369,6 +383,7 @@ export class ContainerScreen {
     const titles: Record<ScreenKind, string> = {
       none: '', inventory: 'Inventário', crafting: 'Bancada',
       furnace: 'Fornalha', chest: 'Baú', enchanting: 'Mesa de Encantamento', anvil: 'Bigorna',
+      brewing: 'Suporte de Preparo',
       trading: this.callbacks.tradeTitle?.() ?? 'Aldeão',
     };
     this.title.textContent = titles[this.kind];
@@ -435,6 +450,11 @@ export class ContainerScreen {
       });
       this.anvilPanel.reset();
       this.column.appendChild(this.anvilPanel.element);
+    } else if (this.kind === 'brewing') {
+      this.addStation([[BREW_INGREDIENT, 'Ingrediente'], [BREW_FUEL, 'Combustível']]);
+      this.brewPanel ??= new BrewPanel();
+      this.column.appendChild(this.brewPanel.element);
+      this.addStation([[0, 'Frasco'], [1, 'Frasco'], [2, 'Frasco']]);
     } else if (this.kind === 'chest') {
       // Baú, e desde o M15 também funil, dispensador e liberador: a mesma
       // grade, com a largura e o título do contêiner.
@@ -824,6 +844,9 @@ export class ContainerScreen {
     }
 
     if (this.kind === 'furnace') this.refreshFurnace();
+    if (this.kind === 'brewing' && this.container instanceof BrewingStand) {
+      this.brewPanel?.refresh(this.container);
+    }
     if (this.kind === 'enchanting') {
       // As ofertas dependem do item no slot: três hashes por redesenho.
       this.callbacks.onEnchantRefresh?.();

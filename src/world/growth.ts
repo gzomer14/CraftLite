@@ -16,7 +16,7 @@ import {
   AIR, BLOCK_BY_NAME, DIRT, FARMLAND, GRASS_BLOCK, PODZOL, WATER,
   blockIdOf, defOf, makeState, stateBitsOf,
 } from '../data/blocks';
-import { cropOfState, type CropDef } from '../data/crops';
+import { cropOfState, cropSoilId, type CropDef } from '../data/crops';
 import { plantOfState, type PlantDef } from '../data/plants';
 import { TREE_MAX_HEIGHT, growTree, type TreeRng, type TreeWriter } from './trees';
 import { WORLD_HEIGHT } from './chunk';
@@ -205,7 +205,7 @@ export class Growth {
   /** Avança a idade se houver luz; cai se a terra sumiu debaixo dela. */
   private tickCrop(x: number, y: number, z: number, state: number, crop: CropDef): void {
     const soil = this.world.getBlock(x, y - 1, z);
-    if (blockIdOf(soil) !== FARMLAND) {
+    if (blockIdOf(soil) !== cropSoilId(crop)) {
       this.breakCrop(x, y, z, state);
       return;
     }
@@ -216,9 +216,10 @@ export class Growth {
     const light = Math.max(
       this.world.getBlockLight(x, y, z), this.world.getSkyLight(x, y, z),
     );
-    if (light < MIN_LIGHT) return;
+    if (light < MIN_LIGHT && crop.growsInDark !== true) return;
 
-    const moist = stateBitsOf(soil) > 0;
+    // Só a terra arada guarda umidade; a areia das almas é sempre "boa".
+    const moist = blockIdOf(soil) !== FARMLAND || stateBitsOf(soil) > 0;
     const chance = crop.growChance * (moist ? 1 : DRY_PENALTY);
     if (this.random() >= chance) return;
 
@@ -405,7 +406,8 @@ export class Growth {
 
     // Tirou o chão da plantação: ela cai na hora, não na próxima varredura.
     const above = this.world.getBlock(x, y + 1, z);
-    if (cropOfState(above) !== undefined && blockIdOf(state) !== FARMLAND) {
+    const crop = cropOfState(above);
+    if (crop !== undefined && blockIdOf(state) !== cropSoilId(crop)) {
       this.breakCrop(x, y + 1, z, above);
     }
   }

@@ -8,8 +8,13 @@
  * montou, e nenhuma guarda estado.
  */
 
-import { MOB_BY_NAME } from '../data/mobs';
-import { FIREBALL_FLAGS } from '../entity/projectile';
+import { MOB_BY_NAME, type ShotKind } from '../data/mobs';
+import { ITEM_BY_NAME, itemDef } from '../data/items';
+import { EFFECT_BY_NAME } from '../data/effects';
+import { POTIONS } from '../data/potions';
+import {
+  FIREBALL_FLAGS, FLAG_IGNITES, FLAG_NO_GRAVITY, FLAG_POTION,
+} from '../entity/projectile';
 import { GROW_TICKS, type MobEvents } from '../entity/mobs';
 import { EGG_HATCH_CHANCE } from './itemuse';
 import { ItemFlow } from './itemflow';
@@ -23,6 +28,31 @@ const HIT_RADIUS = 0.7;
 const FIREBALL_SPEED = 0.45;
 /** Força da explosão da bola de fogo: quebra ponte, não some com a base. */
 const FIREBALL_POWER = 1.6;
+/** Bola de fogo do blaze (M16): mais rápida que a do ghast, e não explode. */
+const SMALL_FIREBALL_SPEED = 0.7;
+/** Quanto tempo o jogador arde depois de levar a bola do blaze: 5 s. */
+const IGNITE_TICKS = 100;
+/** Velocidade do frasco da bruxa: lento, em arco. */
+const POTION_SPEED = 0.75;
+/** Raio em que o frasco quebrado pega o jogador. */
+const SPLASH_RADIUS = 4;
+/** O olho do ender cai (e não parte) quatro vezes em cinco (M16). */
+const EYE_SURVIVES = 0.8;
+/**
+ * As poções que a bruxa atira, por nome (M16). Uma lista, e não um sorteio
+ * na tabela de poções, porque a bruxa só atira o que faz mal.
+ */
+const WITCH_POTIONS: readonly number[] = ['poison_potion', 'slowness_potion', 'weakness_potion']
+  .map((name) => ITEM_BY_NAME.get(name)?.id ?? -1).filter((id) => id >= 0);
+/** Tiro de mob → bandeiras e velocidade do projétil. */
+const SHOT_FLAGS: Readonly<Record<ShotKind, number>> = {
+  arrow: 0, fireball: FIREBALL_FLAGS, small_fireball: FLAG_NO_GRAVITY | FLAG_IGNITES,
+  potion: FLAG_POTION,
+};
+const SHOT_SPEED: Readonly<Record<ShotKind, number>> = {
+  arrow: 1.2, fireball: FIREBALL_SPEED, small_fireball: SMALL_FIREBALL_SPEED,
+  potion: POTION_SPEED,
+};
 
 /**
  * Funil, dispensador e liberador (M15): o `ItemFlow` com o que ele toca, e o
@@ -120,12 +150,14 @@ export function mobEvents(s: Session, events: SessionEvents): MobEvents {
     },
     onArrow: (
       x: number, y: number, z: number,
-      dx: number, dy: number, dz: number, damage: number, fireball = false,
+      dx: number, dy: number, dz: number, damage: number, kind: ShotKind = 'arrow',
     ) => {
+      // O frasco não fere no golpe: quem fere é o efeito que ele espalha.
+      const item = kind === 'potion' && WITCH_POTIONS.length > 0
+        ? WITCH_POTIONS[Math.floor(s.random() * WITCH_POTIONS.length)] : 0;
       s.projectiles.spawn(
-        x, y, z, dx, dy, dz, damage, false,
-        fireball ? FIREBALL_SPEED : 1.2,
-        fireball ? FIREBALL_FLAGS : 0,
+        x, y, z, dx, dy, dz, kind === 'potion' ? 0 : damage, false,
+        SHOT_SPEED[kind], SHOT_FLAGS[kind], item,
       );
     },
     // Aldeia (M9): o aldeão abre a porta de casa, e bater nele tem memória.
@@ -138,7 +170,7 @@ export function mobEvents(s: Session, events: SessionEvents): MobEvents {
 
 /** A flecha acerta o jogador ou um mob — o primeiro que estiver no caminho. */
 export function wireProjectiles(s: Session, events: SessionEvents): void {
-  s.projectiles.onHit = (x, y, z, damage, fromPlayer) => {
+  s.projectiles.onHit = (x, y, z, damage, fromPlayer, flags) => {
     if (!fromPlayer) {
       const dx = x - s.player.x;
       const dy = y - (s.player.y + s.player.height * 0.5);
@@ -146,9 +178,14 @@ export function wireProjectiles(s: Session, events: SessionEvents): void {
       if (Math.abs(dx) < HIT_RADIUS && Math.abs(dz) < HIT_RADIUS
         && Math.abs(dy) < s.player.height * 0.5 + 0.2) {
         const length = Math.hypot(dx, dz) || 1;
-        s.combat.hurtPlayer(damage, 'arrow', (-dx / length) * 0.2, (-dz / length) * 0.2);
+        if (damage > 0) {
+          s.combat.hurtPlayer(damage, 'arrow', (-dx / length) * 0.2, (-dz / length) * 0.2);
+        }
+        if ((flags & FLAG_IGNITES) !== 0) s.survival.ignite(IGNITE_TICKS);
         return true;
       }
+      // Tiro de mob não acerta outro mob: o blaze não queima o vizinho.
+      if ((flags & (FLAG_IGNITES | FLAG_POTION)) !== 0) return false;
     }
     const store = s.mobs.store;
     for (let i = 0; i < store.active; i++) {
@@ -164,6 +201,34 @@ export function wireProjectiles(s: Session, events: SessionEvents): void {
     events.onSound?.('player/arrow', x, y, z);
   };
   s.projectiles.onExplode = (x, y, z) => { s.combat.explodeAt(x, y, z, FIREBALL_POWER); };
+  // M16: o olho do ender, a bola do blaze e o frasco da bruxa.
+  s.projectiles.onEye = (x, y, z) => {
+    const eye = ITEM_BY_NAME.get('ender_eye');
+    if (eye !== undefined && s.random() < EYE_SURVIVES) {
+      s.items.spawn(x, y, z, { item: eye.id, count: 1, damage: 0 });
+    } else {
+      events.onSound?.('break/glass', x, y, z);
+    }
+  };
+  s.projectiles.onIgnite = (x, y, z) => {
+    s.fire.ignite(Math.floor(x), Math.floor(y), Math.floor(z));
+  };
+  s.projectiles.onPotion = (x, y, z, item) => {
+    events.onSound?.('break/glass', x, y, z);
+    const dx = s.player.x - x;
+    const dy = s.player.y + 1 - y;
+    const dz = s.player.z - z;
+    if (dx * dx + dy * dy + dz * dz > SPLASH_RADIUS * SPLASH_RADIUS) return;
+    if (s.player.mode !== 'survival') return;
+    const name = itemDef(item)?.name;
+    const potion = POTIONS.find((p) => p.name === name);
+    const effect = potion?.effect === undefined ? undefined : EFFECT_BY_NAME.get(potion.effect);
+    if (potion === undefined || effect === undefined) return;
+    // Arremessada, a poção dura três quartos do que duraria bebida.
+    s.survival.effects.add(
+      effect.id, potion.level ?? 1, Math.round((potion.seconds ?? 0) * 20 * 0.75), s.survival,
+    );
+  };
   // Ovo quebrado: um em oito choca (doc 07 §1).
   s.projectiles.onEgg = (x, y, z) => {
     if (s.random() >= EGG_HATCH_CHANCE) return;

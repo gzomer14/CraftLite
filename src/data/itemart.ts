@@ -19,6 +19,7 @@
  */
 
 import { DYES } from './dyes';
+import { POTIONS } from './potions';
 import type { Rgb } from '../render/texgen';
 
 export interface ItemArt {
@@ -911,6 +912,27 @@ export const SHAPES: Record<string, readonly string[]> = {
   ],
 };
 
+// Frasco (M16): gargalo com rolha, bojo de vidro em `m` e o líquido em `a`.
+// O frasco vazio usa o acento igual ao vidro.
+SHAPES.bottle = [
+  '................',
+  '......xxxx......',
+  '......xddx......',
+  '.......xx.......',
+  '......xMmx......',
+  '......xMmx......',
+  '.....xMaamx.....',
+  '....xMaaaamx....',
+  '...xMaAaaaamx...',
+  '...xMAaaaaamx...',
+  '...xmaaaaaamx...',
+  '...xmaaaaaadx...',
+  '....xmaaaadx....',
+  '.....xxxxxx.....',
+  '................',
+  '................',
+];
+
 // --- paleta -----------------------------------------------------------------
 
 const WOOD: Rgb = [140, 106, 62];
@@ -1006,6 +1028,16 @@ const SIMPLE: Record<string, [string, Rgb]> = {
   enchanted_book: ['sheet', [126, 70, 176]],
   cod: ['fish', [190, 164, 116]],
   cooked_cod: ['fish', [206, 140, 74]],
+  // M16: o que a fortaleza do Nether dá e o que a poção pede.
+  blaze_rod: ['rod', [242, 184, 62]],
+  blaze_powder: ['dust', [238, 150, 40]],
+  nether_wart: ['seeds', [150, 32, 44]],
+  ender_eye: ['eye', [58, 172, 132]],
+  magma_cream: ['round', [222, 112, 42]],
+  gold_nugget: ['chunk', GOLD],
+  glistering_melon_slice: ['round', [232, 170, 84]],
+  golden_carrot: ['carrot', GOLD],
+  fermented_spider_eye: ['eye', [150, 76, 62]],
 };
 
 /** Arte por nome de item, montada uma vez no boot. */
@@ -1059,6 +1091,12 @@ function buildArt(): Record<string, ItemArt> {
   };
   out.clock = { shape: 'dial', color: [232, 190, 60], accent: [96, 150, 220], dial: 'sky', hold: 'face' };
   out.map = { shape: 'map', color: [226, 214, 176], accent: [70, 120, 196], hold: 'face' };
+  // Frascos (M16): o vidro é o mesmo, o líquido é a cor da poção.
+  const glass: Rgb = [200, 222, 232];
+  out.glass_bottle = { shape: 'bottle', color: glass, accent: [214, 232, 240] };
+  for (const potion of POTIONS) {
+    out[potion.name] = { shape: 'bottle', color: glass, accent: [potion.color[0], potion.color[1], potion.color[2]] };
+  }
   /*
    * Corante e cama coloridos (M8). São a mesma silhueta em oito cores — o
    * caso que este módulo existe para resolver: o desenho é o papel, a cor é o

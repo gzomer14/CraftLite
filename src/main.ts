@@ -52,6 +52,9 @@ import { SaveDatabase, isAvailable as saveAvailable, type WorldMeta } from './sa
 import { SaveManager } from './save/savemanager';
 import { MenuFlow, newWorldMeta } from './ui/menuflow';
 import { DeathScreen } from './ui/screens/death';
+import { CreditsScreen } from './ui/screens/credits';
+import { BossBar } from './ui/bossbar';
+import { ACHIEVEMENTS } from './data/achievements';
 import { SignEditor } from './ui/screens/signeditor';
 import { SignTextPass } from './render/signtext';
 import { SceneFeed } from './render/scenefeed';
@@ -235,6 +238,9 @@ async function boot(): Promise<void> {
   const hud = new Hud(settings);
   const effectsBar = new EffectsBar();
   hud.mount(effectsBar.el);
+  // A vida do dragão, no alto da tela, só no End (M16).
+  const bossBar = new BossBar('Dragão do End');
+  hud.mount(bossBar.element);
   // Marcadores na borda de cima (M10).
   const markerBar = new MarkerBar();
   hud.mount(markerBar.element);
@@ -276,6 +282,7 @@ async function boot(): Promise<void> {
     spawned = false;
   };
   const deathScreen = new DeathScreen({ onRespawn: respawn, onQuit: respawn });
+  const creditsScreen = new CreditsScreen(() => { /* o jogo segue de onde estava */ });
 
   const session = new Session(world, player, {
     onDimensionChange: (dimension) => {
@@ -320,6 +327,14 @@ async function boot(): Promise<void> {
     onSound: (name, x, y, z) => audio.play(name, x, y, z),
     onMessage: (text) => hud.showMessage(text),
     onAchievement: (title, description) => hud.showAchievement(title, description),
+    // O fim da jornada (M16): de volta do End, com o dragão derrubado.
+    onCredits: () => {
+      controls.mouse.exitLock();
+      creditsScreen.show({
+        stats: session.journal.stats.values, days: session.dayNight.day + 1,
+        achievements: session.achievements.count, achievementTotal: ACHIEVEMENTS.length,
+      });
+    },
     onHurt: () => {
       hud.flashDamage();
       if (settings.get('vibration')) navigator.vibrate?.(20);
@@ -350,7 +365,7 @@ async function boot(): Promise<void> {
    * jogo de todo dia não expõe nada.
    */
   if (/[?&]smoke\b/.test(location.search)) {
-    (window as unknown as { __craftlite?: unknown }).__craftlite = { world, player, session, items: ITEM_BY_NAME };
+    (window as unknown as { __craftlite?: unknown }).__craftlite = { world, player, session, items: ITEM_BY_NAME, renderer, pipeline };
   }
   renderer.blockLightAt = (x, y, z) => (world.getSkyLight(x, y, z) << 4) | world.getBlockLight(x, y, z);
   // Item na mão (doc 01 §191). O passe é uma draw call e limpa a profundidade,
@@ -397,6 +412,9 @@ async function boot(): Promise<void> {
     }
     player.setPosition(meta.spawn[0] + 0.5, SEA_LEVEL + 30, meta.spawn[2] + 0.5);
   }
+  // O portal de saída do End leva ao nascimento de quem não tem cama (M16).
+  session.worldSpawnX = meta.spawn[0];
+  session.worldSpawnZ = meta.spawn[2];
 
   if (!restored) {
     // Modo criativo começa com blocos para experimentar.
@@ -530,7 +548,7 @@ async function boot(): Promise<void> {
 
   const hudFeed = new HudFeed({
     hud, effectsBar, touchUi: isTouchDevice ? touchUi : null, debug, session, controls, settings,
-    renderer, pipeline, audio, itemSprites, markerBar,
+    renderer, pipeline, audio, itemSprites, markerBar, bossBar,
     compassTarget: () => [meta.spawn[0] + 0.5, meta.spawn[2] + 0.5],
   });
 
@@ -594,7 +612,9 @@ async function boot(): Promise<void> {
 
       // Com uma tela de contêiner aberta o mundo continua rodando, mas o
       // jogador não interage com ele (doc 08 §4.2). O mapa (M10) também.
-      if (containerScreen.isOpen || creativeScreen.isOpen || deathScreen.isOpen || mapScreen.isOpen) {
+      if (containerScreen.isOpen || creativeScreen.isOpen || deathScreen.isOpen || mapScreen.isOpen
+        || creditsScreen.isOpen) {
+        if (loop.stats.tick % 4 === 0) containerScreen.tickLive();
         actions.idle();
         return;
       }
@@ -648,6 +668,7 @@ async function boot(): Promise<void> {
       camera.fovDeg += (wantFov - camera.fovDeg) * 0.18;
 
       renderer.skyFlash = session.weather.flash;
+      renderer.nightVision = session.survival.effects.nightVision;
       renderer.setDayTime(
         dayNight.time, dayNight.dayFactor, session.weather.intensity, session.weather.moonPhase,
       );

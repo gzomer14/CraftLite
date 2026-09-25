@@ -23,6 +23,7 @@ import type { Hud } from './hud';
 import type { TouchUi } from './touchui';
 import type { ItemSprites } from '../render/itemsprites';
 import type { MarkerBar } from './markerbar';
+import type { BossBar } from './bossbar';
 
 export interface HudFeedDeps {
   hud: Hud;
@@ -41,6 +42,8 @@ export interface HudFeedDeps {
   compassTarget?: () => readonly [number, number];
   /** Marcadores na borda de cima (M10). */
   markerBar?: MarkerBar;
+  /** Vida do dragão (M16). */
+  bossBar?: BossBar;
 }
 
 const COMPASS = ITEM_BY_NAME.get('compass')?.id ?? -1;
@@ -105,6 +108,7 @@ export class HudFeed {
     hud.setStats(survival.health, survival.hunger, survival.air, MAX_AIR, session.armorPoints);
     hud.setExperience(session.xp.level, session.xp.progress);
     effectsBar.update(survival.effects, survival.absorption);
+    this.d.bossBar?.update(session.dragonFight.bossHealth);
     hud.setFps(loop.stats.fps, settings.get('showFps'));
     if (touchUi !== null) {
       const aimX = ((controls.aimNdcX + 1) / 2) * window.innerWidth;

@@ -358,6 +358,15 @@ const MOB_VOICES: Record<string, VoiceSpec> = {
   ghast: { freq: 520, type: 'sine', formants: [900, 2100], vibrato: 0.08, noise: 0.18 },
   // O golem de ferro (M9): grave e metálico, mais rangido que voz.
   iron_golem: { freq: 70, type: 'square', formants: [240, 620], noise: 0.35 },
+  // M16. O blaze respira fogo: grave, quase só chiado.
+  blaze: { freq: 140, type: 'sawtooth', formants: [380, 900], noise: 0.7 },
+  // A bruxa ri pelo nariz: médio, trêmulo.
+  witch: { freq: 240, type: 'triangle', formants: [520, 1300], vibrato: 0.07, noise: 0.15 },
+  // O dragão: o mais grave do jogo, com rugido de garganta.
+  ender_dragon: { freq: 48, type: 'sawtooth', formants: [180, 460], vibrato: 0.03, noise: 0.35 },
+  // O cristal do End zumbe: seno grave, quase sem ruído — dez deles ao mesmo
+  // tempo não podem virar um apito.
+  end_crystal: { freq: 110, type: 'sine', formants: [330, 660], vibrato: 0.02, noise: 0.05 },
 };
 
 /** Variação de cada tipo de vocalização a partir da voz base. */
@@ -429,6 +438,9 @@ const BASE_SOUNDS: Record<string, Recipe> = {
   // cansar enquanto o incêndio anda.
   'block/fire': { kind: 'noise', duration: 0.35, color: 'pink', gain: 0.3, attack: 0.004, decay: 0.3, filter: 'bandpass', freq: 1100, freqTo: 480, q: 1.1 },
   // Água virando vapor no Nether: chiado agudo que morre rápido.
+  // M16: o portal do End acendendo. Beber usa o som de comer: um gole a
+  // mais custaria 40 KB, e a memória de áudio mora colada no teto.
+  'block/end_portal': { kind: 'arpeggio', notes: [130.81, 196, 261.63, 392], step: 0.14, gain: 0.3, decay: 0.9 },
   'block/evaporate': { kind: 'noise', duration: 0.35, color: 'white', gain: 0.3, attack: 0.002, decay: 0.32, filter: 'highpass', freq: 2400, freqTo: 5200 },
 
   /*

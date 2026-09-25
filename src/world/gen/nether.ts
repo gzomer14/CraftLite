@@ -28,6 +28,7 @@ import { hash3 } from '../../core/rng';
 import { DIM_NETHER, dimensionOf } from '../../data/dimensions';
 import { ChunkColumn, SECTION_SIZE, WORLD_HEIGHT } from '../chunk';
 import { computeChunkLight } from './terrain';
+import { placeFortress } from './fortress';
 
 /** Topo do mar de lava. Abaixo disto, o que não é rocha é lava. */
 export const LAVA_SEA_LEVEL = 31;
@@ -117,6 +118,8 @@ export interface NetherOptions {
   ores?: boolean;
   /** Areia das almas e glowstone no teto. */
   decoration?: boolean;
+  /** Fortaleza (M16). */
+  structures?: boolean;
 }
 
 /**
@@ -143,6 +146,10 @@ export function generateNetherChunk(
       buildColumn(chunk, noise, salted, lx, lz, withOres, withDecoration);
     }
   }
+
+  // A fortaleza (M16) entra depois do maciço: as pontes cavam a rocha e os
+  // pilares procuram o chão que o ruído deixou.
+  if (options.structures ?? true) placeFortress(chunk, seed);
 
   chunk.recomputeHeightMap();
   /*

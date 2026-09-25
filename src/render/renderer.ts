@@ -48,6 +48,9 @@ export interface HighlightState {
  */
 const NETHER_DAY_FACTOR = 0.35;
 
+/** Piso de luz com Visão Noturna: a caverna se lê, sem virar meio-dia. */
+const NIGHT_VISION_LIGHT = 0.8;
+
 export class Renderer {
   readonly ctx: GlContext;
   readonly camera = new Camera();
@@ -110,6 +113,8 @@ export class Renderer {
    * mora aqui e é reaplicado lá.
    */
   minSkyLight = 0.06;
+  /** Visão Noturna ativa (M16): o piso de luz vai quase ao dia claro. */
+  nightVision = false;
   /**
    * Névoa do doc 08 §3.11: `off` sem névoa, `near` densa, `far` o padrão.
    *
@@ -270,7 +275,9 @@ export class Renderer {
     this.dayTime = dayTime;
     this.sky.update(dayTime, moonPhase);
     this.sky.applyRain(rain);
-    this.skyParams.minSkyLight = Math.max(this.minSkyLight, this.ambient);
+    this.skyParams.minSkyLight = Math.max(
+      this.minSkyLight, this.ambient, this.nightVision ? NIGHT_VISION_LIGHT : 0,
+    );
 
     const override = this.fogOverride;
     if (override !== null) {

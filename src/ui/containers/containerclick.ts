@@ -8,6 +8,7 @@
 
 import { itemDef, type ItemStack } from '../../data/items';
 import { Furnace, type ContainerView } from '../../game/container';
+import { brewingAccepts } from '../../game/brewing';
 import type { ClickButton, Inventory } from '../../game/inventory';
 import type { ScreenKind } from './screen';
 
@@ -52,6 +53,9 @@ if (container === null) return;
   }
 
   const cursor = inventory.cursor;
+
+  // Suporte de preparo (M16): frasco só nos frascos, pó só no combustível.
+  if (kind === 'brewing' && cursor !== null && !brewingAccepts(index, cursor.item)) return;
 
   // Saída da fornalha só sai, nunca entra — e leva junto o XP guardado.
   if (kind === 'furnace' && index === 2) {

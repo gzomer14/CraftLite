@@ -27,6 +27,24 @@ export interface EffectDef {
   damageEvery?: number;
   /** Vida extra, em pontos, por nível — gasta antes da vida (Absorção). */
   absorptionPerLevel?: number;
+  // --- poções (M16) ----------------------------------------------------------
+  /**
+   * Fração somada à velocidade de andar por nível: +0,2 é Velocidade, −0,15
+   * Lentidão. Quem lê é a física do jogador, pelo multiplicador que
+   * `StatusEffects.speedMultiplier` soma.
+   */
+  speedPerLevel?: number;
+  /** Dano somado ao golpe corpo a corpo por nível: +3 Força, −4 Fraqueza. */
+  attackPerLevel?: number;
+  /** Enxerga no escuro: o render sobe o piso de luz (Visão Noturna). */
+  nightVision?: boolean;
+  /** Fogo e lava não ferem (Resistência ao Fogo). */
+  fireImmune?: boolean;
+  /**
+   * Cura na hora, em pontos por nível, e não fica ativo (Cura Instantânea).
+   * Sem duração: `add` aplica e sai, sem ícone no HUD.
+   */
+  instantHeal?: number;
 }
 
 export const EFFECTS: readonly EffectDef[] = [
@@ -47,6 +65,35 @@ export const EFFECTS: readonly EffectDef[] = [
   {
     id: 3, name: 'poison', display: 'Veneno', color: [78, 147, 49], harmful: true,
     damageEvery: 25,
+  },
+  // --- M16: os efeitos das poções, no fim (o id vai para o save) -------------
+  {
+    id: 4, name: 'speed', display: 'Velocidade', color: [124, 175, 198], harmful: false,
+    speedPerLevel: 0.2,
+  },
+  {
+    id: 5, name: 'slowness', display: 'Lentidão', color: [90, 108, 129], harmful: true,
+    speedPerLevel: -0.15,
+  },
+  {
+    id: 6, name: 'strength', display: 'Força', color: [147, 36, 35], harmful: false,
+    attackPerLevel: 3,
+  },
+  {
+    id: 7, name: 'weakness', display: 'Fraqueza', color: [72, 77, 72], harmful: true,
+    attackPerLevel: -4,
+  },
+  {
+    id: 8, name: 'night_vision', display: 'Visão Noturna', color: [31, 31, 161], harmful: false,
+    nightVision: true,
+  },
+  {
+    id: 9, name: 'fire_resistance', display: 'Resistência ao Fogo', color: [228, 154, 58],
+    harmful: false, fireImmune: true,
+  },
+  {
+    id: 10, name: 'instant_health', display: 'Cura Instantânea', color: [248, 36, 35],
+    harmful: false, instantHeal: 4,
   },
 ];
 

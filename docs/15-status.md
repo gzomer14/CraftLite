@@ -9,7 +9,15 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-24 15:28 — **M15 no campo, primeira volta.** A mesa de
+**Última atualização:** 2026-09-25 12:09 — **M16 fechado: um fim para a jornada.** Fortaleza do
+Nether com blaze, poções no suporte de preparo, olho do ender, fortaleza da superfície com a sala
+do portal, o End como terceira dimensão, o dragão com os cristais, o portal de saída, o ovo e os
+créditos. A cadeia do tronco ao dragão fecha sobre as tabelas (`tests/journey.test.ts`) e cada elo
+roda de verdade (`tests/theend.test.ts`); o dragão custa 0,04 ms por tick. Três defeitos antigos
+achados no caminho (§4): os marcos de estrutura não atravessavam o worker desde o M6 (baú de
+dungeon vazio), a tela da fornalha não se atualizava sozinha desde o M4, e uma malha pedida antes
+do portal podia marcar pronta a coluna da outra dimensão (M7). Antes, 15:40: **M15 validado em
+campo** (*"Tudo funcionando perfeitamente!"*). Antes, 15:28: **M15 no campo, primeira volta.** A mesa de
 encantamento e a bigorna não diziam qual slot recebia o quê (os rótulos existiam no DOM e nenhum
 CSS os mostrava), e o funil não entrava em cima do baú porque o toque abria o baú. Slots com nome
 embaixo, uma frase com o próximo passo e a regra de colocar funil colado em contêiner (§3, M15).
@@ -50,8 +58,8 @@ três perdas de encantamento antigas foram corrigidas (§4). Antes, 11:03: M14 v
 | **M12** O mundo chega antes do jogador | culling por conectividade e por direção de face, cópia de vizinhança fora da thread principal, luz na borda do chunk | ✅ **validado em campo em 2026-09-23** | preset do T0 não revisto (sem T0 na mão) — §3 |
 | **M13** Casa em ordem | uso de item como dado, `session.ts` e `main.ts` abaixo de 700 linhas, lã e cama em 16 cores por tint | ✅ **validado em campo em 2026-09-23** | — |
 | **M14** Água e paisagem | visão submersa, rios, pesca, afogado, lua com fases, biomas por tint, selva | ✅ **validado em campo em 2026-09-24** | muda o terreno gerado: **mundo antigo ganha costura** (§3) |
-| **M15** Oficina | bigorna, reparo na grade, funil, dispensador, comparador, observador | ✅ concluído em 2026-09-24; **1ª volta de campo corrigida** (telas e funil) | reteste no aparelho (§6) |
-| **M16** Um fim para a jornada | fortaleza do Nether, blaze, poções, olho do ender, End, dragão, créditos | ⬜ proposto (2026-09-22) | depende de M11 (efeitos) e M13 (atlas); a bruxa veio para cá (§5) |
+| **M15** Oficina | bigorna, reparo na grade, funil, dispensador, comparador, observador | ✅ **validado em campo em 2026-09-24** (depois da 1ª volta corrigida: telas e funil) | — |
+| **M16** Um fim para a jornada | fortaleza do Nether, blaze, poções, olho do ender, End, dragão, créditos, bruxa | ✅ concluído em 2026-09-24 | **não visto em aparelho**; End em T0 não medido (§6) |
 | **M17** Alcance | menu Idioma (doc 08 §3.11) com `en`, primeira hora guiada, seed compartilhável | ⬜ proposto (2026-09-22) | — |
 
 **O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
@@ -65,21 +73,23 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-24 15:28, na primeira volta de campo do M15, com `npm test`, `npm run build`,
+Medidas em 2026-09-24 17:14, ao fechar o M16, com `npm test`, `npm run build`,
 `SIZE_BUDGET_KB=350 npm run size` e `npm run smoke`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **267,3 KB** (265,7 ao fechar o M15; 257,9 antes do M15; 249,5 antes do M14; 240,0 antes do M10) | < 350 KB | `npm run size` |
-| Testes | **2164**, 109 arquivos (2156 ao fechar o M15; 2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
+| Bundle (gzip, tudo) | **282,5 KB** (267,3 antes do M16; 265,7 ao fechar o M15; 257,9 antes do M15; 249,5 antes do M14; 240,0 antes do M10) | < 350 KB | `npm run size` |
+| Testes | **2235**, 113 arquivos (2164 antes do M16; 2156 ao fechar o M15; 2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
 | Smoke test de navegador | **7 passos verdes**: carregar, criar, andar 10 s, quebrar, salvar, recarregar, conferir | verde | `npm run smoke` |
-| Camadas de atlas | **212** com a oficina (+11: bigorna, funil, dispensador, liberador, comparador, observador); 201 com a selva; 194 antes do M14 | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
-| Memória de áudio | **3,140 MB** (3,497 no M14, colado no teto): degrau de ¼ da taxa para som grave, sem tirar nenhum (§4) | < 3,5 MB | `tests/audio.test.ts` |
+| Camadas de atlas | **223** com o M16 (+11: verruga, suporte, pedra do End, moldura com e sem olho, portal do End, ovo); **212** com a oficina (+11: bigorna, funil, dispensador, liberador, comparador, observador); 201 com a selva; 194 antes do M14 | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
+| Memória de áudio | **3,442 MB** com as vozes do blaze, da bruxa, do dragão e do cristal (§5: perto do teto de novo); **3,140 MB** no M15 (3,497 no M14, colado no teto): degrau de ¼ da taxa para som grave, sem tirar nenhum (§4) | < 3,5 MB | `tests/audio.test.ts` |
 | Mapa explorado (M10) | **0,23 ms por segundo de jogo**; 500 blocos = 16 regiões, ~146 KB; voando a 20 blocos/s, zero buraco | < 1 ms/s; ≤ 64 regiões | `tests/journal.test.ts` |
 | Geração de chunk | **6,4 ms** (mediana; 6,2 antes do rio) | < 25 ms | `tests/perf.test.ts` |
 | Clima do tint de bioma, thread principal | **8–9 µs por chunk** (até 32 por quadro) | < 60 µs | `tests/perf.test.ts` |
 | Rio (seed 2, 768×768 blocos) | atravessa deserto e planície; maior degrau **≤ 8** | sem parede | `tests/rivers.test.ts` |
 | Pesca | **≥ 10 peixes em 5 min** de jogo, reagindo em 0,3 s | 10 em 5 min (aceite do M14) | `tests/fishing.test.ts` |
+| Dragão com os dez cristais | **0,04 ms** no 3º pior de 300 ticks | < 1 ms (aceite do M16) | `tests/theend.test.ts` |
+| Cadeia do tronco ao dragão | olho do ender, arco, espada de diamante, obsidiana e as cinco poções alcançáveis só com o que o mundo dá | aceite do M16 | `tests/journey.test.ts` |
 | 32 funis movendo item | **0,35 ms** no pior tick (funil + circuito) | < 5 ms (aceite do M15) | `tests/workshop.test.ts` |
 | Bigorna e fornalha automática | picareta de diamante encantada **10% → 100%** com 4 diamantes, sem perder o encantamento; baú → funil → fornalha funde **64 de 64** | aceite do M15 | `tests/workshop.test.ts` |
 | Geração de chunk do Nether | 5,1 ms (mediana; 3,8 antes de a luz entrar) | < 25 ms | `tests/perf.test.ts` |
@@ -1785,6 +1795,86 @@ comparador lê o contêiner encostado (não através de bloco) e as laterais ace
 (`world/redstoneparts.ts`); comparador e observador energizando um bloco sólido realimentam pó com
 15, a regra do circuito do M7.
 
+### M16 — Um fim para a jornada ✅ — 2026-09-24
+
+Pedido: *"Tudo funcionando perfeitamente! Agora vamos partir para implementação do M16"* — com o
+M15 validado em campo no mesmo recado. O que cada item virou:
+
+- **Fortaleza do Nether** (`world/gen/fortress.ts`). Uma por região de 16×16 chunks, inteira
+  dentro dela: nenhum ponto do Nether fica a mais de ~300 blocos de uma (teste em quatro pontos).
+  Cruz de pontes de tijolo sobre a lava — cruzamento no centro, quatro pontes de 20 a 36 blocos com
+  cerca (bloco novo), **pilares que descem até achar chão** (peça nova `pillar` em
+  `data/structures.ts`) e pedra luminosa na grade a cada 8 blocos, que é o que se vê de longe na
+  névoa. Nas pontas: duas salas com **gerador de blaze**, o **jardim de verruga** madura na areia
+  das almas, e a sala do baú (loot `nether_fortress`). Onde a ponte atravessa rocha, vira corredor.
+- **Blaze** (mob 18): voa baixo (traço novo `hoverHeight`), atira a bola pequena que **incendeia**
+  (o jogador passa a arder, `Survival.burnTicks`; a água apaga), imune a fogo, dá vara de blaze.
+  Nasce do gerador e também sozinho, mas só pisando em tijolo do Nether — isto é, na fortaleza.
+- **Poções** (`data/potions.ts`, `game/brewing.ts`). Cada poção é um **item** (frasco d'água,
+  estranha, cura, força, velocidade, visão noturna, resistência ao fogo, veneno, fraqueza,
+  lentidão), e o preparo é a tabela `BREWING`: água + verruga → estranha → o ingrediente dá o
+  efeito. **Suporte de preparo** (bloco e tela nova): três frascos, ingrediente e pó de blaze como
+  combustível (20 preparos por pó), 20 s por preparo, com a tela fechada; frasco só nos frascos e
+  pó só no combustível, pelo toque e pelo funil. Beber é o caminho de comer (`food.drink`) e deixa
+  o frasco. **Efeitos novos** na tabela do M11: velocidade e lentidão mexem no andar
+  (`Player.speedFactor`), força e fraqueza no golpe, visão noturna no piso de luz do render,
+  resistência ao fogo na lava e na chama, e cura instantânea, que age e não fica na lista.
+- **Olho do ender** (`game/journeyuses.ts`, `world/gen/strongholdsites.ts`): pérola + pó. Voa ~12
+  blocos na direção da fortaleza mais perto, subindo; a menos de 16 blocos dela, mergulha para o
+  chão. Cai de volta quatro vezes em cinco. Na moldura do portal, encaixa em vez de voar. No Nether
+  e no End, fica na mão.
+- **Fortaleza da superfície** (`world/gen/stronghold.ts`). Três por mundo, num anel entre 448 e
+  768 blocos da origem. A **sala do portal** com as doze molduras em volta do vão sobre a lava
+  (cada moldura já com olho uma vez em dez), a **biblioteca** com baú de livros e mapas, dois
+  **depósitos** com baú (pão, ferro, pérolas) e um **poço com escada de mão** do corredor até a
+  superfície, onde termina num anel de pedra com uma luz.
+- **Portal do End** (`game/endportal.ts`): o décimo segundo olho acende o vão 3×3. Entrar leva ao
+  End na hora.
+- **O End** (`world/gen/end.ts`, `data/dimensions.ts`): a terceira dimensão, sem céu, névoa
+  roxa-escura e luz ambiente alta. A ilha de pedra do End com a borda recortada por ruído, **dez
+  colunas de obsidiana** com rocha-mãe no topo e a bacia do portal de saída, apagada, no centro. A
+  chegada é uma plataforma de obsidiana a um bloco da borda, na altura dela, olhando para a ilha.
+- **O dragão** (mob 20, `entity/ai/dragongoals.ts`): circula num anel de doze pontos entre as
+  colunas, **investe** no jogador (bate e empurra), **pousa** no portal por 10 s — a janela da
+  espada — e sobe de novo. Pousa mais quando não há cristal. Atravessa blocos (traço `noClip`), não
+  é empurrado, e tem barra de vida no alto da tela (`ui/bossbar.ts`).
+- **Cristais** (mob 21): um em cada coluna; um golpe ou uma flecha e explodem (traço
+  `explodesOnDeath`, a explosão sai no tick seguinte para não mexer no pool no meio de uma volta).
+  Enquanto houver um, o dragão se cura. **A luta** (`game/dragonfight.ts`) é quem guarda memória,
+  porque mob não vai para o save: se o dragão caiu, quais cristais quebraram, a vida dele e se os
+  créditos já passaram, na meta do mundo. O dragão caído acende o **portal de saída** e põe o
+  **ovo** em cima.
+- **Créditos** (`ui/screens/credits.ts`): a primeira volta pelo portal de saída depois do dragão
+  leva para a cama (ou o nascimento do mundo) e abre os créditos — dias no mundo, as estatísticas
+  do M10 e as conquistas —, que sobem devagar e fecham com um toque.
+- **Bruxa** (mob 19), que veio do M14: mora na cabana do pântano e nasce de noite nele; atira
+  frasco de veneno, lentidão ou fraqueza, que pega em quem está a 4 blocos.
+- **Conquistas**: seis novas, da vara de blaze ao dragão. O bibliotecário passou a vender pérola
+  (4 esmeraldas): o olho do ender não pode depender só de caçar à noite.
+
+**Critérios de aceite** (`tests/journey.test.ts`, `tests/theend.test.ts`): a cadeia de itens —
+partindo só do que se quebra, do que os mobs que nascem sozinhos soltam, dos baús das estruturas e
+do que o aldeão vende — alcança o olho do ender, arco, espada de diamante, obsidiana e as cinco
+poções (e o teste falha, conferido, quando o blaze sai da conta). Cada elo com mundo roda: o olho
+voa na direção da fortaleza e cai; o décimo segundo olho acende o portal; entrar constrói a
+plataforma; os dez cristais e o dragão nascem; a cura para sem cristal; o dragão pousa, investe e
+acerta; cai e abre o portal com o ovo; a volta dá os créditos uma vez só; o estado vai para o save.
+**Dragão e dez cristais: 0,04 ms no pior tick** (teto 1). **O End em T0 a 30 FPS não foi medido.**
+
+**Visto no Chrome headless** (seed `2`): a fortaleza do Nether (ponte, cercas, luzes e a Visão
+Noturna), a sala do portal com as doze molduras e o musgo, a boca do poço no deserto, a chegada no
+End olhando a ilha, a ilha com as colunas e os cristais, o dragão de perto, o portal de saída com
+o ovo e a conquista, os créditos, o suporte de preparo e o blaze e a bruxa. Duas correções saíram
+daí: a plataforma de chegada ficava abaixo da borda da ilha e de costas para ela.
+
+**Desvios conscientes, no comentário do módulo:** três fortalezas da superfície num anel de 448 a
+768 blocos, não 128 a partir de 1280 (`strongholdsites.ts`); o poço com escada até a superfície,
+que o gênero não tem (`stronghold.ts`); a direção das molduras não conta para acender
+(`endportal.ts`); só a ilha principal do End, sem as de fora, e a chegada a um bloco da borda em
+vez de (100, 48, 0) (`end.ts`); cada poção é um item, não um item com o efeito em bits; o dragão
+não quebra blocos, não sopra fogo e não tem animação de morte; o blaze atira uma bola por vez, não
+rajadas de três; beber usa o som de comer (a memória de áudio).
+
 ## 4. Correções fora de marco
 
 Bugs anteriores encontrados durante o M5 e já corrigidos — ficam registrados porque explicam
@@ -1792,6 +1882,9 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-24 | `workers/genjob.ts`, `workers/protocol.ts`, `world/pipeline.ts` | **Os marcos de estrutura nunca atravessaram o worker** (M6). O gerador marcava o baú com a tabela de loot e o gerador de monstros com o mob, mas a resposta do worker levava só sections, altura e bioma: o baú de dungeon, de mina, de aldeia e de naufrágio **abria vazio**, e o gerador de monstros da dungeon era um bloco inerte. Os testes geravam a coluna direto, sem worker, e nunca viram. A geração do worker saiu para `genjob.ts` (testável) e a resposta leva os marcos. Achado porque a fortaleza do Nether ficaria sem blaze. Mundo antigo: coluna nunca modificada ganha o loot ao voltar; a gravada no save continua como está. Regressão em `tests/journeygen.test.ts`. |
+| 2026-09-24 | `ui/containers/screen.ts`, `main.ts` | **A tela da fornalha não andava sozinha** (M4). Nada redesenhava a tela de contêiner com o tick: a barra de progresso ficava parada e a saída pronta só aparecia no próximo toque. Agora a fornalha e o suporte de preparo se redesenham a cada 4 ticks com a tela aberta (`tickLive`). |
+| 2026-09-24 | `world/pipeline.ts`, `workers/meshjob.ts` | **Malha pedida antes do portal marcava pronta a coluna da outra dimensão** (M7). A resposta de meshing não dizia a dimensão: entregue depois da travessia, ela achava a coluna nova de mesma coordenada, marcava-a pronta com a geometria velha e apagava o registro do pedido novo. O pedido agora leva a dimensão, e a resposta de outra é descartada, como a geração já fazia. Regressão em `tests/journeygen.test.ts` (sem a guarda, o teste falha — conferido). |
 | 2026-09-24 | `ui/containers/screen.ts` | **Os rótulos dos slots de slot único nunca apareceram** (M4). A fornalha passava "Entrada", "Combustível" e "Saída" para `addSection`, que os guardava num `data-hint` sem CSS nenhum desde o primeiro commit: estavam no DOM e não na tela. Achado no relato de campo da mesa de encantamento (§3, M15); agora vão escritos embaixo do slot. |
 | 2026-09-24 | `game/session.ts` | **Agachar não mudava o clique** (desde o primeiro commit). O gênero coloca o bloco ao lado do baú quando se está agachado; aqui o clique num contêiner, porta ou alavanca sempre respondia ao bloco. Agora, agachado com algo na mão, o clique vai para o item. Regressão em `tests/workshop.test.ts`. |
 | 2026-09-24 | `game/inventory.ts`, `ui/containers/containerclick.ts`, `game/workbench.ts` | **Três cópias de pilha perdiam o encantamento** (M6). Tirar metade com clique direito (numa espada, "metade" é ela inteira), soltar uma unidade com clique direito e **jogar fora com Q** montavam a pilha nova campo a campo, sem o `ench`: a espada encantada saía comum. Agora a cópia é da pilha inteira, e `giveStack` guarda com encantamento e nome. Regressões em `tests/workshop.test.ts` ("pilhas inteiras"). |
@@ -1971,11 +2064,26 @@ tem **1116** linhas (981 antes; as contas novas foram para `redstoneparts.ts`, f
 callbacks; **930** depois que as ofertas da mesa foram para `enchantpanel.ts`, na volta de campo) e `session.ts` 816. O corte natural do circuito é por papel — pó e energia, componentes,
 pistão —, e o da tela, a grade de slots de um lado e os painéis do outro. Não depende de nada.
 
+**Pendências abertas em 2026-09-24 (M16):**
+
+- **Memória de áudio em 3,442 MB, com teto de 3,5.** As vozes dos quatro mobs novos custaram 300 KB
+  mesmo com a bruxa e o cristal no grave (um quarto da taxa). Som novo no M17 precisa de folga:
+  candidatos são as vozes agudas a 22 kHz (galinha, lula, aranha, esqueleto, creeper, morcego,
+  ghast: ~95 KB cada morte).
+- **Módulos acima do teto de novo.** `game/session.ts` **885** (816 antes: a luta, os créditos e a
+  regra de colocar), `main.ts` **741** (720), `entity/mobs.ts` **895**, `ui/containers/screen.ts`
+  **953**, e `world/redstone.ts` 1116 do M15. Os usos de item novos e os ajudantes já saíram de
+  `itemuse.ts` (`journeyuses.ts`, `itemhelpers.ts`), que ficou em 427.
+- **O End em T0 não foi medido.** A ilha é plana e a névoa é curta, então não deve pesar mais que a
+  superfície; o dragão (oito vezes a escala, dez caixas) é o que o F3 precisa olhar.
+- **Enderman não nasce no End.** A regra de nascimento tem uma dimensão só; pérola depois do End
+  não é necessária, mas a ilha fica vazia fora da luta.
+- **O dragão não quebra bloco, não sopra fogo e não tem animação de morte** (desvio, §3).
+
 **Pendências abertas em 2026-09-24 (M14):**
 
 - ~~**Memória de áudio em 3,497 MB, com teto de 3,5.**~~ **Fechada no M15**: 3,140 MB (§3).
-- **A bruxa foi para o M16.** O doc 15 dizia "a bruxa é do M14", mas o checklist do M14 no doc 14
-  não a lista, e ela sem poção não tem o que arremessar. A cabana continua vazia.
+- ~~**A bruxa foi para o M16.**~~ **Fechada no M16**: mora na cabana e atira poção (§3).
 - **Custo do tint de bioma em T0 não medido.** São duas leituras de textura por vértice no terreno
   (clima e tabela), só em WebGL2. No S24 não deve aparecer; num Mali-T830 o F3 dirá. Se pesar, o
   tint pode virar opção de Vídeo, e a cor volta à fixa.
@@ -2131,9 +2239,22 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
 
 ## 6. Próximo passo recomendado
 
-0. **Olhar o M15 num aparelho de novo**, e depois escolher entre M16 (fim da jornada) e M17
-   (alcance). A primeira volta (2026-09-24) achou as telas confusas e o funil que não entrava em
-   cima do baú — corrigidos (§3, M15). Em ordem de quanto pode estar errado:
+0. **Jogar o M16 num aparelho**, num mundo novo, e depois o M17 (alcance), o último da lista.
+   O M16 só foi visto em testes e no Chrome headless. Em ordem de quanto pode estar errado:
+   - **tela do suporte de preparo no celular**: Ingrediente, Combustível e os três Frasco, a barra
+     andando com a tela aberta e a frase de cada passo. Encher o frasco de vidro na água; beber;
+   - **a fortaleza do Nether**: achar pelas luzes na névoa, a ponte, os blazes (as bolas de fogo
+     incendeiam; a água apaga), a verruga no jardim;
+   - **o olho do ender**: arremessar na superfície e seguir; perto da fortaleza ele mergulha, e o
+     poço com a luz na boca fica ali. Descer a escada; a sala do portal;
+   - **o End**: a chegada de frente para a ilha, um pulo até a borda; os cristais (flecha); o
+     dragão investindo e pousando no centro; **o FPS no T0**, se der (F3);
+   - **a volta**: o portal de saída com o ovo, os créditos, e chegar na cama;
+   - **a bruxa**, no pântano de noite.
+
+   ~~**Olhar o M15 num aparelho de novo**~~ — **feito em 2026-09-24**: *"Tudo funcionando
+   perfeitamente!"* A primeira volta tinha achado as telas confusas e o funil que não entrava em
+   cima do baú — corrigidos (§3, M15). O roteiro que foi seguido, para referência:
    - **mesa de encantamento**: os rótulos Item e Lápis, a frase de cima mudando a cada passo, e
      uma oferta encantando de verdade com lápis e nível. Os textos são legíveis no aparelho?
    - **funil em cima do baú, com o funil na mão**: o toque coloca, não abre. E baú em cima do funil.

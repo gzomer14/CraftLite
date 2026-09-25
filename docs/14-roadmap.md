@@ -422,26 +422,31 @@ sem o jogador tocar. Tick de circuito com 32 funis abaixo de 5 ms (o orçamento 
 
 ---
 
-## M16 — Um fim para a jornada
+## M16 — Um fim para a jornada ✅
 
 > O jogo não tem objetivo. Não há chefe, não há créditos, e o loop "minerar → descer → sobreviver"
-> não aponta para lugar nenhum. É o marco maior desta lista.
+> não aponta para lugar nenhum. É o marco maior desta lista. **Fechado em 2026-09-24** — detalhe no
+> doc 15 §3.
 
-- [ ] **Fortaleza do Nether** com **blaze**, e a vara de blaze que o doc 05 §5 já lista como
-      combustível.
-- [ ] **Poções**, com o suporte de preparo, a verruga do Nether e o sistema de efeitos do M11: cura,
-      força, velocidade, visão noturna, resistência ao fogo. A tabela de receitas de poção é dado.
-- [ ] **Olho do ender** (pérola, que já cai do enderman, + pó de blaze): arremessado, voa na
-      direção da fortaleza.
-- [ ] **Fortaleza** subterrânea com biblioteca e a sala do portal.
-- [ ] **O End**: terceira dimensão. O doc 15 §5 já registrou que `data/dimensions.ts` e o
-      protocolo do worker são genéricos — *"uma terceira dimensão é uma entrada na tabela e um
-      gerador"*. Ilhas de pedra do End, obsidiana em colunas, cristais.
-- [ ] **O dragão**: voo por caminho, cristais que curam, ovo, e **créditos** com o tempo de jogo e
-      as estatísticas do M10.
+- [x] **Fortaleza do Nether** com **blaze**, e a vara de blaze que o doc 05 §5 já lista como
+      combustível (`world/gen/fortress.ts`).
+- [x] **Poções**, com o suporte de preparo, a verruga do Nether e o sistema de efeitos do M11: cura,
+      força, velocidade, visão noturna, resistência ao fogo. A tabela de receitas de poção é dado
+      (`data/potions.ts`, `game/brewing.ts`).
+- [x] **Olho do ender** (pérola, que já cai do enderman, + pó de blaze): arremessado, voa na
+      direção da fortaleza (`game/journeyuses.ts`).
+- [x] **Fortaleza** subterrânea com biblioteca e a sala do portal (`world/gen/stronghold.ts`).
+- [x] **O End**: terceira dimensão. Ilhas de pedra do End, obsidiana em colunas, cristais
+      (`world/gen/end.ts`) — só a ilha principal, sem as de fora (desvio, doc 15 §3).
+- [x] **O dragão**: voo por caminho, cristais que curam, ovo, e **créditos** com o tempo de jogo e
+      as estatísticas do M10 (`entity/ai/dragongoals.ts`, `game/dragonfight.ts`).
 
 **Critério de aceite:** um mundo novo pode ser **terminado** — do primeiro tronco ao dragão — sem
 comando nem modo criativo. O End em T0 a 30 FPS; o dragão no tick abaixo de 1 ms.
+**Medido o que dá para medir sem o aparelho:** a cadeia de itens do tronco ao olho do ender, às
+armas e às cinco poções fecha só com o que o mundo dá (`tests/journey.test.ts`); cada elo que
+precisa de mundo roda de verdade (`tests/theend.test.ts`); o dragão com os dez cristais custa
+**0,04 ms** no pior tick. O End em T0 não foi medido (sem T0 na mão).
 
 ---
 

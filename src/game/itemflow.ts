@@ -7,6 +7,8 @@
  * em cima dele. Na fornalha a regra é a do gênero: entrando por cima vai para
  * a entrada, pelo lado vai para o combustível, e puxando de baixo sai só a
  * saída. É o que faz a fornalha alimentada sozinha do critério do doc 14.
+ * No suporte de preparo (M16), também a do gênero: por cima o ingrediente,
+ * pelo lado o pó de blaze e os frascos, e de baixo saem só as poções.
  *
  * **Dispensador e liberador.** Disparam na subida de energia (quem avisa é o
  * `Redstone`). O liberador solta o item — ou o empurra para o contêiner da
@@ -32,6 +34,10 @@ import type { ItemEntities } from '../entity/itementity';
 import type { Projectiles } from '../entity/projectile';
 import type { Fire } from '../world/fire';
 import type { World } from '../world/world';
+import {
+  BREW_BOTTLE_COUNT, BREW_FUEL, BREW_INGREDIENT, BrewingStand, brewingAccepts, isBrewingFuel,
+  isBrewingIngredient,
+} from './brewing';
 
 /** Ticks entre dois itens do funil: 2,5 itens por segundo, como no gênero. */
 export const HOPPER_COOLDOWN = 8;
@@ -322,6 +328,19 @@ function takeOne(container: Container, slot: number): void {
  * queima). No resto: primeiro empilha, depois ocupa um slot vazio.
  */
 export function insertOne(container: Container, one: ItemStack, entry: Entry): boolean {
+  // Suporte de preparo (M16): por cima o ingrediente; pelo lado o pó de blaze
+  // e os frascos. Nunca o carvão no lugar da poção.
+  if (container instanceof BrewingStand) {
+    if (entry === 'above') {
+      return isBrewingIngredient(one.item) && insertAt(container, BREW_INGREDIENT, one);
+    }
+    if (entry !== 'side') return false;
+    if (isBrewingFuel(one.item)) return insertAt(container, BREW_FUEL, one);
+    for (let i = 0; i < BREW_BOTTLE_COUNT; i++) {
+      if (container.get(i) === null && brewingAccepts(i, one.item)) return insertAt(container, i, one);
+    }
+    return false;
+  }
   if (container instanceof Furnace) {
     if (entry === 'above') {
       if (smeltingOutput(one.item) === null) return false;
@@ -374,6 +393,15 @@ function sameKind(a: ItemStack, b: ItemStack): boolean {
 function extractSlot(source: Container, into: Container): number {
   if (source instanceof Furnace) {
     return source.get(FURNACE_OUTPUT) === null ? -1 : FURNACE_OUTPUT;
+  }
+  // Do suporte, só as poções — e só com o suporte parado.
+  if (source instanceof BrewingStand) {
+    if (source.brewTicks > 0) return -1;
+    for (let i = 0; i < BREW_BOTTLE_COUNT; i++) {
+      const stack = source.get(i);
+      if (stack !== null && fits(into, stack)) return i;
+    }
+    return -1;
   }
   for (let i = 0; i < source.size; i++) {
     const stack = source.get(i);

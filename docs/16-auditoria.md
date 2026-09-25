@@ -12,6 +12,76 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-24 15:40 → 2026-09-25 12:09 · M16: um fim para a jornada
+
+**Pedido:** *"Tudo funcionando perfeitamente! Agora vamos partir para implementação do M16"* — com o
+M15 validado em campo.
+
+**Resultado:** M16 fechado, os seis itens do doc 14. Fortaleza do Nether (pontes com pilares,
+geradores de blaze, jardim de verruga), blaze, poções (dez itens, tabela de preparo, suporte de
+preparo com tela, sete efeitos novos), olho do ender, três fortalezas da superfície com a sala do
+portal, biblioteca, depósitos e um poço até a superfície, o portal do End, o End como terceira
+dimensão (ilha, dez colunas, portal de saída), o dragão com fases, os cristais que curam, a luta
+com memória no save, o ovo, a barra do chefe, os créditos, e a bruxa. Seis conquistas; o
+bibliotecário vende pérola. Critério: a cadeia do tronco ao dragão fecha sobre as tabelas e cada
+elo roda em teste; dragão e dez cristais a 0,04 ms por tick. O End em T0 não foi medido. Três
+defeitos antigos corrigidos: marcos de estrutura que não atravessavam o worker (M6: baú de dungeon
+vazio), tela da fornalha parada (M4) e malha de outra dimensão marcando a coluna pronta (M7).
+Visto no Chrome headless; dali saíram duas correções da chegada no End.
+
+Portões: **2235 testes** em 113 arquivos, lint limpo, build ok, **282,5 KB** de 350, smoke 7/7.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| **Dado** | | |
+| `+` | `src/data/potions.ts` | as dez poções e a tabela de preparo |
+| `~` | `src/data/blocks.ts` | verruga, suporte de preparo, pedra do End, moldura com e sem olho, portal do End, ovo, cerca de tijolo do Nether; formas novas |
+| `~` | `src/data/items.ts` | vara e pó de blaze, verruga, frasco, olho do ender, creme de magma, pepita, melancia reluzente, cenoura dourada, olho fermentado, e as poções; `food.drink`; usos `fill_bottle` e `throw_eye` |
+| `~` | `src/data/effects.ts` | velocidade, lentidão, força, fraqueza, visão noturna, resistência ao fogo, cura instantânea |
+| `~` | `src/data/mobs.ts` | blaze, bruxa, dragão e cristal; `shoots` no lugar de `shootsFireball`; traços `hoverHeight`, `noClip`, `noKnockback`, `explodesOnDeath`, `boss` |
+| `~` | `src/data/mobmodels.ts`, `src/data/mobskins.ts` | modelos e peles dos quatro; animação `spin` |
+| `~` | `src/data/dimensions.ts` | o End |
+| `~` | `src/data/structures.ts` | peça `pillar`, mobs de estrutura (a bruxa na cabana), loot da fortaleza do Nether e da superfície |
+| `~` | `src/data/recipes.ts`, `src/data/crops.ts`, `src/data/textures.ts`, `src/data/itemart.ts` | receitas, a verruga como plantação, 11 texturas, frasco e itens novos |
+| `~` | `src/data/achievements.ts`, `src/data/villagers.ts` | seis conquistas; pérola no bibliotecário |
+| **Mundo** | | |
+| `+` | `src/world/gen/fortress.ts` | a fortaleza do Nether por região |
+| `+` | `src/world/gen/stronghold.ts`, `src/world/gen/strongholdsites.ts` | a fortaleza da superfície e onde ficam as três |
+| `+` | `src/world/gen/end.ts` | o gerador do End, a chegada pela borda da ilha |
+| `~` | `src/world/gen/nether.ts`, `src/world/gen/terrain.ts`, `src/world/gen/structures.ts` | as fortalezas no gerador; `pillar`; corte da peça fora do chunk |
+| `~` | `src/world/growth.ts` | solo da plantação pela tabela; a verruga cresce no escuro |
+| `~` | `src/world/mesh/shapes.ts`, `src/world/mesh/blockinfo.ts` | cinco formas de caixa novas |
+| `~` | `src/world/pipeline.ts` | marcos de estrutura na coluna; malha de outra dimensão descartada |
+| **Worker** | | |
+| `+` | `src/workers/genjob.ts` | a geração por dimensão, testável, com os marcos na resposta |
+| `~` | `src/workers/chunk.worker.ts`, `src/workers/protocol.ts`, `src/workers/meshjob.ts` | usa o `genjob`; `structures` e `dim` nas mensagens |
+| **Entidades** | | |
+| `+` | `src/entity/ai/dragongoals.ts` | o goal `dragon` com as fases |
+| `~` | `src/entity/mobs.ts`, `src/entity/mobstore.ts`, `src/entity/ai/goals.ts` | tiros por tipo, explosão de morte no tick seguinte, sem colisão, altura de pairar |
+| `~` | `src/entity/projectile.ts` | olho do ender, bola que incendeia, frasco da bruxa |
+| `~` | `src/entity/player.ts` | `speedFactor` |
+| **Jogo** | | |
+| `+` | `src/game/brewing.ts` | o suporte de preparo |
+| `+` | `src/game/dragonfight.ts` | a luta: cristais, cura, vitória, estado no save |
+| `+` | `src/game/endportal.ts` | olho na moldura, portal, plataforma, portal de saída |
+| `+` | `src/game/journeyuses.ts`, `src/game/itemhelpers.ts` | frasco e olho do ender; ajudantes que saíram de `itemuse.ts` |
+| `~` | `src/game/travel.ts` | rotas do End (ida, volta para casa); portal do Nether não funciona no End |
+| `~` | `src/game/session.ts`, `src/game/sessionwiring.ts` | a luta, os créditos, os tiros novos, o olho que cai |
+| `~` | `src/game/effects.ts`, `src/game/survival.ts`, `src/game/playercombat.ts` | efeitos novos; arder; sem empurrão no chefe |
+| `~` | `src/game/tiles.ts`, `src/game/container.ts`, `src/game/workbench.ts`, `src/game/savegame.ts`, `src/save/db.ts` | suporte no mundo, na tela e no save; a luta na meta do mundo |
+| `~` | `src/game/itemflow.ts`, `src/game/itemuse.ts`, `src/game/stationhelp.ts` | funil no suporte; som ao comer; a frase do suporte |
+| **Render e interface** | | |
+| `+` | `src/ui/bossbar.ts`, `src/ui/screens/credits.ts`, `src/ui/containers/brewpanel.ts` | barra do dragão, créditos, painel do suporte |
+| `~` | `src/ui/containers/screen.ts`, `src/ui/containers/containerclick.ts`, `src/ui/hudfeed.ts` | tela do suporte; redesenho ao vivo da fornalha; a barra |
+| `~` | `src/render/renderer.ts`, `src/render/mobrender.ts`, `src/audio/synth.ts`, `src/main.ts` | visão noturna; `spin`; vozes novas; créditos, barra e o renderer no gancho do smoke |
+| **Testes** | | |
+| `+` | `tests/potions.test.ts`, `tests/journeygen.test.ts`, `tests/theend.test.ts`, `tests/journey.test.ts` | poções, geração, a luta e a cadeia do tronco ao dragão |
+| `~` | `tests/mobs.test.ts`, `tests/tints.test.ts` | contagem de mobs; teto do atlas |
+| **Docs** | | |
+| `~` | `docs/14-roadmap.md` | M16 ✅ |
+| `~` | `docs/15-status.md` | M15 validado; M16 no §1, §2, §3; três defeitos antigos no §4; pendências no §5; §6 |
+| `~` | `README.md` | M16, testes e bundle |
+
 ## 2026-09-24 · 15:05 → 15:28 · M15 no campo: telas que dizem o que fazer, funil sobre o baú
 
 **Pedido:** *"Não consegui utilizar a mesa de encantamento. Não entendi muito bem o que cada campo

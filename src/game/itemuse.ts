@@ -30,7 +30,7 @@ import { DYES } from '../data/dyes';
 import { ITEM_BY_NAME, itemDef, type ItemStack, type ItemUse } from '../data/items';
 import { mobDef } from '../data/mobs';
 import type { Vec3 } from '../core/math';
-import { raycast, type RayHit } from '../world/raycast';
+import type { RayHit } from '../world/raycast';
 import { isSource, makeFluid } from '../world/fluids';
 import { FLAG_EGG } from '../entity/projectile';
 import { dye, shear, woolColorOf, woolItemOf } from '../entity/husbandry';
@@ -38,6 +38,8 @@ import { isRail } from '../world/rails';
 import { ignitePortal } from './portal';
 import { plantSeed, tillSoil } from './farming';
 import { applyFoodEffects } from './food';
+import { consumeWithRemainder, fluidRay, itemIdOf, swapHeld } from './itemhelpers';
+import { fillBottle, throwEye } from './journeyuses';
 import { FISHING_XP } from '../data/fishing';
 import type { FishingLine } from './fishing';
 import type { Fire } from '../world/fire';
@@ -115,36 +117,6 @@ const BOW_MAX_DAMAGE = 9;
 /** Abaixo desta fração da carga a flecha "escorrega" da corda e não sai. */
 const BOW_MIN_POWER = 0.15;
 const ARROW = ITEM_BY_NAME.get('arrow')?.id ?? -1;
-
-function itemIdOf(name: string): number {
-  return ITEM_BY_NAME.get(name)?.id ?? -1;
-}
-
-/**
- * Troca uma unidade do item na mão por outro item (balde vazio ↔ cheio).
- * No criativo a mão não muda — é a regra de "não gasta item" do doc 06 §9.
- */
-function swapHeld(ctx: ItemUseContext, held: ItemStack, next: string): void {
-  if (ctx.player.mode === 'creative') return;
-  const id = itemIdOf(next);
-  if (id < 0) return;
-  if (held.count === 1) {
-    ctx.inventory.set(ctx.inventory.selected, { item: id, count: 1, damage: 0 });
-    return;
-  }
-  ctx.inventory.consumeHeld();
-  const left = ctx.inventory.give(id, 1, 0, 0);
-  if (left > 0) ctx.drop({ item: id, count: left, damage: 0 }, ctx.player.x, ctx.player.y + 1, ctx.player.z);
-}
-
-/** Raio da mira que **enxerga fluido** — o do balde vazio. */
-function fluidRay(ctx: ItemUseContext): RayHit {
-  const p = ctx.player;
-  return raycast(
-    ctx.world, p.x, p.y + p.eyeHeight, p.z, ctx.aim[0], ctx.aim[1], ctx.aim[2], p.reach,
-    { fluids: true, replaceable: true },
-  );
-}
 
 /** Balde vazio: pega a **fonte** de água ou lava mirada, ou o leite da vaca. */
 const fillBucket: ItemUseHandler = {
@@ -256,25 +228,6 @@ const dyeSheep: ItemUseHandler = {
   },
 };
 
-/**
- * Gasta um do item na mão e devolve o resto (tigela, balde) no lugar, como o
- * gênero faz: o ensopado vira tigela na mesma casinha.
- */
-export function consumeWithRemainder(ctx: ItemUseContext, held: ItemStack): void {
-  if (ctx.player.mode === 'creative') return;
-  const restName = itemDef(held.item)?.remainder;
-  const rest = restName === undefined ? -1 : itemIdOf(restName);
-  if (rest >= 0 && held.count === 1) {
-    ctx.inventory.set(ctx.inventory.selected, { item: rest, count: 1, damage: 0 });
-    return;
-  }
-  ctx.inventory.consumeHeld();
-  if (rest >= 0) {
-    const left = ctx.inventory.give(rest, 1, 0, 0);
-    if (left > 0) ctx.drop({ item: rest, count: left, damage: 0 }, ctx.player.x, ctx.player.y + 1, ctx.player.z);
-  }
-}
-
 /** Comer: segurar até `eatTicks`, e só com fome — exceto o que é remédio. */
 const eat: ItemUseHandler = {
   hold: true,
@@ -286,6 +239,7 @@ const eat: ItemUseHandler = {
     ctx.resetHold();
     ctx.survival.eat(food.hunger, food.saturation);
     applyFoodEffects(ctx.survival, food.effects, () => ctx.random());
+    ctx.sound('player/eat', ctx.player.x, ctx.player.y + 1.5, ctx.player.z);
     consumeWithRemainder(ctx, held);
     return true;
   },
@@ -460,6 +414,8 @@ export const ITEM_USES: Record<ItemUse, ItemUseHandler> = {
   dye_sheep: dyeSheep,
   open_map: openMap,
   fish,
+  fill_bottle: fillBottle,
+  throw_eye: throwEye,
 };
 
 /** Os usos do item na mão, em ordem de tentativa (vazio se nenhum). */

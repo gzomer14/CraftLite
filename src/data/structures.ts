@@ -23,7 +23,13 @@ export type PieceKind =
   /** Só as quatro paredes verticais. */
   | 'walls'
   /** Um voxel só, em `[x0,y0,z0]`. */
-  | 'point';
+  | 'point'
+  /**
+   * Coluna que desce de `y0` até bater em chão sólido (M16: os pilares da
+   * ponte da fortaleza do Nether, que não sabem de antemão onde o chão fica).
+   * Atravessa ar e fluido; para no primeiro bloco sólido ou 64 blocos abaixo.
+   */
+  | 'pillar';
 
 /** Onde a peça pode escrever. */
 export type PieceReplace =
@@ -90,6 +96,8 @@ export interface StructureDef {
   pieces: readonly Piece[];
   chests?: readonly ChestSpot[];
   spawners?: readonly SpawnerSpot[];
+  /** Mobs que nascem com a estrutura, na primeira vez que o chunk entra (M16: a bruxa). */
+  mobs?: readonly { at: readonly [number, number, number]; mob: string }[];
   placement: Placement;
 }
 
@@ -133,6 +141,33 @@ export const CHEST_LOOT: Record<string, readonly LootRoll[]> = {
     { item: 'oak_sapling', count: [1, 3], chance: 0.3 },
   ],
   // Naufrágio (2026-09-22): mantimento de bordo e um pouco de metal.
+  // M16: a fortaleza do Nether guarda o que falta para o fim da jornada.
+  nether_fortress: [
+    { item: 'nether_wart', count: [3, 7], chance: 0.6 },
+    { item: 'iron_ingot', count: [1, 5], chance: 0.45 },
+    { item: 'gold_ingot', count: [1, 3], chance: 0.45 },
+    { item: 'diamond', count: [1, 3], chance: 0.2 },
+    { item: 'obsidian', count: [2, 4], chance: 0.3 },
+    { item: 'flint_and_steel', count: [1, 1], chance: 0.2 },
+    { item: 'blaze_rod', count: [1, 2], chance: 0.25 },
+  ],
+  // M16: os baús da fortaleza da superfície. As pérolas são o seguro de quem
+  // não conseguiu caçar endermen — o olho que faltou para acender o portal.
+  stronghold_corridor: [
+    { item: 'ender_pearl', count: [1, 2], chance: 0.45 },
+    { item: 'bread', count: [1, 3], chance: 0.6 },
+    { item: 'iron_ingot', count: [1, 5], chance: 0.5 },
+    { item: 'redstone', count: [4, 9], chance: 0.35 },
+    { item: 'golden_apple', count: [1, 1], chance: 0.15 },
+    { item: 'diamond', count: [1, 3], chance: 0.1 },
+  ],
+  stronghold_library: [
+    { item: 'book', count: [1, 3], chance: 0.8 },
+    { item: 'paper', count: [2, 7], chance: 0.6 },
+    { item: 'compass', count: [1, 1], chance: 0.3 },
+    { item: 'map', count: [1, 1], chance: 0.3 },
+    { item: 'ender_pearl', count: [1, 1], chance: 0.25 },
+  ],
   shipwreck: [
     { item: 'paper', count: [1, 6], chance: 0.6 },
     { item: 'coal', count: [2, 6], chance: 0.5 },
@@ -458,6 +493,8 @@ const WITCH_HUT: StructureDef = {
     { kind: 'point', block: 'brown_mushroom', box: [3, 3, 3, 3, 3, 3], replace: 'any' },
     { kind: 'point', block: 'red_mushroom', box: [3, 3, 1, 3, 3, 1], replace: 'any' },
   ],
+  // A bruxa mora na cabana desde o M16.
+  mobs: [{ at: [2, 3, 2], mob: 'witch' }],
   placement: { attempts: 0.004, minY: 0, maxY: 0, surface: true, biomes: ['swamp'] },
 };
 

@@ -130,16 +130,18 @@ describe('morcego (categoria ambient)', () => {
 });
 
 describe('tabela de mobs', () => {
-  it('tem os 12 mobs do MVP, o aldeão, os dois do Nether, o morcego, o golem e o afogado', () => {
+  it('tem os 12 mobs do MVP, o aldeão, os do Nether, o morcego, o golem, o afogado e os do M16', () => {
     // 12 do MVP + aldeão (M6) + porco zumbi e ghast (M7) + morcego + golem (M9)
-    // + afogado (M14).
-    expect(MOB_BY_NAME.size).toBe(18);
+    // + afogado (M14) + blaze, bruxa, dragão e cristal do End (M16).
+    expect(MOB_BY_NAME.size).toBe(22);
     for (const name of MOB_BY_NAME.keys()) {
       const def = MOB_BY_NAME.get(name)!;
       expect(def.model.length).toBeGreaterThan(0);
       expect(def.skin.length).toBeGreaterThan(0);
       expect(def.health).toBeGreaterThan(0);
-      expect(def.goals.length).toBeGreaterThan(0);
+      // O cristal do End (M16) é o único sem IA: ele não faz nada além de
+      // existir, curar o dragão (quem cura é a luta) e explodir ao morrer.
+      if (def.name !== 'end_crystal') expect(def.goals.length).toBeGreaterThan(0);
     }
   });
 

@@ -382,6 +382,18 @@ export class MobStore {
       if (def.traits.glides === true && this.vy[i] < GLIDE_MAX_FALL) this.vy[i] = GLIDE_MAX_FALL;
     }
 
+    // Atravessa blocos (M16: dragão, cristal): anda livre, sem colisão.
+    if (def.traits.noClip === true) {
+      this.x[i] += this.vx[i];
+      this.y[i] += this.vy[i];
+      this.z[i] += this.vz[i];
+      this.onGround[i] = 0;
+      this.vx[i] *= AIR_FRICTION;
+      this.vz[i] *= AIR_FRICTION;
+      this.updateAnimation(i, this.vx[i], this.vz[i]);
+      return;
+    }
+
     // Aranha subindo parede: vira "escalar" enquanto encostada.
     if (this.hasFlag(i, FLAG_CLIMBING)) this.vy[i] = 0.14;
 

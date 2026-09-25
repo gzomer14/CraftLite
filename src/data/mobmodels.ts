@@ -22,9 +22,11 @@
 /**
  * Como a parte se move. `head` acompanha o olhar, `swing` oscila com o andar,
  * `flap` bate no tempo da idade (asa) e `stiff` fica travada na rotação fixa
- * com um tremor de 0,05 rad — os braços do zumbi do doc 07 §5.
+ * com um tremor de 0,05 rad — os braços do zumbi do doc 07 §5. `spin` (M16)
+ * gira sem parar no eixo, `amp` radianos por tick: as varas do blaze e o
+ * cristal do End.
  */
-export type AnimKind = 'none' | 'head' | 'swing' | 'flap' | 'stiff';
+export type AnimKind = 'none' | 'head' | 'swing' | 'flap' | 'stiff' | 'spin';
 
 export interface PartDef {
   name: string;
@@ -296,6 +298,74 @@ export const MODELS: Record<string, ModelDef> = {
       { name: 'tentacle3', pivot: [3, 2, -3], box: [-1, -8, -1, 2, 8, 2], uv: [48, 0], anim: 'swing', axis: 0, amp: 0.4, phase: 3 * PI / 2 },
     ],
   },
+};
+
+// --- M16 -----------------------------------------------------------------------
+
+/** As varas do blaze: dois anéis de quatro, girando em sentidos opostos. */
+function blazeRods(): PartDef[] {
+  const out: PartDef[] = [];
+  for (let k = 0; k < 4; k++) {
+    out.push({
+      name: `rodUpper${k}`, pivot: [0, 14, 0], box: [5, -4, -1, 2, 8, 2], uv: [0, 16],
+      anim: 'spin', axis: 1, amp: 0.1, phase: (k * PI) / 2,
+    });
+    out.push({
+      name: `rodLower${k}`, pivot: [0, 5, 0], box: [3, -4, -1, 2, 8, 2], uv: [0, 16],
+      anim: 'spin', axis: 1, amp: -0.07, phase: (k * PI) / 2 + PI / 4,
+    });
+  }
+  return out;
+}
+
+MODELS.blaze = {
+  skinSize: 64, height: 26,
+  parts: [
+    { name: 'head', pivot: [0, 18, 0], box: [-4, 0, -4, 8, 8, 8], uv: [0, 0], anim: 'head' },
+    ...blazeRods(),
+  ],
+};
+
+/** Bruxa: o humanoide com nariz comprido e o chapéu de aba larga. */
+MODELS.witch = {
+  skinSize: 64, height: 36,
+  parts: [
+    ...HUMANOID_PARTS,
+    { name: 'nose', pivot: [0, 24, 0], box: [-1, 1, 4, 2, 4, 2], uv: [32, 0], anim: 'head' },
+    { name: 'hatBrim', pivot: [0, 24, 0], box: [-5, 8, -5, 10, 1, 10], uv: [0, 32], anim: 'head' },
+    { name: 'hatCone', pivot: [0, 24, 0], box: [-3, 9, -3, 6, 4, 6], uv: [40, 32], anim: 'head' },
+    { name: 'hatTip', pivot: [0, 24, 0], box: [-1, 13, -1, 2, 3, 2], uv: [0, 44], anim: 'head' },
+  ],
+};
+
+/**
+ * Dragão do End: corpo, pescoço, cabeça, asas que batem, cauda que balança e
+ * quatro patas. Desenhado pequeno — tudo cabe numa skin de 64 — e aumentado
+ * oito vezes pelo `modelScale` da tabela de mobs: 15 blocos de asa a asa.
+ */
+MODELS.dragon = {
+  skinSize: 64, height: 9,
+  parts: [
+    { name: 'body', pivot: [0, 4, 0], box: [-3, 0, -6, 6, 4, 12], uv: [0, 0] },
+    { name: 'neck', pivot: [0, 6, 6], box: [-1, -1, 0, 2, 2, 5], uv: [36, 0] },
+    { name: 'head', pivot: [0, 6, 11], box: [-2, -1, 0, 4, 3, 5], uv: [36, 7], anim: 'head' },
+    { name: 'wingRight', pivot: [-3, 4, 2], box: [-12, 0, -3, 12, 1, 6], uv: [0, 16], anim: 'flap', axis: 2, amp: 0.55 },
+    { name: 'wingLeft', pivot: [3, 4, 2], box: [0, 0, -3, 12, 1, 6], uv: [0, 16], mirror: true, anim: 'flap', axis: 2, amp: 0.55, phase: PI },
+    { name: 'tail', pivot: [0, 5, -6], box: [-1, -1, -14, 2, 2, 14], uv: [0, 24], anim: 'flap', axis: 1, amp: 0.2 },
+    { name: 'legFrontRight', pivot: [-2, 4, 4], box: [-1, -4, -1, 2, 4, 2], uv: [40, 24] },
+    { name: 'legFrontLeft', pivot: [2, 4, 4], box: [-1, -4, -1, 2, 4, 2], uv: [40, 24], mirror: true },
+    { name: 'legBackRight', pivot: [-2, 4, -4], box: [-1, -4, -1, 2, 4, 2], uv: [40, 24] },
+    { name: 'legBackLeft', pivot: [2, 4, -4], box: [-1, -4, -1, 2, 4, 2], uv: [40, 24], mirror: true },
+  ],
+};
+
+/** Cristal do End: um cubo dentro do outro, girando em sentidos opostos. */
+MODELS.end_crystal = {
+  skinSize: 64, height: 21,
+  parts: [
+    { name: 'outer', pivot: [0, 16, 0], box: [-5, -5, -5, 10, 10, 10], uv: [0, 0], anim: 'spin', axis: 1, amp: 0.06 },
+    { name: 'inner', pivot: [0, 16, 0], box: [-3, -3, -3, 6, 6, 6], uv: [0, 20], anim: 'spin', axis: 1, amp: -0.1, rot: [0.6, 0, 0.6] },
+  ],
 };
 
 export function modelOf(name: string): ModelDef {

@@ -18,6 +18,7 @@
 import { ChunkColumn } from '../world/chunk';
 import { computeChunkLight } from '../world/gen/terrain';
 import { Container, Furnace, type ContainerKind } from './container';
+import { BrewingStand } from './brewing';
 import type { SignRecord } from './signs';
 import { INVENTORY_SIZE } from './inventory';
 import { TICKS_PER_DAY } from './daynight';
@@ -55,6 +56,8 @@ export interface ContainerRecord {
   persistent?: boolean;
   /** Fornalha: [burnTicks, burnTotal, cookTicks]. */
   burn?: [number, number, number];
+  /** Suporte de preparo (M16): [preparos pagos, ticks que faltam]. */
+  brew?: [number, number];
 }
 
 export interface SaveGameOptions {
@@ -339,6 +342,7 @@ export class SaveGame {
     this.session.weather.setSeed(this.session.world.seed);
     this.session.survival.difficulty = this.meta.difficulty;
     this.session.villages.loadBans(this.meta.villageBans);
+    this.session.dragonFight.restore(this.meta.end);
     this.session.journal.map.load(await this.manager.loadMapRegions());
     if (saved === undefined) return false;
     this.restore(saved);
@@ -352,6 +356,7 @@ export class SaveGame {
       this.meta.difficulty = this.session.survival.difficulty;
       this.meta.gameMode = this.player.mode;
       this.meta.villageBans = this.session.villages.saveBans();
+      this.meta.end = this.session.dragonFight.snapshot();
       await this.manager.flush();
       await this.manager.savePlayer(this.snapshot());
       await this.manager.saveTiles(this.tileRecords());
@@ -419,6 +424,7 @@ export function tileFrom(container: Container): ContainerRecord {
   if (container instanceof Furnace) {
     record.burn = [container.burnTicks, container.burnTotal, container.cookTicks];
   }
+  if (container instanceof BrewingStand) record.brew = [container.fuel, container.brewTicks];
   return record;
 }
 
@@ -427,7 +433,9 @@ export function containerFrom(record: ContainerRecord): Container {
   const size = record.slots.length / 3;
   const container = record.kind === 'furnace'
     ? new Furnace(record.x, record.y, record.z)
-    : new Container(record.kind, size, record.x, record.y, record.z);
+    : record.kind === 'brewing'
+      ? new BrewingStand(record.x, record.y, record.z)
+      : new Container(record.kind, size, record.x, record.y, record.z);
 
   for (let i = 0; i < size && i < container.size; i++) {
     const item = record.slots[i * 3];
@@ -445,6 +453,10 @@ export function containerFrom(record: ContainerRecord): Container {
     container.burnTicks = record.burn[0];
     container.burnTotal = record.burn[1];
     container.cookTicks = record.burn[2];
+  }
+  if (container instanceof BrewingStand && record.brew !== undefined) {
+    container.fuel = record.brew[0];
+    container.brewTicks = record.brew[1];
   }
   return container;
 }

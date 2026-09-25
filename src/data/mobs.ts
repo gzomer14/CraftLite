@@ -13,6 +13,9 @@ import type { Drop } from './loot';
 
 export type MobCategory = 'passive' | 'neutral' | 'hostile' | 'ambient' | 'water';
 
+/** O que um mob atira (goal `shoot`). */
+export type ShotKind = 'arrow' | 'fireball' | 'small_fireball' | 'potion';
+
 /** Nome de um goal de IA. A ordem na lista do mob é a prioridade. */
 export type GoalName =
   | 'floatInWater'
@@ -29,6 +32,8 @@ export type GoalName =
   | 'breed'
   | 'wander'
   | 'lookAtPlayer'
+  // --- o dragão (M16, `entity/ai/dragongoals.ts`) ---
+  | 'dragon'
   // --- aldeia (M9, `entity/ai/villagegoals.ts`) ---
   | 'trade'
   | 'avoidHostile'
@@ -51,8 +56,12 @@ export interface MobTraits {
   swims?: boolean;
   /** Voa: sem gravidade, e o destino de movimento inclui o Y (ghast). */
   flies?: boolean;
-  /** Atira bola de fogo em vez de flecha (ghast). */
-  shootsFireball?: boolean;
+  /**
+   * O que o goal `shoot` dispara, quando não é flecha (M16 trocou o antigo
+   * `shootsFireball`): bola de fogo que explode (ghast), bola pequena que
+   * incendeia (blaze), frasco de poção (bruxa).
+   */
+  shoots?: ShotKind;
   /**
    * Escala do modelo **e** da hitbox, como o slime já fazia por tamanho.
    *
@@ -94,6 +103,24 @@ export interface MobTraits {
    * usa a pele base do mob.
    */
   variantSkins?: readonly string[];
+
+  // --- M16 ---------------------------------------------------------------------
+  /**
+   * Altura em que o voador paira sobre o alvo enquanto atira. Ausente = 8
+   * (o ghast, que atira de cima); o blaze fica mais perto, na altura da cabeça.
+   */
+  hoverHeight?: number;
+  /**
+   * Atravessa blocos: sem colisão com o mundo (o dragão). Uma caixa de 12
+   * blocos varrendo o mundo a cada tick custaria caro e travaria nos pilares.
+   */
+  noClip?: boolean;
+  /** Não é empurrado ao levar golpe (dragão, cristal). */
+  noKnockback?: boolean;
+  /** Explode com esta força ao morrer (o cristal do End). */
+  explodesOnDeath?: number;
+  /** Chefe: não conta nos tetos de spawn e ganha a barra de vida no HUD. */
+  boss?: boolean;
 }
 
 export interface SpawnRule {
@@ -189,6 +216,10 @@ export const SPAWN_RULES: Record<string, SpawnRule> = {
   // --- Nether (M7): luz não filtra nada aqui, porque lá tudo é escuro ------
   zombified_piglin: { light: 'any', ground: ['netherrack', 'soul_sand', 'nether_bricks'], minY: 32, maxY: 120, biomes: [], packMin: 2, packMax: 4, weight: 12, dimension: 1 },
   ghast: { light: 'any', ground: ['netherrack', 'soul_sand'], minY: 40, maxY: 110, biomes: [], packMin: 1, packMax: 1, weight: 4, dimension: 1 },
+  // M16: o blaze só pisa em tijolo do Nether — isto é, só nasce na fortaleza.
+  blaze: { light: 'any', ground: ['nether_bricks'], minY: 32, maxY: 120, biomes: [], packMin: 1, packMax: 2, weight: 10, dimension: 1 },
+  // M16: a bruxa, de noite, no pântano (e a da cabana, que nasce com ela).
+  witch: { light: 'dark', ground: [], minY: 55, maxY: 90, biomes: ['swamp'], packMin: 1, packMax: 1, weight: 3 },
 };
 
 /**
@@ -422,7 +453,7 @@ const SPECS: MobSpec[] = [
     goals: ['shoot', 'wander', 'lookAtPlayer'],
     model: 'cube', skin: 'ghast', sound: 'ghast',
     despawnable: true,
-    traits: { flies: true, shootsFireball: true, fireImmune: true, modelScale: 4 },
+    traits: { flies: true, shoots: 'fireball', fireImmune: true, modelScale: 4 },
   },
 
   // --- aldeia (M9) --------------------------------------------------------
@@ -470,6 +501,79 @@ const SPECS: MobSpec[] = [
     goals: ['attackMelee', 'moveToTarget', 'avoidSunlight', 'wander', 'lookAtPlayer'],
     model: 'humanoid', skin: 'drowned', sound: 'zombie',
     despawnable: true, traits: { burnsInSunlight: true, swims: true },
+  },
+
+  // --- um fim para a jornada (M16) ---------------------------------------------
+  /*
+   * Blaze: o guardião da fortaleza do Nether. Voa baixo, na altura do alvo, e
+   * atira a bola pequena que incendeia em vez de explodir. É dele a vara que
+   * ferve a poção e acorda o olho do ender — uma a cada duas mortes, em média.
+   */
+  {
+    id: 18, name: 'blaze', display: 'Blaze', category: 'hostile',
+    health: 20, width: 0.6, height: 1.8, speed: 2.6,
+    attack: { damage: [3, 5, 7], reach: 2, cooldownTicks: 40 },
+    followRange: 24, xp: [10, 10],
+    drops: [{ item: 'blaze_rod', count: [0, 1] }],
+    goals: ['shoot', 'wander', 'lookAtPlayer'],
+    model: 'blaze', skin: 'blaze', sound: 'blaze',
+    despawnable: true,
+    traits: { flies: true, shoots: 'small_fireball', fireImmune: true, hoverHeight: 2 },
+  },
+  /*
+   * Bruxa: mora na cabana do pântano. Não bate: atira frasco de veneno,
+   * lentidão ou fraqueza (`game/sessionwiring.ts`), e deixa cair o que se usa
+   * para fazer poção.
+   */
+  {
+    id: 19, name: 'witch', display: 'Bruxa', category: 'hostile',
+    health: 26, width: 0.6, height: 1.95, speed: 3,
+    attack: { damage: [0, 0, 0], reach: 8, cooldownTicks: 60 },
+    followRange: 16, xp: [5, 5],
+    drops: [
+      { item: 'glass_bottle', count: [0, 2], chance: 0.4 },
+      { item: 'glowstone_dust', count: [0, 2], chance: 0.4 },
+      { item: 'redstone', count: [0, 2], chance: 0.4 },
+      { item: 'sugar', count: [0, 2], chance: 0.4 },
+      { item: 'spider_eye', count: [0, 2], chance: 0.4 },
+      { item: 'gunpowder', count: [0, 2], chance: 0.4 },
+    ],
+    goals: ['floatInWater', 'shoot', 'moveToTarget', 'wander', 'lookAtPlayer'],
+    model: 'witch', skin: 'witch', sound: 'witch',
+    despawnable: true,
+    traits: { shoots: 'potion' },
+  },
+  /*
+   * Dragão do End: o chefe. Voa em volta das colunas, mergulha no jogador e
+   * pousa no portal do centro, onde a espada o alcança. Os cristais das
+   * colunas o curam. A IA é o goal `dragon` (`entity/ai/dragongoals.ts`); a
+   * luta — cristais, portal de saída, ovo — é de `game/dragonfight.ts`.
+   */
+  {
+    id: 20, name: 'ender_dragon', display: 'Dragão do End', category: 'hostile',
+    health: 200, width: 1.5, height: 0.6, speed: 9,
+    attack: { damage: [6, 10, 15], reach: 5, cooldownTicks: 20 },
+    followRange: 150, xp: [500, 500],
+    drops: [],
+    goals: ['dragon'],
+    model: 'dragon', skin: 'dragon', sound: 'ender_dragon',
+    despawnable: false,
+    traits: { flies: true, fireImmune: true, modelScale: 8, noClip: true, noKnockback: true, boss: true },
+  },
+  /*
+   * Cristal do End: a pedra que cura o dragão, no topo de cada coluna. Um
+   * golpe ou uma flecha basta, e ele explode. É mob para ganhar de graça o que
+   * mob tem: ser desenhado, ser mirado e levar dano.
+   */
+  {
+    id: 21, name: 'end_crystal', display: 'Cristal do End', category: 'passive',
+    health: 1, width: 1, height: 1.4, speed: 0,
+    followRange: 0, xp: [0, 0],
+    drops: [],
+    goals: [],
+    model: 'end_crystal', skin: 'end_crystal', sound: 'end_crystal',
+    despawnable: false,
+    traits: { flies: true, fireImmune: true, noClip: true, noKnockback: true, explodesOnDeath: 6 },
   },
 ];
 

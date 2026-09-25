@@ -19,7 +19,7 @@
  * as cavernas em `terrain.ts`.
  */
 
-import { AIR, BLOCK_BY_NAME, makeState } from '../../data/blocks';
+import { AIR, BLOCK_BY_NAME, defOf, makeState } from '../../data/blocks';
 import { BIOMES } from '../../data/biomes';
 import { CHEST_LOOT, STRUCTURES, type Piece, type StructureDef } from '../../data/structures';
 import { hash3 } from '../../core/rng';
@@ -144,12 +144,21 @@ export function stamp(
     setIfInside(chunk, ox + spawner.at[0], oy + spawner.at[1], oz + spawner.at[2],
       makeState(blockId('mob_spawner')), 'any');
   }
+  for (const mob of def.mobs ?? []) {
+    markInChunk(chunk, 'mob', ox + mob.at[0], oy + mob.at[1], oz + mob.at[2], mob.mob);
+  }
 }
 
 function stampPiece(
   chunk: ChunkColumn, seed: number, piece: Piece, ox: number, oy: number, oz: number,
 ): void {
   const [x0, y0, z0, x1, y1, z1] = piece.box;
+  // Peça inteira fora do chunk: nem percorre. A fortaleza e a biblioteca têm
+  // dezenas de peças, e quase todas caem fora de cada chunk que as visita.
+  const baseX = chunk.cx * SECTION_SIZE;
+  const baseZ = chunk.cz * SECTION_SIZE;
+  if (ox + x1 < baseX || ox + x0 >= baseX + SECTION_SIZE
+    || oz + z1 < baseZ || oz + z0 >= baseZ + SECTION_SIZE) return;
   const id = blockId(piece.block);
   const altId = piece.alt === undefined ? -1 : blockId(piece.alt);
   const altChance = piece.altChance ?? 0;
@@ -158,6 +167,10 @@ function stampPiece(
 
   if (piece.kind === 'point') {
     setIfInside(chunk, ox + x0, oy + y0, oz + z0, makeState(id, state), replace);
+    return;
+  }
+  if (piece.kind === 'pillar') {
+    stampPillar(chunk, makeState(id, state), ox + x0, ox + x1, oy + y0, oz + z0, oz + z1);
     return;
   }
 
@@ -171,6 +184,27 @@ function stampPiece(
           if (roll < altChance) block = altId;
         }
         setIfInside(chunk, ox + x, oy + y, oz + z, makeState(block, state), replace);
+      }
+    }
+  }
+}
+
+/** Quanto um pilar desce, no máximo: nenhuma ponte fica mais alta que isso. */
+const PILLAR_DEPTH = 64;
+
+/** Colunas que descem de `top` até o primeiro bloco sólido (peça `pillar`). */
+function stampPillar(
+  chunk: ChunkColumn, state: number, wx0: number, wx1: number, top: number, wz0: number, wz1: number,
+): void {
+  for (let wz = wz0; wz <= wz1; wz++) {
+    for (let wx = wx0; wx <= wx1; wx++) {
+      const lx = wx - chunk.cx * SECTION_SIZE;
+      const lz = wz - chunk.cz * SECTION_SIZE;
+      if (lx < 0 || lx >= SECTION_SIZE || lz < 0 || lz >= SECTION_SIZE) continue;
+      for (let y = top; y >= 1 && y > top - PILLAR_DEPTH; y--) {
+        const def = defOf(chunk.getBlock(lx, y, lz));
+        if (def.solid) break;
+        chunk.setBlock(lx, y, lz, state);
       }
     }
   }

@@ -134,6 +134,11 @@ export class Player {
   pitch = 0;
 
   onGround = false;
+  /**
+   * Multiplicador de andar dos efeitos (M16: Velocidade, Lentidão). Quem
+   * escreve é a `Session`, a cada tick, a partir de `StatusEffects`.
+   */
+  speedFactor = 1;
   sneaking = false;
   sprinting = false;
   /**
@@ -212,8 +217,8 @@ export class Player {
     const friction = this.onGround ? this.groundFriction(world) : AIR_FRICTION;
     this.sprinting = input.sprint && input.forward > 0 && !this.sneaking;
 
-    const multiplier = this.sneaking ? SNEAK_MULTIPLIER
-      : this.sprinting ? SPRINT_MULTIPLIER : WALK_MULTIPLIER;
+    const multiplier = (this.sneaking ? SNEAK_MULTIPLIER
+      : this.sprinting ? SPRINT_MULTIPLIER : WALK_MULTIPLIER) * this.speedFactor;
 
     let acceleration: number;
     if (this.inWater || this.inLava) {

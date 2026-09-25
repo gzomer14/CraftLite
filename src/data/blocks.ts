@@ -17,7 +17,8 @@ export type BlockShape =
   | 'cube' | 'cross' | 'slab' | 'stairs' | 'fence' | 'fence_gate' | 'door' | 'trapdoor'
   | 'torch' | 'carpet' | 'flat' | 'liquid' | 'pane' | 'ladder' | 'sign' | 'painting'
   | 'lever' | 'button' | 'plate' | 'repeater' | 'piston' | 'piston_head' | 'rail' | 'bed'
-  | 'chest' | 'cake' | 'bell' | 'anvil' | 'hopper' | 'comparator' | 'none';
+  | 'chest' | 'cake' | 'bell' | 'anvil' | 'hopper' | 'comparator' | 'brewing_stand'
+  | 'portal_frame' | 'portal_frame_eye' | 'portal_plane' | 'egg' | 'none';
 
 /**
  * De que o bloco precisa para continuar existindo (M7).
@@ -797,6 +798,45 @@ SPECS.push(
     hardness: 0, sound: 'stone', support: 'below', itemless: true },
   { id: 154, name: 'observer', display: 'Observador', hardness: 3, ...rock(),
     tex: { top: 'block/observer_side', side: 'block/observer_side', front: 'block/observer_front' } },
+);
+
+/*
+ * Um fim para a jornada (M16). Ids no fim, como sempre.
+ *
+ * - Verruga do Nether: plantação na areia das almas (`data/crops.ts`), três
+ *   idades (bits 0..1), sem item próprio — quem planta é o item `nether_wart`.
+ * - Suporte de preparo: contêiner de poção (`game/brewing.ts`), com luz fraca
+ *   da chama de baixo.
+ * - Moldura do portal do End: inquebrável, com e sem olho. São dois ids, como
+ *   a lâmpada: o olho muda a forma e a textura do topo, que são colunas por id.
+ * - Portal do End: a placa escura que leva ao End; sem colisão, como o portal
+ *   do Nether.
+ * - Ovo do dragão: o troféu que fica sobre o portal de saída.
+ */
+SPECS.push(
+  { id: 155, name: 'nether_wart', display: 'Verruga do Nether', tex: 'block/nether_wart_0',
+    ...plant(), itemless: true, stages: ['block/nether_wart_0', 'block/nether_wart_1',
+      'block/nether_wart_1', 'block/nether_wart_2'] },
+  { id: 156, name: 'brewing_stand', display: 'Suporte de Preparo', shape: 'brewing_stand',
+    hardness: 0.5, ...rock('pickaxe', 1), opaque: false, lightAttenuation: 0, emission: 1,
+    sound: 'metal',
+    tex: { top: 'block/brewing_stand_base', side: 'block/brewing_stand', bottom: 'block/brewing_stand_base' } },
+  { id: 157, name: 'end_stone', display: 'Pedra do End', tex: 'block/end_stone',
+    hardness: 3, ...rock() },
+  { id: 158, name: 'end_portal_frame', display: 'Moldura do Portal do End',
+    shape: 'portal_frame', hardness: -1, opaque: false, lightAttenuation: 0, sound: 'glass',
+    tex: { top: 'block/end_portal_frame_top', side: 'block/end_portal_frame_side', bottom: 'block/end_stone' } },
+  { id: 159, name: 'end_portal_frame_eye', display: 'Moldura do Portal do End',
+    shape: 'portal_frame_eye', hardness: -1, opaque: false, lightAttenuation: 0, emission: 1,
+    sound: 'glass', itemless: true,
+    tex: { top: 'block/end_portal_frame_eye', side: 'block/end_portal_frame_side', bottom: 'block/end_stone' } },
+  { id: 160, name: 'end_portal', display: 'Portal do End', shape: 'portal_plane',
+    tex: 'block/end_portal', solid: false, opaque: false, lightAttenuation: 0, emission: 15,
+    hardness: -1, sound: 'glass', itemless: true },
+  { id: 161, name: 'dragon_egg', display: 'Ovo do Dragão', shape: 'egg', tex: 'block/dragon_egg',
+    hardness: 3, opaque: false, lightAttenuation: 0, emission: 1, sound: 'stone' },
+  { id: 162, name: 'nether_brick_fence', display: 'Cerca de Tijolo do Nether', shape: 'fence',
+    tex: 'block/nether_bricks', hardness: 2, ...rock(), opaque: false, lightAttenuation: 0 },
 );
 SPECS.push(...dyedSpecs());
 

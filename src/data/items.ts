@@ -10,6 +10,7 @@
 import { BLOCK_BY_NAME, BLOCKS, type ToolKind } from './blocks';
 import { DYES, LEGACY_DYE_COUNT } from './dyes';
 import type { FoodEffect } from './effects';
+import { POTIONS } from './potions';
 
 /** Id de bloco por nome, para os itens que colocam um bloco de outro nome. */
 function blockIdByName(name: string): number {
@@ -41,6 +42,8 @@ export interface FoodSpec {
   effects?: readonly FoodEffect[];
   /** Come mesmo de barriga cheia — a maçã dourada é remédio, não comida. */
   alwaysEdible?: boolean;
+  /** Bebe em vez de comer (M16, poções): muda só o som. */
+  drink?: boolean;
 }
 
 /** Item que se usa segurando o botão (doc 05 §1). */
@@ -103,7 +106,9 @@ export interface ItemDef {
 export type ItemUse =
   | 'fill_bucket' | 'pour_water' | 'pour_lava' | 'drink_milk' | 'shears' | 'throw_egg'
   | 'throw_snowball' | 'dye_sheep' | 'eat' | 'charge' | 'place_boat' | 'place_minecart'
-  | 'ignite' | 'till' | 'plant' | 'open_map' | 'fish';
+  | 'ignite' | 'till' | 'plant' | 'open_map' | 'fish'
+  // M16: encher o frasco na água e arremessar o olho do ender.
+  | 'fill_bottle' | 'throw_eye';
 
 /**
  * Materiais de ferramenta (doc 05 §2).
@@ -582,6 +587,52 @@ register({
   tex: 'item/enchanted_book',
   maxStack: 1,
 });
+
+// --- apêndice do M16: um fim para a jornada, no fim da fila de ids -----------
+// Vara e pó de blaze saem da fortaleza do Nether; a verruga, do jardim dela.
+// O olho do ender (pérola + pó) aponta a fortaleza da superfície. O resto é
+// ingrediente de poção (`data/potions.ts`).
+for (const item of [
+  { name: 'blaze_rod', display: 'Vara de Blaze', fuel: 2400 },
+  { name: 'blaze_powder', display: 'Pó de Blaze' },
+  { name: 'nether_wart', display: 'Verruga do Nether', use: 'plant' },
+  { name: 'glass_bottle', display: 'Frasco de Vidro', use: 'fill_bottle' },
+  { name: 'ender_eye', display: 'Olho do Ender', use: 'throw_eye' },
+  { name: 'magma_cream', display: 'Creme de Magma' },
+  { name: 'gold_nugget', display: 'Pepita de Ouro' },
+  { name: 'glistering_melon_slice', display: 'Fatia de Melancia Reluzente' },
+  {
+    name: 'golden_carrot', display: 'Cenoura Dourada',
+    food: { hunger: 6, saturation: 14.4, eatTicks: 32 },
+  },
+  { name: 'fermented_spider_eye', display: 'Olho de Aranha Fermentado' },
+] satisfies AppendixItem[]) {
+  register({
+    id: nextId++,
+    name: item.name,
+    display: item.display,
+    tex: `item/${item.name}`,
+    maxStack: 64,
+    ...(item.food !== undefined ? { food: item.food } : {}),
+    ...(item.use !== undefined ? { use: item.use } : {}),
+    ...(item.fuel !== undefined ? { fuel: item.fuel } : {}),
+  });
+}
+// As poções, na ordem da tabela: bebe-se como se come, e sobra o frasco.
+for (const potion of POTIONS) {
+  const effects: FoodEffect[] = potion.effect === undefined
+    ? []
+    : [{ effect: potion.effect, level: potion.level ?? 1, seconds: potion.seconds ?? 0 }];
+  register({
+    id: nextId++,
+    name: potion.name,
+    display: potion.display,
+    tex: `item/${potion.name}`,
+    maxStack: 1,
+    remainder: 'glass_bottle',
+    food: { hunger: 0, saturation: 0, eatTicks: 32, alwaysEdible: true, drink: true, effects },
+  });
+}
 
 /**
  * Usos de cada item, em ordem de tentativa (ver `ItemDef.uses`).

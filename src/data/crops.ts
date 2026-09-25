@@ -27,6 +27,11 @@ export interface CropDef {
   ripe: readonly Drop[];
   /** O que sai ao arrancar antes da hora — só a semente de volta. */
   young: readonly Drop[];
+  /**
+   * Cresce no escuro (M16: a verruga do Nether, que não vê o céu). Sem isto
+   * a planta precisa de luz 9, como o trigo.
+   */
+  growsInDark?: boolean;
 }
 
 export const CROPS: readonly CropDef[] = [
@@ -45,6 +50,14 @@ export const CROPS: readonly CropDef[] = [
     ripe: [{ item: 'potato', count: [2, 4] }],
     young: [{ item: 'potato', count: 1 }],
   },
+  // M16: a verruga na areia das almas, sem água e sem luz — o jardim da
+  // fortaleza do Nether é de onde ela vem, e é ela que começa toda poção.
+  {
+    block: 'nether_wart', seed: 'nether_wart', soil: 'soul_sand', maxAge: 3, growChance: 0.1,
+    ripe: [{ item: 'nether_wart', count: [2, 4] }],
+    young: [{ item: 'nether_wart', count: 1 }],
+    growsInDark: true,
+  },
 ];
 
 /** Índice blockId → plantação; o tick de crescimento consulta isso por voxel. */
@@ -62,6 +75,15 @@ for (const crop of CROPS) {
   BY_BLOCK.set(block.id, crop);
   BY_SEED.set(seed.id, crop);
   BLOCK_ID.set(crop, block.id);
+}
+
+/** Solo de cada plantação, por id — o tick de crescimento confere o de baixo. */
+const SOIL_ID = new Map<CropDef, number>();
+for (const crop of CROPS) SOIL_ID.set(crop, BLOCK_BY_NAME.get(crop.soil)?.id ?? -1);
+
+/** Id do bloco em que a plantação pega. */
+export function cropSoilId(crop: CropDef): number {
+  return SOIL_ID.get(crop) ?? -1;
 }
 
 /** Id do bloco de uma plantação. */

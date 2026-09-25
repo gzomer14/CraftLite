@@ -11,6 +11,7 @@ import { BLOCK_BY_NAME, blockIdOf, makeState, stateBitsOf } from '../data/blocks
 import { ITEM_BY_NAME, type ItemStack } from '../data/items';
 import { rollChestLoot } from '../world/gen/structures';
 import { CHEST_SLOTS, Container, DoubleChestView, Furnace } from './container';
+import { BrewingStand } from './brewing';
 import type { World } from '../world/world';
 
 const FURNACE = BLOCK_BY_NAME.get('furnace')?.id ?? -1;
@@ -19,6 +20,7 @@ const CHEST = BLOCK_BY_NAME.get('chest')?.id ?? -1;
 export const HOPPER = BLOCK_BY_NAME.get('hopper')?.id ?? -1;
 const DISPENSER = BLOCK_BY_NAME.get('dispenser')?.id ?? -1;
 const DROPPER = BLOCK_BY_NAME.get('dropper')?.id ?? -1;
+export const BREWING_STAND = BLOCK_BY_NAME.get('brewing_stand')?.id ?? -1;
 
 /** Slots de funil, dispensador e liberador (M15). */
 export const HOPPER_SLOTS = 5;
@@ -40,7 +42,7 @@ export interface TileEvents {
 
 export function isContainerBlock(id: number): boolean {
   return id === FURNACE || id === FURNACE_LIT || id === CHEST
-    || id === HOPPER || id === DISPENSER || id === DROPPER;
+    || id === HOPPER || id === DISPENSER || id === DROPPER || id === BREWING_STAND;
 }
 
 /** true se o contêiner abre na grade simples (baú, funil, dispensador, liberador). */
@@ -51,6 +53,7 @@ export function isGridContainer(id: number): boolean {
 /** Um contêiner novo para o bloco `id`, na posição dada. */
 function containerFor(id: number, x: number, y: number, z: number): Container {
   if (isFurnaceBlock(id)) return new Furnace(x, y, z);
+  if (id === BREWING_STAND) return new BrewingStand(x, y, z);
   if (id === HOPPER) {
     const hopper = new Container('hopper', HOPPER_SLOTS, x, y, z);
     // Vai para o save mesmo vazio: é assim que o funil volta a sugar depois de
@@ -198,9 +201,10 @@ export class Tiles {
     if (open) this.openLids.push(x, y, z);
   }
 
-  /** Fornalhas queimam com a tela fechada (doc 05 §7). */
+  /** Fornalhas queimam e suportes fervem com a tela fechada (doc 05 §7, M16). */
   tick(): void {
     for (const container of this.containers.values()) {
+      if (container instanceof BrewingStand) { container.tick(); continue; }
       if (!(container instanceof Furnace)) continue;
       container.tick();
       this.syncFurnaceBlock(container);
@@ -249,7 +253,8 @@ export class Tiles {
   get saved(): readonly Container[] {
     const out: Container[] = [];
     for (const container of this.containers.values()) {
-      if (!container.isEmpty || container.persistent || container instanceof Furnace) {
+      if (!container.isEmpty || container.persistent || container instanceof Furnace
+        || container instanceof BrewingStand) {
         out.push(container);
       }
     }

@@ -45,7 +45,13 @@ export class StatusEffects {
   /** Aplica um efeito. Devolve true se algo mudou. */
   add(id: number, level: number, ticks: number, target?: EffectTarget): boolean {
     const def = EFFECTS[id];
-    if (def === undefined || level < 1 || ticks <= 0) return false;
+    if (def === undefined || level < 1) return false;
+    // Instantâneo (M16): age agora e não entra na lista — não há o que durar.
+    if (def.instantHeal !== undefined) {
+      target?.heal(def.instantHeal * level);
+      return target !== undefined;
+    }
+    if (ticks <= 0) return false;
     const current = this.level[id];
     if (this.ticks[id] > 0) {
       if (level < current) return false;
@@ -60,6 +66,50 @@ export class StatusEffects {
       target.absorption = Math.max(target.absorption, def.absorptionPerLevel * level);
     }
     return true;
+  }
+
+  /**
+   * Multiplicador de velocidade de andar (M16): 1 sem nada, 1,2 com
+   * Velocidade I, 0,85 com Lentidão I. Varre a tabela — onze entradas, sem
+   * alocar — só quando há efeito ativo.
+   */
+  speedMultiplier(): number {
+    if (this.active === 0) return 1;
+    let sum = 1;
+    for (let id = 0; id < EFFECTS.length; id++) {
+      const per = EFFECTS[id].speedPerLevel;
+      if (per !== undefined && this.ticks[id] > 0) sum += per * this.level[id];
+    }
+    return Math.max(0.1, sum);
+  }
+
+  /** Dano somado ao golpe corpo a corpo (Força, Fraqueza). */
+  attackBonus(): number {
+    if (this.active === 0) return 0;
+    let sum = 0;
+    for (let id = 0; id < EFFECTS.length; id++) {
+      const per = EFFECTS[id].attackPerLevel;
+      if (per !== undefined && this.ticks[id] > 0) sum += per * this.level[id];
+    }
+    return sum;
+  }
+
+  /** true com algum efeito de enxergar no escuro ativo. */
+  get nightVision(): boolean {
+    return this.hasFlag('nightVision');
+  }
+
+  /** true com algum efeito que protege do fogo ativo. */
+  get fireImmune(): boolean {
+    return this.hasFlag('fireImmune');
+  }
+
+  private hasFlag(flag: 'nightVision' | 'fireImmune'): boolean {
+    if (this.active === 0) return false;
+    for (let id = 0; id < EFFECTS.length; id++) {
+      if (EFFECTS[id][flag] === true && this.ticks[id] > 0) return true;
+    }
+    return false;
   }
 
   /** Tira um efeito (ou todos, o que o leite faz). */

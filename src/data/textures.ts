@@ -1562,6 +1562,52 @@ export const TEXTURES: Record<string, TexRecipe> = {
     ops: [speckle([226, 62, 48], 0.16, 1), emboss(0.3), dither(0.05)],
   },
 
+  // --- um fim para a jornada (M16) -----------------------------------------
+  /** Suporte de preparo: ferro escuro com a haste de latão. */
+  'block/brewing_stand': {
+    base: [96, 86, 70], noise: 'value', scale: 5, variance: 0.08,
+    ops: [stripes('v', 4, 0.1), border([62, 56, 46], 1), dither(0.04)],
+  },
+  /** A base: pedra lisa com três pés escuros. */
+  'block/brewing_stand_base': {
+    base: [126, 126, 128], noise: 'value', scale: 6, variance: 0.07,
+    ops: [rect(1, 1, 4, 4, [76, 76, 80]), rect(11, 1, 4, 4, [76, 76, 80]),
+      rect(6, 11, 4, 4, [76, 76, 80]), rect(7, 7, 2, 2, [190, 158, 70]), dither(0.04)],
+  },
+  /** Pedra do End: amarelo-palha pálido, pontilhado. */
+  'block/end_stone': {
+    base: [220, 222, 158], noise: 'cell', scale: 4, variance: 0.12,
+    ops: [speckle([186, 188, 124], 0.18, 1), emboss(0.25), dither(0.05)],
+  },
+  /** Moldura do portal: pedra verde-azulada com o encaixe escuro do olho. */
+  'block/end_portal_frame_top': {
+    base: [74, 116, 98], noise: 'value', scale: 5, variance: 0.1,
+    ops: [border([188, 190, 132], 2), rect(4, 4, 8, 8, [30, 44, 40]),
+      outline(4, 4, 8, 8, [54, 84, 72]), dither(0.04)],
+  },
+  'block/end_portal_frame_side': {
+    base: [222, 222, 160], noise: 'cell', scale: 4, variance: 0.1,
+    ops: [rect(0, 0, 16, 4, [74, 116, 98]), rect(0, 4, 16, 1, [54, 84, 72]),
+      speckle([186, 188, 124], 0.14, 1), dither(0.04)],
+  },
+  /** Com o olho encaixado: a íris verde e a pupila. */
+  'block/end_portal_frame_eye': {
+    inherit: 'block/end_portal_frame_top',
+    ops: [rect(5, 5, 6, 6, [58, 172, 132]), rect(6, 4, 4, 8, [58, 172, 132]),
+      rect(4, 6, 8, 4, [58, 172, 132]), rect(7, 6, 2, 4, [20, 30, 26]), dither(0.03)],
+  },
+  /** Portal do End: o vazio com estrelas verdes e brancas. */
+  'block/end_portal': {
+    base: [8, 12, 18], noise: 'value', scale: 3, variance: 0.3,
+    ops: [speckle([66, 170, 150], 0.05, 1), speckle([220, 240, 236], 0.025, 1),
+      speckle([28, 60, 70], 0.12, 1)],
+  },
+  /** Ovo do dragão: preto com pintas roxas. */
+  'block/dragon_egg': {
+    base: [20, 12, 26], noise: 'cell', scale: 4, variance: 0.3,
+    ops: [speckle([96, 36, 120], 0.16, 1), emboss(0.3), dither(0.04)],
+  },
+
   // --- Nether (M7) --------------------------------------------------------
   'block/netherrack': {
     base: [111, 54, 52], noise: 'cell', scale: 4, variance: 0.28,
@@ -1625,6 +1671,8 @@ function cropTextures(): Record<string, TexRecipe> {
     { name: 'wheat', steps: 8, stalk: [110, 156, 62], tip: [216, 186, 86] },
     { name: 'carrots', steps: 4, stalk: [72, 148, 62], tip: [232, 132, 44] },
     { name: 'potatoes', steps: 4, stalk: [88, 152, 72], tip: [214, 206, 108] },
+    // M16: a verruga, vermelho-escura com as pontas em bulbo.
+    { name: 'nether_wart', steps: 3, stalk: [112, 26, 30], tip: [176, 40, 52] },
   ];
   const out: Record<string, TexRecipe> = {};
   for (const crop of crops) {

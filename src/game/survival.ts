@@ -82,6 +82,8 @@ export interface SurvivalContext {
   inLava: boolean;
   /** Corpo dentro de um bloco de fogo (`world/fire.ts`). */
   onFire: boolean;
+  /** Corpo dentro d'água (pés ou cabeça): apaga quem está pegando fogo (M16). */
+  inWater?: boolean;
   /** Cabeça dentro de bloco sólido e opaco. */
   suffocating: boolean;
   y: number;
@@ -122,6 +124,11 @@ export class Survival implements EffectTarget {
   private suffocateTimer = 0;
   /** Ticks dentro do fogo desde o último dano. */
   private fireTimer = 0;
+  /**
+   * Ticks que o jogador continua pegando fogo depois de sair da chama (M16: a
+   * bola de fogo do blaze). A água apaga; Resistência ao Fogo ignora.
+   */
+  burnTicks = 0;
 
   /** Chamado ao morrer. */
   onDeath: ((cause: DamageCause) => void) | null = null;
@@ -139,6 +146,12 @@ export class Survival implements EffectTarget {
   /** Mensagem da tela de morte. */
   get deathMessage(): string {
     return this.lastCause === null ? 'Você morreu' : CAUSE_MESSAGES[this.lastCause];
+  }
+
+  /** Põe o jogador para arder por `ticks` (M16: bola de fogo do blaze). */
+  ignite(ticks: number): void {
+    if (this.effects.fireImmune) return;
+    this.burnTicks = Math.max(this.burnTicks, ticks);
   }
 
   /** Acumula exaustão; a conversão em fome acontece no tick. */
@@ -233,7 +246,11 @@ export class Survival implements EffectTarget {
       this.suffocateTimer = 0;
     }
 
-    if (context.inLava) this.damage(4, 'lava');
+    // Resistência ao Fogo (M16): lava e chama não ferem, e ninguém arde.
+    const fireproof = this.effects.fireImmune;
+    if (context.inWater === true || context.submerged || fireproof) this.burnTicks = 0;
+    else if (this.burnTicks > 0) this.burnTicks--;
+    if (context.inLava && !fireproof) this.damage(4, 'lava');
     /*
      * Fogo: metade do dano da lava e a cada meio segundo, não a cada tick.
      *
@@ -241,7 +258,7 @@ export class Survival implements EffectTarget {
      * caro, ficar parado nela mata. Com dano por tick, um bloco de fogo era
      * morte instantânea e o incêndio deixava de ser jogável.
      */
-    if (context.onFire) {
+    if ((context.onFire || this.burnTicks > 0) && !fireproof) {
       this.fireTimer++;
       if (this.fireTimer >= 10) {
         this.fireTimer = 0;
@@ -331,6 +348,7 @@ export class Survival implements EffectTarget {
     this.suffocateTimer = 0;
     this.lastCause = null;
     this.effects.clear(this);
+    this.burnTicks = 0;
     this.absorption = 0;
   }
 }

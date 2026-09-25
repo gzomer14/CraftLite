@@ -49,6 +49,11 @@ export interface WorldMeta {
    * como chave e o tick total do fim da má fama. Mundo antigo não tem o campo.
    */
   villageBans?: number[];
+  /**
+   * A luta contra o dragão (M16): se ele caiu, quais cristais foram quebrados,
+   * a vida dele e se os créditos já passaram. Mundo antigo não tem o campo.
+   */
+  end?: { killed: boolean; crystalsBroken: number; dragonHealth: number; creditsSeen: boolean };
   createdAt: number;
   lastPlayed: number;
   sizeBytes: number;

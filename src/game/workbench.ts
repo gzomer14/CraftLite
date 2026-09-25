@@ -20,7 +20,9 @@ import { TOO_EXPENSIVE } from '../data/anvil';
 import { consumeGrid, type CraftGrid, type RecipeBook, type RecipeEntry } from './crafting';
 import { MAX_BOOKSHELVES, type EnchantOffer } from './enchanting';
 import { CRAFT_END, CRAFT_RESULT, CRAFT_START, type Inventory } from './inventory';
-import { isContainerBlock, isFurnaceBlock, isGridContainer, type Tiles } from './tiles';
+import {
+  BREWING_STAND, isContainerBlock, isFurnaceBlock, isGridContainer, type Tiles,
+} from './tiles';
 import type { Achievements } from './achievements';
 import type { Experience } from './xp';
 import type { Player } from '../entity/player';
@@ -36,7 +38,7 @@ const BOOK = ITEM_BY_NAME.get('book')?.id ?? -1;
 /** O que o jogador tem aberto no momento. */
 export type OpenScreen =
   | 'none' | 'inventory' | 'crafting' | 'furnace' | 'chest' | 'enchanting' | 'trading'
-  | 'anvil';
+  | 'anvil' | 'brewing';
 
 /** O que a bancada precisa da sessão. */
 export interface WorkbenchHost {
@@ -129,6 +131,11 @@ export class Workbench {
     const container = tiles.atOrCreate(x, y, z, id);
     if (isFurnaceBlock(id)) {
       this.setScreen('furnace', container);
+      return true;
+    }
+    // Suporte de preparo (M16): a tela própria, com a barra de fervura.
+    if (id === BREWING_STAND) {
+      this.setScreen('brewing', container);
       return true;
     }
     // Funil, dispensador e liberador: a grade simples, sem tampa (M15).

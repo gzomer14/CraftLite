@@ -36,6 +36,20 @@ export const FIREBALL_FLAGS = FLAG_NO_GRAVITY | FLAG_EXPLOSIVE;
  * item, não com o modelo da flecha.
  */
 export const FLAG_EGG = 4;
+/**
+ * Olho do ender (M16): voa na direção da fortaleza sem bater em nada e, depois
+ * de `EYE_TICKS`, avisa `onEye` — quem ouve decide se ele cai ou se parte.
+ */
+export const FLAG_EYE = 8;
+/**
+ * Bola de fogo do blaze (M16): não cai, não explode — **incendeia** o que
+ * acerta (o jogador arde; o bloco pega fogo). Quem ouve é `onIgnite`.
+ */
+export const FLAG_IGNITES = 16;
+/** Frasco arremessado da bruxa (M16): quebra e espalha o efeito (`onPotion`). */
+export const FLAG_POTION = 32;
+/** Ticks de voo do olho antes de parar no ar. */
+export const EYE_TICKS = 40;
 
 export class Projectiles {
   private readonly x: Float64Array;
@@ -58,12 +72,20 @@ export class Projectiles {
   private count = 0;
 
   /** Chamado quando o projétil encosta em algo que pode levar dano. */
-  onHit: ((x: number, y: number, z: number, damage: number, fromPlayer: boolean) => boolean) | null = null;
+  onHit: ((
+    x: number, y: number, z: number, damage: number, fromPlayer: boolean, flags: number,
+  ) => boolean) | null = null;
   onImpactSound: ((x: number, y: number, z: number) => void) | null = null;
   /** Um projétil explosivo parou: quem ouve detona (bola de fogo do ghast). */
   onExplode: ((x: number, y: number, z: number) => void) | null = null;
   /** Um ovo quebrou: quem ouve sorteia o pintinho. */
   onEgg: ((x: number, y: number, z: number) => void) | null = null;
+  /** O olho do ender terminou o voo (M16). */
+  onEye: ((x: number, y: number, z: number) => void) | null = null;
+  /** A bola de fogo do blaze parou (M16): incendeia onde bateu. */
+  onIgnite: ((x: number, y: number, z: number) => void) | null = null;
+  /** O frasco da bruxa quebrou (M16), com o item da poção. */
+  onPotion: ((x: number, y: number, z: number, item: number) => void) | null = null;
 
   constructor(capacity = 64) {
     this.capacity = capacity;
@@ -116,6 +138,10 @@ export class Projectiles {
       this.age[i]++;
 
       if (this.age[i] > MAX_AGE) { this.removeAt(i); i--; continue; }
+      if ((this.flags[i] & FLAG_EYE) !== 0 && this.age[i] > EYE_TICKS) {
+        this.detonate(i);
+        this.removeAt(i); i--; continue;
+      }
 
       if ((this.flags[i] & FLAG_NO_GRAVITY) === 0) this.vy[i] += GRAVITY;
       this.vx[i] *= DRAG;
@@ -136,6 +162,8 @@ export class Projectiles {
       this.x[i] += stepX;
       this.y[i] += stepY;
       this.z[i] += stepZ;
+      // O olho atravessa tudo: o que importa é a direção, não o caminho.
+      if ((this.flags[i] & FLAG_EYE) !== 0) continue;
 
       const def = defOf(world.getBlock(
         Math.floor(this.x[i]), Math.floor(this.y[i]), Math.floor(this.z[i]),
@@ -146,7 +174,9 @@ export class Projectiles {
         return true;
       }
       if (this.onHit !== null
-        && this.onHit(this.x[i], this.y[i], this.z[i], this.damage[i], this.fromPlayer[i] === 1)) {
+        && this.onHit(
+          this.x[i], this.y[i], this.z[i], this.damage[i], this.fromPlayer[i] === 1, this.flags[i],
+        )) {
         this.detonate(i);
         return true;
       }
@@ -172,7 +202,11 @@ export class Projectiles {
 
   /** Explode, se for explosivo. Chamado em todo fim de trajetória. */
   private detonate(i: number): void {
-    if ((this.flags[i] & FLAG_EGG) !== 0) this.onEgg?.(this.x[i], this.y[i], this.z[i]);
+    const flags = this.flags[i];
+    if ((flags & FLAG_EGG) !== 0) this.onEgg?.(this.x[i], this.y[i], this.z[i]);
+    if ((flags & FLAG_EYE) !== 0) this.onEye?.(this.x[i], this.y[i], this.z[i]);
+    if ((flags & FLAG_IGNITES) !== 0) this.onIgnite?.(this.prevX[i], this.prevY[i], this.prevZ[i]);
+    if ((flags & FLAG_POTION) !== 0) this.onPotion?.(this.x[i], this.y[i], this.z[i], this.item[i]);
     if ((this.flags[i] & FLAG_EXPLOSIVE) === 0) return;
     this.onExplode?.(this.x[i], this.y[i], this.z[i]);
   }

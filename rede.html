@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0d12">
+<meta name="color-scheme" content="dark">
+<title>CraftLite — rede local</title>
+<style>
+  html,body{margin:0;background:#0b0d12;color:#e8e8e8;font-family:ui-monospace,"Courier New",monospace}
+  #app{max-width:560px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:10px}
+  h1{font-size:20px;margin:8px 0}
+  h2{font-size:16px;margin:12px 0 0}
+  p{margin:0;line-height:1.45}
+  button{font:inherit;padding:12px;border:0;border-radius:6px;background:#2a3140;color:#fff}
+  button.primary{background:#4f7a2f}
+  textarea{font:inherit;padding:8px;background:#151a22;color:#fff;border:1px solid #394254;border-radius:6px;width:100%;box-sizing:border-box}
+  canvas{align-self:center;max-width:100%;image-rendering:pixelated;border-radius:4px}
+  video{width:100%;border-radius:6px}
+  .code{font-size:18px;letter-spacing:1px;word-break:break-all;user-select:all}
+  .muted{opacity:.65;font-size:13px}
+  .error{color:#ff8a80}
+  .ok{color:#9ccc65}
+  .results{display:grid;grid-template-columns:auto 1fr;gap:6px 12px}
+  .report{font-size:11px}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/net/probe.ts"></script>
+</body>
+</html>

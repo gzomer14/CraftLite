@@ -26,9 +26,14 @@ function walk(dir) {
  * mod pode pesar; o jogo sem mod, não.
  */
 const isMod = (file) => file.startsWith('m/');
+/** A página de prova de conexão do M20 (`rede.html` e `n/`): também fora do jogo. */
+const isNet = (file) => file.startsWith('n/') || file === 'rede.html';
+const bucketOf = (file) => (isMod(file) ? 'mods' : isNet(file) ? 'net' : 'game');
 
 const rows = [];
-const totals = { game: { raw: 0, gz: 0, br: 0 }, mods: { raw: 0, gz: 0, br: 0 } };
+const totals = {
+  game: { raw: 0, gz: 0, br: 0 }, mods: { raw: 0, gz: 0, br: 0 }, net: { raw: 0, gz: 0, br: 0 },
+};
 
 for (const file of walk(DIST).sort()) {
   const ext = extname(file);
@@ -38,7 +43,7 @@ for (const file of walk(DIST).sort()) {
   const br = brotliCompressSync(buf).length;
   const name = file.replace(`${DIST}/`, '').split('\\').join('/');
   rows.push({ file: name, raw: buf.length, gz, br });
-  const bucket = isMod(name) ? totals.mods : totals.game;
+  const bucket = totals[bucketOf(name)];
   bucket.raw += buf.length;
   bucket.gz += gz;
   bucket.br += br;
@@ -48,7 +53,7 @@ const kb = (n) => (n / 1024).toFixed(1).padStart(7);
 const line = (label, t) => `  ${label.padEnd(34)} ${kb(t.raw)} ${kb(t.gz)} ${kb(t.br)}  KB`;
 console.log('\n  arquivo                                 bruto    gzip  brotli');
 console.log('  ' + '-'.repeat(62));
-for (const r of rows.filter((r) => !isMod(r.file))) {
+for (const r of rows.filter((r) => bucketOf(r.file) === 'game')) {
   console.log(`  ${r.file.padEnd(34)} ${kb(r.raw)} ${kb(r.gz)} ${kb(r.br)}`);
 }
 console.log('  ' + '-'.repeat(62));
@@ -58,6 +63,12 @@ if (modRows.length > 0) {
   console.log('\n  só com mod ligado (m/)');
   for (const r of modRows) console.log(`  ${r.file.padEnd(34)} ${kb(r.raw)} ${kb(r.gz)} ${kb(r.br)}`);
   console.log(line('TOTAL de mods', totals.mods));
+}
+const netRows = rows.filter((r) => isNet(r.file));
+if (netRows.length > 0) {
+  console.log('\n  página de rede (rede.html, n/)');
+  for (const r of netRows) console.log(`  ${r.file.padEnd(34)} ${kb(r.raw)} ${kb(r.gz)} ${kb(r.br)}`);
+  console.log(line('TOTAL da página de rede', totals.net));
 }
 
 /*

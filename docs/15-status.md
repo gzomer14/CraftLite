@@ -9,7 +9,11 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-27 03:00 — **M21 fechado: mods.** Tela **Mods** no título, mod de
+**Última atualização:** 2026-09-27 04:00 — **M20 começou pela prova de conexão (M20.0).** A página
+`rede.html` liga dois aparelhos sem servidor, trocando um QR ou um código em texto, e mede a
+ligação; dois Chrome na mesma máquina se ligaram por ela, com e sem mDNS (`npm run smoke:net`). **O
+que decide o resto do M20 é o usuário rodá-la num celular e num computador na mesma rede Wi-Fi** —
+§6, item 0. O jogo não mudou um byte (304,7 KB). Antes, 03:00 — **M21 fechado: mods.** Tela **Mods** no título, mod de
 exemplo (o Cristal de Luz), e o ponto do marco provado: **sem mod ligado, a página baixa um único
 arquivo de código, o mesmo de antes**, e as tabelas do jogo saem idênticas (§3). O jogo sem mod ficou
 2,5 KB maior (302,2 → 304,7) e abre em 3G rápido 13 ms depois (+0,5%, medido lado a lado). Receita para
@@ -67,7 +71,7 @@ compartilhável).
 | **M17** Alcance | menu Idioma (doc 08 §3.11) com `en`, primeira hora guiada, seed compartilhável | ✅ concluído em 2026-09-25 | **não visto em aparelho** (visto no Chrome headless, em pt e en, desktop e celular emulado) |
 | **M18** Casa em ordem, 2ª volta | cinco módulos abaixo do teto, memória de áudio com folga, varredura de idioma pelo destino | ✅ concluído em 2026-09-25 | — |
 | **M19** Pontas soltas | enderman no End, dragão que quebra, sopra e morre devagar, ilhas de fora e portal de passagem, tint no WebGL1 | ✅ concluído em 2026-09-25 | **não visto em aparelho** (End visto no Chrome headless) |
-| **M20** Jogar junto na mesma rede | multijogador por WebRTC só na rede local, sinalização por QR, sem servidor; o mundo e os dados do convidado só no aparelho do anfitrião | ⬜ não iniciado | começa por uma **prova de conexão em dois aparelhos reais** (§3) |
+| **M20** Jogar junto na mesma rede | multijogador por WebRTC só na rede local, sinalização por QR, sem servidor; o mundo e os dados do convidado só no aparelho do anfitrião | 🚧 **M20.0 construída** (página `rede.html`) | **esperando o teste em dois aparelhos do usuário** (§6) antes do resto |
 | **M21** Mods | mods escritos no repositório, cada um um pedaço de bundle próprio, ligados e desligados na tela Mods; **desligados, a página baixa um arquivo só, o de antes** (teste e build cobram); mod de exemplo | ✅ concluído em 2026-09-27 | **não visto em aparelho** (visto no Chrome headless); mods e M20 esperam o M20 |
 
 **O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
@@ -83,14 +87,17 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-27 03:00, ao fechar o M21, com `npm test`, `npm run build`,
-`SIZE_BUDGET_KB=350 npm run size`, `npm run smoke` e `npm run smoke:mods`.
+Medidas em 2026-09-27 04:00, com a prova de conexão do M20, com `npm test`, `npm run build`,
+`SIZE_BUDGET_KB=350 npm run size`, `npm run smoke`, `npm run smoke:mods` e `npm run smoke:net`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
 | Bundle (gzip, o jogo sem mod) | **304,7 KB**, worker 42,7 (302,2 antes do M21: a infraestrutura de mods custou 1,9 KB no pedaço principal, 0,3 no worker e 0,2 no HTML; 301,8 ao fechar o M19; 298,4 ao fechar o M17; o M19 somou as ilhas de fora e o portal de passagem, e o worker foi a 42,3; 282,5 antes do M17: o inglês e as chaves custaram 15,9; o worker, 41,8, não mudou um byte; 267,3 antes do M16; 265,7 ao fechar o M15; 257,9 antes do M15; 249,5 antes do M14; 240,0 antes do M10) | < 350 KB | `npm run size` |
-| Testes | **2316**, 120 arquivos (2290 antes do M21; 2281 ao fechar o M19; 2271 ao fechar o M17; 2235 antes do M17; 2164 antes do M16; 2156 ao fechar o M15; 2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
+| Testes | **2334**, 121 arquivos (2316 ao fechar o M21; 2290 antes do M21; 2281 ao fechar o M19; 2271 ao fechar o M17; 2235 antes do M17; 2164 antes do M16; 2156 ao fechar o M15; 2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
 | Smoke test de navegador | **7 passos verdes**: carregar, criar, andar 10 s, quebrar, salvar, recarregar, conferir | verde | `npm run smoke` |
+| Smoke test da rede (M20.0) | **7 passos verdes**: dois Chrome, anfitrião e convidado pela página `rede.html`, trocando os códigos como uma pessoa; ligados em candidato `host` dos dois lados; ida e volta ~0,3 ms, perda 0/300, 6–18 MB/s. Com e sem mDNS (`SMOKE_NET_MDNS=1`). **Na mesma máquina — não prova a rede Wi-Fi** | verde | `npm run smoke:net` |
+| Página de rede (`rede.html`, `n/`) | **10,6 KB**, fora do jogo e do precache | — | `npm run size` |
+| Código de pareamento | **119 caracteres** com IP à vista, **138** com mDNS (72 e 84 bytes + CRC); QR versão 7–8, lido pelo OpenCV na captura da página | QR ≤ versão 8 | `tests/net.test.ts` |
 | Smoke test dos mods (M21) | **6 passos verdes**: sem mod, **um** arquivo de código; ligar pela tela Mods; o cristal no mundo, com luz 14; desligar volta a um arquivo e apaga a escolha; o mundo pede o mod | verde | `npm run smoke:mods` |
 | Pedaços que só baixam com mod (`m/`) | **45,6 KB**: ponto de entrada 1,9, mod de exemplo 0,6, worker com mods 0,4 + o worker de sempre como pedaço, 42,7 | sem orçamento (o jogo sem mod é que tem) | `npm run size` |
 | Textos de interface | **~500 chaves**, as mesmas em `pt` e `en` (o compilador cobra); **nenhum literal com cara de português** fora de `data/strings/pt.ts` e dos campos de nome das tabelas | varredura verde | `tests/i18n.test.ts` |
@@ -2086,22 +2093,53 @@ hotbar e na mão, a luz 14 igual à da pedra luminosa.
 7. **Limites:** atlas de 256 camadas no total (o jogo usa 223; o exemplo, 1) — o teste soma todos os
    mods do catálogo; mob, som, estrutura e conquista de mod ainda não têm tabela aberta.
 
-### M20 — planejado ⬜ — 2026-09-27
+### M20 — em andamento 🚧 — 2026-09-27
 
-Escrito no doc 14, com checklist e critério; **nenhuma linha de código ainda.** O que a leitura do
-código mostrou ao desenhar, para quem for implementar conferir de novo:
+Pedido: *"Agora vamos partir para implementação do M20 Multijogador"*. O marco começa pela **prova
+de conexão (M20.0)**, como o doc 14 manda: o resto (protocolo, jogo com vários jogadores, boneco do
+outro) não depende do transporte, mas a pergunta "dois navegadores na mesma rede Wi-Fi se ligam
+direto?" só se responde em aparelho, e a resposta decide a sinalização.
 
-- **O que já ajuda:** `world.setBlock` já recebe `source: 'network'` (`world/world.ts:16`);
-  `STORE_PLAYERS` já é chaveado por `[worldId, playerId]` (`save/db.ts:359`), então guardar o
-  convidado no mundo do anfitrião não pede formato novo; o terreno é determinístico pela seed, e só
-  a diferença viaja. Não existe nada de `RTCPeerConnection` nem de leitura de QR no código.
-- **O que o navegador não deixa:** página web não abre porta nem anuncia sala na rede. Por isso a
-  sinalização é por QR na tela, e o "só na rede local" vem de ligar sem STUN/TURN. O maior risco é
-  de campo — mDNS no Android, Wi-Fi com isolamento de cliente, câmera de computador — e só se mede
-  com **dois aparelhos do usuário**, por isso o marco começa pela prova de conexão (M20.0).
-- **O que o M21 deixou pronto para ele:** o código de rede pode seguir o mesmo caminho dos mods —
-  um pedaço à parte que o jogo sozinho não baixa. `WorldMeta.mods` é o que o anfitrião manda no
-  `WELCOME`.
+**O que existe (`src/net/`, só usado pela página `rede.html`):**
+
+- **`signal.ts` — sinalização compacta.** Do SDP do navegador sai o que importa: `ice-ufrag`,
+  `ice-pwd`, a impressão digital SHA-256 do DTLS, o papel DTLS e até 4 candidatos UDP `host` (IPv4,
+  IPv6 ou nome mDNS guardado como UUID em 16 bytes). Vira 72–84 bytes; do outro lado,
+  `sdpFromSignal` remonta um SDP mínimo só com o canal de dados, que o Chrome aceitou dos dois
+  lados. **Escolha consciente:** as credenciais ICE vão no código em vez de derivadas de uma semente
+  (que pouparia ~40 bytes) — derivar exige alterar o SDP à mão antes do `setLocalDescription`, o que é
+  frágil entre navegadores. Com a prova passando, dá para medir se vale a pena.
+- **`base32.ts` — o código em texto.** Base32 do RFC 4648 com CRC-16 no fim: letra trocada é pega
+  antes de chegar ao WebRTC; 0, 1 e 8 digitados viram O, I e B.
+- **`qr.ts` — gerador de QR, escrito aqui.** Modo alfanumérico, nível M, versões 1–10. Conferido
+  com o leitor do OpenCV em 13 códigos da versão 1 à 8 e na captura da própria página; os testes
+  batem Reed–Solomon e bits de formato com os valores de referência da norma.
+- **`scan.ts` — leitura pela câmera** com o `BarcodeDetector` do navegador (Chrome no Android). Sem
+  ele (Chrome no Windows e no Linux, Firefox), o caminho é o código em texto.
+- **`link.ts` — a ligação.** `RTCPeerConnection` com `iceServers: []` e dois canais negociados
+  (id 0 confiável, id 1 sem ordem nem retransmissão). A coleta de candidatos termina 600 ms depois
+  do último candidato UDP, e não no estado `complete`: no Chrome, com mDNS, esse estado só chegava
+  no tempo esgotado (4 s de espera para mostrar o código; agora 0,6 s).
+- **`probe.ts` — a página.** Anfitrião mostra QR e código; convidado lê, mostra a resposta;
+  anfitrião lê. Ligados, o anfitrião mede 500 idas e voltas, a perda de 300 mensagens rápidas e a
+  velocidade com 4 MB, manda os números ao convidado, e os dois mostram um **relatório** em JSON
+  para copiar: navegador, câmera, tamanho dos códigos, tipos de candidato, caminho escolhido
+  (endereço com o fim escondido), tempos e o registro de estados do WebRTC.
+
+**Fora do jogo, por construção:** `rede.html` é outro ponto de entrada; `src/net/` só importa de
+`src/net/` (teste), a saída vai para `n/`, fora do precache, e o relatório de tamanho a conta à
+parte. O jogo continua com 304,7 KB e um arquivo só.
+
+**O que a prova no container mostrou, e o que não mostrou.** Dois Chrome na mesma máquina se ligam
+pela página com e sem mDNS, com o caminho direto entre candidatos `host`. Isso prova que a
+sinalização compacta e o SDP remontado funcionam. **Não prova** a rede Wi-Fi: mDNS entre aparelhos,
+isolamento de cliente no roteador, Chrome do Android e navegador do computador conversando — é o
+que o teste do usuário responde.
+
+**O que já ajudava, conferido ao desenhar:** `world.setBlock` já recebe `source: 'network'`
+(`world/world.ts:16`); `STORE_PLAYERS` já é chaveado por `[worldId, playerId]` (`save/db.ts:359`);
+o terreno é determinístico pela seed, e só a diferença viaja. O M21 deixou o caminho de "pedaço à
+parte que o jogo sozinho não baixa", que o código de rede do jogo vai seguir.
 
 ## 4. Correções fora de marco
 
@@ -2300,6 +2338,16 @@ tem **1116** linhas (981 antes; as contas novas foram para `redstoneparts.ts`, f
 `ui/containers/screen.ts` **949** (916; a bigorna foi para `anvilpanel.ts`, ficaram a grade e os
 callbacks; **930** depois que as ofertas da mesa foram para `enchantpanel.ts`, na volta de campo) e `session.ts` 816. O corte natural do circuito é por papel — pó e energia, componentes,
 pistão —, e o da tela, a grade de slots de um lado e os painéis do outro. Não depende de nada.
+
+**Pendências abertas em 2026-09-27 (M20.0):**
+
+- **A prova de conexão não rodou em aparelho.** É a pendência que segura o M20 inteiro (§6).
+- **Computador sem `BarcodeDetector` não lê QR** (Chrome no Windows e no Linux, Firefox): digita ou
+  cola o código de 119–138 caracteres. Se a prova passar, entra um leitor de QR próprio — ou um
+  código de resposta mais curto.
+- **O certificado do anfitrião não é guardado**: cada sala é um pareamento novo. Fica para o jogo.
+- **Firefox não foi testado** (o container só tem Chromium); o SDP do Firefox é lido nos testes
+  a partir de um exemplo escrito à mão.
 
 **Pendências abertas em 2026-09-27 (M21):**
 
@@ -2520,11 +2568,20 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
 
 ## 6. Próximo passo recomendado
 
-0. **M21 fechado (2026-09-27); o que vem depois é escolha do usuário:**
-   - **Mods a pedido** (*"crie um mod que adicione armas"*): a receita está no §3, M21. Cada mod é
-     uma pasta, uma linha no catálogo, uma nos carregadores e um teste.
-   - **M20 (rede local)** começa pela **prova de conexão (M20.0)**, que precisa do usuário com um
-     celular e um computador na mesma rede Wi-Fi. Sem ela, o resto do M20 não deve ser escrito.
+0. **A prova de conexão do M20 em dois aparelhos (2026-09-27).** É o que libera o resto do M20.
+   - **Onde abrir:** `https://gzomer14.github.io/CraftLite/rede.html`, depois que o branch entrar na
+     `main` (o Pages só publica a `main`). HTTPS é o que libera a câmera. Sem publicar: `npm run dev`
+     no computador e, no celular, `http://<ip-do-computador>:5173/rede.html` — funciona, mas sem
+     câmera (HTTP não é contexto seguro), só com o código em texto.
+   - **O roteiro:** celular e computador **na mesma rede Wi-Fi**. Primeiro com o computador
+     abrindo a sala: o celular lê o QR da tela; o computador digita ou cola a resposta (dá para o
+     celular copiar o código e mandar para si mesmo por mensagem). Depois ao contrário, com o
+     celular abrindo a sala. Se der, uma terceira vez com dois celulares, que leem o QR um do outro.
+   - **O que mandar de volta:** o **relatório** dos dois aparelhos (botão *Copiar*), dê certo ou
+     não. Se não ligar, dizer também se a rede é de visitante e se algum aparelho usa VPN.
+   - **O que decide:** ligou → o M20 segue como está no doc 14. Não ligou em nenhuma combinação → o
+     marco para e a escolha volta ao usuário (doc 14, M20.0).
+   - **Mods a pedido** continuam possíveis a qualquer momento (receita no §3, M21).
    - **No celular, o M21:** abrir o PWA sem mod e **offline** (o boot e o precache mudaram), ligar
      o Exemplo na tela Mods, pôr um Cristal de Luz de noite, desligar.
    - O roteiro de celular do item 1 continua valendo para declarar o MVP.

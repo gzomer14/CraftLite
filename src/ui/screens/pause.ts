@@ -32,6 +32,10 @@ export interface PauseMenuCallbacks {
   /** Espectador do Criativo (M10): estado e troca. O botão só aparece no Criativo. */
   spectator?: () => boolean;
   onToggleSpectator?: () => void;
+  /** Sala na rede local (M20): abrir, ou ver quem está dentro. Sem ele, some. */
+  onNetwork?: () => void;
+  /** Rótulo do botão da rede, que muda com a sala aberta. */
+  networkLabel?: () => string;
 }
 
 export class PauseMenu {
@@ -42,6 +46,7 @@ export class PauseMenu {
   private readonly modeButton: HTMLButtonElement | null;
   private readonly statsList: HTMLDivElement;
   private readonly spectatorButton: HTMLButtonElement | null;
+  private readonly networkButton: HTMLButtonElement | null;
   private readonly callbacks: PauseMenuCallbacks;
 
   constructor(callbacks: PauseMenuCallbacks) {
@@ -96,6 +101,9 @@ export class PauseMenu {
       ? null
       : button(t('mode.spectator'), () => { spectate(); this.refreshMode(); });
     if (this.spectatorButton !== null) actions.appendChild(this.spectatorButton);
+    const network = callbacks.onNetwork;
+    this.networkButton = network === undefined ? null : button(t('net.open_room'), network);
+    if (this.networkButton !== null) actions.appendChild(this.networkButton);
     actions.append(options, quit);
 
     this.root.append(title, this.status, actions, this.achievementList, this.statsList);
@@ -172,6 +180,8 @@ export class PauseMenu {
   show(): void {
     this.root.hidden = false;
     this.refreshMode();
+    const label = this.callbacks.networkLabel;
+    if (this.networkButton !== null && label !== undefined) this.networkButton.textContent = label();
     this.resumeButton.focus();
   }
 

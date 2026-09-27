@@ -20,15 +20,13 @@ import { computeChunkLight } from '../world/gen/terrain';
 import { Container, Furnace, type ContainerKind } from './container';
 import { BrewingStand } from './brewing';
 import type { SignRecord } from './signs';
-import { INVENTORY_SIZE } from './inventory';
 import { TICKS_PER_DAY } from './daynight';
-import { DIM_OVERWORLD } from '../data/dimensions';
 import { AUTOSAVE_TICKS, type SaveManager } from '../save/savemanager';
 import type { PlayerSave, WorldMeta } from '../save/db';
 import type { Player } from '../entity/player';
 import type { Session, VehicleRecord } from './session';
 import { encodeRegion } from './worldmap';
-import type { Marker } from './markers';
+import { restorePlayer, snapshotPlayer } from './playersave';
 import type { ItemStack } from '../data/items';
 import { modsToRecord } from '../mods/worldmods';
 
@@ -234,102 +232,29 @@ export class SaveGame {
 
   /** Estado do jogador no formato do save. */
   snapshot(): PlayerSave {
-    const inventory: number[] = new Array(INVENTORY_SIZE * 3).fill(0);
-    const enchants: number[] = new Array(INVENTORY_SIZE).fill(0);
-    let names: (string | null)[] | undefined;
-    for (let i = 0; i < INVENTORY_SIZE; i++) {
-      const stack = this.session.inventory.get(i);
-      if (stack === null) continue;
-      inventory[i * 3] = stack.item;
-      inventory[i * 3 + 1] = stack.count;
-      inventory[i * 3 + 2] = stack.damage;
-      enchants[i] = stack.ench ?? 0;
-      if (stack.name !== undefined) {
-        names ??= new Array<string | null>(INVENTORY_SIZE).fill(null);
-        names[i] = stack.name;
-      }
-    }
-
-    return {
-      worldId: this.meta.id,
-      playerId: LOCAL_PLAYER,
-      x: this.player.x,
-      y: this.player.y,
-      z: this.player.z,
-      yaw: this.player.yaw,
-      pitch: this.player.pitch,
-      health: this.session.survival.health,
-      hunger: this.session.survival.hunger,
-      saturation: this.session.survival.saturation,
-      selected: this.session.inventory.selected,
-      dimension: this.session.world.dimension,
-      inventory,
-      enchants,
-      names,
-      xp: this.session.xp.total,
-      achievements: this.session.achievements.mask,
-      guide: this.session.guide.stepsDone,
-      effects: this.session.survival.effects.snapshot(),
-      absorption: this.session.survival.absorption,
-      bedSpawn: this.session.spawnY >= 0
-        ? [this.session.spawnX, this.session.spawnY, this.session.spawnZ]
-        : undefined,
-      markers: this.session.journal.markers.snapshot(),
-      stats: this.session.journal.stats.snapshot(),
-      spectator: this.player.spectator ? true : undefined,
-    };
+    return snapshotPlayer(this.session, this.player, this.meta.id, LOCAL_PLAYER);
   }
 
   /** Aplica um save de jogador ao estado vivo. */
   restore(saved: PlayerSave): void {
-    /*
-     * A dimensão vem **antes** da posição: sair do mundo dentro do Nether e
-     * voltar precisa recarregar o Nether, senão o jogador reaparece com as
-     * coordenadas de lá dentro da superfície — 8 vezes fora do lugar, e
-     * possivelmente dentro de pedra maciça.
-     */
-    const dimension = saved.dimension ?? DIM_OVERWORLD;
-    if (dimension !== this.session.world.dimension) {
-      this.session.enterDimension(dimension);
-    }
-    this.player.setPosition(saved.x, saved.y, saved.z);
-    this.player.yaw = saved.yaw;
-    this.player.pitch = saved.pitch;
-    this.session.survival.health = saved.health;
-    this.session.survival.hunger = saved.hunger;
-    this.session.survival.saturation = saved.saturation;
-    this.session.survival.effects.restore(saved.effects, this.session.survival);
-    if (saved.absorption !== undefined) this.session.survival.absorption = saved.absorption;
-    this.session.inventory.select(saved.selected);
-    this.session.xp.setTotal(saved.xp ?? 0);
-    this.session.achievements.setMask(saved.achievements ?? 0);
-    this.session.guide.restore(saved.guide);
+    restorePlayer(this.session, this.player, saved);
+  }
 
-    for (let i = 0; i < INVENTORY_SIZE; i++) {
-      const item = saved.inventory[i * 3] ?? 0;
-      const count = saved.inventory[i * 3 + 1] ?? 0;
-      this.session.inventory.set(
-        i,
-        item > 0 && count > 0
-          ? withName({
-            item, count,
-            damage: saved.inventory[i * 3 + 2] ?? 0,
-            ench: saved.enchants?.[i] ?? 0,
-          }, saved.names?.[i])
-          : null,
-      );
-    }
+  /**
+   * Registro de outro jogador neste mundo (M20): o convidado de uma sala na
+   * rede local. Fica no mesmo banco, chaveado por `[worldId, playerId]`.
+   */
+  loadPlayerRecord(playerId: string): Promise<PlayerSave | undefined> {
+    return this.manager.loadPlayer(playerId);
+  }
 
-    this.session.journal.markers.restore(saved.markers as Partial<Marker>[] | undefined);
-    this.session.journal.stats.restore(saved.stats);
-    this.player.spectator = saved.spectator === true && this.player.mode === 'creative';
-    if (this.player.spectator) this.player.flying = true;
+  savePlayerRecord(record: PlayerSave): Promise<void> {
+    return this.manager.savePlayer(record);
+  }
 
-    if (saved.bedSpawn !== undefined) {
-      this.session.spawnX = saved.bedSpawn[0];
-      this.session.spawnY = saved.bedSpawn[1];
-      this.session.spawnZ = saved.bedSpawn[2];
-    }
+  /** Coluna gravada de uma dimensão, ainda comprimida (M20: servir o convidado). */
+  loadChunkData(dimension: number, cx: number, cz: number): Promise<Uint8Array | undefined> {
+    return this.manager.loadChunkData(dimension, cx, cz);
   }
 
   /** Carrega jogador e tile entities. Devolve false se o mundo é novo. */

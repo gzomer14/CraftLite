@@ -80,7 +80,9 @@ import { attachBlockFeedback } from './ui/blockfeedback';
 import { giveStartingKit } from './game/startingkit';
 import { warnStorage } from './save/storagewarning';
 import { buildMapPalette } from './render/mapcolors';
-
+import { attachPadNotice } from './ui/padnotice';
+import { restorePlayer } from './game/playersave';
+import { joinRoom, leaveRoom, openRoom, roomButtonLabel, setGame, type RemoteStart } from './game/netgate';
 
 async function boot(): Promise<void> {
   const view = document.getElementById('view') as HTMLCanvasElement | null;
@@ -190,6 +192,8 @@ async function boot(): Promise<void> {
   // --- fluxo de menus: título → mundos → jogo ------------------------------
   const menu = new MenuFlow(db, settings, keybinds, gamepads, {
     start: (meta) => { void startGame(meta); },
+    // Sala na rede local (M20): o jogo sobe como convidado, com o mundo do outro.
+    join: (back) => joinRoom((meta, remote) => { menu.hideAll(); void startGame(meta, remote); }, back),
   });
 
   const params = new URLSearchParams(location.search);
@@ -211,7 +215,7 @@ async function boot(): Promise<void> {
    * Tudo que depende de mundo vive aqui dentro: antes disso o jogo é só a tela
    * de título, e é isso que permite escolher o save antes de gerar terreno.
    */
-  async function startGame(meta: WorldMeta): Promise<void> {
+  async function startGame(meta: WorldMeta, remote?: RemoteStart): Promise<void> {
   const seed = meta.seedHash;
   const world = new World(seed);
   // A sessão só existe mais abaixo; o pipeline avisa por esta referência.
@@ -368,7 +372,8 @@ async function boot(): Promise<void> {
   // --- persistência (doc 11) ------------------------------------------------
   const thumbnail = new Thumbnail();
 
-  const save = db === null
+  // O convidado (M20) não grava nada: o mundo e ele mesmo ficam no anfitrião.
+  const save = db === null || remote !== undefined
     ? null
     : new SaveGame(new SaveManager(db, meta.id), session, player, meta, {
       onError: (message) => hud.showMessage(tf('store.save_failed', message), 120),
@@ -386,6 +391,11 @@ async function boot(): Promise<void> {
       // travar na tela preta.
       restored = false;
     }
+  }
+
+  if (remote !== undefined) {
+    pipeline.loadSaved = (cx, cz) => remote.loadChunk(cx, cz);
+    if (remote.saved !== null) { restorePlayer(session, player, remote.saved); restored = true; }
   }
 
   /*
@@ -438,7 +448,9 @@ async function boot(): Promise<void> {
     player, session, controls, hud, containerScreen, creativeScreen,
     touchUi: () => touchUi,
     openOptions: (back) => menu.openOptions(back),
-    saveAll: async () => { await save?.saveAll(); },
+    saveAll: async () => { await save?.saveAll(); await leaveRoom(); },
+    onNetwork: remote === undefined ? () => { flow.togglePause(); openRoom(); } : undefined,
+    networkLabel: () => roomButtonLabel(t('net.open_room')),
   });
   attachBlockFeedback({
     interaction, atlas, renderer, audio, settings, rumble: () => controls.gamepad.rumble(),
@@ -478,25 +490,7 @@ async function boot(): Promise<void> {
   touchUi.setVisible(isTouchDevice);
   flow.applyGameMode();
 
-  /*
-   * Controle ligado: diz qual foi reconhecido, porque é a única forma de o
-   * jogador saber que o rótulo dos botões mudou — e porque um controle que o
-   * navegador **não** normalizou merece aviso, já que aí o mapeamento é
-   * palpite de família e não a especificação.
-   */
-  gamepads.onConnect((profile) => {
-    hud.showMessage(tf('hud.pad_connected', profile.labels.family), 80);
-    /*
-     * O som não liga sozinho aqui.
-     *
-     * A política de autoplay pede um **gesto do usuário**, e aperto de botão de
-     * controle não conta como gesto em navegador nenhum. Quem só tem o controle
-     * na mão jogaria mudo sem entender por quê, então o jogo avisa o que fazer.
-     */
-    if (!sound.started) {
-      hud.showMessage(t('hud.sound_gesture'), 120);
-    }
-  });
+  attachPadNotice(gamepads, hud, () => sound.started);
   audio.onSubtitle = (text, direction) => hud.showSubtitle(text, direction);
   // Primeiro toque: tela cheia + trava de orientação (precisa de gesto).
   controls.touch.onFirstTouch = () => screenMode.enter();
@@ -554,7 +548,7 @@ async function boot(): Promise<void> {
         threeFingerArmed = true;
       }
 
-      if (flow.paused) return;
+      if (flow.worldStopped) return;
 
       if (!spawned) {
         spawned = trySpawn(world, player, restored);
@@ -685,13 +679,16 @@ async function boot(): Promise<void> {
   });
 
   loop.start();
+  const game = {
+    world, player, session, pipeline, meta, save, hud, flow, controls, sceneFeed, mobRenderer, entityAtlas, tier,
+  };
+  setGame(game);
+  remote?.attach(game);
 
   Object.assign(window as unknown as Record<string, unknown>, {
     craftlite: {
-      loop, renderer, atlas, preset, tier, device, world, pipeline, debug, seed,
-      player, session, inventory, interaction, settings, controls, touchUi, screenMode,
-      audio, entityAtlas, mobRenderer, itemSprites, save, meta, menu,
-      mobs: session.mobs, spawner: session.spawner,
+      ...game, loop, renderer, atlas, preset, tier, device, debug, seed, inventory, interaction,
+      settings, touchUi, screenMode, audio, itemSprites, menu, mobs: session.mobs, spawner: session.spawner,
       containerScreen, creativeScreen, deathScreen, pauseMenu,
     },
   });

@@ -11,11 +11,11 @@
  * (Chrome no Android); sem ele, o código em texto é o caminho (`net/scan.ts`).
  */
 
-const ALNUM = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:';
+export const ALNUM = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:';
 
 /** Códigos de correção por bloco e número de blocos, nível M, versões 1–10. */
-const ECC_PER_BLOCK = [0, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26];
-const BLOCKS = [0, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5];
+export const ECC_PER_BLOCK: readonly number[] = [0, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26];
+export const BLOCKS: readonly number[] = [0, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5];
 export const MAX_VERSION = 10;
 /** Bits de formato do nível M. */
 const ECL_BITS = 0;
@@ -164,41 +164,7 @@ function drawMatrix(version: number, codewords: readonly number[]): QrMatrix {
     dark[y * size + x] = on ? 1 : 0;
     fixed[y * size + x] = 1;
   };
-
-  // Linhas de sincronismo.
-  for (let i = 0; i < size; i++) {
-    set(6, i, i % 2 === 0);
-    set(i, 6, i % 2 === 0);
-  }
-  // Marcas de posição, com o separador branco em volta.
-  for (const [cx, cy] of [[3, 3], [size - 4, 3], [3, size - 4]]) {
-    for (let dy = -4; dy <= 4; dy++) {
-      for (let dx = -4; dx <= 4; dx++) {
-        const x = cx + dx;
-        const y = cy + dy;
-        if (x < 0 || y < 0 || x >= size || y >= size) continue;
-        const d = Math.max(Math.abs(dx), Math.abs(dy));
-        set(x, y, d !== 2 && d !== 4);
-      }
-    }
-  }
-  // Marcas de alinhamento, menos as que cairiam sobre as de posição.
-  const align = alignmentPositions(version);
-  for (let i = 0; i < align.length; i++) {
-    for (let j = 0; j < align.length; j++) {
-      const corner = (i === 0 && j === 0) || (i === 0 && j === align.length - 1)
-        || (i === align.length - 1 && j === 0);
-      if (corner) continue;
-      for (let dy = -2; dy <= 2; dy++) {
-        for (let dx = -2; dx <= 2; dx++) {
-          set(align[i] + dx, align[j] + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
-        }
-      }
-    }
-  }
-  // Reserva das áreas de formato e versão (valor provisório).
-  drawFormat(set, size, 0);
-  drawVersion(set, size, version);
+  drawFunctionPatterns(version, set);
 
   // Dados em zigue-zague, de duas em duas colunas, da direita para a esquerda.
   let bit = 0;
@@ -235,9 +201,61 @@ function drawMatrix(version: number, codewords: readonly number[]): QrMatrix {
   return { size, version, mask: best, dark };
 }
 
+/**
+ * As marcas fixas: sincronismo, posição (com o separador), alinhamento e as
+ * áreas de formato e versão (formato com valor provisório). O gerador as
+ * desenha; o leitor (`net/qrread.ts`) as usa para saber o que não é dado.
+ */
+function drawFunctionPatterns(version: number, set: (x: number, y: number, on: boolean) => void): void {
+  const size = version * 4 + 17;
+  // Linhas de sincronismo.
+  for (let i = 0; i < size; i++) {
+    set(6, i, i % 2 === 0);
+    set(i, 6, i % 2 === 0);
+  }
+  // Marcas de posição, com o separador branco em volta.
+  for (const [cx, cy] of [[3, 3], [size - 4, 3], [3, size - 4]]) {
+    for (let dy = -4; dy <= 4; dy++) {
+      for (let dx = -4; dx <= 4; dx++) {
+        const x = cx + dx;
+        const y = cy + dy;
+        if (x < 0 || y < 0 || x >= size || y >= size) continue;
+        const d = Math.max(Math.abs(dx), Math.abs(dy));
+        set(x, y, d !== 2 && d !== 4);
+      }
+    }
+  }
+  // Marcas de alinhamento, menos as que cairiam sobre as de posição.
+  const align = alignmentPositions(version);
+  for (let i = 0; i < align.length; i++) {
+    for (let j = 0; j < align.length; j++) {
+      const corner = (i === 0 && j === 0) || (i === 0 && j === align.length - 1)
+        || (i === align.length - 1 && j === 0);
+      if (corner) continue;
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          set(align[i] + dx, align[j] + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
+        }
+      }
+    }
+  }
+  // Reserva das áreas de formato e versão (valor provisório).
+  drawFormat(set, size, 0);
+  drawVersion(set, size, version);
+
+}
+
+/** Quais módulos são marca fixa (1) e quais carregam dado (0). */
+export function functionModules(version: number): Uint8Array {
+  const size = version * 4 + 17;
+  const fixed = new Uint8Array(size * size);
+  drawFunctionPatterns(version, (x, y) => { fixed[y * size + x] = 1; });
+  return fixed;
+}
+
 /** Bits de formato (nível + máscara, BCH, máscara fixa 0x5412). */
-export function formatBits(mask: number): number {
-  const data = (ECL_BITS << 3) | mask;
+export function formatBits(mask: number, ecl = ECL_BITS): number {
+  const data = (ecl << 3) | mask;
   let rem = data;
   for (let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
   return ((data << 10) | rem) ^ 0x5412;

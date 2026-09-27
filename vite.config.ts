@@ -2,9 +2,18 @@ import { defineConfig } from 'vite';
 import { relative, resolve } from 'node:path';
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 
+/** A sala na rede local (M20): o pedaço que o jogo baixa só ao abrir ou entrar numa sala. */
+const NET_ENTRY = resolve(__dirname, 'src/net/room.ts');
+let netChunkRef = '';
+
 // Alvo es2017: roda em WebView do Android 7+ (ver doc 01 §1).
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   base: './',
+  /*
+   * No servidor de desenvolvimento, a sala vem do fonte; no build, o plugin
+   * `craftlite-net-chunk` troca o nome pela URL do pedaço emitido.
+   */
+  define: command === 'serve' ? { __CRAFTLITE_NET_URL__: JSON.stringify('/src/net/room.ts') } : {},
   resolve: {
     alias: { '@': resolve(__dirname, 'src') },
   },
@@ -32,8 +41,10 @@ export default defineConfig({
         // `n/` é a página de rede (M20.0), que o jogo também não baixa.
         entryFileNames: (chunk) => (chunk.name === 'modboot' ? 'm/[hash].js'
           : chunk.name === 'rede' ? 'n/[hash].js' : 'a/[hash].js'),
+        // Pedaço compartilhado não tem fachada: vale o que ele contém.
         chunkFileNames: (chunk) => (isModChunk(chunk.facadeModuleId) ? 'm/[hash].js'
-          : isNetChunk(chunk.facadeModuleId) ? 'n/[hash].js' : 'a/[hash].js'),
+          : isNetChunk(chunk.facadeModuleId) || chunk.moduleIds.every((id) => isNetChunk(id))
+            ? 'n/[hash].js' : 'a/[hash].js'),
         assetFileNames: 'a/[hash][extname]',
       },
     },
@@ -56,6 +67,29 @@ export default defineConfig({
   },
   server: { host: true },
   plugins: [
+    {
+      /*
+       * O pedaço de rede (M20). Ele é emitido daqui, "carregado depois do
+       * `main`": o Rollup entrega o que ele usa a partir do próprio `main`, que
+       * já está na memória. E o `game/netgate.ts` o importa por uma URL em
+       * variável, que o Vite não embrulha em `__vitePreload` — esse ajudante,
+       * usado também pelo ponto de entrada dos mods, viraria um pedaço
+       * compartilhado que o jogo sozinho teria de baixar.
+       */
+      name: 'craftlite-net-chunk',
+      apply: 'build',
+      buildStart() {
+        netChunkRef = this.emitFile({
+          type: 'chunk', id: NET_ENTRY, implicitlyLoadedAfterOneOf: [resolve(__dirname, 'src/main.ts')],
+          // Ninguém importa estas funções pelo nome: sem isto, o Rollup as jogaria fora.
+          preserveSignature: 'exports-only',
+        });
+      },
+      transform(code, id) {
+        if (!id.endsWith('src/game/netgate.ts')) return null;
+        return code.split('__CRAFTLITE_NET_URL__').join(`import.meta.ROLLUP_FILE_URL_${netChunkRef}`);
+      },
+    },
     {
       /*
        * Mods (M21). O `index.html` não tem `<script type="module" src>`: um
@@ -107,10 +141,13 @@ export default defineConfig({
           // cache depois de uma partida com rede.
           // O que é de mod (`m/`) fica fora: entra no cache quando o jogador
           // liga o mod e o arquivo passa pela rede (stale-while-revalidate).
+          // A sala na rede local (`n/`, M20) entra: numa rede Wi-Fi sem
+          // internet, ela precisa funcionar sem nunca ter sido baixada antes.
+          // Custa ~20 KB em segundo plano na instalação, fora da abertura.
+          // A página de prova (`rede.html`) fica fora.
           const assets = listAssets(dist, dist)
             .filter((file) => file !== 'sw.js' && file !== 'index.html'
-              && file !== 'manifest.webmanifest' && !file.startsWith('m/')
-              && !file.startsWith('n/') && file !== 'rede.html')
+              && file !== 'manifest.webmanifest' && !file.startsWith('m/') && file !== 'rede.html')
             .map((file) => `./${file}`);
           writeFileSync(
             path,
@@ -124,7 +161,7 @@ export default defineConfig({
       },
     },
   ],
-});
+}));
 
 /** Todos os arquivos de `dir`, em caminhos relativos a `root`, com `/`. */
 function listAssets(dir: string, root: string): string[] {

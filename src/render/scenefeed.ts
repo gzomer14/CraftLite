@@ -53,6 +53,11 @@ export class SceneFeed {
   private readonly d: SceneFeedDeps;
   /** Reusado por quadro para medir o brilho do bloco mirado. */
   private readonly crackColor = new Float32Array(3);
+  /**
+   * Entidades de fora da sessão, no mesmo batch (M20: os outros jogadores de
+   * uma sala). Quem liga é o código de rede; sem sala, fica `null`.
+   */
+  extraEntities: ((alpha: number) => void) | null = null;
   /** Fator de dia do quadro corrente, lido pelos callbacks abaixo. */
   private dayFactor = 1;
 
@@ -170,6 +175,8 @@ export class SceneFeed {
     session.vehicles.boats.forEach(this.addBoat, alpha);
     session.projectiles.forEach(this.addArrow, alpha);
     this.fishingLine(alpha);
+    // Os outros jogadores de uma sala na rede local (M20), quando há sala.
+    this.extraEntities?.(alpha);
 
     // Sombras por último: elas fecham o buffer para poderem ser desenhadas com
     // blending numa segunda chamada.

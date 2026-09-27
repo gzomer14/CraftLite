@@ -194,17 +194,41 @@ describe('isolamento da página de rede', () => {
   });
   const rel = (f: string): string => relative('src', f).split(sep).join('/');
 
-  it('src/net/ só importa valor de dentro de src/net/', () => {
+  /** Os imports de valor de um arquivo, já resolvidos para `src/…`. */
+  const valueImports = (file: string): string[] => {
+    const code = readFileSync(file, 'utf8');
+    const out: string[] = [];
+    for (const m of code.matchAll(/^import\s+(type\s+)?[^;]*?from\s+'([^']+)';/gm)) {
+      if (m[1] !== undefined) continue;
+      out.push(relative('src', normalize(join(dirname(file), m[2]))).split(sep).join('/'));
+    }
+    return out;
+  };
+
+  it('a página de prova e tudo que ela puxa só importam de src/net/', () => {
+    // A prova é outro ponto de entrada: um módulo do jogo nela iria para um
+    // pedaço compartilhado que o `main` teria de importar.
+    const seen = new Set<string>();
+    const queue = ['net/probe'];
     const leaks: string[] = [];
-    for (const file of files('src/net')) {
-      const code = readFileSync(file, 'utf8');
-      for (const m of code.matchAll(/^import\s+(type\s+)?[^;]*?from\s+'([^']+)';/gm)) {
-        if (m[1] !== undefined) continue;
-        const to = relative('src', normalize(join(dirname(file), m[2]))).split(sep).join('/');
-        if (!to.startsWith('net/')) leaks.push(`${rel(file)} → ${m[2]}`);
+    while (queue.length > 0) {
+      const mod = queue.pop()!;
+      if (seen.has(mod)) continue;
+      seen.add(mod);
+      for (const to of valueImports(join('src', `${mod}.ts`))) {
+        if (!to.startsWith('net/')) leaks.push(`${mod} → ${to}`);
+        else queue.push(to);
       }
     }
     expect(leaks).toEqual([]);
+    expect(seen.has('net/link')).toBe(true);
+  });
+
+  it('o jogo não importa nada de src/net/ por valor: só o `netgate`, por URL', () => {
+    const offenders = files('src').filter((f) => !rel(f).startsWith('net/'))
+      .filter((f) => valueImports(f).some((to) => to.startsWith('net/')))
+      .map(rel);
+    expect(offenders).toEqual([]);
   });
 
   it('o jogo não importa a página de prova', () => {
@@ -214,10 +238,11 @@ describe('isolamento da página de rede', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('rede.html sobe a prova, e o precache do jogo não a leva', () => {
+  it('rede.html sobe a prova; o precache leva a sala e não leva a prova', () => {
     expect(readFileSync('rede.html', 'utf8')).toContain('src="/src/net/probe.ts"');
     const config = readFileSync('vite.config.ts', 'utf8');
-    expect(config).toContain("!file.startsWith('n/')");
+    // A sala do jogo (`n/`) vai para o cache offline; a página de prova, não.
+    expect(config).not.toContain("!file.startsWith('n/')");
     expect(config).toContain("file !== 'rede.html'");
   });
 });

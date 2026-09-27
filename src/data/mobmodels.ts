@@ -107,6 +107,9 @@ function spiderLegs(): PartDef[] {
 
 export const MODELS: Record<string, ModelDef> = {
   humanoid: { skinSize: 64, height: 31, parts: HUMANOID_PARTS },
+  // O outro jogador de uma sala na rede local (M20): o mesmo corpo do humanoide,
+  // com a skin `player` que o boneco do inventário já usava.
+  player: { skinSize: 64, height: 31, parts: HUMANOID_PARTS },
   zombie: { skinSize: 64, height: 31, parts: ZOMBIE_PARTS },
 
   quadruped: {

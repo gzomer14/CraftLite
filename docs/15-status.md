@@ -9,7 +9,16 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-27 14:11 — **A prova de conexão do M20 passou em aparelho.**
+**Última atualização:** 2026-09-27 15:20 — **M20 no jogo: dá para jogar junto.** Pausa → **Abrir
+para a rede local** mostra um QR; no outro aparelho, título → **Entrar numa sala**, ler, mostrar a
+resposta, e o convidado cai direto no mundo do anfitrião: vê o que foi construído, põe e quebra
+bloco (o outro vê em 0–15 ms entre dois Chrome), vê o boneco do outro e os mobs, e ao sair **fica
+salvo no mundo do anfitrião** com o inventário — no aparelho dele, zero mundo e zero chunk. O
+computador sem `BarcodeDetector` **lê o QR pela webcam** com um leitor escrito aqui. O
+**pareamento lembrado não foi feito** (§3, M20: exige mexer à mão nas credenciais ICE do SDP, que
+os navegadores estão fechando). Jogo sem sala: 307,1 KB (+2,4); a sala inteira é pedaço à parte
+(`n/`, 24,2 KB), baixado só ao abrir ou entrar. **Falta ver em aparelho** (§6, item 0). Antes, 14:11
+— **A prova de conexão do M20 passou em aparelho.**
 Celular Android e computador na mesma rede se ligaram direto, sem servidor, nos dois sentidos, em
 0,1–0,2 s depois do último código; ida e volta de ~4,5 ms, nenhum pacote rápido perdido, 3–5 MB/s
 (§3, M20). O M20 segue como está no doc 14. Antes, 04:00 — **M20 começou pela prova de conexão (M20.0).** A página
@@ -74,15 +83,15 @@ compartilhável).
 | **M17** Alcance | menu Idioma (doc 08 §3.11) com `en`, primeira hora guiada, seed compartilhável | ✅ concluído em 2026-09-25 | **não visto em aparelho** (visto no Chrome headless, em pt e en, desktop e celular emulado) |
 | **M18** Casa em ordem, 2ª volta | cinco módulos abaixo do teto, memória de áudio com folga, varredura de idioma pelo destino | ✅ concluído em 2026-09-25 | — |
 | **M19** Pontas soltas | enderman no End, dragão que quebra, sopra e morre devagar, ilhas de fora e portal de passagem, tint no WebGL1 | ✅ concluído em 2026-09-25 | **não visto em aparelho** (End visto no Chrome headless) |
-| **M20** Jogar junto na mesma rede | multijogador por WebRTC só na rede local, sinalização por QR, sem servidor; o mundo e os dados do convidado só no aparelho do anfitrião | 🚧 **M20.0 passou em aparelho** (celular ↔ computador, nos dois sentidos) | o jogo multijogador em si (§6) |
-| **M21** Mods | mods escritos no repositório, cada um um pedaço de bundle próprio, ligados e desligados na tela Mods; **desligados, a página baixa um arquivo só, o de antes** (teste e build cobram); mod de exemplo | ✅ concluído em 2026-09-27 | **não visto em aparelho** (visto no Chrome headless); mods e M20 esperam o M20 |
+| **M20** Jogar junto na mesma rede | multijogador por WebRTC só na rede local, sinalização por QR, sem servidor; o mundo e os dados do convidado só no aparelho do anfitrião | 🚧 **no jogo em 2026-09-27**: sala, entrada por QR (câmera ou webcam), blocos, bonecos, mobs, convidado salvo no anfitrião — dois Chrome, `npm run smoke:room` | **não visto em aparelho**; limites da primeira versão no §5 (sem chat, sem nome em cima, só na superfície, convidado não abre baú) |
+| **M21** Mods | mods escritos no repositório, cada um um pedaço de bundle próprio, ligados e desligados na tela Mods; **desligados, a página baixa um arquivo só, o de antes** (teste e build cobram); mod de exemplo | ✅ concluído em 2026-09-27 | **não visto em aparelho** (visto no Chrome headless); na sala do M20, mods diferentes não entram |
 
 **O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
 ele irá pesar muito o jogo e trazer muita complexidade por enquanto desnecessária"*. O
 [doc 12](12-multiplayer.md) continua normativo e o `world.setBlock(..., source)` continua
 preparado para ele (`source: 'network'`); o que não existe é implementação nem prazo.
 **Voltou como M20 em 2026-09-27**, por pedido do usuário, restrito à rede local e sem servidor (o
-doc 12 §2 foi revisto para isso). Continua sem implementação.
+doc 12 §2 foi revisto para isso). No jogo desde 2026-09-27 (§3, M20).
 
 Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ não iniciado
 
@@ -90,16 +99,21 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-27 04:00, com a prova de conexão do M20, com `npm test`, `npm run build`,
-`SIZE_BUDGET_KB=350 npm run size`, `npm run smoke`, `npm run smoke:mods` e `npm run smoke:net`.
+Medidas em 2026-09-27 15:20, com o M20 no jogo, com `npm test`, `npm run build`,
+`SIZE_BUDGET_KB=350 npm run size`, `npm run smoke`, `npm run smoke:mods`, `npm run smoke:net`,
+`npm run smoke:room` e `npm run smoke:camera`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, o jogo sem mod) | **304,7 KB**, worker 42,7 (302,2 antes do M21: a infraestrutura de mods custou 1,9 KB no pedaço principal, 0,3 no worker e 0,2 no HTML; 301,8 ao fechar o M19; 298,4 ao fechar o M17; o M19 somou as ilhas de fora e o portal de passagem, e o worker foi a 42,3; 282,5 antes do M17: o inglês e as chaves custaram 15,9; o worker, 41,8, não mudou um byte; 267,3 antes do M16; 265,7 ao fechar o M15; 257,9 antes do M15; 249,5 antes do M14; 240,0 antes do M10) | < 350 KB | `npm run size` |
-| Testes | **2334**, 121 arquivos (2316 ao fechar o M21; 2290 antes do M21; 2281 ao fechar o M19; 2271 ao fechar o M17; 2235 antes do M17; 2164 antes do M16; 2156 ao fechar o M15; 2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
+| Bundle (gzip, o jogo sem mod) | **307,1 KB**, worker 42,7 (304,7 antes do M20 no jogo: os ganchos — botões, `game/netgate.ts`, `playersave.ts`, o boneco do jogador no atlas — custaram 2,4 KB no pedaço principal; 302,2 antes do M21: a infraestrutura de mods custou 1,9 KB no pedaço principal, 0,3 no worker e 0,2 no HTML; 301,8 ao fechar o M19; 298,4 ao fechar o M17; o M19 somou as ilhas de fora e o portal de passagem, e o worker foi a 42,3; 282,5 antes do M17: o inglês e as chaves custaram 15,9; o worker, 41,8, não mudou um byte; 267,3 antes do M16; 265,7 ao fechar o M15; 257,9 antes do M15; 249,5 antes do M14; 240,0 antes do M10) | < 350 KB | `npm run size` |
+| Testes | **2362**, 123 arquivos (2334 antes do M20 no jogo; 2316 ao fechar o M21; 2290 antes do M21; 2281 ao fechar o M19; 2271 ao fechar o M17; 2235 antes do M17; 2164 antes do M16; 2156 ao fechar o M15; 2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
 | Smoke test de navegador | **7 passos verdes**: carregar, criar, andar 10 s, quebrar, salvar, recarregar, conferir | verde | `npm run smoke` |
 | Smoke test da rede (M20.0) | **7 passos verdes**: dois Chrome, anfitrião e convidado pela página `rede.html`, trocando os códigos como uma pessoa; ligados em candidato `host` dos dois lados; ida e volta ~0,3 ms, perda 0/300, 6–18 MB/s. Com e sem mDNS (`SMOKE_NET_MDNS=1`). **Na mesma máquina — não prova a rede Wi-Fi** | verde | `npm run smoke:net` |
-| Página de rede (`rede.html`, `n/`) | **10,6 KB**, fora do jogo e do precache | — | `npm run size` |
+| Smoke test da sala (M20) | **12 passos verdes**: dois Chrome, anfitrião cria mundo e põe bloco, abre a sala; o convidado entra pelo título trocando os códigos; vê o bloco (chunk modificado do anfitrião); blocos nos dois sentidos; bonecos; mobs perto dele; sai pelo menu e fica salvo no anfitrião **com o inventário**; **0 mundo e 0 chunk no banco do convidado**; nenhum erro | verde, 11 seguidas | `npm run smoke:room` |
+| Bloco do anfitrião no convidado | **0–15 ms** por viagem, mediana 1–4 ms (5 viagens por rodada; eram até 214 ms antes de o lote sair na microtarefa, sem esperar o tick) | < 150 ms (aceite do M20) | `npm run smoke:room` |
+| Smoke test da câmera (M20) | **3 passos verdes**: a webcam falsa do Chrome filma o QR do anfitrião inclinado, borrado e com ruído; o leitor próprio lê em **205–410 ms** | verde | `npm run smoke:camera` |
+| Leitor de QR próprio | lê a partir de **~4,1 px por módulo** e com trapézio de até **30%** (borda de cima com 70% da de baixo); falha com 45% e a 3,3 px/módulo; **~10 ms** por quadro de 640×480 no Node (cinco leituras e a foto sintética em 59 ms) | < 120 ms/quadro | `tests/qrread.test.ts` |
+| Pedaços da rede (`n/` e `rede.html`) | **24,2 KB**: a sala do jogo (9,6), as peças em comum com a página de prova — ligação, sinal, base32, gerador e leitor de QR, câmera (9,9) —, a página de prova (4,0 + 0,8 do HTML). **Abrir ou entrar numa sala baixa 19,5 KB.** Fora do jogo sem sala, **dentro do precache** (a sala abre sem internet) | sem orçamento (o jogo sem sala é que tem) | `npm run size` |
 | Código de pareamento | **119 caracteres** com IP à vista, **138** com mDNS (72 e 84 bytes + CRC); QR versão 7–8, lido pelo OpenCV na captura da página | QR ≤ versão 8 | `tests/net.test.ts` |
 | Smoke test dos mods (M21) | **6 passos verdes**: sem mod, **um** arquivo de código; ligar pela tela Mods; o cristal no mundo, com luz 14; desligar volta a um arquivo e apaga a escolha; o mundo pede o mod | verde | `npm run smoke:mods` |
 | Pedaços que só baixam com mod (`m/`) | **45,6 KB**: ponto de entrada 1,9, mod de exemplo 0,6, worker com mods 0,4 + o worker de sempre como pedaço, 42,7 | sem orçamento (o jogo sem mod é que tem) | `npm run size` |
@@ -2118,7 +2132,8 @@ direto?" só se responde em aparelho, e a resposta decide a sinalização.
   com o leitor do OpenCV em 13 códigos da versão 1 à 8 e na captura da própria página; os testes
   batem Reed–Solomon e bits de formato com os valores de referência da norma.
 - **`scan.ts` — leitura pela câmera** com o `BarcodeDetector` do navegador (Chrome no Android). Sem
-  ele (Chrome no Windows e no Linux, Firefox), o caminho é o código em texto.
+  ele (Chrome no Windows e no Linux, Firefox), o caminho era o código em texto — **desde o M20 no
+  jogo, o leitor próprio (`qrread.ts`, abaixo)**.
 - **`link.ts` — a ligação.** `RTCPeerConnection` com `iceServers: []` e dois canais negociados
   (id 0 confiável, id 1 sem ordem nem retransmissão). A coleta de candidatos termina 600 ms depois
   do último candidato UDP, e não no estado `complete`: no Chrome, com mDNS, esse estado só chegava
@@ -2167,6 +2182,83 @@ Três leituras para o desenho do M20:
 (`world/world.ts:16`); `STORE_PLAYERS` já é chaveado por `[worldId, playerId]` (`save/db.ts:359`);
 o terreno é determinístico pela seed, e só a diferença viaja. O M21 deixou o caminho de "pedaço à
 parte que o jogo sozinho não baixa", que o código de rede do jogo vai seguir.
+
+#### M20 no jogo — 2026-09-27 15:20
+
+Pedido: *"Pode seguir"* — o M20 no jogo, o pareamento lembrado e o leitor de QR pela webcam do
+computador. Os dois primeiros e o terceiro, menos o pareamento lembrado (abaixo, com o motivo).
+
+**Como se joga.** O dono do mundo: pausa → **Abrir para a rede local**. A tela da sala mostra o QR
+e o código; o jogo **não para** enquanto a sala está aberta (`flow.worldStopped` = pausa **e**
+sala fechada). O convidado: título → **Entrar numa sala**, nome, lê o QR (câmera no celular,
+webcam no computador, ou cola o código), mostra o QR de resposta; o anfitrião lê pela mesma tela
+(*Ler com a câmera* ou colando o código, logo abaixo do QR) e o convidado entra direto no mundo. **Convidar mais alguém** gera um código
+novo; a lista mostra quem está dentro, com **Expulsar**. Limite de 4 jogadores com anfitrião T0,
+6 em T1+.
+
+**As peças:**
+
+- **O jogo sem sala não carrega nada da rede.** `game/netgate.ts` é o único ponto de contato: guarda
+  as peças do jogo (`GameHandles`) e, só ao abrir ou entrar numa sala, importa `net/room.ts` por
+  URL. Um plugin do Vite (`craftlite-net-chunk`) emite a sala como pedaço à parte em `n/` e troca
+  a URL no `netgate` — sem ele, o Vite punha o ajudante de pré-carga num pedaço compartilhado que
+  o `main` importava. O relatório de tamanho cobra: **nenhum `import` estático em `a/`**, e
+  `import()` só de `../n/`. `n/` entra no precache (a sala abre sem internet); `rede.html` não.
+- **`net/protocol.ts`** — pacotes `u8 tipo | carga` em `DataView`, com escritor reusado (sem
+  alocar por tick). `HELLO` leva versão do protocolo, **impressão digital do conteúdo** (nomes de
+  blocos e itens, com os de mod), nome, id estável e mods; build ou mods diferentes não entram, com
+  mensagem. O único JSON é o save do convidado, a cada 10 s.
+- **`net/host.ts`** — a sala. Embrulha o `tick` da sessão (como um mod do M21): lote de blocos
+  mudados para cada convidado menos quem pediu, a posição do anfitrião e os mobs a até 64 blocos de
+  cada convidado no canal rápido, o tempo do mundo a cada 5 s (o clima sai dele). Pedido de bloco
+  do convidado vale só **a até 10 blocos dele** (6 do jogador + folga do atraso; doc 12 §6 pede 6)
+  e onde o anfitrião tem a coluna carregada; recusado, volta o estado real (`BLOCK_DENY`). Chunk
+  pedido: carregado e modificado vai **na hora**, serializado (comprimir é assíncrono, e um bloco
+  mudado nesse meio-tempo se perderia); fora da memória, do banco já comprimido; nunca modificado,
+  nada — o convidado gera da seed.
+- **`net/guest.ts`** — o convidado. `main.ts` recebe um `RemoteStart`: **sem `SaveGame`**, o
+  pipeline pede cada coluna ao anfitrião (`loadSaved`), e o jogador sai do save que o anfitrião
+  guardou dele. `net/follower.ts` desliga o que só o anfitrião roda (mobs, fluidos, fogo,
+  circuito, crescimento, spawner, dragão, portal) por sobrescrita na instância, sem tocar
+  `session.ts`. Bloco posto aplica na hora e sai para o anfitrião na microtarefa seguinte.
+- **`game/playersave.ts`** — `snapshotPlayer`/`restorePlayer`, tirados do `SaveGame` para o
+  convidado usar o mesmo formato (`PlayerSave`). O anfitrião guarda o convidado com o
+  `worldId` dele e o `playerId` do convidado, **ignorando o que o convidado diz de si**.
+- **`net/avatars.ts`** — o boneco do outro (o modelo `player`, humanoide, com camada própria no
+  atlas de entidades), interpolado entre ticks, desenhado pelo `mobRenderer` num gancho novo do
+  `sceneFeed` (`extraEntities`). **`net/mobsync.ts`** — os mobs do anfitrião como bonecos no
+  `MobStore` do convidado, com a posição anterior para o quadro interpolar.
+- **`net/qrread.ts` — o leitor de QR próprio** (~650 linhas, zero dependência): binarização
+  adaptativa, busca dos três quadrados de canto (1:1:3:1:1, confirmada na vertical), estimativa da
+  versão, marca de alinhamento com candidatas ranqueadas **e decididas pelo Reed–Solomon**,
+  homografia, formato e máscara, Reed–Solomon completo (Berlekamp–Massey, Chien, Forney). Lê a
+  imagem espelhada (webcam) tentando a transposta. `scan.ts` pede 1280×720 à câmera e usa o
+  `BarcodeDetector` quando existe; senão, um quadro a cada 150 ms vai para o leitor.
+
+**Visto funcionando (dois Chrome no container):** `npm run smoke:room`, 12 passos — ver §2 — e
+`npm run smoke:camera`, o leitor lendo o QR da tela do anfitrião por uma webcam falsa, inclinado e
+borrado, em 205–410 ms. Captura de tela conferida: o boneco do convidado de pé no mundo do
+anfitrião. Achados no caminho, todos corrigidos antes de fechar: o pedido de bloco chegava antes
+de qualquer posição e era recusado em (0,0,0) (a posição agora vai no próprio pedido); o lote de
+blocos esperava o tick (viagens de até 214 ms; agora sai na microtarefa, 0–15 ms); o leitor lia
+errado com perspectiva forte (um trecho de dado imitava a marca de alinhamento; agora as
+candidatas passam pelo Reed–Solomon); o smoke da sala pedia bloco numa coluna que o convidado
+ainda não tinha (logo depois de entrar, 3 ou 4 colunas) — metade das rodadas falhava, e o smoke
+passou a esperar a coluna.
+
+**O pareamento lembrado não foi feito — decisão consciente.** Para o convidado já pareado entrar
+só lendo o QR do anfitrião, sem mostrar resposta, o anfitrião teria de saber de antemão as
+credenciais ICE e a impressão digital do convidado. O navegador sorteia as credenciais a cada
+ligação; fixá-las exige reescrever o SDP à mão antes do `setLocalDescription` — o Chrome já
+recusa parte disso e o Firefox recusa mais — e a resposta do convidado teria de ser montada pelo
+anfitrião, sintética. Frágil entre navegadores, e o ganho encolheu: com o leitor pela webcam,
+**ninguém digita código** em nenhum sentido. Fica no §5 como possibilidade, não como pendência de
+marco.
+
+**O que não cabe nesta primeira versão** (conferido no código; §5 lista cada um): sem chat e sem
+nome em cima do boneco; a sala é na superfície; o convidado só mexe onde o anfitrião tem colunas
+carregadas; mobs não miram nem apanham do convidado; o convidado não abre contêiner, não dorme e
+não passa por portal; inventário e movimento do convidado são confiados.
 
 ## 4. Correções fora de marco
 
@@ -2371,12 +2463,38 @@ pistão —, e o da tela, a grade de slots de um lado e os painéis do outro. N�
 - ~~A prova de conexão não rodou em aparelho~~ — **passou em 2026-09-27** (§3).
 - **Nenhum lado com câmera** (dois computadores digitando o código) não foi testado: sem a
   permissão de câmera, os dois escondem o IP atrás do mDNS.
-- **Computador sem `BarcodeDetector` não lê QR** (Chrome no Windows e no Linux, Firefox): digita ou
-  cola o código de 119–138 caracteres. Se a prova passar, entra um leitor de QR próprio — ou um
-  código de resposta mais curto.
-- **O certificado do anfitrião não é guardado**: cada sala é um pareamento novo. Fica para o jogo.
+- ~~Computador sem `BarcodeDetector` não lê QR~~ — **fechada em 2026-09-27**: leitor próprio
+  (`net/qrread.ts`), lendo pela webcam (§3, M20).
+- **O certificado do anfitrião não é guardado**: cada sala é um pareamento novo. O pareamento
+  lembrado foi **deixado de fora de propósito** (§3, M20 no jogo: exige reescrever credenciais ICE
+  no SDP à mão). Possibilidade, não pendência de marco.
 - **Firefox não foi testado** (o container só tem Chromium); o SDP do Firefox é lido nos testes
   a partir de um exemplo escrito à mão.
+
+**Pendências abertas em 2026-09-27 (M20 no jogo)** — cada uma conferida no código:
+
+- **Nada da sala foi visto em aparelho.** Só dois Chrome no mesmo container. O critério de aceite
+  do doc 14 — 30 min jogando juntos, o convidado sai e volta, **T0 anfitrião com um convidado
+  acima de 30 FPS**, e a ligação que **não fecha** em outra rede — é do usuário (§6, item 0).
+- **Sem chat e sem nome em cima do boneco** (`net/avatars.ts` desenha só o modelo; nenhum pacote
+  de chat em `net/protocol.ts`). Quem entra e sai aparece como mensagem no HUD.
+- **A sala é na superfície.** Com o anfitrião no Nether ou no End, os pedidos de bloco do
+  convidado são recusados, os chunks saem do banco e o boneco do anfitrião some (`MOVE_AWAY`). O
+  convidado não passa por portal (`follower.ts`: `travel.tick` devolve `false`).
+- **O convidado só mexe onde o anfitrião tem colunas carregadas** (`host.ts`, `world.isLoaded`):
+  longe do anfitrião, além do alcance de visão dele, todo bloco é recusado.
+- **Mobs não miram no convidado nem apanham dele**: a IA do anfitrião só conhece o jogador do
+  anfitrião, e o golpe do convidado não vira pacote. Nascimento de mob também só olha o anfitrião.
+- **O convidado não abre contêiner nem dorme** (`follower.ts`, com mensagem na tela); a cama só
+  marca o ponto de renascer. Texto de placa não viaja (só o bloco).
+- **Inventário e movimento do convidado são confiados** — desvio consciente do doc 12 §6
+  (`host.ts`, comentário do módulo): o anfitrião não confere o item usado nem refaz o movimento.
+  O alcance do pedido de bloco é 10, não 6 (folga do atraso).
+- **Queda do convidado sem `BYE`**: o anfitrião guarda o último `SAVE` recebido (até 10 s de
+  atraso), não o instante da queda.
+- **`main.ts` em 698 linhas** (701 antes do M20 no jogo; o aviso do controle saiu para
+  `ui/padnotice.ts` para caber a entrada remota). **`net/qrread.ts` em 653**, **`net/host.ts` em
+  416**: acima das ~400, cada um é uma responsabilidade só (o leitor, a sala).
 
 **Pendências abertas em 2026-09-27 (M21):**
 
@@ -2391,7 +2509,7 @@ pistão —, e o da tela, a grade de slots de um lado e os painéis do outro. N�
   mod, e tabelas de mob, som, estrutura e conquista. Entram quando o primeiro mod pedir, do jeito
   do tick (doc 14, M21).
 - **Tirar um mod de um mundo** de propósito não existe: o mundo pede os mods do último save.
-- **Mods e M20** esperam o M20.
+- **Mods e M20, em parte (2026-09-27):** o `HELLO` leva os mods ligados e a impressão digital do conteúdo; mods diferentes não entram, com a lista do anfitrião na mensagem (`net/host.ts`). O convidado **não liga sozinho** os mods do anfitrião: liga na tela Mods e tenta de novo.
 - **`game/session.ts` em 704 linhas** (702 antes; a chamada de `attachModSystems` e o import).
 - **O worker de sempre sai duas vezes no `dist/`**: em `assets/` (sem mod) e como pedaço em `m/`
   (com mod). São 42,7 KB que só baixam com mod ligado, e o relatório os lista à parte.
@@ -2597,11 +2715,20 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
 
 ## 6. Próximo passo recomendado
 
-0. **O M20 no jogo (a prova passou em 2026-09-27).** O checklist do doc 14 a partir de *Abrir sala
-   a partir do mundo*, reusando `src/net/`. Decisões propostas ao usuário depois da prova: o
-   **pareamento lembrado** (dois aparelhos que já se ligaram uma vez: da próxima, o convidado só
-   lê o QR) e o **leitor de QR próprio** para computador sem `BarcodeDetector` (sem digitar
-   código; e a permissão da câmera ainda revela o IP do computador).
+0. **A sala do M20 em aparelho** (no jogo desde 2026-09-27; precisa ir para a `main` para sair
+   no Pages). Celular e computador na mesma rede Wi-Fi:
+   - **Computador anfitrião:** abrir um mundo, pausa → *Abrir para a rede local*. No celular:
+     título → *Entrar numa sala* → *Ler com a câmera*; o celular mostra a resposta, e o
+     computador lê **pela webcam** (*Ler com a câmera*, logo abaixo do QR da sala). Depois, o inverso:
+     celular anfitrião, computador lendo pela webcam.
+   - Jogar junto uns minutos: um quebra, o outro vê na hora? O boneco anda liso? Os mobs do
+     convidado batem com os do anfitrião?
+   - O convidado guarda algo na mochila, sai pelo menu (*Salvar e Sair*), entra de novo: está onde
+     saiu, com o mesmo inventário?
+   - **No T0, como anfitrião com um convidado:** FPS no F3 (critério: acima de 30).
+   - Um aparelho nos dados móveis tentando entrar: **não pode fechar a ligação**.
+   - Depois disso, o que o usuário priorizar dos limites do §5 (chat e nome em cima são os
+     candidatos naturais).
    - **Mods a pedido** continuam possíveis a qualquer momento (receita no §3, M21).
    - **No celular, o M21:** abrir o PWA sem mod e **offline** (o boot e o precache mudaram), ligar
      o Exemplo na tela Mods, pôr um Cristal de Luz de noite, desligar.

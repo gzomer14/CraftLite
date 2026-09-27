@@ -36,8 +36,11 @@ export const BOBBER_LAYER = 'fishing_bobber';
 export const FISHING_LINE_LAYER = 'fishing_line';
 
 /** Camadas fora da tabela de mobs, mas com modelo e skin próprios. */
+/** O outro jogador numa sala na rede local (M20). */
+export const PLAYER_LAYER = 'player';
+
 const EXTRA_LAYERS: readonly string[] = [
-  ARROW_LAYER, BOAT_LAYER, MINECART_LAYER, BOBBER_LAYER, FISHING_LINE_LAYER,
+  ARROW_LAYER, BOAT_LAYER, MINECART_LAYER, BOBBER_LAYER, FISHING_LINE_LAYER, PLAYER_LAYER,
 ];
 
 export class EntityAtlas {

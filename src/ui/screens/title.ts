@@ -17,6 +17,8 @@ export interface TitleCallbacks {
   onPacks: () => void;
   /** Mods (M21). */
   onMods: () => void;
+  /** Entrar numa sala na rede local (M20). */
+  onJoin: () => void;
 }
 
 export class TitleScreen {
@@ -35,12 +37,13 @@ export class TitleScreen {
     const options = menuButton(t('opt.title'), callbacks.onOptions);
     const packs = menuButton(t('title.packs'), callbacks.onPacks);
     const mods = menuButton(t('title.mods'), callbacks.onMods);
+    const join = menuButton(t('title.join'), callbacks.onJoin);
 
     const footer = document.createElement('p');
     footer.className = 'footer';
     footer.textContent = t('title.footer');
 
-    body.append(tagline, this.playButton, options, packs, mods, footer);
+    body.append(tagline, this.playButton, join, options, packs, mods, footer);
     this.root.appendChild(panel);
     injectTitleStyle();
   }

@@ -31,10 +31,18 @@ export interface GameFlowDeps {
   /** Opções a partir da pausa; `back` volta para ela. */
   openOptions: (back: () => void) => void;
   saveAll: () => Promise<void>;
+  /** Sala na rede local (M20); ausente para o convidado, que não abre sala. */
+  onNetwork?: () => void;
+  networkLabel?: () => string;
 }
 
 export class GameFlow {
   paused = false;
+  /**
+   * Sala aberta na rede local (M20). Com gente dentro, pausar só abre o menu:
+   * o mundo continua, senão os convidados congelariam junto.
+   */
+  roomOpen = false;
   readonly pauseMenu: PauseMenu;
   /** A tela do mapa (M10); nasce depois do fluxo, no `main`. */
   mapScreen: MapScreen | null = null;
@@ -55,6 +63,8 @@ export class GameFlow {
       stats: () => session.journal.stats.values,
       spectator: () => player.spectator,
       onToggleSpectator: () => this.setSpectator(!player.spectator),
+      onNetwork: deps.onNetwork,
+      networkLabel: deps.networkLabel,
       onSaveAndQuit: () => {
         this.pauseMenu.setStatus(t('pause.saving'));
         void (async () => {
@@ -65,6 +75,11 @@ export class GameFlow {
         })();
       },
     });
+  }
+
+  /** O mundo parado: pausado e sem sala na rede. */
+  get worldStopped(): boolean {
+    return this.paused && !this.roomOpen;
   }
 
   togglePause(): void {

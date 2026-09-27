@@ -62,6 +62,14 @@ Todo pacote: `u8 type | payload`. Usar `DataView`, nunca JSON no caminho quente.
 
 **Taxas:** posição do jogador 20 Hz; entidades 10 Hz com delta compression; blocos por evento.
 
+> **O que o M20 implementou (2026-09-27)** — `src/net/protocol.ts` é a referência. Os tipos
+> mudaram de número e de forma: `HELLO` leva também a impressão digital do conteúdo e os mods;
+> o chunk é **pedido** pelo convidado (`CHUNK_REQ`/`CHUNK`, e o anfitrião responde "nada" quando
+> a coluna nunca mudou); um só `BLOCKS` em lote nos dois sentidos, com a posição de quem pede e o
+> estado anterior, e `BLOCK_DENY` na volta; mobs a 20 Hz sem delta (`MOBS`); o inventário não
+> viaja por slot — o convidado manda o próprio save a cada 10 s (`SAVE`). O clima não viaja: sai
+> do `totalTicks` (`TIME`). Chat não existe ainda. Detalhe no doc 15 §3, M20.
+
 ## 5. Predição e reconciliação
 
 - **Client-side prediction** do próprio jogador (aplica o input local imediatamente).
@@ -75,3 +83,8 @@ Todo pacote: `u8 type | payload`. Usar `DataView`, nunca JSON no caminho quente.
 
 Mesmo em P2P entre amigos: o host valida alcance (≤ 6 blocos), cooldown de ações, e se o jogador
 realmente tem o item. Não confiar no cliente.
+
+> **No M20 (2026-09-27), em parte:** o alcance é validado, com 10 blocos em vez de 6 (folga do
+> atraso), e só onde o host tem a coluna carregada. Cadência, item no inventário e o *rewind* do
+> §5 não existem: inventário e movimento do cliente são confiados — desvio consciente, escrito no
+> comentário de `src/net/host.ts`.

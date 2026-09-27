@@ -547,7 +547,7 @@ dois marcos, e se ela falhar o desenho de sinalização muda antes de escrever o
 
 ---
 
-## M20 — Jogar junto na mesma rede 🚧
+## M20 — Jogar junto na mesma rede 🚧 (no jogo; falta aparelho)
 
 > Multijogador **só na rede local**, entre celular e computador, **sem servidor nenhum**. Um
 > aparelho abre uma sala a partir de um mundo dele; quem está na mesma rede entra. O mundo, e tudo
@@ -570,7 +570,7 @@ O que dá para fazer sem servidor:
 
 ### Checklist
 
-- [ ] **M20.0 — Prova de conexão, antes de tudo.** Uma página de teste escondida (sem jogo) que
+- [x] **M20.0 — Prova de conexão, antes de tudo.** Uma página de teste escondida (sem jogo) que
       liga um celular Android e um computador na mesma rede Wi-Fi com `iceServers: []`, troca de
       descrição por QR nos dois sentidos, e mede ida e volta de 1000 mensagens. **Validar no
       aparelho do usuário:** Chrome Android ↔ Chrome/Edge no computador, e se der, Firefox. Riscos a
@@ -584,6 +584,11 @@ O que dá para fazer sem servidor:
       mensagens no canal rápido e a velocidade com 4 MB, e escreve um relatório para copiar.
       `npm run smoke:net` liga dois Chrome na mesma máquina pela página, com e sem mDNS. O que
       falta é o que só o usuário pode fazer: rodar em dois aparelhos numa rede Wi-Fi de verdade.
+      **Passou em aparelho em 2026-09-27:** celular Android (Chrome 154) e computador na mesma rede,
+      nos dois sentidos. A ligação fechou **83 ms** (computador anfitrião) e **161 ms** (celular
+      anfitrião) depois do último código; ida e volta de 4,4–4,6 ms na mediana, 0 de 300 pacotes
+      rápidos perdidos, 3,2–4,8 MB/s. O caminho foi o endereço real do celular (a permissão da
+      câmera revela o IP) ↔ o computador, que ficou escondido atrás do mDNS. O M20 segue.
 - [ ] **A sinalização compacta** (`net/pairing.ts`): descrição reduzida ao que importa (chave
       ICE, impressão digital DTLS, candidatos) em ~100 bytes, com versão e verificação. Leitor de
       QR **escrito aqui** (zero dependência, doc 13), com `BarcodeDetector` quando o aparelho tem.
@@ -591,42 +596,55 @@ O que dá para fazer sem servidor:
       convidado já pareado reconhece o mesmo anfitrião da próxima vez.
       **Feito:** `net/signal.ts` (72–84 bytes, SDP remontado aceito pelo Chrome), `net/base32.ts`
       (texto com CRC-16), `net/qr.ts` (gerador, conferido com o leitor do OpenCV), leitura por
-      `BarcodeDetector` (`net/scan.ts`). **Falta:** leitor de QR próprio para computador sem
-      `BarcodeDetector` (Windows, Linux) e o certificado guardado — os dois dependem do que a prova
-      mostrar.
-- [ ] **Abrir sala a partir do mundo** (pausa → *Abrir para a rede local*). Só o dono do mundo
+      `BarcodeDetector` (`net/scan.ts`), e **leitor de QR próprio** (`net/qrread.ts`) para o
+      computador ler pela webcam. **Não feito, de propósito:** o certificado guardado e o
+      pareamento lembrado — exigem reescrever as credenciais ICE no SDP à mão, frágil entre
+      navegadores, e com a webcam ninguém digita código (doc 15 §3, M20).
+- [x] **Abrir sala a partir do mundo** (pausa → *Abrir para a rede local*). Só o dono do mundo
       tem o botão, porque o mundo só existe no aparelho dele. Nome do anfitrião, limite de
       jogadores (**4 no total com anfitrião T0**, 6 em T1+), lista de quem está dentro com
-      *expulsar*.
-- [ ] **Entrar numa sala** (tela de título → *Entrar em sala na rede*): ler o QR, mostrar o de
+      *expulsar*. **Feito** (`net/host.ts`, `net/roomui.ts`); o jogo não para com a sala aberta.
+- [x] **Entrar numa sala** (tela de título → *Entrar em sala na rede*): ler o QR, mostrar o de
       resposta, nome do jogador. O convidado **não escolhe mundo e não cria save**: a sessão dele
-      roda em modo remoto, sem `SaveManager`.
-- [ ] **Protocolo binário do doc 12 §4** (`net/protocol.ts`), com `DataView` e sem JSON no
+      roda em modo remoto, sem `SaveManager`. **Feito** (`net/guest.ts`; `main.ts` com
+      `RemoteStart`).
+- [x] **Protocolo binário do doc 12 §4** (`net/protocol.ts`), com `DataView` e sem JSON no
       caminho quente: dois canais (posição sem garantia; blocos, inventário e chat confiáveis),
       versão do protocolo e do build no `HELLO` — build diferente não entra, com mensagem clara.
-- [ ] **O mundo chega ao convidado sem virar arquivo nele.** O convidado gera o terreno da seed
+      **Feito** (`net/protocol.ts`): o "build" é a impressão digital dos nomes de bloco e item, e
+      os mods ligados também precisam bater. Sem chat ainda.
+- [x] **O mundo chega ao convidado sem virar arquivo nele.** O convidado gera o terreno da seed
       localmente (é determinístico) e o anfitrião manda **só os chunks que diferem da geração**.
       Nada disso toca o IndexedDB do convidado; ao sair, some. (Limite honesto: a seed viaja para
       o aparelho do convidado, porque é ela que evita mandar o mundo inteiro pela rede. O que o
-      jogador construiu só existe no anfitrião.)
+      jogador construiu só existe no anfitrião.) **Feito**: o smoke da sala confere 0 mundo e 0
+      chunk no banco do convidado depois de sair.
 - [ ] **O anfitrião é a autoridade** (doc 12 §6): valida alcance, cadência, se o item existe no
       inventário do convidado; mobs, tempo, clima, fluidos, circuito e fogo rodam só nele. O
       convidado prevê o próprio movimento e o bloco que colocou, e corrige quando o anfitrião
-      discorda (doc 12 §5).
-- [ ] **O convidado é salvo no mundo do anfitrião**: `STORE_PLAYERS` já é chaveado por
+      discorda (doc 12 §5). **Em parte:** alcance validado (10 blocos, com folga do atraso),
+      simulação só no anfitrião (`net/follower.ts`), bloco otimista com `BLOCK_DENY`. **Desvio
+      consciente:** inventário e movimento do convidado são confiados, sem cadência nem *rewind*
+      (comentário de `net/host.ts`).
+- [x] **O convidado é salvo no mundo do anfitrião**: `STORE_PLAYERS` já é chaveado por
       `[worldId, playerId]` (`save/db.ts`). O convidado tem um `playerId` estável guardado nas
       configurações do aparelho dele — ao voltar, ele reaparece onde saiu, com o que tinha. O
-      anfitrião salva no mesmo ritmo do save de hoje.
+      anfitrião salva no mesmo ritmo do save de hoje. **Feito**: o convidado manda o próprio
+      `PlayerSave` a cada 10 s e ao sair; o anfitrião o grava com o `worldId` dele.
 - [ ] **Mais de um jogador no mundo**: o anel de chunks carregados, o nascimento de mobs, a mira
       dos mobs, o sono (todos na cama) e os portais passam a olhar para uma lista de jogadores, e
       não para um. **Com a sala fechada, a lista tem um jogador e o código faz o que faz hoje.**
+      **Não feito:** mobs, sono e portais seguem olhando só o anfitrião; o convidado não dorme nem
+      passa por portal, e a sala é na superfície (doc 15 §5).
 - [ ] **Ver o outro**: o boneco do jogador (acabamento pós-M7) com nome em cima, interpolado com
       100 ms de atraso (doc 12 §5); item na mão; golpe e dano entre jogadores **desligado por
-      padrão** (opção da sala).
+      padrão** (opção da sala). **Em parte:** o boneco interpolado (`net/avatars.ts`) e os mobs
+      do anfitrião no convidado (`net/mobsync.ts`); sem nome em cima e sem item na mão.
 - [ ] **Chat** curto, com teclado virtual no celular, e as mensagens de entrou/saiu.
-- [ ] **Caiu a rede**: o convidado volta ao título com aviso, e o anfitrião salva o convidado na
+- [x] **Caiu a rede**: o convidado volta ao título com aviso, e o anfitrião salva o convidado na
       hora em que ele some. O anfitrião que fecha o jogo derruba a sala (não há migração de
-      anfitrião).
+      anfitrião). **Feito:** o convidado vê o aviso e volta ao título em 4 s; o anfitrião guarda o
+      último save que recebeu dele (até 10 s antes da queda).
 
 **Critério de aceite:** celular e computador, na mesma rede, jogam juntos 30 min — um quebra, o
 outro vê em menos de 150 ms; o convidado sai, volta e está onde estava, com o mesmo inventário; o
@@ -707,6 +725,8 @@ futuro, se um dia fizer sentido — e então com outro desenho (dado sem código
       futuro.
 - [ ] **Mods e M20** — depende do M20, que não existe ainda. O desenho continua o de cima: o
       anfitrião manda a lista no `WELCOME`, e o convidado liga os mesmos só para a sessão.
+      **Em parte (2026-09-27):** o convidado manda os mods ligados no `HELLO`, e mods diferentes
+      não entram — a recusa diz quais o anfitrião usa. Ligar sozinho os do anfitrião, não.
 - [x] **Mod de demonstração** (`src/mods/exemplo/`): o **Cristal de Luz**, que brilha como a pedra
       luminosa e cura meio coração a cada 2 s quem fica em cima; o **Fragmento de Cristal**, com
       silhueta própria; vidro + redstone → 2 fragmentos, 4 fragmentos → 1 cristal.

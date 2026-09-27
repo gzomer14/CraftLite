@@ -199,6 +199,18 @@ export class SaveManager {
     }
   }
 
+  /**
+   * Os bytes gravados de uma coluna de **qualquer** dimensão, sem abrir (M20):
+   * o anfitrião no Nether ainda serve a superfície ao convidado.
+   */
+  async loadChunkData(dimension: number, cx: number, cz: number): Promise<Uint8Array | undefined> {
+    try {
+      return await this.db.getChunk(dimensionIdFor(this.worldId, dimension), cx, cz);
+    } catch {
+      return undefined;
+    }
+  }
+
   async saveWorldMeta(meta: WorldMeta): Promise<void> {
     meta.lastPlayed = Date.now();
     await this.db.put(STORE_WORLDS, meta);

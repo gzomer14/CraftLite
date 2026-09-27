@@ -12,6 +12,94 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-27 15:20 · M20 no jogo: sala, entrada por QR e leitor pela webcam
+
+**Pedido:** *"Pode seguir"* — o M20 no jogo, o pareamento lembrado e a leitura do QR pela webcam do
+computador.
+
+**Resultado:** dá para jogar junto. Pausa → *Abrir para a rede local* no dono do mundo; título →
+*Entrar numa sala* no outro aparelho; troca de QR e o convidado cai no mundo do anfitrião. Blocos
+nos dois sentidos (0–15 ms entre dois Chrome, depois de o lote passar a sair na microtarefa), o
+boneco do outro, os mobs do anfitrião no convidado, tempo e clima, e o convidado salvo **no mundo
+do anfitrião** — no aparelho dele, 0 mundo e 0 chunk. Leitor de QR escrito aqui (Reed–Solomon
+completo, perspectiva, espelho), lendo a webcam falsa do Chrome em 205–410 ms. O jogo sem sala
+subiu 2,4 KB (307,1) e não baixa nada da rede: a sala é pedaço à parte, pedido por URL (plugin do
+Vite, conferido pelo relatório de tamanho e por teste). **O pareamento lembrado não foi feito**:
+exige reescrever credenciais ICE no SDP à mão (doc 15 §3). O smoke da sala falhava em metade das
+rodadas pedindo bloco numa coluna que o convidado ainda não tinha; passou a esperar a coluna, e
+fez 11 rodadas verdes seguidas. Limites da primeira versão no doc 15 §5. 2362 testes; lint, build,
+tamanho e os cinco smokes verdes. **Não visto em aparelho.**
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| **Rede (só em `n/`)** | | |
+| + | `src/net/protocol.ts` | pacotes binários, escritor/leitor reusáveis, `HELLO`/`WELCOME`, impressão digital do conteúdo |
+| + | `src/net/host.ts` | a sala: entrada e recusa, pedidos de bloco com alcance, chunks, lote de blocos, posição, mobs, tempo, save do convidado |
+| + | `src/net/guest.ts` | o convidado: entrada, chunks pedidos, blocos otimistas com `BLOCK_DENY`, posição e save a cada 10 s, saída |
+| + | `src/net/follower.ts` | a sessão do convidado sem simulação (sobrescrita na instância); sem contêiner, cama e portal |
+| + | `src/net/avatars.ts` | o boneco dos outros jogadores, interpolado, pelo `mobRenderer` |
+| + | `src/net/mobsync.ts` | mobs do anfitrião a até 64 blocos, como bonecos no `MobStore` do convidado |
+| + | `src/net/identity.ts` | id estável e nome do jogador no aparelho, conteúdo e mods locais |
+| + | `src/net/roomui.ts` | tela da sala (QR, leitura da resposta, lista, expulsar) e tela de entrada |
+| + | `src/net/room.ts` | o ponto de entrada do pedaço da sala: abrir, entrar, rótulo do botão |
+| + | `src/net/qrread.ts` | leitor de QR próprio: binarização, cantos, alinhamento, homografia, formato, Reed–Solomon |
+| ~ | `src/net/qr.ts` | padrões fixos fatorados e expostos para o leitor (`functionModules`, `formatBits`) |
+| ~ | `src/net/scan.ts` | leitor próprio quando não há `BarcodeDetector`; câmera a 1280×720; `canScan` por dispositivo |
+| **Jogo** | | |
+| + | `src/game/netgate.ts` | a única porta do jogo para a rede: peças do jogo e `import()` da sala por URL |
+| + | `src/game/playersave.ts` | `snapshotPlayer`/`restorePlayer`, tirados do `SaveGame` |
+| ~ | `src/game/savegame.ts` | usa `playersave.ts`; ler/gravar jogador por id; bytes de chunk do banco |
+| ~ | `src/save/savemanager.ts` | `loadChunkData` (chunk comprimido, sem descomprimir) |
+| ~ | `src/main.ts` | `startGame` com `RemoteStart` (sem save, chunks do anfitrião); botão da sala; `setGame`; 701 → 698 linhas |
+| + | `src/ui/padnotice.ts` | o aviso de controle, tirado do `main.ts` |
+| ~ | `src/ui/gameflow.ts` | `roomOpen`: com a sala aberta, a pausa não para o mundo |
+| ~ | `src/ui/screens/pause.ts` | botão *Abrir para a rede local* / *Sala na rede (n dentro)* |
+| ~ | `src/ui/screens/title.ts` | botão *Entrar numa sala* |
+| ~ | `src/ui/menuflow.ts` | `join` nos callbacks do menu |
+| ~ | `src/render/scenefeed.ts` | gancho `extraEntities` depois da linha de pesca |
+| ~ | `src/render/entityatlas.ts` | camada `player` no atlas de entidades |
+| ~ | `src/data/mobmodels.ts` | modelo `player` (humanoide, pele 64) |
+| ~ | `src/data/strings/pt.ts`, `en.ts` | `title.join` e 46 chaves `net.*` |
+| **Build, testes e scripts** | | |
+| ~ | `vite.config.ts` | plugin `craftlite-net-chunk` (pedaço emitido, URL no `netgate`); `n/` no precache |
+| ~ | `scripts/size-report.mjs` | balde da rede; nenhum `import` estático em `a/`, `import()` só de `../n/` |
+| ~ | `package.json` | `smoke:room` e `smoke:camera` |
+| + | `scripts/smoke-room.mjs` | dois Chrome jogando juntos, 12 passos, com a mediana da viagem do bloco |
+| + | `scripts/smoke-camera.mjs` | webcam falsa com o QR filmado (vídeo `.y4m` gerado no script) |
+| + | `tests/netroom.test.ts` | 12 testes: protocolo, mobs, anfitrião com ligações falsas |
+| + | `tests/qrread.test.ts` | 15 testes: Reed–Solomon, matriz, fotos sintéticas (perspectiva, borrão, luz, espelho), custo |
+| ~ | `tests/net.test.ts` | o jogo não importa `src/net/` por valor; a prova só puxa `src/net/`; precache leva `n/` |
+| ~ | `tests/modsisolation.test.ts` | `game/netgate.ts` pode usar `import()` |
+| **Documentos** | | |
+| ~ | `docs/12-multiplayer.md` | notas do que o M20 implementou (§4) e do desvio de segurança (§6) |
+| ~ | `docs/14-roadmap.md` | checklist do M20 marcado, com o que ficou em parte; mods e M20 em parte |
+| ~ | `docs/15-status.md` | data; §1; §2 (bundle, testes, smokes, leitor, `n/`); §3 M20 no jogo; §5; §6 item 0 |
+| ~ | `docs/16-auditoria.md` | esta sessão |
+| ~ | `README.md` | M20 no jogo, testes, bundle, comandos novos |
+
+---
+
+## 2026-09-27 14:11 · A prova de conexão do M20 passou em aparelho
+
+**Pedido:** o usuário rodou a página `rede.html` num celular e num computador — *"Deu certo também
+com esse outro caminho"* — e mandou os dois relatórios.
+
+**Resultado:** só registro. Ligou nos dois sentidos, 83 ms e 161 ms depois do último código; ida e
+volta de ~4,5 ms, 0/300 perdidos, 3,2–4,8 MB/s; caminho pelo IP real do celular (permissão de
+câmera) com o computador escondido atrás do mDNS. O `checking` antes do último código era o
+computador já batendo na porta, não demora. O M20 segue. O PR #2 foi mesclado; atualizar o branch
+para a ponta da `main` foi negado pelo classificador de permissões e ficou como estava (mesmo
+conteúdo da `main`). Portões verdes, sem mudança.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| ~ | `docs/14-roadmap.md` | M20.0 ✅ com os números da prova |
+| ~ | `docs/15-status.md` | data; §1; §3 (tabela da prova e leituras); §5; §6 item 0 |
+| ~ | `docs/16-auditoria.md` | esta sessão |
+| ~ | `README.md` | a prova passou em aparelho |
+
+---
+
 ## 2026-09-27 03:10 → 04:00 · M20.0: a prova de conexão
 
 **Pedido:** *"Agora vamos partir para implementação do M20 Multijogador"*.

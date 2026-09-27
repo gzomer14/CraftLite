@@ -66,20 +66,26 @@ if (modRows.length > 0) {
 }
 const netRows = rows.filter((r) => isNet(r.file));
 if (netRows.length > 0) {
-  console.log('\n  página de rede (rede.html, n/)');
+  console.log('\n  rede local (n/: a sala do jogo, só ao abrir ou entrar numa sala; e rede.html, a prova)');
   for (const r of netRows) console.log(`  ${r.file.padEnd(34)} ${kb(r.raw)} ${kb(r.gz)} ${kb(r.br)}`);
-  console.log(line('TOTAL da página de rede', totals.net));
+  console.log(line('TOTAL da rede local', totals.net));
 }
 
 /*
- * O pedaço principal não pode depender de outro arquivo: um `import` dele para
- * um pedaço compartilhado seria uma requisição a mais no jogo **sem mod**
- * (acontece se um mod importar valor do jogo — ver `src/mods/types.ts`).
+ * O pedaço principal não pode depender de outro arquivo: um `import` estático
+ * dele para um pedaço compartilhado seria uma requisição a mais no jogo **sem
+ * mod e sem sala** (acontece se um mod importar valor do jogo — ver
+ * `src/mods/types.ts` — ou se o ajudante `__vitePreload` do Vite virar pedaço
+ * próprio). O único `import()` aceito é o da sala na rede local (M20), por URL,
+ * que só roda quando o jogador abre ou entra numa sala.
  */
 for (const r of rows.filter((r) => r.file.startsWith('a/') && r.file.endsWith('.js'))) {
   const code = readFileSync(join(DIST, r.file), 'utf8');
-  if (/\bimport\s*\(|\bfrom\s*["']\.{1,2}\//.test(code)) {
-    console.error(`\n  ✗ ${r.file} importa outro pedaço: o jogo sem mod baixaria mais de um arquivo`);
+  const staticImport = /\bfrom\s*["']\.{1,2}\/|(^|[;}])import\s*["']\.{1,2}\//.test(code);
+  const dynamic = code.match(/\bimport\s*\([^)]{0,40}/g) ?? [];
+  const foreign = dynamic.filter((d) => !/^import\(new URL\("\.\.\/n\//.test(d));
+  if (staticImport || foreign.length > 0) {
+    console.error(`\n  ✗ ${r.file} importa outro pedaço: o jogo sem mod e sem sala baixaria mais de um arquivo`);
     process.exit(1);
   }
 }

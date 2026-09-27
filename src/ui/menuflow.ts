@@ -30,6 +30,8 @@ import { t, tf } from '../core/i18n';
 export interface MenuFlowCallbacks {
   /** Chamado quando o jogador escolhe um mundo para jogar. */
   start: (meta: WorldMeta) => void;
+  /** Entrar numa sala na rede local (M20); `back` volta ao título. */
+  join: (back: () => void) => void;
 }
 
 export class MenuFlow {
@@ -100,6 +102,10 @@ export class MenuFlow {
       onMods: () => {
         this.title.hide();
         this.mods.show();
+      },
+      onJoin: () => {
+        this.title.hide();
+        callbacks.join(() => this.title.show());
       },
     });
   }

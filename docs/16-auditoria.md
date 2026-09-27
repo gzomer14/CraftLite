@@ -12,6 +12,31 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-27 02:09 · Dois marcos novos no roteiro: M20 (rede local) e M21 (mods)
+
+**Pedido:** *"Vamos criar dois novos marcos então, um será o multiplayer, que deverá permitir jogar
+entre plataformas (Celular junto com computador), e exclusivamente local (…) Outro marco que quero
+que você crie é uma possibilidade de criação de mods no jogo (…) sem o usuario ativar mod algum, o
+jogo continuará super leve e performatico exatamente como é hoje"*.
+
+**Resultado:** só planejamento, nenhum código. **M20:** WebRTC sem STUN/TURN, e é isso que prende a
+ligação à rede local; a sinalização é por QR na tela, porque uma página web não consegue anunciar
+sala na rede; o mundo e os dados do convidado ficam só no anfitrião (`STORE_PLAYERS` já é chaveado
+por jogador). O marco começa por uma prova de conexão em dois aparelhos reais. **M21:** mods escritos
+no repositório, cada um num pedaço de bundle próprio, registrados nas tabelas de `src/data/` no boot
+e ligados na tela Mods; "desligado custa zero" vira teste e orçamento que falham o build. O doc 12
+§2 foi revisto para a decisão de rede local. Portões verdes, sem mudança: 2290 testes, 302,2 KB.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| ~ | `docs/14-roadmap.md` | seção do pedido de 2026-09-27, M20 e M21 com checklist e critério de aceite |
+| ~ | `docs/12-multiplayer.md` | §2: só rede local, sem servidor de sinalização, QR na tela, dados no host |
+| ~ | `docs/15-status.md` | data; M20 e M21 no §1; P2P de volta como M20; §3 "planejados"; §6 item 0 |
+| ~ | `docs/16-auditoria.md` | esta sessão |
+| ~ | `README.md` | M20 e M21 planejados; P2P de volta como M20 |
+
+---
+
 ## 2026-09-25 18:50 → 19:11 · Campo: a dica das tábuas, durabilidade na hotbar, rachadura lateral
 
 **Pedido:** três situações do teste no celular — *"ao chegar no objetivo de construir quatro

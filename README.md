@@ -33,7 +33,9 @@ mão, e a seed em código curto (`03NQ-K8NH`) para copiar e colar. O **M18** pô
 (módulos grandes cortados por papel, memória de áudio com folga) e o **M19** fechou as pontas
 soltas: enderman no End, o dragão que quebra, sopra e morre devagar, as ilhas de fora do End com
 o portal de passagem, e o tint de bioma no WebGL1. M16 a M19 ainda não vistos em aparelho — o
-roteiro está no doc 15 §6.
+roteiro está no doc 15 §6. Dois marcos novos estão planejados, ainda sem código: o **M20**,
+multijogador só na rede local (celular com computador, sem servidor), e o **M21**, mods que se ligam
+e desligam num menu sem custar nada desligados (doc 14).
 
 - **M0 — esqueleto:** Vite + TypeScript strict, renderer WebGL2 próprio com fallback WebGL1,
   detecção de tier, loop de 20 Hz com interpolação, gerador procedural de texturas alimentando um
@@ -85,7 +87,7 @@ roteiro está no doc 15 §6.
   preso à linha sem uma única consulta de colisão. E **import/export de mundos**: um arquivo `.clw`
   com todas as dimensões, os baús e os veículos, que leva o mundo do celular para o computador sem
   passar por servidor nenhum. O multijogador P2P **saiu do escopo** deste marco por decisão do
-  projeto.
+  projeto, e voltou como M20, só na rede local.
 - **Dois estilos de textura**, ambos gerados por código e trocáveis em Opções → Vídeo. O
   **Clássico** é o procedural cru; o **Nítido** passa cada ladrilho por relevo direcional, realce,
   tom e chanfro de borda, e transforma as máscaras de item em sólidos iluminados — mesma silhueta

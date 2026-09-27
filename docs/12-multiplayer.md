@@ -1,4 +1,4 @@
-# 12 — Multijogador (opcional, pós-MVP)
+# 12 — Multijogador (pós-MVP, marco M20)
 
 Fora do MVP, mas **a arquitetura precisa nascer com os ganchos certos** ou refatorar depois custa
 caro. Este documento define o que deve ser respeitado desde o dia 1.
@@ -15,15 +15,26 @@ caro. Este documento define o que deve ser respeitado desde o dia 1.
    (`{t:'break', x,y,z}`, `{t:'place', x,y,z,item}`, `{t:'move', x,y,z,yaw,pitch}`).
 5. Tick numerado globalmente (`totalTicks`), usado como timestamp lógico.
 
-## 2. Opção A — P2P via WebRTC (recomendada: sem custo de servidor)
+## 2. Opção A — P2P via WebRTC, só na rede local (decidida em 2026-09-27)
 
-- Um jogador é o **host** (autoritativo). Os outros são clientes.
-- Sinalização: um servidor minúsculo de WebSocket (ou um serviço pronto) só para trocar
-  SDP/ICE. Depois disso, o tráfego é direto entre navegadores.
+> Revisto em 2026-09-27 por decisão do usuário: *"exclusivamente local (…) evitando assim qualquer
+> problema de segurança ou principalmente necessidade de servidores reais"*. O marco é o **M20** do
+> [doc 14](14-roadmap.md). A versão anterior desta seção previa um servidor de sinalização e um
+> código de sala de 6 caracteres; os dois saíram.
+
+- Um jogador é o **host** (autoritativo), e **só o aparelho que tem o mundo pode ser host**. Os
+  outros são clientes, e não guardam nada do mundo.
+- **Sem servidor de nenhum tipo.** `RTCPeerConnection` com `iceServers: []`: sem STUN e sem TURN,
+  a ligação só encontra os endereços da rede local. Quem está fora da rede não conecta.
+- **Sinalização pela tela:** o host mostra um QR code (e um código em texto) com a descrição
+  compacta da ligação; o cliente lê e mostra o QR de resposta, que o host lê. Uma página web não
+  consegue anunciar uma sala na rede, então "ver a sala" é ver a tela do host.
 - `RTCDataChannel` com `ordered: false, maxRetransmits: 0` para posição (não importa perder um
   pacote antigo) e um segundo canal `ordered: true` confiável para blocos, inventário e chat.
-- Código de sala de 6 caracteres para entrar.
-- Limite prático: **4–6 jogadores** (o host de celular não aguenta mais).
+- Dados do cliente (posição, inventário, vida, XP) ficam no save do host, em `STORE_PLAYERS`,
+  chaveados por `[worldId, playerId]`; o `playerId` é estável e mora no aparelho do cliente.
+- O código de rede é um pedaço de bundle à parte: jogar sozinho não baixa nem roda nada dele.
+- Limite prático: **4 jogadores com host T0, 6 com host T1+** (o host de celular não aguenta mais).
 
 ## 3. Opção B — Servidor Node com WebSocket
 

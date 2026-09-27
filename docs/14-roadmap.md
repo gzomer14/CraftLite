@@ -521,6 +521,195 @@ com o mesmo tint.
 
 ---
 
+## Pedido de 2026-09-27 — M20 e M21
+
+> Acrescentado em 2026-09-27, a pedido do usuário: *"Vamos criar dois novos marcos então, um será o
+> multiplayer, que deverá permitir jogar entre plataformas (Celular junto com computador), e
+> exclusivamente local (…) Outro marco que quero que você crie é uma possibilidade de criação de
+> mods no jogo (…) ao desativar o mod, o jogo precisa funcionar exatamente da mesma forma que
+> funciona, principalmente com o exato mesmo desempenho sem mod algum"*.
+>
+> Os dois marcos compartilham uma regra que vale mais que qualquer item da lista: **quem não usa,
+> não paga.** O jogo sozinho, sem sala aberta e sem mod ligado, baixa os mesmos bytes, roda o
+> mesmo tick e desenha o mesmo quadro de hoje. O código de rede e o de cada mod ficam em pedaços
+> de bundle separados (`import()`), baixados só quando alguém abre uma sala ou liga um mod.
+
+### Ordem recomendada
+
+```
+M20.0 prova de conexão em dois aparelhos (precisa do usuário) ──► M20 resto
+M21 mods ─────────────────────────────────────────────────────────┘ (M20 manda a lista de mods)
+```
+
+O M21 pode começar já: dá para validá-lo inteiro aqui, com teste e navegador. O M20 começa por uma
+**prova de conexão** que só se valida com dois aparelhos reais na mesma rede — é o maior risco dos
+dois marcos, e se ela falhar o desenho de sinalização muda antes de escrever o resto.
+
+---
+
+## M20 — Jogar junto na mesma rede ⬜
+
+> Multijogador **só na rede local**, entre celular e computador, **sem servidor nenhum**. Um
+> aparelho abre uma sala a partir de um mundo dele; quem está na mesma rede entra. O mundo, e tudo
+> do convidado nele — posição, inventário, vida, XP —, fica **só no aparelho que abriu a sala**. O
+> [doc 12](12-multiplayer.md) foi revisto para esta decisão (§2).
+
+**O limite do navegador, dito antes de desenhar:** uma página web não consegue abrir uma porta nem
+anunciar nada na rede. Não existe, no navegador, "procurar salas na rede" como num jogo instalado.
+O que dá para fazer sem servidor:
+
+- **Conexão direta por WebRTC** (`RTCDataChannel`), com a lista de servidores ICE **vazia** — sem
+  STUN e sem TURN. Sem eles, os únicos caminhos que a conexão encontra são os endereços da própria
+  rede local. **Fora da rede local, a conexão não fecha: o limite de "só na mesma rede" é da
+  física da ligação, não de uma regra que alguém possa burlar.**
+- **Sinalização pela tela, e não por servidor.** Para abrir a ligação, os dois lados trocam uma
+  vez uma descrição curta (quem sou, chave, endereço). No lugar do servidor de sinalização do doc
+  12 antigo: o anfitrião mostra um **QR code** (e um código em texto, para quem não tem câmera); o
+  convidado lê e mostra o QR de resposta, que o anfitrião lê. A sala é "visível" só para quem vê a
+  tela do anfitrião — é a versão honesta de "só quem está na rede vê a sala".
+
+### Checklist
+
+- [ ] **M20.0 — Prova de conexão, antes de tudo.** Uma página de teste escondida (sem jogo) que
+      liga um celular Android e um computador na mesma rede Wi-Fi com `iceServers: []`, troca de
+      descrição por QR nos dois sentidos, e mede ida e volta de 1000 mensagens. **Validar no
+      aparelho do usuário:** Chrome Android ↔ Chrome/Edge no computador, e se der, Firefox. Riscos a
+      medir aqui, e não depois: endereço `.local` (mDNS) que o Android não resolve, roteador com
+      **isolamento de cliente** (Wi-Fi de visitante) que bloqueia a ligação, e câmera de
+      computador para ler o QR. **Se a prova falhar, o marco para e volta para decisão do
+      usuário** — as alternativas (servidor de sinalização local, servidor na nuvem) mudam o que
+      foi pedido.
+- [ ] **A sinalização compacta** (`net/pairing.ts`): descrição reduzida ao que importa (chave
+      ICE, impressão digital DTLS, candidatos) em ~100 bytes, com versão e verificação. Leitor de
+      QR **escrito aqui** (zero dependência, doc 13), com `BarcodeDetector` quando o aparelho tem.
+      O certificado do anfitrião fica guardado (`RTCCertificate` vai para o IndexedDB), então um
+      convidado já pareado reconhece o mesmo anfitrião da próxima vez.
+- [ ] **Abrir sala a partir do mundo** (pausa → *Abrir para a rede local*). Só o dono do mundo
+      tem o botão, porque o mundo só existe no aparelho dele. Nome do anfitrião, limite de
+      jogadores (**4 no total com anfitrião T0**, 6 em T1+), lista de quem está dentro com
+      *expulsar*.
+- [ ] **Entrar numa sala** (tela de título → *Entrar em sala na rede*): ler o QR, mostrar o de
+      resposta, nome do jogador. O convidado **não escolhe mundo e não cria save**: a sessão dele
+      roda em modo remoto, sem `SaveManager`.
+- [ ] **Protocolo binário do doc 12 §4** (`net/protocol.ts`), com `DataView` e sem JSON no
+      caminho quente: dois canais (posição sem garantia; blocos, inventário e chat confiáveis),
+      versão do protocolo e do build no `HELLO` — build diferente não entra, com mensagem clara.
+- [ ] **O mundo chega ao convidado sem virar arquivo nele.** O convidado gera o terreno da seed
+      localmente (é determinístico) e o anfitrião manda **só os chunks que diferem da geração**.
+      Nada disso toca o IndexedDB do convidado; ao sair, some. (Limite honesto: a seed viaja para
+      o aparelho do convidado, porque é ela que evita mandar o mundo inteiro pela rede. O que o
+      jogador construiu só existe no anfitrião.)
+- [ ] **O anfitrião é a autoridade** (doc 12 §6): valida alcance, cadência, se o item existe no
+      inventário do convidado; mobs, tempo, clima, fluidos, circuito e fogo rodam só nele. O
+      convidado prevê o próprio movimento e o bloco que colocou, e corrige quando o anfitrião
+      discorda (doc 12 §5).
+- [ ] **O convidado é salvo no mundo do anfitrião**: `STORE_PLAYERS` já é chaveado por
+      `[worldId, playerId]` (`save/db.ts`). O convidado tem um `playerId` estável guardado nas
+      configurações do aparelho dele — ao voltar, ele reaparece onde saiu, com o que tinha. O
+      anfitrião salva no mesmo ritmo do save de hoje.
+- [ ] **Mais de um jogador no mundo**: o anel de chunks carregados, o nascimento de mobs, a mira
+      dos mobs, o sono (todos na cama) e os portais passam a olhar para uma lista de jogadores, e
+      não para um. **Com a sala fechada, a lista tem um jogador e o código faz o que faz hoje.**
+- [ ] **Ver o outro**: o boneco do jogador (acabamento pós-M7) com nome em cima, interpolado com
+      100 ms de atraso (doc 12 §5); item na mão; golpe e dano entre jogadores **desligado por
+      padrão** (opção da sala).
+- [ ] **Chat** curto, com teclado virtual no celular, e as mensagens de entrou/saiu.
+- [ ] **Caiu a rede**: o convidado volta ao título com aviso, e o anfitrião salva o convidado na
+      hora em que ele some. O anfitrião que fecha o jogo derruba a sala (não há migração de
+      anfitrião).
+
+**Critério de aceite:** celular e computador, na mesma rede, jogam juntos 30 min — um quebra, o
+outro vê em menos de 150 ms; o convidado sai, volta e está onde estava, com o mesmo inventário; o
+aparelho do convidado não tem nenhum dado do mundo depois de sair (conferido no IndexedDB). Num
+aparelho em outra rede (dados móveis), a ligação **não fecha**. **O jogo sem sala aberta mede o
+mesmo de antes:** bundle inicial igual (o código de rede é pedaço à parte), `tests/perf.test.ts` e
+o tick de 20 mobs sem regressão, e o T0 com o anfitrião e um convidado **acima de 30 FPS**.
+
+---
+
+## M21 — Mods ⬜
+
+> Conteúdo e comportamento que o jogador liga e desliga num menu. O fluxo pedido: o usuário pede
+> (*"crie um mod que adicione armas"*), o mod é escrito aqui, no repositório, e aparece na tela
+> **Mods** para ligar ou desligar.
+>
+> **O ponto fundamental, nas palavras do pedido:** *"sem o usuario ativar mod algum, o jogo
+> continuará super leve e performatico exatamente como é hoje"*. Todo o desenho abaixo existe para
+> que essa frase vire **teste que falha o build**, e não promessa.
+
+**O que um mod é:** uma pasta `src/mods/<id>/` com um `mod.ts` que exporta um `ModDef` — nome,
+descrição, versão, e **linhas das mesmas tabelas de `src/data/`** (blocos, itens, receitas,
+fundição, mobs, texturas procedurais, sons, estruturas, conquistas, textos `pt` e `en`), mais,
+quando o conteúdo não basta, **sistemas** (um tick próprio, um uso de item, uma reação a bloco).
+Regra de código do projeto mantida: acrescentar arma é linha de tabela, não `case` novo. Mod não
+traz asset de fora — textura e som são gerados por código, como o resto (doc 13).
+
+**Quem escreve mod:** só o repositório. Mod é código TypeScript compilado junto com o jogo; não
+existe carregar arquivo de mod baixado da internet. Isso é o que mantém o jogo sem risco de
+segurança, e é o que foi pedido (o mod é criado aqui, a pedido). Mod de terceiro fica para o
+futuro, se um dia fizer sentido — e então com outro desenho (dado sem código).
+
+### Como "desligado custa zero" vira fato
+
+1. **Cada mod é um pedaço de bundle próprio** (`import()` no catálogo `src/mods/index.ts`). O
+   bundle inicial só leva o catálogo — id, nome, descrição, uma linha por mod. O código do mod é
+   baixado quando ele é ligado.
+2. **Ligar e desligar vale no boot**, como o idioma do M17 (*Aplicar agora* recarrega). Com zero
+   mods ligados, o boot pula a etapa inteira num único `if` — **nenhum `if (mod)` no tick, no
+   render, no mesher ou no worker**. Não existe lista de ganchos vazia sendo percorrida a cada
+   quadro: o sistema de um mod entra na mesma lista de sistemas de mundo (`game/worldsystems.ts`)
+   só quando ele está ligado; desligado, a lista é a de hoje, item por item.
+3. **As tabelas aceitam linhas novas só antes de congelar.** `BLOCKS`, `ITEMS`, receitas e o
+   resto ganham uma etapa de registro no boot, antes de qualquer consumidor derivar o que deriva
+   (atlas, folha de sprites, índices por nome, tabelas do mesher). Depois, congelam. Sem mod, a
+   tabela congelada é idêntica à de hoje — mesmo tamanho, mesma ordem, mesmos ids.
+4. **O worker recebe a lista de mods ligados** e importa os mesmos pedaços antes do primeiro
+   pedido de geração ou de malha (bloco de mod precisa de forma e de textura lá também).
+5. **O precache do service worker** leva só o bundle do jogo; o pedaço de um mod entra no cache
+   quando ele é ligado (para funcionar offline dali em diante).
+
+### Checklist
+
+- [ ] **Registro nas tabelas** (`mods/registry.ts`): a etapa antes de congelar, para cada tabela
+      de `src/data/`, com ids de mod alocados depois dos do jogo (há folga: o id de bloco tem 10
+      bits, `data/blocks.ts:makeState`) e **nome com prefixo do mod** (`armas:espada_longa`).
+- [ ] **Sistemas de mod**: pontos de extensão fixos e pequenos — um sistema de tick de mundo, um
+      uso de item (a tabela de uso do M13), um ouvinte de `world.setBlock` — montados no boot só
+      com o mod ligado. Qualquer ponto novo que um mod futuro pedir entra do mesmo jeito: montado
+      no boot, nunca consultado por quadro.
+- [ ] **Tela Mods** (título → *Mods*): lista do catálogo, chave liga/desliga, descrição, e o **custo
+      medido** de cada mod (bytes do pedaço; "pode pesar" para mod declarado pesado). *Aplicar*
+      recarrega. A tela em si também é pedaço à parte.
+- [ ] **Mods e mundos**: o `WorldMeta` guarda os mods com que o mundo foi jogado e o mapa
+      nome → id do conteúdo de mod (ids são alocados no boot, então o save precisa do nome para
+      voltar ao mesmo bloco). **Mundo sem mod não ganha campo nenhum** — o formato de hoje não
+      muda. Abrir um mundo com um mod que agora está desligado avisa antes; o que era do mod vira
+      um bloco/item "de mod ausente" que **guarda o id**, para que religar o mod devolva tudo
+      intacto. Nunca apagar dado de mod por estar desligado.
+- [ ] **Mods e M20** (quando os dois existirem): o anfitrião manda a lista de mods no `WELCOME`; o
+      convidado liga os mesmos para aquela sessão, sem mudar a escolha salva dele, e sai sem eles.
+      Mod que o build do convidado não tem = não entra, com a lista na mensagem.
+- [ ] **Um mod de demonstração pequeno** (`src/mods/exemplo/`: um bloco, um item, uma receita, um
+      sistema de tick barato) para provar o caminho de ponta a ponta. O mod de armas, e os
+      próximos, vêm a pedido, cada um com teste próprio.
+- [ ] **Receita para escrever mod** (seção no doc 15 ou comentário do catálogo): onde fica, o que
+      a tabela aceita, como testar, o que conta como "pesado".
+
+**Critério de aceite — o de desempenho falha o build:**
+
+- `npm run size` mede o **bundle inicial** separado dos pedaços de mod, e o bundle inicial com o
+  catálogo não pode crescer mais que o próprio catálogo (orçamento: **≤ 2 KB** gzip para a
+  infraestrutura inteira de mods que fica no pedaço principal).
+- Um teste liga o boot com zero mods e confere que **nenhum pedaço de mod é pedido**, e que as
+  tabelas congeladas, a lista de sistemas de mundo e as tabelas do mesher são **idênticas** às de
+  um boot sem a infraestrutura de mods.
+- `tests/perf.test.ts` roda sem mods, com os números de hoje e a mesma tolerância; nenhum orçamento
+  sobe.
+- O mod de demonstração: ligado, o bloco dele nasce, é quebrado, vai para o save e volta;
+  desligado, o mundo abre com o bloco "de mod ausente" no lugar; religado, o bloco volta.
+
+---
+
 ## Testes obrigatórios (a manter verde desde M1)
 
 | Tipo | O que cobrir |

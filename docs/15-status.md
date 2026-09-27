@@ -9,7 +9,10 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-25 19:11 — **três defeitos do teste de campo corrigidos** (§4): a
+**Última atualização:** 2026-09-27 02:09 — **dois marcos novos no roteiro, ainda não iniciados:
+M20 (multijogador só na rede local, celular com computador, sem servidor) e M21 (mods que se ligam
+e desligam num menu, com custo zero desligados)** — doc 14, doc 12 §2 revisto, §3 e §6 abaixo.
+Nenhum código mudou. Antes, 2026-09-25 19:11 — **três defeitos do teste de campo corrigidos** (§4): a
 dica das tábuas não andava (fechar a mochila com as tábuas no cursor as jogava no chão), a barra de
 durabilidade só existia com a mochila aberta (agora também na hotbar), e **a rachadura não aparecia
 nas faces laterais** de nenhum bloco (o cubo dela estava enrolado para dentro e o culling o
@@ -62,11 +65,15 @@ compartilhável).
 | **M17** Alcance | menu Idioma (doc 08 §3.11) com `en`, primeira hora guiada, seed compartilhável | ✅ concluído em 2026-09-25 | **não visto em aparelho** (visto no Chrome headless, em pt e en, desktop e celular emulado) |
 | **M18** Casa em ordem, 2ª volta | cinco módulos abaixo do teto, memória de áudio com folga, varredura de idioma pelo destino | ✅ concluído em 2026-09-25 | — |
 | **M19** Pontas soltas | enderman no End, dragão que quebra, sopra e morre devagar, ilhas de fora e portal de passagem, tint no WebGL1 | ✅ concluído em 2026-09-25 | **não visto em aparelho** (End visto no Chrome headless) |
+| **M20** Jogar junto na mesma rede | multijogador por WebRTC só na rede local, sinalização por QR, sem servidor; o mundo e os dados do convidado só no aparelho do anfitrião | ⬜ não iniciado | começa por uma **prova de conexão em dois aparelhos reais** (§3) |
+| **M21** Mods | mods escritos no repositório, cada um um pedaço de bundle próprio, ligados e desligados na tela Mods; **desligados custam zero** (teste que falha o build) | ⬜ não iniciado | — |
 
 **O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
 ele irá pesar muito o jogo e trazer muita complexidade por enquanto desnecessária"*. O
 [doc 12](12-multiplayer.md) continua normativo e o `world.setBlock(..., source)` continua
 preparado para ele (`source: 'network'`); o que não existe é implementação nem prazo.
+**Voltou como M20 em 2026-09-27**, por pedido do usuário, restrito à rede local e sem servidor (o
+doc 12 §2 foi revisto para isso). Continua sem implementação.
 
 Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ não iniciado
 
@@ -1998,6 +2005,32 @@ sopro, o vazio entre as ilhas, as ilhas com santuário, o portal de passagem de 
 raios, o portal de passagem de pé, a chegada numa ilha de fora com outras boiando no vazio, e o
 céu do End sem sol.
 
+### M20 e M21 — planejados ⬜ — 2026-09-27
+
+Pedido do usuário: *"Vamos criar dois novos marcos então, um será o multiplayer (…) e
+exclusivamente local (…) Outro marco (…) mods no jogo"*. Os dois estão escritos no doc 14, com
+checklist e critério de aceite; **nenhuma linha de código existe ainda.** O que a leitura do código
+mostrou ao desenhar, para quem for implementar conferir de novo:
+
+- **O que já ajuda o M20:** `world.setBlock` já recebe `source: 'network'` (`world/world.ts:16`);
+  `STORE_PLAYERS` já é chaveado por `[worldId, playerId]` (`save/db.ts:359`), então guardar o
+  convidado no mundo do anfitrião não pede formato novo; o terreno é determinístico pela seed, e só
+  a diferença viaja. Não existe nada de `RTCPeerConnection` nem de leitura de QR no código.
+- **O que o navegador não deixa (M20):** página web não abre porta nem anuncia sala na rede. Por
+  isso a sinalização é por QR na tela, e o "só na rede local" vem de ligar sem STUN/TURN. O maior
+  risco é de campo — mDNS no Android, Wi-Fi com isolamento de cliente, câmera de computador — e só
+  se mede com **dois aparelhos do usuário**, por isso o marco começa pela prova de conexão
+  (M20.0). Se ela falhar, a decisão volta para o usuário.
+- **O que o M21 precisa mudar:** as tabelas de `src/data/` são constantes montadas no import
+  (`data/blocks.ts:890`, `data/items.ts:656`), e o worker importa as dele
+  (`workers/chunk.worker.ts`). Mod precisa de uma etapa de registro no boot, antes de atlas,
+  sprites, índices e worker derivarem o que derivam — e depois congelar. Espaço de id há: o id de
+  bloco tem 10 bits (`makeState`). O `vite.config.ts` hoje não gera pedaço separado de nada fora o
+  worker; os mods serão os primeiros `import()`.
+- **A regra que atravessa os dois:** sem sala aberta e sem mod ligado, o bundle inicial, o tick e o
+  quadro ficam **iguais aos de hoje**. No M21 isso vira teste e orçamento (≤ 2 KB de infraestrutura
+  no pedaço principal; nenhum pedaço de mod pedido com zero mods; tabelas idênticas).
+
 ## 4. Correções fora de marco
 
 Bugs anteriores encontrados durante o M5 e já corrigidos — ficam registrados porque explicam
@@ -2396,6 +2429,14 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
 ---
 
 ## 6. Próximo passo recomendado
+
+0. **Dois marcos novos (2026-09-27): M20 e M21** (doc 14). Qual começar é escolha do usuário:
+   - **M21 (mods)** pode começar já e se valida inteiro aqui, com teste e navegador. A primeira
+     entrega é o registro nas tabelas com o teste de "zero mods = tabelas idênticas", antes da tela.
+   - **M20 (rede local)** começa pela **prova de conexão (M20.0)**, que precisa do usuário com um
+     celular e um computador na mesma rede Wi-Fi. Sem ela, o resto do M20 não deve ser escrito.
+   - O roteiro de celular do item 1 continua valendo para declarar o MVP, e não depende de nenhum
+     dos dois.
 
 1. **O roteiro de celular que fecha o MVP** (2026-09-25). O código de M0 a M19 está pronto; o que
    falta é ver no aparelho o que só foi visto em teste e no Chrome headless — M16, M17, M18 e M19

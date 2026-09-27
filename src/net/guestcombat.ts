@@ -16,8 +16,10 @@ import { HURT_CAUSES, MSG, PacketWriter, type PacketReader } from './protocol';
 export interface GuestCombat {
   /** `LOOT`: itens e XP do mob que o convidado matou, no chão daqui. */
   loot(r: PacketReader): void;
-  /** `HURT`: o dano que o anfitrião mediu, pelo `hurtPlayer` de sempre. */
+  /** `HURT`: o dano que o anfitrião mediu, pelo `hurtPlayer` de sempre, e o fogo. */
   hurt(r: PacketReader): void;
+  /** `SPLASH`: um frasco quebrou perto; o `onPotion` daqui mede e aplica. */
+  splash(r: PacketReader): void;
 }
 
 export function attachGuestCombat(
@@ -49,7 +51,13 @@ export function attachGuestCombat(
     },
     hurt(r) {
       const damage = r.f32(); const cause = HURT_CAUSES[r.u8()] ?? 'mob';
-      session.combat.hurtPlayer(damage, cause, r.f32(), r.f32());
+      const pushX = r.f32(); const pushZ = r.f32(); const fire = r.u16();
+      if (damage > 0) session.combat.hurtPlayer(damage, cause, pushX, pushZ);
+      if (fire > 0 && session.player.mode === 'survival') session.survival.ignite(fire);
+    },
+    splash(r) {
+      const item = r.u16(); const x = r.f32(); const y = r.f32(); const z = r.f32();
+      session.projectiles.onPotion?.(x, y, z, item);
     },
   };
 }

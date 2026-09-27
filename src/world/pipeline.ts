@@ -127,6 +127,14 @@ export class ChunkPipeline {
   renderDistance: number;
   private centerX = 0;
   private centerZ = 0;
+  /**
+   * Outros pontos que seguram colunas carregadas (M20: os convidados de uma
+   * sala, `[cx, cz, …]`), num raio pequeno. Sem sala, vazio — e cada laço
+   * abaixo sobre ele não roda. As colunas só das âncoras não viram malha:
+   * aqui ninguém olha para elas; elas existem para o mundo rodar lá.
+   */
+  private anchors: number[] = [];
+  anchorRadius = 3;
   private readonly packed: boolean;
   private readonly smoothLighting: boolean;
 
@@ -212,6 +220,30 @@ export class ChunkPipeline {
     this.centerZ = Number.NaN;
   }
 
+  /** Troca as âncoras (`[cx, cz, …]`): carrega em volta delas e solta o que sobrou. */
+  setAnchors(list: readonly number[]): void {
+    if (list.length === this.anchors.length && list.every((v, i) => v === this.anchors[i])) return;
+    this.anchors = list.slice();
+    this.enqueueRing();
+    this.unloadFarChunks();
+  }
+
+  /** Perto de alguma âncora (com a folga de `extra` colunas)? */
+  private nearAnchor(cx: number, cz: number, extra: number): boolean {
+    const a = this.anchors;
+    const limit = (this.anchorRadius + extra) ** 2;
+    for (let i = 0; i < a.length; i += 2) {
+      if ((cx - a[i]) ** 2 + (cz - a[i + 1]) ** 2 <= limit) return true;
+    }
+    return false;
+  }
+
+  /** Dentro do anel do jogador, onde há malha? */
+  private inRing(cx: number, cz: number): boolean {
+    const rd = this.renderDistance;
+    return (cx - this.centerX) ** 2 + (cz - this.centerZ) ** 2 <= rd * rd + rd;
+  }
+
   /** Recentra o pipeline na posição do jogador e reordena as filas. */
   setCenter(x: number, z: number): void {
     const cx = Math.floor(x / 16);
@@ -234,10 +266,32 @@ export class ChunkPipeline {
         const cx = this.centerX + dx;
         const cz = this.centerZ + dz;
         const key = chunkKey(cx, cz);
-        if (this.world.getChunk(cx, cz) !== undefined) continue;
+        const present = this.world.getChunk(cx, cz);
+        if (present !== undefined) {
+          // Carregada por uma âncora e agora no anel: falta a malha.
+          if (this.anchors.length > 0 && present.state === ChunkState.Generated) this.enqueueMeshAround(cx, cz);
+          continue;
+        }
         if (this.generating.has(key) || this.queuedKeys.has(key)) continue;
         this.queuedKeys.add(key);
         this.genQueue.push({ cx, cz, mask: 0, priority: dx * dx + dz * dz });
+      }
+    }
+    const a = this.anchors;
+    const ar = this.anchorRadius;
+    for (let i = 0; i < a.length; i += 2) {
+      for (let dz = -ar; dz <= ar; dz++) {
+        for (let dx = -ar; dx <= ar; dx++) {
+          if (dx * dx + dz * dz > ar * ar + ar) continue;
+          const cx = a[i] + dx;
+          const cz = a[i + 1] + dz;
+          const key = chunkKey(cx, cz);
+          if (this.world.getChunk(cx, cz) !== undefined) continue;
+          if (this.generating.has(key) || this.queuedKeys.has(key)) continue;
+          this.queuedKeys.add(key);
+          // Depois do anel do jogador: o que se vê vem primeiro.
+          this.genQueue.push({ cx, cz, mask: 0, priority: rd * rd + dx * dx + dz * dz });
+        }
       }
     }
     // Mais perto primeiro. Ordenar aqui é barato: só acontece ao trocar de chunk.
@@ -251,7 +305,7 @@ export class ChunkPipeline {
     this.world.forEachChunk((chunk) => {
       const dx = chunk.cx - this.centerX;
       const dz = chunk.cz - this.centerZ;
-      if (dx * dx + dz * dz > limit) doomed.push(chunk);
+      if (dx * dx + dz * dz > limit && !this.nearAnchor(chunk.cx, chunk.cz, 2)) doomed.push(chunk);
     });
     for (const chunk of doomed) {
       this.world.removeChunk(chunk.cx, chunk.cz);
@@ -492,7 +546,7 @@ export class ChunkPipeline {
     // Fora de alcance enquanto carregava: descarta em vez de guardar lixo.
     const dx = chunk.cx - this.centerX;
     const dz = chunk.cz - this.centerZ;
-    if (dx * dx + dz * dz > (this.renderDistance + 2) ** 2) return;
+    if (dx * dx + dz * dz > (this.renderDistance + 2) ** 2 && !this.nearAnchor(chunk.cx, chunk.cz, 2)) return;
 
     chunk.state = ChunkState.Generated;
     this.world.addChunk(chunk);
@@ -509,6 +563,7 @@ export class ChunkPipeline {
       for (let dx = -1; dx <= 1; dx++) {
         const column = this.world.getChunk(cx + dx, cz + dz);
         if (column === undefined || column.state !== ChunkState.Generated) continue;
+        if (this.anchors.length > 0 && !this.inRing(cx + dx, cz + dz)) continue;
         if (!this.hasAllNeighbors(cx + dx, cz + dz)) continue;
         let mask = 0;
         for (let sy = 0; sy < SECTIONS_PER_COLUMN; sy++) {

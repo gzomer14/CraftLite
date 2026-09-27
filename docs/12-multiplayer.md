@@ -76,7 +76,8 @@ Todo pacote: `u8 type | payload`. Usar `DataView`, nunca JSON no caminho quente.
 > - `SLEEP`/`SLEEP_STATE`/`WAKE`;
 > - `SIGN`.
 >
-> Detalhe no doc 15 §3, M20.
+> Na terceira volta (protocolo 3) entraram a dimensão no `MOVE`, no pedido de bloco e no de chunk,
+> `DIMENSION` (a sala segue o anfitrião) e `SPLASH` (frasco de poção). Detalhe no doc 15 §3, M20.
 
 ## 5. Predição e reconciliação
 

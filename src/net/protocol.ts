@@ -10,7 +10,7 @@
  * posição e mobs, onde um pacote velho não vale nada.
  */
 
-export const PROTOCOL = 2;
+export const PROTOCOL = 3;
 
 export const MSG = {
   /** Convidado → anfitrião: versão, conteúdo, nome, id estável, mods. */
@@ -40,8 +40,10 @@ export const MSG = {
   ATTACK: 0x31,
   /** Anfitrião → convidado: o que o mob que ele matou deixou (itens e XP). */
   LOOT: 0x32,
-  /** Anfitrião → convidado: dano de mob, flecha ou explosão, com o empurrão. */
+  /** Anfitrião → convidado: dano de mob, flecha ou explosão, com o empurrão e o fogo. */
   HURT: 0x33,
+  /** Anfitrião → convidado: um frasco quebrou em x, y, z (quem estiver perto bebe). */
+  SPLASH: 0x34,
   SAVE: 0x40,
   TIME: 0x50,
   /** Convidado → anfitrião: clicou na cama em x, y, z (`net/sleepsync.ts`). */
@@ -50,6 +52,11 @@ export const MSG = {
   SLEEP_STATE: 0x52,
   /** Anfitrião → convidado: todos dormiram; o tempo do mundo novo. */
   WAKE: 0x53,
+  /**
+   * Anfitrião → convidado: a sala está nesta dimensão, e o anfitrião aqui
+   * (`net/dimensionsync.ts`). O convidado atravessa junto.
+   */
+  DIMENSION: 0x54,
   /** Convidado → anfitrião: o texto. Anfitrião → convidado: quem falou (netId) e o texto. */
   CHAT: 0x60,
   /** Convidado → anfitrião: quero abrir o contêiner em x, y, z (`net/containersync.ts`). */

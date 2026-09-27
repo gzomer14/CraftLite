@@ -30,13 +30,14 @@ import { attachGuestCombat, type GuestCombat } from './guestcombat';
 import { GuestContainers } from './containersync';
 import { GuestSleep } from './sleepsync';
 import { SignSync } from './signsync';
+import { GuestDimension } from './dimensionsync';
 import { reactToNetworkBlock } from './blockreact';
 import { MobPuppets } from './mobsync';
 import { makeFollower } from './follower';
 import { activeModIds, localContent, playerId } from './identity';
 import { Link } from './link';
 import {
-  MOVE_FLYING, MOVE_SNEAK, MOVE_UNTARGETABLE, MSG, PROTOCOL, PacketReader, PacketWriter, readWelcome, writeHello,
+  MOVE_AWAY, MOVE_FLYING, MOVE_SNEAK, MOVE_UNTARGETABLE, MSG, PROTOCOL, PacketReader, PacketWriter, readWelcome, writeHello,
   type Welcome,
 } from './protocol';
 import type { Signal } from './signal';
@@ -69,6 +70,9 @@ export class GuestClient {
   private containers: GuestContainers | null = null;
   private sleep: GuestSleep | null = null;
   private signText: SignSync | null = null;
+  private dimension: GuestDimension | null = null;
+  /** A dimensão antes de o jogo estar de pé (a do save guardado no anfitrião). */
+  private startDim = 0;
   private puppets: MobPuppets | null = null;
   /** Mudanças locais do tick: `x, y, z, estado, anterior`. */
   private readonly outgoing: number[] = [];
@@ -130,11 +134,13 @@ export class GuestClient {
         case MSG.CHAT: this.onChat(r.u8(), cleanChat(r.str())); break;
         case MSG.LOOT: this.combat?.loot(r); break;
         case MSG.HURT: this.combat?.hurt(r); break;
+        case MSG.SPLASH: this.combat?.splash(r); break;
         case MSG.CONTAINERS: this.containers?.receive(r); break;
         case MSG.CONTAINER_GONE: this.containers?.gone(); break;
         case MSG.SLEEP_STATE: this.sleep?.state(r); break;
         case MSG.WAKE: this.sleep?.wake(r); break;
         case MSG.SIGN: this.signText?.apply(r); break;
+        case MSG.DIMENSION: this.dimension?.apply(r); break;
         case MSG.BYE: this.end(t('net.host_left')); break;
         default: break;
       }
@@ -164,6 +170,7 @@ export class GuestClient {
     if (m.saved !== '') {
       try {
         saved = JSON.parse(m.saved) as PlayerSave;
+        this.startDim = saved.dimension ?? 0;
       } catch {
         saved = null;
       }
@@ -183,7 +190,7 @@ export class GuestClient {
     const req = this.nextReq++;
     return new Promise((resolve) => {
       this.chunks.set(req, resolve);
-      this.link.send(this.w.reset(MSG.CHUNK_REQ).u32(req).i32(cx).i32(cz).view8(), true);
+      this.link.send(this.w.reset(MSG.CHUNK_REQ).u32(req).i32(cx).i32(cz).u8(this.currentDim()).view8(), true);
     });
   }
 
@@ -206,9 +213,15 @@ export class GuestClient {
     void decompressChunk(data).then((chunk) => resolve(lit(chunk)), () => resolve(null));
   }
 
+  private currentDim(): number {
+    return this.game?.world.dimension ?? this.startDim;
+  }
+
   private onBlocks(r: PacketReader, fact: boolean): void {
     if (this.game === null) return;
     const { world, session } = this.game;
+    // Blocos de outra dimensão (a sala está mudando): não são deste mundo.
+    if (fact && r.u8() !== world.dimension) return;
     const count = r.u16();
     this.applying = true;
     for (let n = 0; n < count; n++) {
@@ -223,7 +236,9 @@ export class GuestClient {
 
   private onMove(r: PacketReader): void {
     const netId = r.u8();
-    this.avatars?.move(netId, r.f32(), r.f32(), r.f32(), r.f32(), r.f32(), r.u8());
+    const x = r.f32(); const y = r.f32(); const z = r.f32(); const yaw = r.f32(); const pitch = r.f32();
+    const flags = r.u8(); const held = r.u16(); const dim = r.u8();
+    this.avatars?.move(netId, x, y, z, yaw, pitch, flags | (dim === this.currentDim() ? 0 : MOVE_AWAY), held);
   }
 
   private onJoin(netId: number, name: string): void {
@@ -263,6 +278,7 @@ export class GuestClient {
     };
     makeFollower(session);
     this.containers = new GuestContainers(session, (bytes) => this.link.send(bytes, true));
+    this.dimension = new GuestDimension(game);
     this.signText = new SignSync(session.signs, (bytes) => this.link.send(bytes, true));
     this.sleep = new GuestSleep(game, (bytes) => this.link.send(bytes, true), (totalTicks) => this.onTime(totalTicks));
     this.avatars = new Avatars(world, game.mobRenderer, game.entityAtlas, () => session.dayNight.dayFactor);
@@ -283,6 +299,7 @@ export class GuestClient {
       this.avatars.draw(alpha);
       tags.update(this.avatars.list, alpha);
     };
+    sceneFeed.extraItems = (items, alpha) => this.avatars?.drawItems(items, alpha);
     world.onBlockChange((change) => this.onLocalBlock(change));
     const base = session.tick.bind(session);
     session.tick = (): void => {
@@ -311,7 +328,8 @@ export class GuestClient {
     const safe = session.survival.isDead || p.mode !== 'survival';
     const flags = (p.sneaking ? MOVE_SNEAK : 0) | (p.flying ? MOVE_FLYING : 0) | (safe ? MOVE_UNTARGETABLE : 0);
     this.link.send(this.wFast.reset(MSG.MOVE).u8(0).f32(p.x).f32(p.y).f32(p.z)
-      .f32(p.yaw).f32(p.pitch).u8(flags).u16(session.inventory.held?.item ?? 0xffff).view8(), false);
+      .f32(p.yaw).f32(p.pitch).u8(flags).u16(session.inventory.held?.item ?? 0xffff)
+      .u8(game.world.dimension).view8(), false);
     if (++this.ticks % SAVE_EVERY === 0) this.sendSave();
   }
 
@@ -320,7 +338,7 @@ export class GuestClient {
     const p = this.game?.player;
     let at = 0;
     while (at < b.length) {
-      const w = this.w.reset(MSG.BLOCKS).f32(p?.x ?? 0).f32(p?.y ?? 0).f32(p?.z ?? 0);
+      const w = this.w.reset(MSG.BLOCKS).u8(this.currentDim()).f32(p?.x ?? 0).f32(p?.y ?? 0).f32(p?.z ?? 0);
       const countAt = w.length;
       w.u16(0);
       let count = 0;

@@ -244,7 +244,11 @@ try {
   // 9. O nome em cima do boneco: o convidado se afasta, o anfitrião olha para ele.
   await guest.avaliar(`(() => {
     const p = window.__craftlite.player;
-    p.setPosition(p.x + 6, p.y + 1, p.z);
+    p.setPosition(p.x - 3, p.y + 1, p.z + 2);
+    // Uma espada na mão: o boneco dele a mostra (item na mão, M20).
+    const inv = window.__craftlite.session.inventory;
+    inv.set(0, { item: window.__craftlite.items.get('iron_sword').id, count: 1, damage: 0 });
+    inv.selected = 0;
     return true;
   })()`);
   await esperar(800);
@@ -312,6 +316,45 @@ try {
     .catch(() => false);
   const luz = await host.avaliar(`window.__craftlite.world.getSkyLight(${poco[0]}, ${poco[1]}, ${poco[2]})`);
   passo('o fundo do poço cavado pelo convidado recebe a luz do céu no anfitrião', claro === true, `luz ${luz}`);
+
+  // 12b. Longe do anfitrião — além do anel dele —, o anfitrião segura o mundo
+  // em volta do convidado (âncora do pipeline): o bloco que ele põe lá vale.
+  const anel = await host.avaliar('window.__craftlite.pipeline.renderDistance');
+  const salto = (anel + 6) * 16;
+  await guest.avaliar(`(() => { const p = window.__craftlite.player; p.setPosition(p.x + ${salto}, 110, p.z); return true; })()`);
+  const longe = JSON.parse(await ate(guest, `(() => {
+    const { world, player } = window.__craftlite;
+    const x = Math.floor(player.x), z = Math.floor(player.z) + 2;
+    if (!world.isLoaded(x, z)) return false;
+    return JSON.stringify([x, z]);
+  })()`, 30000));
+  await ate(host, `window.__craftlite.world.isLoaded(${longe[0]}, ${longe[1]})`, 30000);
+  const alto = await guest.avaliar(`(() => {
+    const { world, player } = window.__craftlite;
+    const y = Math.floor(player.y);
+    world.setBlock(${longe[0]}, y, ${longe[1]}, __smoke.id('gold_block'), 'player');
+    return y;
+  })()`);
+  const valeu = await ate(host, `window.__craftlite.world.getBlock(${longe[0]}, ${alto}, ${longe[1]}) === __smoke.id('gold_block')`, 10000)
+    .catch(() => false);
+  passo('além do anel do anfitrião, o bloco do convidado vale (o anfitrião segura o mundo em volta dele)', valeu === true,
+    `${salto} blocos; anel do anfitrião ${anel} colunas`);
+
+  // 12c. O anfitrião vai ao Nether: a sala vai junto; e volta.
+  await host.avaliar("(() => { const p = window.__craftlite.player; window.__craftlite.session.travel.begin(Math.floor(p.x), Math.floor(p.z), 'nether'); return true; })()");
+  const noNether = await ate(guest, `(() => {
+    const { world, session, player } = window.__craftlite;
+    if (world.dimension !== 1 || session.travel.isTravelling) return false;
+    const h = window.__craftliteNet.guest().avatars.get(0);
+    return h !== undefined && Math.hypot(h.x - player.x, h.z - player.z) < 3 ? JSON.stringify([Math.round(player.x), Math.round(player.z)]) : false;
+  })()`, 60000).catch(() => false);
+  passo('o anfitrião atravessa para o Nether e o convidado aparece ao lado dele', noNether !== false, String(noNether));
+  await host.avaliar("(() => { const p = window.__craftlite.player; window.__craftlite.session.travel.begin(Math.floor(p.x), Math.floor(p.z), 'nether'); return true; })()");
+  const deVolta = await ate(guest, `(() => {
+    const { world, session } = window.__craftlite;
+    return world.dimension === 0 && !session.travel.isTravelling;
+  })()`, 60000).catch(() => false);
+  passo('e na volta, os dois na superfície', deVolta === true);
 
   // 13. O convidado guarda um item e sai pelo menu: fica no mundo do anfitrião.
   const idConvidado = await guest.avaliar(`(() => {

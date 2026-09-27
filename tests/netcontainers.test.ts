@@ -12,6 +12,7 @@ import { ITEM_BY_NAME, makeStack } from '../src/data/items';
 import { GuestContainers, HostContainers } from '../src/net/containersync';
 import { MSG, PacketReader, PacketWriter } from '../src/net/protocol';
 import { HostSleep } from '../src/net/sleepsync';
+import { GuestDimension, HostWorld } from '../src/net/dimensionsync';
 import { placeMulti } from '../src/world/multiblock';
 import type { GameHandles } from '../src/game/netgate';
 import { Furnace } from '../src/game/container';
@@ -178,5 +179,62 @@ describe('dormir na sala', () => {
     hs.request(guest, bedAt(4, GROUND + 1, 4));
     expect(sent).toEqual([MSG.SLEEP_STATE]);
     expect(host.dayNight.time).toBe(6000);
+  });
+});
+
+describe('a sala segue o anfitrião entre dimensões', () => {
+  const NETHER = 1;
+
+  it('convidado noutra dimensão recebe DIMENSION com a posição do anfitrião; na mesma, vira âncora', () => {
+    const host = session();
+    host.world.dimension = NETHER;
+    const anchors: number[][] = [];
+    const sent: [string, number][] = [];
+    const game = {
+      session: host, world: host.world, player: host.player,
+      pipeline: { setAnchors: (list: readonly number[]) => { anchors.push(list.slice()); } },
+    } as unknown as GameHandles;
+    const a = { name: 'a', x: 40.5, y: 70, z: 8.5, dim: 0 };
+    const b = { name: 'b', x: 3.5, y: 70, z: 3.5, dim: NETHER };
+    const hw = new HostWorld(game, () => [a, b], (g, bytes) => { sent.push([g.name, bytes[0]]); });
+    for (let t = 0; t < 10; t++) hw.tick();
+    expect(sent).toEqual([['a', MSG.DIMENSION]]);
+    expect(anchors[anchors.length - 1]).toEqual([0, 0]);
+    // Não puxa de novo logo em seguida: a ida leva um tempo.
+    for (let t = 0; t < 10; t++) hw.tick();
+    expect(sent).toHaveLength(1);
+  });
+
+  it('o convidado atravessa, fica parado até o chão chegar e aparece onde o anfitrião está', () => {
+    const guest = session();
+    const game = { session: guest, world: guest.world, player: guest.player } as unknown as GameHandles;
+    const gd = new GuestDimension(game);
+    const r = new PacketReader(new PacketWriter().reset(MSG.DIMENSION).u8(NETHER).f32(40.5).f32(33).f32(8.5).view8().slice());
+    r.u8();
+    gd.apply(r);
+    expect(guest.world.dimension).toBe(NETHER);
+    expect(guest.travel.isTravelling).toBe(true);
+    expect(guest.travel.tick(0, 0, 0)).toBe(true);
+    // O chão do outro lado chega.
+    guest.world.addChunk(new ChunkColumn(2, 0));
+    expect(guest.travel.tick(0, 0, 0)).toBe(false);
+    expect(guest.travel.isTravelling).toBe(false);
+    expect([guest.player.x, guest.player.y, guest.player.z]).toEqual([40.5, 33, 8.5]);
+  });
+});
+
+describe('bichos em volta do convidado', () => {
+  it('o ciclo de spawn roda também em volta de cada convidado na mesma dimensão', () => {
+    const host = session();
+    const calls: number[][] = [];
+    host.spawner.runCycle = (_c, x, y, z) => { calls.push([x, y, z]); return 0; };
+    const game = {
+      session: host, world: host.world, player: host.player, pipeline: { setAnchors: () => undefined },
+    } as unknown as GameHandles;
+    const near = { x: 20.5, y: 64, z: 4.5, dim: 0 };
+    const away = { x: 1, y: 64, z: 1, dim: 1 };
+    const hw = new HostWorld(game, () => [near, away], () => undefined);
+    for (let t = 0; t < 40; t++) hw.tick();
+    expect(calls).toEqual([[20.5, 64, 4.5], [20.5, 64, 4.5]]);
   });
 });

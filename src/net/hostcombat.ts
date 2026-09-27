@@ -29,6 +29,10 @@ import { HURT_CAUSES, MOVE_UNTARGETABLE, MSG, PacketWriter, type PacketReader } 
 /** Meia largura do convidado para a flecha, como a do jogador daqui. */
 const HIT_RADIUS = 0.7;
 const GUEST_HEIGHT = 1.8;
+/** Fogo da bola do blaze, em ticks (o mesmo de `sessionwiring.ts`). */
+const IGNITE_TICKS = 100;
+/** Até onde o `SPLASH` vai: o convidado confere o raio de verdade. */
+const SPLASH_REACH = 8;
 /** Golpe de um convidado mais longe que isto do mob é recusado (arco incluído). */
 const ATTACK_RANGE = 64;
 
@@ -48,6 +52,7 @@ export class HostCombat {
   private readonly w = new PacketWriter(256);
   private baseHit: Hit | null = null;
   private baseExplode: ((x: number, y: number, z: number, power: number) => void) | null = null;
+  private basePotion: ((x: number, y: number, z: number, item: number) => void) | null = null;
 
   constructor(
     private readonly game: GameHandles,
@@ -62,6 +67,13 @@ export class HostCombat {
     this.baseHit = hit;
     projectiles.onHit = (x, y, z, damage, fromPlayer, flags) =>
       (!fromPlayer && this.arrowHitsGuest(x, y, z, damage, flags)) || (hit?.(x, y, z, damage, fromPlayer, flags) ?? false);
+    // O frasco da bruxa quebrou: quem estiver perto, aqui ou lá, bebe.
+    const potion = projectiles.onPotion;
+    this.basePotion = potion;
+    projectiles.onPotion = (x, y, z, item) => {
+      potion?.(x, y, z, item);
+      this.splash(x, y, z, item);
+    };
     const explode = combat.explodeAt.bind(combat);
     this.baseExplode = explode;
     combat.explodeAt = (x, y, z, power) => {
@@ -75,6 +87,7 @@ export class HostCombat {
     mobs.others = null;
     mobs.onHitOther = null;
     projectiles.onHit = this.baseHit;
+    projectiles.onPotion = this.basePotion;
     if (this.baseExplode !== null) combat.explodeAt = this.baseExplode;
   }
 
@@ -143,9 +156,18 @@ export class HostCombat {
     this.send(g, this.w.reset(MSG.LOOT).str(JSON.stringify(loot)).view8());
   }
 
-  private hurt(g: Guest | undefined, damage: number, cause: number, pushX: number, pushZ: number): void {
-    if (g === undefined || damage <= 0) return;
-    this.send(g, this.w.reset(MSG.HURT).f32(damage).u8(cause).f32(pushX).f32(pushZ).view8());
+  private hurt(g: Guest | undefined, damage: number, cause: number, pushX: number, pushZ: number, fire = 0): void {
+    if (g === undefined || (damage <= 0 && fire <= 0)) return;
+    this.send(g, this.w.reset(MSG.HURT).f32(damage).u8(cause).f32(pushX).f32(pushZ).u16(fire).view8());
+  }
+
+  /** O frasco: cada convidado perto mede a distância e bebe lá (`SPLASH`). */
+  private splash(x: number, y: number, z: number, item: number): void {
+    for (let k = 0; k < this.views.length; k++) {
+      const v = this.views[k];
+      if ((v.x - x) ** 2 + (v.y - y) ** 2 + (v.z - z) ** 2 > SPLASH_REACH * SPLASH_REACH) continue;
+      this.send(this.owners[k], this.w.reset(MSG.SPLASH).u16(item).f32(x).f32(y).f32(z).view8());
+    }
   }
 
   /** Flecha, bola de fogo ou frasco de mob no corpo de um convidado. */
@@ -157,12 +179,12 @@ export class HostCombat {
       const dy = y - (v.y + GUEST_HEIGHT * 0.5);
       const dz = z - v.z;
       if (Math.abs(dx) >= HIT_RADIUS || Math.abs(dz) >= HIT_RADIUS || Math.abs(dy) >= GUEST_HEIGHT * 0.5 + 0.2) continue;
-      // O frasco da bruxa não fere no golpe (o efeito é de quem o bebe) e a
-      // bola do blaze só queima: nenhum dos dois atravessa a rede ainda.
-      if ((flags & (FLAG_POTION | FLAG_IGNITES)) === 0) {
-        const length = Math.hypot(dx, dz) || 1;
-        this.hurt(this.owners[k], damage, HURT_CAUSES.indexOf('arrow'), (-dx / length) * 0.2, (-dz / length) * 0.2);
-      }
+      // O frasco não fere no golpe: quebra aqui, e o efeito vai pelo `SPLASH`.
+      if ((flags & FLAG_POTION) !== 0) return true;
+      const length = Math.hypot(dx, dz) || 1;
+      // A bola do blaze põe fogo, como no jogador daqui (`sessionwiring.ts`).
+      const fire = (flags & FLAG_IGNITES) !== 0 ? IGNITE_TICKS : 0;
+      this.hurt(this.owners[k], damage, HURT_CAUSES.indexOf('arrow'), (-dx / length) * 0.2, (-dz / length) * 0.2, fire);
       return true;
     }
     return false;

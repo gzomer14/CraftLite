@@ -12,6 +12,48 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-27 17:11 · M20, terceira volta: dimensões, mundo em volta do convidado, item na mão
+
+**Pedido:** *"Pode seguir com o que ainda falta"*.
+
+**Resultado:**
+- **A sala segue o anfitrião entre dimensões:** ele atravessa o portal e os convidados aparecem ao
+  lado dele. Quem renasce ou entra em outra dimensão é trazido para perto dele. O convidado não
+  atravessa sozinho (desvio consciente: seriam duas dimensões carregadas no anfitrião).
+- **Âncoras no pipeline:** raio 3 carregado no anfitrião em volta de cada convidado, sem malha. O
+  convidado constrói longe, e os mobs andam e nascem perto dele.
+- **Item na mão do boneco.**
+- **Fogo da bola do blaze e frasco da bruxa no convidado.**
+- **Protocolo 3.**
+
+Portões: 2398 testes; lint, build e tamanho verdes (jogo 308,2 KB; sala 16,8 KB). Smoke da sala
+com 19 passos; o passo do bloco a 288 blocos falha sem as âncoras (conferido). Os outros smokes
+verdes. Não visto em aparelho.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| + | `src/net/dimensionsync.ts` | a sala segue o anfitrião (`DIMENSION`); âncoras e spawn em volta de cada convidado |
+| ~ | `src/world/pipeline.ts` | `setAnchors`/`anchorRadius`: colunas seguras em volta de outros pontos, sem malha; 659 → 714 linhas |
+| ~ | `src/entity/spawn.ts` | `CATEGORIES` exportado |
+| ~ | `src/render/scenefeed.ts` | gancho `extraItems` |
+| ~ | `src/net/avatars.ts` | item na mão (`held`, `drawItems`) |
+| ~ | `src/net/hostcombat.ts` | fogo no `HURT`; `SPLASH` do frasco |
+| ~ | `src/net/guestcombat.ts` | fogo e frasco aplicados no convidado |
+| ~ | `src/net/protocol.ts` | protocolo 3: `DIMENSION`, `SPLASH`, dimensão em `MOVE`/`BLOCKS`/`CHUNK_REQ` |
+| ~ | `src/net/host.ts` | dimensão de cada convidado; chunks e blocos de qualquer dimensão; mobs só para quem está na mesma |
+| ~ | `src/net/guest.ts` | dimensão nos pedidos; `DIMENSION`; item na mão |
+| ~ | `src/net/follower.ts` | comentário: o portal é do anfitrião |
+| ~ | `tests/pipeline.test.ts` | âncoras: carrega longe sem malha, solta ao tirar, malha ao entrar no anel |
+| ~ | `tests/netcontainers.test.ts` | `DIMENSION` e âncora no anfitrião; o convidado atravessa e aparece; spawn perto do convidado |
+| ~ | `tests/netroom.test.ts` | formato novo dos pacotes; fogo, frasco, item na mão |
+| ~ | `scripts/smoke-room.mjs` | 19 passos: bloco além do anel do anfitrião, Nether e volta; espada na mão |
+| ~ | `docs/12-multiplayer.md`, `docs/14-roadmap.md` | protocolo 3; "mais de um jogador" feito, com o desvio do portal |
+| ~ | `docs/15-status.md` | data; §1; §2; §3 terceira volta; §5; §6 item 0 |
+| ~ | `docs/16-auditoria.md` | esta sessão |
+| ~ | `README.md` | terceira volta, testes |
+
+---
+
 ## 2026-09-27 16:48 · M20, segunda volta: relatos de campo e o multijogador completo
 
 **Pedido:** *"Testei aqui e funcionou perfeitamente a conexão, inclusive saindo e voltando não

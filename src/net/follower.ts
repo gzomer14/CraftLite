@@ -11,9 +11,9 @@
  * classe `Session` não ganha um `if (convidado)` em lugar nenhum, e quem joga
  * sozinho roda exatamente o código de antes.
  *
- * O que o convidado ainda não faz: atravessar portal (a sala é na
- * superfície). Baú e fornalha passam pelo anfitrião (`net/containersync.ts`),
- * e a cama pela sala (`net/sleepsync.ts`).
+ * O portal daqui não leva a lugar nenhum: a sala segue o anfitrião
+ * (`net/dimensionsync.ts`). Baú e fornalha passam pelo anfitrião
+ * (`net/containersync.ts`), e a cama pela sala (`net/sleepsync.ts`).
  */
 
 import { applyStructures } from '../game/sessionwiring';

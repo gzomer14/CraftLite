@@ -58,6 +58,8 @@ export class SceneFeed {
    * uma sala). Quem liga é o código de rede; sem sala, fica `null`.
    */
   extraEntities: ((alpha: number) => void) | null = null;
+  /** Itens de fora da sessão (M20: o que os outros jogadores têm na mão). */
+  extraItems: ((items: ItemRenderer, alpha: number) => void) | null = null;
   /** Fator de dia do quadro corrente, lido pelos callbacks abaixo. */
   private dayFactor = 1;
 
@@ -89,6 +91,7 @@ export class SceneFeed {
     itemRenderer.begin();
     session.items.forEach(this.addItem, alpha);
     session.projectiles.forEach(this.addThrown, alpha);
+    this.extraItems?.(itemRenderer, alpha);
     renderer.itemRenderer = itemRenderer;
 
     // Orbes de XP: um brilho verde por orbe no pool de partículas, em vez de

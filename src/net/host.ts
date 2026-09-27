@@ -36,12 +36,13 @@ import { HostCombat, type Loot } from './hostcombat';
 import { HostContainers } from './containersync';
 import { HostSleep } from './sleepsync';
 import { SignSync } from './signsync';
+import { HostWorld } from './dimensionsync';
 import { reactToNetworkBlock } from './blockreact';
 import { activeModIds, localContent } from './identity';
 import { Link } from './link';
 import { writeMobs } from './mobsync';
 import {
-  MOVE_AWAY, MOVE_FLYING, MOVE_SNEAK, MSG, PROTOCOL, PacketReader, PacketWriter, REFUSE,
+  MOVE_AWAY, MOVE_FLYING, MOVE_SNEAK, MOVE_UNTARGETABLE, MSG, PROTOCOL, PacketReader, PacketWriter, REFUSE,
   readHello, writeWelcome, type Hello,
 } from './protocol';
 import type { Signal } from './signal';
@@ -57,6 +58,8 @@ export interface Guest {
   playerId: string;
   link: Link;
   x: number; y: number; z: number;
+  /** A dimensão em que ele está (a sala segue o anfitrião: `net/dimensionsync.ts`). */
+  dim: number;
   /** Passou pelo `HELLO` e recebeu o `WELCOME`. */
   ready: boolean;
   record: PlayerSave | null;
@@ -95,10 +98,12 @@ export class HostRoom {
     this.combat = new HostCombat(game, (g, bytes) => this.send(g, bytes));
     this.containers = new HostContainers<Guest>(session, (g, bytes) => this.send(g, bytes), (g) => g);
     this.sleep = new HostSleep<Guest>(game, () => this.ready(), (g, bytes) => this.send(g, bytes));
+    this.worldSync = new HostWorld<Guest>(game, () => this.ready(), (g, bytes) => this.send(g, bytes));
   }
 
   private readonly containers: HostContainers<Guest>;
   private readonly sleep: HostSleep<Guest>;
+  private readonly worldSync: HostWorld<Guest>;
   private signText: SignSync | null = null;
 
   private readonly combat: HostCombat;
@@ -135,6 +140,7 @@ export class HostRoom {
       this.avatars.draw(alpha);
       this.tags?.update(this.avatars.list, alpha);
     };
+    sceneFeed.extraItems = (items, alpha) => this.avatars.drawItems(items, alpha);
     flow.roomOpen = true;
   }
 
@@ -153,10 +159,12 @@ export class HostRoom {
     this.unsubscribe?.();
     this.combat.uninstall();
     this.sleep.uninstall();
+    this.worldSync.uninstall();
     this.signText?.restore();
     this.signText = null;
     if (this.baseTick !== null) this.game.session.tick = this.baseTick;
     this.game.sceneFeed.extraEntities = null;
+    this.game.sceneFeed.extraItems = null;
     this.tags?.dispose();
     this.tags = null;
     this.chat?.dispose();
@@ -181,7 +189,7 @@ export class HostRoom {
     if (link === null) throw new Error('nenhum convite em aberto');
     this.pending = null;
     const guest: Guest = {
-      netId: 0, name: '', playerId: '', link, x: 0, y: 0, z: 0, ready: false, record: null,
+      netId: 0, name: '', playerId: '', link, x: 0, y: 0, z: 0, dim: DIM_OVERWORLD, ready: false, record: null,
     };
     link.onMessage = (data, reliable) => this.onMessage(guest, new Uint8Array(data), reliable);
     link.onClose = () => { void this.drop(guest); };
@@ -209,7 +217,7 @@ export class HostRoom {
       switch (type) {
         case MSG.MOVE: this.move(g, r); break;
         case MSG.BLOCKS: this.blocks(g, r); break;
-        case MSG.CHUNK_REQ: void this.chunk(g, r.u32(), r.i32(), r.i32()); break;
+        case MSG.CHUNK_REQ: void this.chunk(g, r.u32(), r.i32(), r.i32(), r.u8()); break;
         case MSG.SAVE: this.saved(g, r.str()); break;
         case MSG.CHAT: this.heard(g, cleanChat(r.str())); break;
         case MSG.ATTACK: this.combat.attack(g, r); break;
@@ -253,6 +261,7 @@ export class HostRoom {
     g.record = (await this.game.save?.loadPlayerRecord(g.playerId)) ?? this.memory.get(g.playerId) ?? null;
     if (g.record !== null) {
       g.x = g.record.x; g.y = g.record.y; g.z = g.record.z;
+      g.dim = g.record.dimension ?? DIM_OVERWORLD;
     }
     const { meta, session } = this.game;
     this.send(g, writeWelcome(this.w, {
@@ -294,12 +303,14 @@ export class HostRoom {
   private move(g: Guest, r: PacketReader): void {
     r.u8();
     const x = r.f32(); const y = r.f32(); const z = r.f32();
-    const yaw = r.f32(); const pitch = r.f32(); const flags = r.u8(); const held = r.u16();
-    g.x = x; g.y = y; g.z = z;
-    this.avatars.move(g.netId, x, y, z, yaw, pitch, flags);
-    this.combat.moved(g, flags, held);
+    const yaw = r.f32(); const pitch = r.f32(); const flags = r.u8(); const held = r.u16(); const dim = r.u8();
+    g.x = x; g.y = y; g.z = z; g.dim = dim;
+    // Noutra dimensão (a caminho, ou recém-renascido): nem boneco aqui, nem alvo.
+    const away = dim === this.game.world.dimension ? 0 : MOVE_AWAY | MOVE_UNTARGETABLE;
+    this.avatars.move(g.netId, x, y, z, yaw, pitch, flags | away, held);
+    this.combat.moved(g, flags | away, held);
     const out = this.wFast.reset(MSG.MOVE).u8(g.netId).f32(x).f32(y).f32(z).f32(yaw).f32(pitch).u8(flags)
-      .u16(held).view8();
+      .u16(held).u8(dim).view8();
     for (const other of this.guests) if (other !== g && other.ready) other.link.send(out, false);
   }
 
@@ -311,6 +322,7 @@ export class HostRoom {
    */
   private blocks(g: Guest, r: PacketReader): void {
     const { world } = this.game;
+    const dim = r.u8();
     g.x = r.f32(); g.y = r.f32(); g.z = r.f32();
     const count = r.u16();
     const deny = this.w.reset(MSG.BLOCK_DENY);
@@ -322,7 +334,8 @@ export class HostRoom {
       const valid = BLOCKS[state & 0x3ff] !== undefined;
       const dx = x + 0.5 - g.x; const dy = y + 0.5 - (g.y + 1.6); const dz = z + 0.5 - g.z;
       const near = dx * dx + dy * dy + dz * dz <= REACH * REACH;
-      const here = world.dimension === DIM_OVERWORLD && world.isLoaded(x, z);
+      // Pedido de outra dimensão (a sala mudou no meio): volta, sem ler o mundo daqui.
+      const here = dim === world.dimension && world.isLoaded(x, z);
       if (valid && near && here) {
         const before = world.getBlock(x, y, z);
         const spilled = this.spill(before, state, x, y, z);
@@ -365,14 +378,14 @@ export class HostRoom {
    * meio-tempo chegaria antes do chunk e se perderia. Fora da memória: sai do
    * banco já comprimido. Nunca modificado: nada, e o convidado gera da seed.
    */
-  private async chunk(g: Guest, req: number, cx: number, cz: number): Promise<void> {
+  private async chunk(g: Guest, req: number, cx: number, cz: number, dim: number): Promise<void> {
     const { world, save } = this.game;
     const reply = (kind: number, data: Uint8Array | null): void => {
       const w = this.w.reset(MSG.CHUNK).u32(req).u8(kind);
       if (data !== null) w.bytes(data);
       this.send(g, w.view8());
     };
-    if (world.dimension === DIM_OVERWORLD) {
+    if (world.dimension === dim) {
       const column = world.getChunk(cx, cz);
       if (column !== undefined) {
         reply(column.modified ? 1 : 0, column.modified ? serializeChunk(column) : null);
@@ -380,7 +393,7 @@ export class HostRoom {
         return;
       }
     }
-    const stored = save === null ? undefined : await save.loadChunkData(DIM_OVERWORLD, cx, cz);
+    const stored = save === null ? undefined : await save.loadChunkData(dim, cx, cz);
     reply(stored === undefined ? 0 : 2, stored ?? null);
   }
 
@@ -428,6 +441,7 @@ export class HostRoom {
     this.combat.refresh(this.ready());
     this.containers.close(g);
     this.sleep.left(g);
+    this.worldSync.left(g);
     this.avatars.remove(g.netId);
     for (const other of this.ready()) this.send(other, this.w.reset(MSG.LEAVE).u8(g.netId).view8());
     if (g.ready) this.chat?.add(null, `${g.name} — ${t('net.left')}`);
@@ -439,7 +453,7 @@ export class HostRoom {
   // --- tick ------------------------------------------------------------------------
 
   private onBlock(change: BlockChange): void {
-    if (change.source === 'gen' || this.game.world.dimension !== DIM_OVERWORLD) return;
+    if (change.source === 'gen') return;
     if (this.guests.length === 0) return;
     // O lote sai assim que a tarefa em curso termina, e não no fim do tick:
     // até 50 ms a menos entre pôr o bloco e o outro ver. Uma rajada dentro da
@@ -457,17 +471,19 @@ export class HostRoom {
     this.flushBlocks();
     this.containers.tick();
     this.sleep.tick();
+    this.worldSync.tick();
     this.ticks++;
     const { world, player, session } = this.game;
-    const home = world.dimension === DIM_OVERWORLD;
-    const flags = (player.sneaking ? MOVE_SNEAK : 0) | (player.flying ? MOVE_FLYING : 0) | (home ? 0 : MOVE_AWAY);
+    const flags = (player.sneaking ? MOVE_SNEAK : 0) | (player.flying ? MOVE_FLYING : 0)
+      | (session.travel.isTravelling ? MOVE_AWAY : 0);
     const move = this.wFast.reset(MSG.MOVE).u8(0).f32(player.x).f32(player.y).f32(player.z)
-      .f32(player.yaw).f32(player.pitch).u8(flags).u16(session.inventory.held?.item ?? 0xffff).view8();
+      .f32(player.yaw).f32(player.pitch).u8(flags).u16(session.inventory.held?.item ?? 0xffff)
+      .u8(world.dimension).view8();
     for (const g of this.guests) if (g.ready) g.link.send(move, false);
     for (const g of this.guests) {
       if (!g.ready) continue;
-      // Fora da superfície, os mobs daqui não são os da sala: some tudo.
-      if (home) g.link.send(writeMobs(this.wFast, session.mobs.store, g.x, g.z), false);
+      // Noutra dimensão, os mobs daqui não são os dele: some tudo.
+      if (g.dim === world.dimension) g.link.send(writeMobs(this.wFast, session.mobs.store, g.x, g.z), false);
       else g.link.send(this.wFast.reset(MSG.MOBS).u8(0).view8(), false);
     }
     if (this.ticks % TIME_EVERY === 0) {
@@ -483,7 +499,7 @@ export class HostRoom {
       if (!g.ready) continue;
       let at = 0;
       while (at < b.length) {
-        const w = this.w.reset(MSG.BLOCKS);
+        const w = this.w.reset(MSG.BLOCKS).u8(this.game.world.dimension);
         const countAt = w.length;
         w.u16(0);
         let count = 0;

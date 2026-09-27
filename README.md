@@ -53,7 +53,9 @@ entraram:
 - dormir juntos;
 - texto de placa.
 
-A sala segue só na superfície (doc 15 §5).
+Na terceira volta, a sala passou a seguir o anfitrião entre dimensões: ele atravessa o portal e
+todos vão junto. O anfitrião mantém o mundo rodando em volta de cada convidado, e o boneco mostra
+o item na mão.
 
 - **M0 — esqueleto:** Vite + TypeScript strict, renderer WebGL2 próprio com fallback WebGL1,
   detecção de tier, loop de 20 Hz com interpolação, gerador procedural de texturas alimentando um
@@ -187,13 +189,13 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 2389 testes (vitest)
+npm test           # 2398 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
 npm run smoke      # abre o jogo num Chrome headless e joga o roteiro do doc 14 (precisa do build)
 npm run smoke:mods # liga e desliga o mod de exemplo e confere que o jogo sem mod baixa um arquivo só
 npm run smoke:net  # dois Chrome se ligam pela página de prova de rede (rede.html)
-npm run smoke:room # dois Chrome jogam juntos: sala, blocos, bonecos, nome, chat, baú, mobs, convidado salvo no anfitrião
+npm run smoke:room # dois Chrome jogam juntos: sala, blocos, nome, chat, baú, mobs, Nether, convidado salvo no anfitrião
 npm run smoke:camera # o leitor de QR próprio lê o QR da sala por uma webcam falsa
 npm run icons      # regenera os ícones do PWA
 ```
@@ -274,7 +276,7 @@ src/
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      2389 testes, incluindo orçamento de performance e de luz
+tests/                      2398 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios

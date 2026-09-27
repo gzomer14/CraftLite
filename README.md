@@ -39,9 +39,8 @@ ligado, a página baixa o mesmo arquivo único de antes — o build e um smoke t
 (`npm run smoke:mods`) cobram isso —, e o primeiro mod, o de exemplo, traz um cristal que brilha e
 cura quem fica em cima. O **M20**, multijogador só na rede local (celular com computador, sem
 servidor), começou pela prova de conexão: a página `rede.html` liga dois aparelhos trocando um QR ou
-um código em texto e mede a ligação. Ela já liga dois navegadores na mesma máquina
-(`npm run smoke:net`); o resto do M20 espera o teste num celular e num computador de verdade (doc 15
-§6).
+um código em texto e mede a ligação. Ela passou em aparelho em 2026-09-27: celular e computador na mesma
+rede se ligaram em ~0,1 s, com ~4,5 ms de ida e volta; o multijogador no jogo vem em seguida.
 
 - **M0 — esqueleto:** Vite + TypeScript strict, renderer WebGL2 próprio com fallback WebGL1,
   detecção de tier, loop de 20 Hz com interpolação, gerador procedural de texturas alimentando um

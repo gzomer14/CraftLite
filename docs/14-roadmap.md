@@ -570,7 +570,7 @@ O que dá para fazer sem servidor:
 
 ### Checklist
 
-- [ ] **M20.0 — Prova de conexão, antes de tudo.** Uma página de teste escondida (sem jogo) que
+- [x] **M20.0 — Prova de conexão, antes de tudo.** Uma página de teste escondida (sem jogo) que
       liga um celular Android e um computador na mesma rede Wi-Fi com `iceServers: []`, troca de
       descrição por QR nos dois sentidos, e mede ida e volta de 1000 mensagens. **Validar no
       aparelho do usuário:** Chrome Android ↔ Chrome/Edge no computador, e se der, Firefox. Riscos a
@@ -584,6 +584,11 @@ O que dá para fazer sem servidor:
       mensagens no canal rápido e a velocidade com 4 MB, e escreve um relatório para copiar.
       `npm run smoke:net` liga dois Chrome na mesma máquina pela página, com e sem mDNS. O que
       falta é o que só o usuário pode fazer: rodar em dois aparelhos numa rede Wi-Fi de verdade.
+      **Passou em aparelho em 2026-09-27:** celular Android (Chrome 154) e computador na mesma rede,
+      nos dois sentidos. A ligação fechou **83 ms** (computador anfitrião) e **161 ms** (celular
+      anfitrião) depois do último código; ida e volta de 4,4–4,6 ms na mediana, 0 de 300 pacotes
+      rápidos perdidos, 3,2–4,8 MB/s. O caminho foi o endereço real do celular (a permissão da
+      câmera revela o IP) ↔ o computador, que ficou escondido atrás do mDNS. O M20 segue.
 - [ ] **A sinalização compacta** (`net/pairing.ts`): descrição reduzida ao que importa (chave
       ICE, impressão digital DTLS, candidatos) em ~100 bytes, com versão e verificação. Leitor de
       QR **escrito aqui** (zero dependência, doc 13), com `BarcodeDetector` quando o aparelho tem.

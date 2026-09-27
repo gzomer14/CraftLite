@@ -12,6 +12,27 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-27 14:11 · A prova de conexão do M20 passou em aparelho
+
+**Pedido:** o usuário rodou a página `rede.html` num celular e num computador — *"Deu certo também
+com esse outro caminho"* — e mandou os dois relatórios.
+
+**Resultado:** só registro. Ligou nos dois sentidos, 83 ms e 161 ms depois do último código; ida e
+volta de ~4,5 ms, 0/300 perdidos, 3,2–4,8 MB/s; caminho pelo IP real do celular (permissão de
+câmera) com o computador escondido atrás do mDNS. O `checking` antes do último código era o
+computador já batendo na porta, não demora. O M20 segue. O PR #2 foi mesclado; atualizar o branch
+para a ponta da `main` foi negado pelo classificador de permissões e ficou como estava (mesmo
+conteúdo da `main`). Portões verdes, sem mudança.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| ~ | `docs/14-roadmap.md` | M20.0 ✅ com os números da prova |
+| ~ | `docs/15-status.md` | data; §1; §3 (tabela da prova e leituras); §5; §6 item 0 |
+| ~ | `docs/16-auditoria.md` | esta sessão |
+| ~ | `README.md` | a prova passou em aparelho |
+
+---
+
 ## 2026-09-27 03:10 → 04:00 · M20.0: a prova de conexão
 
 **Pedido:** *"Agora vamos partir para implementação do M20 Multijogador"*.

@@ -9,7 +9,10 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-27 04:00 — **M20 começou pela prova de conexão (M20.0).** A página
+**Última atualização:** 2026-09-27 14:11 — **A prova de conexão do M20 passou em aparelho.**
+Celular Android e computador na mesma rede se ligaram direto, sem servidor, nos dois sentidos, em
+0,1–0,2 s depois do último código; ida e volta de ~4,5 ms, nenhum pacote rápido perdido, 3–5 MB/s
+(§3, M20). O M20 segue como está no doc 14. Antes, 04:00 — **M20 começou pela prova de conexão (M20.0).** A página
 `rede.html` liga dois aparelhos sem servidor, trocando um QR ou um código em texto, e mede a
 ligação; dois Chrome na mesma máquina se ligaram por ela, com e sem mDNS (`npm run smoke:net`). **O
 que decide o resto do M20 é o usuário rodá-la num celular e num computador na mesma rede Wi-Fi** —
@@ -71,7 +74,7 @@ compartilhável).
 | **M17** Alcance | menu Idioma (doc 08 §3.11) com `en`, primeira hora guiada, seed compartilhável | ✅ concluído em 2026-09-25 | **não visto em aparelho** (visto no Chrome headless, em pt e en, desktop e celular emulado) |
 | **M18** Casa em ordem, 2ª volta | cinco módulos abaixo do teto, memória de áudio com folga, varredura de idioma pelo destino | ✅ concluído em 2026-09-25 | — |
 | **M19** Pontas soltas | enderman no End, dragão que quebra, sopra e morre devagar, ilhas de fora e portal de passagem, tint no WebGL1 | ✅ concluído em 2026-09-25 | **não visto em aparelho** (End visto no Chrome headless) |
-| **M20** Jogar junto na mesma rede | multijogador por WebRTC só na rede local, sinalização por QR, sem servidor; o mundo e os dados do convidado só no aparelho do anfitrião | 🚧 **M20.0 construída** (página `rede.html`) | **esperando o teste em dois aparelhos do usuário** (§6) antes do resto |
+| **M20** Jogar junto na mesma rede | multijogador por WebRTC só na rede local, sinalização por QR, sem servidor; o mundo e os dados do convidado só no aparelho do anfitrião | 🚧 **M20.0 passou em aparelho** (celular ↔ computador, nos dois sentidos) | o jogo multijogador em si (§6) |
 | **M21** Mods | mods escritos no repositório, cada um um pedaço de bundle próprio, ligados e desligados na tela Mods; **desligados, a página baixa um arquivo só, o de antes** (teste e build cobram); mod de exemplo | ✅ concluído em 2026-09-27 | **não visto em aparelho** (visto no Chrome headless); mods e M20 esperam o M20 |
 
 **O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
@@ -2136,6 +2139,30 @@ sinalização compacta e o SDP remontado funcionam. **Não prova** a rede Wi-Fi:
 isolamento de cliente no roteador, Chrome do Android e navegador do computador conversando — é o
 que o teste do usuário responde.
 
+**A prova em aparelho (2026-09-27), relatórios do usuário.** Celular Android 10 (Chrome 154, com
+câmera) e computador na mesma rede Wi-Fi:
+
+| | Computador anfitrião | Celular anfitrião |
+|---|---|---|
+| Ligou depois do último código | 83 ms | 161 ms |
+| Ida e volta, mediana / p95 | 4,6 / 8,5 ms | 4,4 / 7,4 ms |
+| Canal rápido perdido | 0 / 300 | 0 / 300 |
+| Velocidade | 4,75 MB/s | 3,19 MB/s |
+| Caminho | celular `host`/IPv6 ↔ computador `prflx` | o mesmo |
+| Códigos | oferta 103 B, resposta 117 B | oferta 117 B, resposta 103 B |
+
+Três leituras para o desenho do M20:
+
+- **O caminho foi o endereço real do celular.** O Chrome só mostra o IP à página que tem permissão
+  de câmera ou microfone; o celular tinha (leu o QR), o computador não, e ficou atrás do nome mDNS
+  — que ninguém precisou resolver: o computador bateu no IPv6 do celular e virou candidato `prflx`.
+  **Funciona sempre que pelo menos um lado usou a câmera.** Não testado: nenhum lado com câmera
+  (dois computadores digitando o código), que depende de o mDNS resolver na rede.
+- **O `checking` que aparece antes do último código não é demora:** quem já tem o código do outro
+  começa a bater na porta enquanto o outro ainda está lendo. A ligação fecha em ~0,1 s depois.
+- **Folga de sobra:** 4,5 ms de ida e volta contra 50 ms de tick, e um chunk modificado (poucos
+  KB) atravessa em milissegundos.
+
 **O que já ajudava, conferido ao desenhar:** `world.setBlock` já recebe `source: 'network'`
 (`world/world.ts:16`); `STORE_PLAYERS` já é chaveado por `[worldId, playerId]` (`save/db.ts:359`);
 o terreno é determinístico pela seed, e só a diferença viaja. O M21 deixou o caminho de "pedaço à
@@ -2341,7 +2368,9 @@ pistão —, e o da tela, a grade de slots de um lado e os painéis do outro. N�
 
 **Pendências abertas em 2026-09-27 (M20.0):**
 
-- **A prova de conexão não rodou em aparelho.** É a pendência que segura o M20 inteiro (§6).
+- ~~A prova de conexão não rodou em aparelho~~ — **passou em 2026-09-27** (§3).
+- **Nenhum lado com câmera** (dois computadores digitando o código) não foi testado: sem a
+  permissão de câmera, os dois escondem o IP atrás do mDNS.
 - **Computador sem `BarcodeDetector` não lê QR** (Chrome no Windows e no Linux, Firefox): digita ou
   cola o código de 119–138 caracteres. Se a prova passar, entra um leitor de QR próprio — ou um
   código de resposta mais curto.
@@ -2568,19 +2597,11 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
 
 ## 6. Próximo passo recomendado
 
-0. **A prova de conexão do M20 em dois aparelhos (2026-09-27).** É o que libera o resto do M20.
-   - **Onde abrir:** `https://gzomer14.github.io/CraftLite/rede.html`, depois que o branch entrar na
-     `main` (o Pages só publica a `main`). HTTPS é o que libera a câmera. Sem publicar: `npm run dev`
-     no computador e, no celular, `http://<ip-do-computador>:5173/rede.html` — funciona, mas sem
-     câmera (HTTP não é contexto seguro), só com o código em texto.
-   - **O roteiro:** celular e computador **na mesma rede Wi-Fi**. Primeiro com o computador
-     abrindo a sala: o celular lê o QR da tela; o computador digita ou cola a resposta (dá para o
-     celular copiar o código e mandar para si mesmo por mensagem). Depois ao contrário, com o
-     celular abrindo a sala. Se der, uma terceira vez com dois celulares, que leem o QR um do outro.
-   - **O que mandar de volta:** o **relatório** dos dois aparelhos (botão *Copiar*), dê certo ou
-     não. Se não ligar, dizer também se a rede é de visitante e se algum aparelho usa VPN.
-   - **O que decide:** ligou → o M20 segue como está no doc 14. Não ligou em nenhuma combinação → o
-     marco para e a escolha volta ao usuário (doc 14, M20.0).
+0. **O M20 no jogo (a prova passou em 2026-09-27).** O checklist do doc 14 a partir de *Abrir sala
+   a partir do mundo*, reusando `src/net/`. Decisões propostas ao usuário depois da prova: o
+   **pareamento lembrado** (dois aparelhos que já se ligaram uma vez: da próxima, o convidado só
+   lê o QR) e o **leitor de QR próprio** para computador sem `BarcodeDetector` (sem digitar
+   código; e a permissão da câmera ainda revela o IP do computador).
    - **Mods a pedido** continuam possíveis a qualquer momento (receita no §3, M21).
    - **No celular, o M21:** abrir o PWA sem mod e **offline** (o boot e o precache mudaram), ligar
      o Exemplo na tela Mods, pôr um Cristal de Luz de noite, desligar.

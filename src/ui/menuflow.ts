@@ -17,12 +17,15 @@ import { clearPack, decodeImage, loadPack, readPack, savePack } from '../render/
 import { WORLD_HEIGHT } from '../world/chunk';
 import { OptionsScreen } from './screens/options';
 import { PacksScreen, type PackSummary } from './screens/packs';
+import { ModsScreen, modName } from './screens/mods';
+import { MOD_CATALOG, readEnabledMods, writeEnabledMods } from '../mods/catalog';
+import { missingMods } from '../mods/worldmods';
 import { TitleScreen } from './screens/title';
 import { WorldsScreen } from './screens/worlds';
 import type { SettingsStore } from '../game/settings';
 import type { Keybinds } from '../input/keybinds';
 import type { Gamepads } from '../input/gamepad';
-import { t } from '../core/i18n';
+import { t, tf } from '../core/i18n';
 
 export interface MenuFlowCallbacks {
   /** Chamado quando o jogador escolhe um mundo para jogar. */
@@ -35,6 +38,7 @@ export class MenuFlow {
   private readonly worlds: WorldsScreen;
   private readonly options: OptionsScreen;
   private readonly packs: PacksScreen;
+  private readonly mods: ModsScreen;
   /** Mundos em memória, quando não há banco. */
   private readonly transient: WorldMeta[] = [];
 
@@ -48,6 +52,7 @@ export class MenuFlow {
     this.worlds = new WorldsScreen({
       list: () => this.listWorlds(),
       play: (meta) => {
+        if (!this.modsReady(meta)) return;
         this.hideAll();
         callbacks.start(meta);
       },
@@ -74,6 +79,11 @@ export class MenuFlow {
       },
     });
 
+    this.mods = new ModsScreen(() => {
+      this.mods.hide();
+      this.title.show();
+    });
+
     this.title = new TitleScreen({
       onPlay: () => {
         this.title.hide();
@@ -87,12 +97,16 @@ export class MenuFlow {
         this.title.hide();
         void this.packs.show();
       },
+      onMods: () => {
+        this.title.hide();
+        this.mods.show();
+      },
     });
   }
 
   get isOpen(): boolean {
     return this.title.isOpen || this.worlds.isOpen || this.options.isOpen
-      || this.packs.isOpen;
+      || this.packs.isOpen || this.mods.isOpen;
   }
 
   showTitle(): void {
@@ -109,6 +123,28 @@ export class MenuFlow {
     this.worlds.hide();
     this.options.hide();
     this.packs.hide();
+    this.mods.hide();
+  }
+
+  /**
+   * O mundo pede mods que não estão ligados (M21): oferece ligar e recarregar.
+   * Não abre sem eles — ver `mods/worldmods.ts`.
+   */
+  private modsReady(meta: WorldMeta): boolean {
+    const missing = missingMods(meta.mods);
+    if (missing.length === 0) return true;
+    const known = MOD_CATALOG.filter((info) => missing.includes(info.id));
+    if (known.length < missing.length) {
+      alert(tf('mods.world_unknown', missing.filter((id) => !known.some((i) => i.id === id)).join(', ')));
+      return false;
+    }
+    if (confirm(tf('mods.world_needs', known.map(modName).join(', ')))) {
+      const enabled = readEnabledMods();
+      writeEnabledMods(MOD_CATALOG.filter((i) => enabled.includes(i.id) || missing.includes(i.id))
+        .map((i) => i.id));
+      location.reload();
+    }
+    return false;
   }
 
   // --- pacote de texturas (M7) ---------------------------------------------

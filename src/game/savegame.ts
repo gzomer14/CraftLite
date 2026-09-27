@@ -30,6 +30,7 @@ import type { Session, VehicleRecord } from './session';
 import { encodeRegion } from './worldmap';
 import type { Marker } from './markers';
 import type { ItemStack } from '../data/items';
+import { modsToRecord } from '../mods/worldmods';
 
 /** Id do jogador local. O multiplayer do M7 vai usar outros (doc 12). */
 export const LOCAL_PLAYER = 'local';
@@ -359,6 +360,8 @@ export class SaveGame {
       this.meta.gameMode = this.player.mode;
       this.meta.villageBans = this.session.villages.saveBans();
       this.meta.end = this.session.dragonFight.snapshot();
+      const mods = modsToRecord();
+      if (mods !== undefined) this.meta.mods = mods;
       await this.manager.flush();
       await this.manager.savePlayer(this.snapshot());
       await this.manager.saveTiles(this.tileRecords());

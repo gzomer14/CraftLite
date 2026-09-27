@@ -12,6 +12,64 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-27 02:15 → 03:07 · M21: mods
+
+**Pedido:** *"Pode começar pelo M21, os mods"*.
+
+**Resultado:** M21 fechado. Tela **Mods** no título; mod de exemplo com o **Cristal de Luz** (brilha
+como pedra luminosa, cura quem fica em cima) e o **Fragmento de Cristal**. Sem mod ligado, a página
+baixa **um** arquivo de código, o mesmo de antes (`npm run smoke:mods`); as tabelas saem idênticas
+(`tests/mods.test.ts`), e o build reprova se o pedaço principal passar a importar outro arquivo
+(testado com um vazamento de propósito). Custo sem mod: +2,5 KB (302,2 → 304,7) e +13 ms na
+abertura em 3G rápido, medido lado a lado. Desvios registrados no doc 14: ids fixos por faixa no
+lugar de alocação no boot; o mundo não abre sem os mods que pede, no lugar do bloco "de mod
+ausente"; a tela fica no pedaço principal. **Defeito achado e corrigido no fechamento:** com mod
+ligado e sem rede, a página ficava em branco (o ponto de entrada dos mods não está no precache);
+agora volta ao jogo sem mod (`tests/bootchooser.test.ts`). 2316 testes, lint, build, smoke (7) e
+smoke dos mods (6) verdes.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| **Mods** | | |
+| + | `src/mods/types.ts` | `ModDef`, `ModContext`, `TexOps`, faixas de id (blocos 768–1023, itens 4096–8191) |
+| + | `src/mods/active.ts` | `ACTIVE_MODS` lido de `globalThis.__CRAFTLITE_MODS__`; `modRows` |
+| + | `src/mods/catalog.ts` | catálogo da tela (nome e descrição pt/en) e a escolha no `localStorage` |
+| + | `src/mods/loaders.ts` | um `import()` por mod; `loadMods` tolera falha de rede |
+| + | `src/mods/validate.ts` | prefixo, faixa, inglês, silhueta 16×16, faixas cruzadas |
+| + | `src/mods/boot.ts` | ponto de entrada com mods: baixa, confere, deixa o global, importa o `main` |
+| + | `src/mods/systems.ts` | tick de mod embrulha o `tick` da `Session` só com mod de tick ligado |
+| + | `src/mods/worldmods.ts` | `missingMods`, `modsToRecord` |
+| + | `src/mods/exemplo/mod.ts` | o mod de exemplo |
+| + | `src/workers/chunk.modworker.ts` | worker com mods: carrega os mesmos mods antes das tabelas |
+| + | `src/ui/screens/mods.ts` | a tela Mods |
+| **Jogo** | | |
+| ~ | `src/data/blocks.ts`, `items.ts`, `recipes.ts`, `smelting.ts` | linhas de mod depois das do jogo |
+| ~ | `src/data/textures.ts`, `itemart.ts` | texturas, silhuetas e arte de mod; operadores por parâmetro |
+| ~ | `src/data/strings/localize.ts` | inglês dos nomes de mod |
+| ~ | `src/data/strings/pt.ts`, `en.ts` | textos da tela Mods e do aviso de mundo |
+| ~ | `src/game/session.ts` | `attachModSystems(this)` no fim do construtor |
+| ~ | `src/game/savegame.ts`, `src/save/db.ts` | `WorldMeta.mods` gravado só com mod ligado |
+| ~ | `src/ui/menuflow.ts`, `src/ui/screens/title.ts` | botão e tela Mods; mundo que pede mod desligado |
+| ~ | `src/world/pipeline.ts` | sobe o worker com mods quando há mod ligado |
+| **Build** | | |
+| ~ | `index.html` | script de escolha no lugar da tag de módulo, com volta ao jogo se o boot dos mods falhar |
+| ~ | `vite.config.ts` | entradas `main` e `modboot`, `m/` para o que é de mod, plugin `craftlite-mod-entry`, precache sem `m/` |
+| ~ | `scripts/size-report.mjs` | jogo e mods separados; reprova se o pedaço principal importar outro arquivo |
+| + | `scripts/smoke-mods.mjs` | smoke test do caminho com mod e da volta |
+| ~ | `package.json` | `npm run smoke:mods` |
+| **Testes** | | |
+| + | `tests/mods.test.ts` | tabelas idênticas sem mod, linhas do jogo intactas com mod, receitas, save, tick, conferência, catálogo |
+| + | `tests/modsisolation.test.ts` | regra de import dos mods, no fonte |
+| + | `tests/bootchooser.test.ts` | o script do `index.html`, com a volta offline |
+| ~ | `tests/i18n.test.ts` | `mods/validate.ts` isento (mensagens de console) |
+| **Docs** | | |
+| ~ | `docs/14-roadmap.md` | M21 ✅, mecanismo real, desvios e o medido |
+| ~ | `docs/15-status.md` | data; §1; §2 (bundle, testes, smoke dos mods, 3G); §3 M21 e a receita de mod; §5; §6 |
+| ~ | `docs/16-auditoria.md` | esta sessão |
+| ~ | `README.md` | M21, 2316 testes, 305 KB, `smoke:mods`, pasta `mods/` |
+
+---
+
 ## 2026-09-27 02:09 · Dois marcos novos no roteiro: M20 (rede local) e M21 (mods)
 
 **Pedido:** *"Vamos criar dois novos marcos então, um será o multiplayer, que deverá permitir jogar

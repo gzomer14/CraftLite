@@ -25,6 +25,7 @@ import { POTIONS } from '../potions';
 import { STATS } from '../stats';
 import { PROFESSIONS } from '../villagers';
 import { lang, type Lang } from '../../core/i18n';
+import { ACTIVE_MODS } from '../../mods/active';
 import {
   ACHIEVEMENT_TEXT_EN, BIOME_NAMES_EN, DIMENSION_NAMES_EN, EFFECT_NAMES_EN, ENCHANT_NAMES_EN,
   MOB_NAMES_EN, PROFESSION_NAMES_EN, STAT_NAMES_EN, THING_NAMES_EN,
@@ -47,10 +48,18 @@ for (const [name, [title, description]] of Object.entries(ACHIEVEMENT_TEXT_EN)) 
   ACHIEVEMENT_DESCRIPTIONS_EN[name] = description;
 }
 
+/**
+ * O inglês de blocos e itens, com o dos mods ligados (M21). Sem mod, é a
+ * própria tabela de `names.en.ts`, sem cópia.
+ */
+const THINGS_EN: Readonly<Record<string, string>> = ACTIVE_MODS.length === 0
+  ? THING_NAMES_EN
+  : Object.assign({}, THING_NAMES_EN, ...ACTIVE_MODS.map((mod) => mod.en));
+
 /** Todas as tabelas com `display`, para localizar e para o teste varrer. */
 export const NAME_TABLES: readonly NameTable[] = [
-  { label: 'BLOCKS', rows: BLOCKS, en: THING_NAMES_EN },
-  { label: 'ITEMS', rows: ITEMS, en: THING_NAMES_EN },
+  { label: 'BLOCKS', rows: BLOCKS, en: THINGS_EN },
+  { label: 'ITEMS', rows: ITEMS, en: THINGS_EN },
   { label: 'POTIONS', rows: POTIONS, en: THING_NAMES_EN },
   { label: 'MOBS', rows: MOBS, en: MOB_NAMES_EN },
   { label: 'BIOMES', rows: BIOMES, en: BIOME_NAMES_EN },

@@ -15,6 +15,8 @@ export interface TitleCallbacks {
   onOptions: () => void;
   /** Pacote de texturas do jogador (M7). */
   onPacks: () => void;
+  /** Mods (M21). */
+  onMods: () => void;
 }
 
 export class TitleScreen {
@@ -32,12 +34,13 @@ export class TitleScreen {
     this.playButton = menuButton(t('worlds.play'), callbacks.onPlay, 'primary');
     const options = menuButton(t('opt.title'), callbacks.onOptions);
     const packs = menuButton(t('title.packs'), callbacks.onPacks);
+    const mods = menuButton(t('title.mods'), callbacks.onMods);
 
     const footer = document.createElement('p');
     footer.className = 'footer';
     footer.textContent = t('title.footer');
 
-    body.append(tagline, this.playButton, options, packs, footer);
+    body.append(tagline, this.playButton, options, packs, mods, footer);
     this.root.appendChild(panel);
     injectTitleStyle();
   }

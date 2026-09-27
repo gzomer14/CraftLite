@@ -9,6 +9,7 @@
  * (rotação, nível de fluido, idade de plantação…). Ver doc 04 §2.5.
  */
 
+import { ACTIVE_MODS } from '../mods/active';
 import { DYES } from './dyes';
 
 export type Face = 'top' | 'bottom' | 'north' | 'south' | 'east' | 'west';
@@ -902,6 +903,14 @@ function buildTable(): BlockDef[] {
       throw new Error(`Id de bloco duplicado: ${spec.id} (${spec.name})`);
     }
     table[spec.id] = { ...DEFAULTS, ...spec } as BlockDef;
+  }
+  // Blocos de mod (M21): id fixo, `blockBase + posição` — ver `mods/types.ts`.
+  for (const mod of ACTIVE_MODS) {
+    const rows = mod.blocks ?? [];
+    for (let i = 0; i < rows.length; i++) {
+      const id = (mod.blockBase ?? 0) + i;
+      table[id] = { ...DEFAULTS, ...rows[i], id } as BlockDef;
+    }
   }
   return table;
 }

@@ -9,10 +9,12 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-27 02:09 — **dois marcos novos no roteiro, ainda não iniciados:
-M20 (multijogador só na rede local, celular com computador, sem servidor) e M21 (mods que se ligam
-e desligam num menu, com custo zero desligados)** — doc 14, doc 12 §2 revisto, §3 e §6 abaixo.
-Nenhum código mudou. Antes, 2026-09-25 19:11 — **três defeitos do teste de campo corrigidos** (§4): a
+**Última atualização:** 2026-09-27 03:00 — **M21 fechado: mods.** Tela **Mods** no título, mod de
+exemplo (o Cristal de Luz), e o ponto do marco provado: **sem mod ligado, a página baixa um único
+arquivo de código, o mesmo de antes**, e as tabelas do jogo saem idênticas (§3). O jogo sem mod ficou
+2,5 KB maior (302,2 → 304,7) e abre em 3G rápido 13 ms depois (+0,5%, medido lado a lado). Receita para
+escrever mod no §3. Antes, 02:09 — M20 e M21 entraram no roteiro (doc 14; doc 12 §2 revisto para
+rede local). Antes, 2026-09-25 19:11 — **três defeitos do teste de campo corrigidos** (§4): a
 dica das tábuas não andava (fechar a mochila com as tábuas no cursor as jogava no chão), a barra de
 durabilidade só existia com a mochila aberta (agora também na hotbar), e **a rachadura não aparecia
 nas faces laterais** de nenhum bloco (o cubo dela estava enrolado para dentro e o culling o
@@ -66,7 +68,7 @@ compartilhável).
 | **M18** Casa em ordem, 2ª volta | cinco módulos abaixo do teto, memória de áudio com folga, varredura de idioma pelo destino | ✅ concluído em 2026-09-25 | — |
 | **M19** Pontas soltas | enderman no End, dragão que quebra, sopra e morre devagar, ilhas de fora e portal de passagem, tint no WebGL1 | ✅ concluído em 2026-09-25 | **não visto em aparelho** (End visto no Chrome headless) |
 | **M20** Jogar junto na mesma rede | multijogador por WebRTC só na rede local, sinalização por QR, sem servidor; o mundo e os dados do convidado só no aparelho do anfitrião | ⬜ não iniciado | começa por uma **prova de conexão em dois aparelhos reais** (§3) |
-| **M21** Mods | mods escritos no repositório, cada um um pedaço de bundle próprio, ligados e desligados na tela Mods; **desligados custam zero** (teste que falha o build) | ⬜ não iniciado | — |
+| **M21** Mods | mods escritos no repositório, cada um um pedaço de bundle próprio, ligados e desligados na tela Mods; **desligados, a página baixa um arquivo só, o de antes** (teste e build cobram); mod de exemplo | ✅ concluído em 2026-09-27 | **não visto em aparelho** (visto no Chrome headless); mods e M20 esperam o M20 |
 
 **O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
 ele irá pesar muito o jogo e trazer muita complexidade por enquanto desnecessária"*. O
@@ -81,14 +83,16 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-25 19:11, depois das correções de campo do M19, com `npm test`, `npm run build`,
-`SIZE_BUDGET_KB=350 npm run size` e `npm run smoke`.
+Medidas em 2026-09-27 03:00, ao fechar o M21, com `npm test`, `npm run build`,
+`SIZE_BUDGET_KB=350 npm run size`, `npm run smoke` e `npm run smoke:mods`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, tudo) | **302,2 KB**, worker 42,4 (301,8 ao fechar o M19; 298,4 ao fechar o M17; o M19 somou as ilhas de fora e o portal de passagem, e o worker foi a 42,3; 282,5 antes do M17: o inglês e as chaves custaram 15,9; o worker, 41,8, não mudou um byte; 267,3 antes do M16; 265,7 ao fechar o M15; 257,9 antes do M15; 249,5 antes do M14; 240,0 antes do M10) | < 350 KB | `npm run size` |
-| Testes | **2290**, 117 arquivos (2281 ao fechar o M19; 2271 ao fechar o M17; 2235 antes do M17; 2164 antes do M16; 2156 ao fechar o M15; 2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
+| Bundle (gzip, o jogo sem mod) | **304,7 KB**, worker 42,7 (302,2 antes do M21: a infraestrutura de mods custou 1,9 KB no pedaço principal, 0,3 no worker e 0,2 no HTML; 301,8 ao fechar o M19; 298,4 ao fechar o M17; o M19 somou as ilhas de fora e o portal de passagem, e o worker foi a 42,3; 282,5 antes do M17: o inglês e as chaves custaram 15,9; o worker, 41,8, não mudou um byte; 267,3 antes do M16; 265,7 ao fechar o M15; 257,9 antes do M15; 249,5 antes do M14; 240,0 antes do M10) | < 350 KB | `npm run size` |
+| Testes | **2316**, 120 arquivos (2290 antes do M21; 2281 ao fechar o M19; 2271 ao fechar o M17; 2235 antes do M17; 2164 antes do M16; 2156 ao fechar o M15; 2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
 | Smoke test de navegador | **7 passos verdes**: carregar, criar, andar 10 s, quebrar, salvar, recarregar, conferir | verde | `npm run smoke` |
+| Smoke test dos mods (M21) | **6 passos verdes**: sem mod, **um** arquivo de código; ligar pela tela Mods; o cristal no mundo, com luz 14; desligar volta a um arquivo e apaga a escolha; o mundo pede o mod | verde | `npm run smoke:mods` |
+| Pedaços que só baixam com mod (`m/`) | **45,6 KB**: ponto de entrada 1,9, mod de exemplo 0,6, worker com mods 0,4 + o worker de sempre como pedaço, 42,7 | sem orçamento (o jogo sem mod é que tem) | `npm run size` |
 | Textos de interface | **~500 chaves**, as mesmas em `pt` e `en` (o compilador cobra); **nenhum literal com cara de português** fora de `data/strings/pt.ts` e dos campos de nome das tabelas | varredura verde | `tests/i18n.test.ts` |
 | Geração de chunk do End nas ilhas de fora | **~2,8 ms** (1089 chunks em ~3 s, com o santuário) | < 25 ms | `tests/theend.test.ts` |
 | Primeira hora guiada | três troncos de bétula → **picareta de pedra**, só pelo livro de receitas, com a dica andando a cada passo | aceite do M17 | `tests/firsthour.test.ts` |
@@ -126,7 +130,7 @@ Medidas em 2026-09-25 19:11, depois das correções de campo do M19, com `npm te
 | Render em T0 | **2,7 ms** de 33,3 ms de orçamento | ≤ 8 ms (soma do doc 02 §2) | overlay F3 no aparelho |
 | Heap em T0 | **20 MB**, estável na sessão | sem crescimento | overlay F3 no aparelho |
 | FPS em celular atual | **75, T2, RD 16, escala 1,00, render 2,6 ms** (S24 Ultra) | — | teste manual |
-| Abertura em 3G rápido | **2,82 s** até a tela de título (medido de novo em 2026-09-25, com 301,8 KB; a medida anterior, 4,48 s, foi de outra rodada, com 240 KB) | < 5 s (PROMPT.md §11) | `npm run slow-network` |
+| Abertura em 3G rápido | **2,82 s** até a tela de título (medido de novo em 2026-09-25, com 301,8 KB; a medida anterior, 4,48 s, foi de outra rodada, com 240 KB). **M21, lado a lado com o build de antes, servidos localmente:** 2 720 → 2 733 ms (+0,5%), e 3G lento 9 522 → 9 579 ms (+0,6%), média de duas rodadas cada; sem limite de rede, igual (383 → 382) | < 5 s (PROMPT.md §11) | `npm run slow-network` com `URL` local |
 | Sessão longa (voo contínuo) | **92,5 min, 0 erros, 0 travamentos** | 2 h sem crash (PROMPT.md §11) | `npm run soak` |
 | Heap na sessão longa | **37,8 MB no início, 44,2 no fim**; média por faixa de 15 min entre 42,8 e 47,2 | sem crescimento | `npm run soak` |
 | FPS na sessão longa | mediana **60**, mínimo 50, nenhuma amostra abaixo de 30 | 30 estáveis | `npm run soak` |
@@ -2005,31 +2009,99 @@ sopro, o vazio entre as ilhas, as ilhas com santuário, o portal de passagem de 
 raios, o portal de passagem de pé, a chegada numa ilha de fora com outras boiando no vazio, e o
 céu do End sem sol.
 
-### M20 e M21 — planejados ⬜ — 2026-09-27
+### M21 — Mods ✅ — 2026-09-27
 
-Pedido do usuário: *"Vamos criar dois novos marcos então, um será o multiplayer (…) e
-exclusivamente local (…) Outro marco (…) mods no jogo"*. Os dois estão escritos no doc 14, com
-checklist e critério de aceite; **nenhuma linha de código existe ainda.** O que a leitura do código
-mostrou ao desenhar, para quem for implementar conferir de novo:
+Pedido: *"Pode começar pelo M21, os mods"*. Detalhe do desenho no doc 14; aqui, o que o código é.
 
-- **O que já ajuda o M20:** `world.setBlock` já recebe `source: 'network'` (`world/world.ts:16`);
+**O caminho de boot.** O `index.html` não tem mais `<script type="module" src>`: um script de três
+linhas lê `localStorage['craftlite.mods']` e sobe `a/<main>.js` (sem mod) ou `m/<modboot>.js` (com
+mod). O plugin `craftlite-mod-entry` do `vite.config.ts` troca os caminhos de fonte pelos arquivos
+finais e põe um `modulepreload` do `main` no `<head>` — a busca começa no mesmo instante em que a
+tag antiga começava. `mods/boot.ts` baixa os mods (`mods/loaders.ts`, um `import()` por mod),
+confere (`mods/validate.ts`: prefixo, faixa, nome em inglês, silhueta 16×16, faixas que se cruzam),
+deixa o que passou em `globalThis.__CRAFTLITE_MODS__` e importa o `main`. O worker com mods
+(`workers/chunk.modworker.ts`) faz o mesmo antes de importar o `chunk.worker.ts`, com os ids no
+próprio nome (`chunk-0|exemplo`), e entrega em ordem as mensagens que chegaram enquanto carregava.
+
+**As tabelas.** `mods/active.ts` lê o global; `data/blocks.ts`, `items.ts`, `recipes.ts`,
+`smelting.ts`, `textures.ts`, `itemart.ts` e `strings/localize.ts` acrescentam as linhas dos mods
+**depois** das do jogo, na avaliação do módulo. Blocos de mod em 768–1023, itens de mod em
+4096–8191, id = `base + posição` (`mods/types.ts`). As camadas de textura do jogo não mudam de
+número. `data/textures.ts` entrega ao mod só os operadores que ele já usa — passar
+`import * as texgen` custou 1,1 KB no worker na primeira tentativa, porque prendia funções que
+nenhuma textura chama.
+
+**O tick.** `mods/systems.ts` embrulha o `tick` da instância da `Session` só se algum mod ligado
+tem tick; sem nenhum, é o método do protótipo (teste).
+
+**A tela e os mundos.** `ui/screens/mods.ts` (título → *Mods*): lista, liga/desliga, *Recarregar
+para aplicar* só quando a escolha difere do que roda; lista vazia **apaga** a chave. O save grava
+`WorldMeta.mods` só com mod ligado; abrir um mundo que pede mod desligado mostra *"Este mundo foi
+jogado com mods que estão desligados: Exemplo. Ligar e recarregar?"* e não abre sem ele
+(`mods/worldmods.ts`, `ui/menuflow.ts`).
+
+**Defeito achado e corrigido no fechamento: página em branco offline com mod ligado.** O ponto
+de entrada dos mods não vai para o precache (só `a/` vai), então ligar um mod e abrir **sem rede**
+pedia um arquivo que não estava em lugar nenhum. Reproduzido no Chrome com o service worker
+instalado e o servidor derrubado (a emulação offline do CDP não vale para o service worker, que
+buscou na rede e mascarou o caso na primeira tentativa). Agora o script de escolha volta ao `main`
+quando o ponto de entrada dos mods não carrega; o jogo abre sem mod. Regressão em
+`tests/bootchooser.test.ts`, que roda o próprio script do `index.html`.
+
+**O mod de exemplo** (`src/mods/exemplo/mod.ts`): **Cristal de Luz** (bloco 768, emissão 15, cura
+meio coração a cada 2 s de quem está em cima), **Fragmento de Cristal** (item 4096, silhueta
+própria); vidro + redstone → 2 fragmentos; 2×2 fragmentos → 1 cristal.
+
+**Critérios, medidos.** O jogo sem mod: **um** arquivo de código na página (`npm run smoke:mods`,
+o mesmo `a/<hash>.js` antes e depois de ligar e desligar); tabelas idênticas com o global ausente ou
+vazio e, com o mod, as linhas do jogo idênticas (`tests/mods.test.ts`, 19 casos); isolamento de
+import cobrado no fonte (`tests/modsisolation.test.ts`) e no build (`size-report` reprova se o
+pedaço principal importar outro arquivo — **testado de propósito:** um `import { makeState }` no
+mod partiu o `main` em dois e o relatório reprovou). Bytes: pedaço principal +1,9 KB, worker +0,3,
+HTML +0,2. Abertura em 3G rápido +13 ms (+0,5%), lado a lado com o build de antes. **Visto no Chrome
+headless:** a tela Mods, a parede de cristais iluminando a grama à noite, o cristal e o fragmento na
+hotbar e na mão, a luz 14 igual à da pedra luminosa.
+
+#### Como escrever um mod (a receita)
+
+1. **Pasta e catálogo.** `src/mods/<id>/mod.ts` com `export default` um `ModDef`. Uma linha em
+   `MOD_CATALOG` (`mods/catalog.ts`: nome e descrição em `pt` e `en`, `heavy: true` se pesa) e uma
+   em `MOD_LOADERS` (`mods/loaders.ts`). O teste cobra que os dois batem.
+2. **Faixas.** Escolha `blockBase` e `itemBase` que não cruzem os mods que existem (o teste liga
+   todos juntos e recusa cruzamento). **Só acrescente no fim** das listas `blocks` e `items`: o id é
+   a posição, e ele está no save de quem jogou.
+3. **Nomes com prefixo** `<id>:` em blocos, itens, texturas e silhuetas. Todo bloco e item com o
+   nome em inglês em `en` (o M17 cobra).
+4. **Só `import type` de fora da pasta do mod.** O que o mod usa em tempo de execução chega por
+   parâmetro: os operadores de textura em `textures(g)`, o mundo, o jogador, a vida e o inventário
+   em `tick(ctx)`. Um import de valor quebra o build (`size-report`) e o teste de isolamento.
+5. **Conteúdo é tabela.** Arma é uma linha em `items` com `attack`, `attackSpeed`, `durability` e
+   `tool: { kind: 'sword', … }`; a arte é uma silhueta em `itemShapes` e uma linha em `itemArt`; a
+   receita, uma linha em `recipes`. Precisou de comportamento que a tabela não tem? Abra um ponto
+   de extensão novo do jeito do tick: montado no boot, só com o mod ligado, nunca consultado por
+   quadro.
+6. **Teste do mod** em `tests/`, carregando o jogo com ele (`loadGame([mod])` em
+   `tests/mods.test.ts` é o molde). Um mod pode ser pesado; o jogo sem ele, não — os portões e o
+   `npm run smoke:mods` continuam valendo.
+7. **Limites:** atlas de 256 camadas no total (o jogo usa 223; o exemplo, 1) — o teste soma todos os
+   mods do catálogo; mob, som, estrutura e conquista de mod ainda não têm tabela aberta.
+
+### M20 — planejado ⬜ — 2026-09-27
+
+Escrito no doc 14, com checklist e critério; **nenhuma linha de código ainda.** O que a leitura do
+código mostrou ao desenhar, para quem for implementar conferir de novo:
+
+- **O que já ajuda:** `world.setBlock` já recebe `source: 'network'` (`world/world.ts:16`);
   `STORE_PLAYERS` já é chaveado por `[worldId, playerId]` (`save/db.ts:359`), então guardar o
   convidado no mundo do anfitrião não pede formato novo; o terreno é determinístico pela seed, e só
   a diferença viaja. Não existe nada de `RTCPeerConnection` nem de leitura de QR no código.
-- **O que o navegador não deixa (M20):** página web não abre porta nem anuncia sala na rede. Por
-  isso a sinalização é por QR na tela, e o "só na rede local" vem de ligar sem STUN/TURN. O maior
-  risco é de campo — mDNS no Android, Wi-Fi com isolamento de cliente, câmera de computador — e só
-  se mede com **dois aparelhos do usuário**, por isso o marco começa pela prova de conexão
-  (M20.0). Se ela falhar, a decisão volta para o usuário.
-- **O que o M21 precisa mudar:** as tabelas de `src/data/` são constantes montadas no import
-  (`data/blocks.ts:890`, `data/items.ts:656`), e o worker importa as dele
-  (`workers/chunk.worker.ts`). Mod precisa de uma etapa de registro no boot, antes de atlas,
-  sprites, índices e worker derivarem o que derivam — e depois congelar. Espaço de id há: o id de
-  bloco tem 10 bits (`makeState`). O `vite.config.ts` hoje não gera pedaço separado de nada fora o
-  worker; os mods serão os primeiros `import()`.
-- **A regra que atravessa os dois:** sem sala aberta e sem mod ligado, o bundle inicial, o tick e o
-  quadro ficam **iguais aos de hoje**. No M21 isso vira teste e orçamento (≤ 2 KB de infraestrutura
-  no pedaço principal; nenhum pedaço de mod pedido com zero mods; tabelas idênticas).
+- **O que o navegador não deixa:** página web não abre porta nem anuncia sala na rede. Por isso a
+  sinalização é por QR na tela, e o "só na rede local" vem de ligar sem STUN/TURN. O maior risco é
+  de campo — mDNS no Android, Wi-Fi com isolamento de cliente, câmera de computador — e só se mede
+  com **dois aparelhos do usuário**, por isso o marco começa pela prova de conexão (M20.0).
+- **O que o M21 deixou pronto para ele:** o código de rede pode seguir o mesmo caminho dos mods —
+  um pedaço à parte que o jogo sozinho não baixa. `WorldMeta.mods` é o que o anfitrião manda no
+  `WELCOME`.
 
 ## 4. Correções fora de marco
 
@@ -2228,6 +2300,24 @@ tem **1116** linhas (981 antes; as contas novas foram para `redstoneparts.ts`, f
 `ui/containers/screen.ts` **949** (916; a bigorna foi para `anvilpanel.ts`, ficaram a grade e os
 callbacks; **930** depois que as ofertas da mesa foram para `enchantpanel.ts`, na volta de campo) e `session.ts` 816. O corte natural do circuito é por papel — pó e energia, componentes,
 pistão —, e o da tela, a grade de slots de um lado e os painéis do outro. Não depende de nada.
+
+**Pendências abertas em 2026-09-27 (M21):**
+
+- **Nada do M21 foi visto em aparelho.** O caminho de boot novo (o script do `index.html` no lugar
+  da tag de módulo) só rodou no Chrome headless. Vale abrir o jogo instalado como PWA no celular,
+  sem mod, e conferir que abre como antes — inclusive **offline**, porque o precache mudou de
+  lista (só `a/`).
+- **Mod ligado sem rede, antes de ter sido baixado:** o jogo abre **sem o mod** (a tela Mods diz
+  "Nenhum mod ligado"), e um mundo que o pede não abre. O pedaço entra no cache na primeira vez que
+  é baixado com rede. Ver o defeito corrigido no §3, M21.
+- **Pontos de extensão que ainda não existem:** uso de item de mod, ouvinte de `world.setBlock` de
+  mod, e tabelas de mob, som, estrutura e conquista. Entram quando o primeiro mod pedir, do jeito
+  do tick (doc 14, M21).
+- **Tirar um mod de um mundo** de propósito não existe: o mundo pede os mods do último save.
+- **Mods e M20** esperam o M20.
+- **`game/session.ts` em 704 linhas** (702 antes; a chamada de `attachModSystems` e o import).
+- **O worker de sempre sai duas vezes no `dist/`**: em `assets/` (sem mod) e como pedaço em `m/`
+  (com mod). São 42,7 KB que só baixam com mod ligado, e o relatório os lista à parte.
 
 **Pendências de 2026-09-25 (M18 e M19):**
 
@@ -2430,13 +2520,14 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
 
 ## 6. Próximo passo recomendado
 
-0. **Dois marcos novos (2026-09-27): M20 e M21** (doc 14). Qual começar é escolha do usuário:
-   - **M21 (mods)** pode começar já e se valida inteiro aqui, com teste e navegador. A primeira
-     entrega é o registro nas tabelas com o teste de "zero mods = tabelas idênticas", antes da tela.
+0. **M21 fechado (2026-09-27); o que vem depois é escolha do usuário:**
+   - **Mods a pedido** (*"crie um mod que adicione armas"*): a receita está no §3, M21. Cada mod é
+     uma pasta, uma linha no catálogo, uma nos carregadores e um teste.
    - **M20 (rede local)** começa pela **prova de conexão (M20.0)**, que precisa do usuário com um
      celular e um computador na mesma rede Wi-Fi. Sem ela, o resto do M20 não deve ser escrito.
-   - O roteiro de celular do item 1 continua valendo para declarar o MVP, e não depende de nenhum
-     dos dois.
+   - **No celular, o M21:** abrir o PWA sem mod e **offline** (o boot e o precache mudaram), ligar
+     o Exemplo na tela Mods, pôr um Cristal de Luz de noite, desligar.
+   - O roteiro de celular do item 1 continua valendo para declarar o MVP.
 
 1. **O roteiro de celular que fecha o MVP** (2026-09-25). O código de M0 a M19 está pronto; o que
    falta é ver no aparelho o que só foi visto em teste e no Chrome headless — M16, M17, M18 e M19

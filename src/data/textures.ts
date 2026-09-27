@@ -11,7 +11,9 @@ import {
   oreBlobs, outline, pattern, plankLines, rect, rings, speckle, stripes, tintBy,
   type Rgb, type TexOp, type TexRecipe,
 } from '../render/texgen';
+import { ACTIVE_MODS } from '../mods/active';
 import type { DyeDef } from './dyes';
+import type { TexOps } from '../mods/types';
 
 const STONE_DARK: [number, number, number] = [86, 86, 86];
 const WOOD_DARK: [number, number, number] = [96, 78, 44];
@@ -1870,6 +1872,21 @@ function bedSideRecipe(dye: DyeDef): TexRecipe {
 TEXTURES['block/bed_top'] = bedHeadRecipe(GREY);
 TEXTURES['block/bed_foot_top'] = bedFootRecipe(GREY);
 TEXTURES['block/bed_side'] = bedSideRecipe(GREY);
+
+// Texturas de mod (M21), depois de todas as do jogo: as camadas do jogo não
+// mudam de número com mod ligado. Os operadores chegam por parâmetro — ver a
+// regra de isolamento em `mods/types.ts`.
+if (ACTIVE_MODS.length > 0) {
+  // Só os operadores que esta tabela já usa: passar `import * as texgen`
+  // prenderia no bundle (e no worker) os que nenhuma textura do jogo chama.
+  const ops: TexOps = {
+    alphaMask, blobs, border, bricks, cropRows, dither, emboss, flow, furrows, oreBlobs,
+    outline, pattern, plankLines, rect, rings, speckle, stripes, tintBy,
+  };
+  for (const mod of ACTIVE_MODS) {
+    if (mod.textures !== undefined) Object.assign(TEXTURES, mod.textures(ops));
+  }
+}
 
 /** Ordem estável de geração — o índice de camada é resolvido por nome. */
 export const TEXTURE_NAMES: readonly string[] = Object.keys(TEXTURES);

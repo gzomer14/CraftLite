@@ -627,7 +627,7 @@ o tick de 20 mobs sem regressão, e o T0 com o anfitrião e um convidado **acima
 
 ---
 
-## M21 — Mods ⬜
+## M21 — Mods ✅
 
 > Conteúdo e comportamento que o jogador liga e desliga num menu. O fluxo pedido: o usuário pede
 > (*"crie um mod que adicione armas"*), o mod é escrito aqui, no repositório, e aparece na tela
@@ -635,14 +635,16 @@ o tick de 20 mobs sem regressão, e o T0 com o anfitrião e um convidado **acima
 >
 > **O ponto fundamental, nas palavras do pedido:** *"sem o usuario ativar mod algum, o jogo
 > continuará super leve e performatico exatamente como é hoje"*. Todo o desenho abaixo existe para
-> que essa frase vire **teste que falha o build**, e não promessa.
+> que essa frase vire **teste que falha o build**, e não promessa. **Fechado em 2026-09-27** —
+> detalhe, números e a receita para escrever mod no doc 15 §3.
 
-**O que um mod é:** uma pasta `src/mods/<id>/` com um `mod.ts` que exporta um `ModDef` — nome,
-descrição, versão, e **linhas das mesmas tabelas de `src/data/`** (blocos, itens, receitas,
-fundição, mobs, texturas procedurais, sons, estruturas, conquistas, textos `pt` e `en`), mais,
-quando o conteúdo não basta, **sistemas** (um tick próprio, um uso de item, uma reação a bloco).
-Regra de código do projeto mantida: acrescentar arma é linha de tabela, não `case` novo. Mod não
-traz asset de fora — textura e som são gerados por código, como o resto (doc 13).
+**O que um mod é:** uma pasta `src/mods/<id>/` com um `mod.ts` cujo `export default` é um `ModDef`
+(`src/mods/types.ts`) — id, versão, faixas de id, e **linhas das mesmas tabelas de `src/data/`**
+(blocos, itens, receitas, fundição, texturas procedurais, silhuetas e arte de sprite, nomes em
+inglês), mais, quando o conteúdo não basta, um **sistema de tick**. Regra de código do projeto
+mantida: acrescentar arma é linha de tabela, não `case` novo. Mod não traz asset de fora — textura
+é gerada por código, como o resto (doc 13). Mobs, sons, estruturas e conquistas de mod ainda não
+têm tabela aberta: entram do mesmo jeito quando o primeiro mod pedir.
 
 **Quem escreve mod:** só o repositório. Mod é código TypeScript compilado junto com o jogo; não
 existe carregar arquivo de mod baixado da internet. Isso é o que mantém o jogo sem risco de
@@ -651,62 +653,70 @@ futuro, se um dia fizer sentido — e então com outro desenho (dado sem código
 
 ### Como "desligado custa zero" vira fato
 
-1. **Cada mod é um pedaço de bundle próprio** (`import()` no catálogo `src/mods/index.ts`). O
-   bundle inicial só leva o catálogo — id, nome, descrição, uma linha por mod. O código do mod é
-   baixado quando ele é ligado.
-2. **Ligar e desligar vale no boot**, como o idioma do M17 (*Aplicar agora* recarrega). Com zero
-   mods ligados, o boot pula a etapa inteira num único `if` — **nenhum `if (mod)` no tick, no
-   render, no mesher ou no worker**. Não existe lista de ganchos vazia sendo percorrida a cada
-   quadro: o sistema de um mod entra na mesma lista de sistemas de mundo (`game/worldsystems.ts`)
-   só quando ele está ligado; desligado, a lista é a de hoje, item por item.
-3. **As tabelas aceitam linhas novas só antes de congelar.** `BLOCKS`, `ITEMS`, receitas e o
-   resto ganham uma etapa de registro no boot, antes de qualquer consumidor derivar o que deriva
-   (atlas, folha de sprites, índices por nome, tabelas do mesher). Depois, congelam. Sem mod, a
-   tabela congelada é idêntica à de hoje — mesmo tamanho, mesma ordem, mesmos ids.
-4. **O worker recebe a lista de mods ligados** e importa os mesmos pedaços antes do primeiro
-   pedido de geração ou de malha (bloco de mod precisa de forma e de textura lá também).
-5. **O precache do service worker** leva só o bundle do jogo; o pedaço de um mod entra no cache
-   quando ele é ligado (para funcionar offline dali em diante).
+1. **Dois pontos de entrada.** O `index.html` tem um script de três linhas que lê a lista de mods
+   no `localStorage`: sem mod, sobe o `main` como sempre (com `modulepreload` no `<head>`, para a
+   busca começar no mesmo instante de antes); com mod, sobe `mods/boot.ts`, que baixa os mods,
+   confere, deixa as definições num global e só então importa o `main`.
+2. **As tabelas leem os mods ao se montar** (`mods/active.ts`). Como o global já existe quando o
+   `main` é avaliado, `BLOCKS`, `ITEMS`, receitas, texturas e arte nascem com as linhas dos mods, e
+   nenhuma tabela derivada (atlas, sprites, índices por nome, tabelas do mesher) precisa ser
+   refeita. Sem mod, cada tabela percorre uma lista vazia **uma vez, no boot**.
+3. **Ids fixos por construção.** Blocos de mod em 768–1023, itens de mod em 4096–8191, com o id =
+   `base + posição`. O jogo base fica abaixo das duas faixas (há teste), então o save não precisa de
+   tabela de tradução e as linhas do jogo nunca mudam de id.
+4. **Nenhum `if (mod)` no caminho quente.** O tick de mod embrulha o `tick` **daquela instância** da
+   `Session` só quando algum mod ligado tem tick; sem nenhum, roda o método do protótipo, o de
+   antes.
+5. **Worker com mods à parte** (`workers/chunk.modworker.ts`): lê os ids no próprio nome, carrega
+   os mesmos mods e só então importa o worker de sempre. Sem mod, a página sobe o worker de antes.
+6. **Isolamento que o Rollup respeita:** mod só importa **tipos** do jogo, e o jogo não importa o
+   carregador. Um import fora dessa regra faria o `main.js` depender de um pedaço compartilhado —
+   uma requisição a mais sem mod nenhum. Um teste cobra a regra no fonte, e o relatório de tamanho
+   reprova o build se o pedaço principal importar outro arquivo.
+7. **O precache do service worker** leva só o jogo (`a/`); o que é de mod (`m/`) entra no cache
+   quando é baixado a primeira vez.
 
 ### Checklist
 
-- [ ] **Registro nas tabelas** (`mods/registry.ts`): a etapa antes de congelar, para cada tabela
-      de `src/data/`, com ids de mod alocados depois dos do jogo (há folga: o id de bloco tem 10
-      bits, `data/blocks.ts:makeState`) e **nome com prefixo do mod** (`armas:espada_longa`).
-- [ ] **Sistemas de mod**: pontos de extensão fixos e pequenos — um sistema de tick de mundo, um
-      uso de item (a tabela de uso do M13), um ouvinte de `world.setBlock` — montados no boot só
-      com o mod ligado. Qualquer ponto novo que um mod futuro pedir entra do mesmo jeito: montado
-      no boot, nunca consultado por quadro.
-- [ ] **Tela Mods** (título → *Mods*): lista do catálogo, chave liga/desliga, descrição, e o **custo
-      medido** de cada mod (bytes do pedaço; "pode pesar" para mod declarado pesado). *Aplicar*
-      recarrega. A tela em si também é pedaço à parte.
-- [ ] **Mods e mundos**: o `WorldMeta` guarda os mods com que o mundo foi jogado e o mapa
-      nome → id do conteúdo de mod (ids são alocados no boot, então o save precisa do nome para
-      voltar ao mesmo bloco). **Mundo sem mod não ganha campo nenhum** — o formato de hoje não
-      muda. Abrir um mundo com um mod que agora está desligado avisa antes; o que era do mod vira
-      um bloco/item "de mod ausente" que **guarda o id**, para que religar o mod devolva tudo
-      intacto. Nunca apagar dado de mod por estar desligado.
-- [ ] **Mods e M20** (quando os dois existirem): o anfitrião manda a lista de mods no `WELCOME`; o
-      convidado liga os mesmos para aquela sessão, sem mudar a escolha salva dele, e sai sem eles.
-      Mod que o build do convidado não tem = não entra, com a lista na mensagem.
-- [ ] **Um mod de demonstração pequeno** (`src/mods/exemplo/`: um bloco, um item, uma receita, um
-      sistema de tick barato) para provar o caminho de ponta a ponta. O mod de armas, e os
-      próximos, vêm a pedido, cada um com teste próprio.
-- [ ] **Receita para escrever mod** (seção no doc 15 ou comentário do catálogo): onde fica, o que
-      a tabela aceita, como testar, o que conta como "pesado".
+- [x] **Registro nas tabelas** (`mods/active.ts`, e cada tabela de `src/data/` lendo `ACTIVE_MODS`
+      ao se montar), com **nome com prefixo do mod** (`exemplo:cristal_luz`). *Desvio:* não há
+      etapa de "congelar" nem alocação no boot — os ids são fixos por faixa (item 3 acima), o que
+      tira a tabela de tradução do save.
+- [x] **Sistema de tick de mod** (`mods/systems.ts`), montado na `Session` só com mod de tick
+      ligado. *Desvio:* uso de item e ouvinte de `world.setBlock` de mod ficam para o primeiro mod
+      que pedir; entram do mesmo jeito, montados no boot.
+- [x] **Tela Mods** (título → *Mods*, `ui/screens/mods.ts`): lista do catálogo, liga/desliga,
+      descrição, aviso "pode pesar" para mod declarado pesado, *Recarregar* só quando a escolha
+      difere do que está rodando. *Desvio:* a tela fica no pedaço principal (~1 KB), e não à parte:
+      um `import()` no jogo traria o ajudante de pré-carga do Vite e quebraria a regra de o jogo
+      sem mod ser um arquivo só. O custo em bytes de cada mod está no `npm run size`, não na tela.
+- [x] **Mods e mundos**: `WorldMeta.mods` guarda os mods ligados no último save; mundo jogado sem
+      mod não ganha o campo. *Desvio:* no lugar do bloco "de mod ausente", o mundo **não abre** sem
+      os mods que pede — a tela oferece ligá-los e recarregar (`mods/worldmods.ts`). Não perde dado
+      e não exige um bloco-fantasma no mesher; tirar um mod de um mundo de propósito fica para o
+      futuro.
+- [ ] **Mods e M20** — depende do M20, que não existe ainda. O desenho continua o de cima: o
+      anfitrião manda a lista no `WELCOME`, e o convidado liga os mesmos só para a sessão.
+- [x] **Mod de demonstração** (`src/mods/exemplo/`): o **Cristal de Luz**, que brilha como a pedra
+      luminosa e cura meio coração a cada 2 s quem fica em cima; o **Fragmento de Cristal**, com
+      silhueta própria; vidro + redstone → 2 fragmentos, 4 fragmentos → 1 cristal.
+- [x] **Receita para escrever mod** — doc 15 §3, M21.
 
 **Critério de aceite — o de desempenho falha o build:**
 
-- `npm run size` mede o **bundle inicial** separado dos pedaços de mod, e o bundle inicial com o
-  catálogo não pode crescer mais que o próprio catálogo (orçamento: **≤ 2 KB** gzip para a
-  infraestrutura inteira de mods que fica no pedaço principal).
-- Um teste liga o boot com zero mods e confere que **nenhum pedaço de mod é pedido**, e que as
-  tabelas congeladas, a lista de sistemas de mundo e as tabelas do mesher são **idênticas** às de
-  um boot sem a infraestrutura de mods.
-- `tests/perf.test.ts` roda sem mods, com os números de hoje e a mesma tolerância; nenhum orçamento
-  sobe.
-- O mod de demonstração: ligado, o bloco dele nasce, é quebrado, vai para o save e volta;
-  desligado, o mundo abre com o bloco "de mod ausente" no lugar; religado, o bloco volta.
+- [x] `npm run size` separa o jogo (`a/`, worker, HTML) do que só baixa com mod (`m/`); o orçamento
+      de 350 KB vale para o jogo, e o build **reprova** se o pedaço principal importar outro
+      arquivo. **Medido:** pedaço principal +1,9 KB (≤ 2 KB), worker +0,3, HTML +0,2 — o jogo foi de
+      302,2 para 304,7 KB (arredondado).
+- [x] Sem mod, **nenhum pedaço de mod é pedido** (`npm run smoke:mods`: a página baixa **um**
+      arquivo de código, o mesmo de antes do M21), e as tabelas, o índice de camadas e as tabelas
+      do mesher são **idênticas** com o global ausente ou vazio; com o mod ligado, as linhas do
+      jogo continuam idênticas (`tests/mods.test.ts`).
+- [x] `tests/perf.test.ts` sem mudança de número nem de tolerância. **Abertura em 3G rápido,
+      medida lado a lado com o build de antes:** 2 720 → 2 733 ms (+0,5%), média de duas rodadas.
+- [x] O mod de demonstração ligado: o bloco nasce, brilha (luz 14, a mesma da pedra luminosa), vai
+      para o save e volta; desligado, o jogo volta a um arquivo só e o mundo pede o mod antes de
+      abrir. *Desvio:* "abre com bloco de mod ausente" virou "não abre sem o mod" (acima).
 
 ---
 

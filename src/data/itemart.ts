@@ -18,6 +18,7 @@
  * isométrica a partir das próprias texturas, no boot (ver `render/itemsprites.ts`).
  */
 
+import { ACTIVE_MODS } from '../mods/active';
 import { DYES } from './dyes';
 import { POTIONS } from './potions';
 import type { Rgb } from '../render/texgen';
@@ -1042,6 +1043,12 @@ const SIMPLE: Record<string, [string, Rgb]> = {
 
 /** Arte por nome de item, montada uma vez no boot. */
 export const ITEM_ART: Record<string, ItemArt> = buildArt();
+
+// Silhuetas e arte de mod (M21).
+for (const mod of ACTIVE_MODS) {
+  if (mod.itemShapes !== undefined) Object.assign(SHAPES, mod.itemShapes);
+  if (mod.itemArt !== undefined) Object.assign(ITEM_ART, mod.itemArt);
+}
 
 function buildArt(): Record<string, ItemArt> {
   const out: Record<string, ItemArt> = {};

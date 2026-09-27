@@ -8,6 +8,7 @@
  * escolher onde nascer (é `spawn.ts`) e desenhar (é `render/mobrender.ts`).
  */
 
+import { copyView, nearestView } from './playerviews';
 import { MOBS, mobDef, type GoalName, type MobDef, type ShotKind } from '../data/mobs';
 import { raycast } from '../world/raycast';
 import { GOALS, type AiContext, type Goal } from './ai/goals';
@@ -122,6 +123,15 @@ export class Mobs {
   /** O que domar, alimentar e cruzar precisam daqui (`mobcare.ts`). */
   private readonly care: CareHost;
   private readonly player: PlayerView = { x: 0, y: 0, z: 0, eyeY: 0, held: -1, alive: true };
+  /**
+   * Os outros jogadores de uma sala (M20): com a lista, cada mob mira o vivo
+   * mais perto, e o golpe num deles sai por `onHitOther`. Sem sala, `null`.
+   */
+  others: PlayerView[] | null = null;
+  onHitOther: ((k: number, damage: number, pushX: number, pushZ: number) => void) | null = null;
+  private readonly own: PlayerView = { x: 0, y: 0, z: 0, eyeY: 0, held: -1, alive: true };
+  /** Quem o mob da vez mira: −1 é o jogador daqui, senão o índice em `others`. */
+  private aim = -1;
   private tickCount = 0;
   /** Explosões de morte a disparar no próximo tick: `[x, y, z, força, …]` (M16). */
   private readonly pendingExplosions: number[] = [];
@@ -272,6 +282,8 @@ export class Mobs {
     this.player.eyeY = player.eyeY;
     this.player.held = player.held;
     this.player.alive = player.alive;
+    this.aim = -1;
+    if (this.others !== null) copyView(this.own, player);
 
     const ctx = this.ctx;
     ctx.playerX = player.x;
@@ -307,6 +319,7 @@ export class Mobs {
       ctx.skyLight = this.world.getSkyLight(bx, by, bz);
       ctx.blockLight = this.world.getBlockLight(bx, by, bz);
 
+      if (this.others !== null) this.aimAt(i, this.others);
       if (this.tickEnvironment(i)) { i--; continue; }
       if ((this.tickCount + i) % TARGET_INTERVAL === 0) this.updateTarget(i);
 
@@ -493,7 +506,17 @@ export class Mobs {
     const dx = this.player.x - s.x[i];
     const dz = this.player.z - s.z[i];
     const length = Math.hypot(dx, dz) || 1;
-    this.events.onHitPlayer(damage, (dx / length) * KNOCKBACK, (dz / length) * KNOCKBACK);
+    if (this.aim >= 0) this.onHitOther?.(this.aim, damage, (dx / length) * KNOCKBACK, (dz / length) * KNOCKBACK);
+    else this.events.onHitPlayer(damage, (dx / length) * KNOCKBACK, (dz / length) * KNOCKBACK);
+  }
+
+  /** Sala aberta: o mob `i` passa a olhar para o jogador vivo mais perto. */
+  private aimAt(i: number, others: PlayerView[]): void {
+    this.aim = nearestView(this.own, others, this.store.x[i], this.store.y[i], this.store.z[i]);
+    const v = this.aim < 0 ? this.own : others[this.aim];
+    copyView(this.player, v);
+    const ctx = this.ctx;
+    ctx.playerX = v.x; ctx.playerY = v.y; ctx.playerZ = v.z; ctx.playerEyeY = v.eyeY; ctx.playerHeld = v.held;
   }
 
   private shootArrow(i: number): void {

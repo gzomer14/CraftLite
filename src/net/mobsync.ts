@@ -57,7 +57,12 @@ export class MobPuppets {
   /** O último pacote, aplicado no tick (e não na chegada). */
   private pending: Uint8Array | null = null;
 
-  constructor(private readonly store: MobStore) {}
+  /** O slot no anfitrião de cada boneco daqui: o golpe do convidado vai para ele (`ATTACK`). */
+  readonly hostSlot: Int32Array;
+
+  constructor(private readonly store: MobStore) {
+    this.hostSlot = new Int32Array(store.capacity).fill(-1);
+  }
 
   receive(bytes: Uint8Array): void {
     // Uma cópia: o `ArrayBuffer` da mensagem pode ser reaproveitado.
@@ -77,7 +82,8 @@ export class MobPuppets {
     this.stamp++;
     store.clear();
     for (let n = 0; n < count; n++) {
-      const slot = r.u16() % SLOTS;
+      const hostSlot = r.u16();
+      const slot = hostSlot % SLOTS;
       const type = r.u8();
       const variant = r.u8();
       const flags = r.u8();
@@ -87,6 +93,7 @@ export class MobPuppets {
       const hurt = r.u8(); const fuse = r.i8(); const age = r.u32();
       const i = store.spawn(type, x, y, z, variant);
       if (i < 0) break;
+      this.hostSlot[i] = hostSlot;
       const same = this.seen[slot] === previous && this.lastType[slot] === type;
       const near = same && Math.abs(this.lastX[slot] - x) + Math.abs(this.lastZ[slot] - z) < 4;
       if (near) {

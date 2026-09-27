@@ -681,6 +681,7 @@ async function boot(): Promise<void> {
   loop.start();
   const game = {
     world, player, session, pipeline, meta, save, hud, flow, controls, sceneFeed, mobRenderer, entityAtlas, tier,
+    camera: renderer.camera, canvas,
   };
   setGame(game);
   remote?.attach(game);

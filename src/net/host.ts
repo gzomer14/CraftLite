@@ -22,13 +22,21 @@
  * carregado (o alcance de visão dele).
  */
 
-import { BLOCKS } from '../data/blocks';
+import { BLOCKS, blockIdOf } from '../data/blocks';
 import { DIM_OVERWORLD } from '../data/dimensions';
+import { t } from '../core/i18n';
 import { serializeChunk } from '../save/serialize';
 import type { PlayerSave } from '../save/db';
 import type { GameHandles } from '../game/netgate';
 import type { BlockChange } from '../world/world';
 import { Avatars } from './avatars';
+import { NameTags } from './nametags';
+import { ChatBox, cleanChat, touchScreen } from './chat';
+import { HostCombat, type Loot } from './hostcombat';
+import { HostContainers } from './containersync';
+import { HostSleep } from './sleepsync';
+import { SignSync } from './signsync';
+import { reactToNetworkBlock } from './blockreact';
 import { activeModIds, localContent } from './identity';
 import { Link } from './link';
 import { writeMobs } from './mobsync';
@@ -84,7 +92,19 @@ export class HostRoom {
   ) {
     const { world, mobRenderer, entityAtlas, session } = game;
     this.avatars = new Avatars(world, mobRenderer, entityAtlas, () => session.dayNight.dayFactor);
+    this.combat = new HostCombat(game, (g, bytes) => this.send(g, bytes));
+    this.containers = new HostContainers<Guest>(session, (g, bytes) => this.send(g, bytes), (g) => g);
+    this.sleep = new HostSleep<Guest>(game, () => this.ready(), (g, bytes) => this.send(g, bytes));
   }
+
+  private readonly containers: HostContainers<Guest>;
+  private readonly sleep: HostSleep<Guest>;
+  private signText: SignSync | null = null;
+
+  private readonly combat: HostCombat;
+
+  private tags: NameTags | null = null;
+  private chat: ChatBox | null = null;
 
   get isOpen(): boolean {
     return this.open;
@@ -96,13 +116,25 @@ export class HostRoom {
     this.open = true;
     const { world, session, sceneFeed, flow } = this.game;
     this.unsubscribe = world.onBlockChange((change) => this.onBlock(change));
+    this.combat.install();
+    this.sleep.install();
+    this.signText = new SignSync(session.signs, (bytes) => {
+      for (const g of this.ready()) this.send(g, bytes);
+    });
     const base = session.tick.bind(session);
     this.baseTick = base;
     session.tick = (): void => {
       base();
       this.tick();
     };
-    sceneFeed.extraEntities = (alpha) => this.avatars.draw(alpha);
+    if (typeof document !== 'undefined') {
+      this.tags = new NameTags(this.game.camera, this.game.canvas);
+      this.chat = new ChatBox((text) => this.say(text), touchScreen());
+    }
+    sceneFeed.extraEntities = (alpha) => {
+      this.avatars.draw(alpha);
+      this.tags?.update(this.avatars.list, alpha);
+    };
     flow.roomOpen = true;
   }
 
@@ -119,8 +151,16 @@ export class HostRoom {
     this.pending?.close();
     this.pending = null;
     this.unsubscribe?.();
+    this.combat.uninstall();
+    this.sleep.uninstall();
+    this.signText?.restore();
+    this.signText = null;
     if (this.baseTick !== null) this.game.session.tick = this.baseTick;
     this.game.sceneFeed.extraEntities = null;
+    this.tags?.dispose();
+    this.tags = null;
+    this.chat?.dispose();
+    this.chat = null;
     this.game.flow.roomOpen = false;
     this.events.changed();
   }
@@ -171,6 +211,13 @@ export class HostRoom {
         case MSG.BLOCKS: this.blocks(g, r); break;
         case MSG.CHUNK_REQ: void this.chunk(g, r.u32(), r.i32(), r.i32()); break;
         case MSG.SAVE: this.saved(g, r.str()); break;
+        case MSG.CHAT: this.heard(g, cleanChat(r.str())); break;
+        case MSG.ATTACK: this.combat.attack(g, r); break;
+        case MSG.OPEN: this.containers.open(g, r); break;
+        case MSG.CSET: this.containers.set(g, r); break;
+        case MSG.CLOSE: this.containers.close(g); break;
+        case MSG.SLEEP: this.sleep.request(g, r); break;
+        case MSG.SIGN: this.signFrom(g, r); break;
         case MSG.BYE: void this.drop(g); break;
         default: break;
       }
@@ -223,17 +270,36 @@ export class HostRoom {
     }
     this.avatars.add(g.netId, g.name);
     if (g.record !== null) this.avatars.move(g.netId, g.x, g.y, g.z, g.record.yaw, g.record.pitch, 0);
+    this.combat.refresh(this.ready());
     this.events.message(g.name);
+    this.chat?.add(null, `${g.name} — ${t('net.joined')}`);
     this.events.changed();
+  }
+
+  /** O anfitrião falou: na tela dele e em todos. */
+  private say(text: string): void {
+    this.chat?.add(this.hostName, text);
+    const bytes = this.w.reset(MSG.CHAT).u8(0).str(text).view8();
+    for (const g of this.ready()) this.send(g, bytes);
+  }
+
+  /** Um convidado falou: na tela do anfitrião e nos outros convidados. */
+  private heard(from: Guest, text: string): void {
+    if (text === '') return;
+    this.chat?.add(from.name, text);
+    const bytes = this.w.reset(MSG.CHAT).u8(from.netId).str(text).view8();
+    for (const g of this.ready()) if (g !== from) this.send(g, bytes);
   }
 
   private move(g: Guest, r: PacketReader): void {
     r.u8();
     const x = r.f32(); const y = r.f32(); const z = r.f32();
-    const yaw = r.f32(); const pitch = r.f32(); const flags = r.u8();
+    const yaw = r.f32(); const pitch = r.f32(); const flags = r.u8(); const held = r.u16();
     g.x = x; g.y = y; g.z = z;
     this.avatars.move(g.netId, x, y, z, yaw, pitch, flags);
-    const out = this.wFast.reset(MSG.MOVE).u8(g.netId).f32(x).f32(y).f32(z).f32(yaw).f32(pitch).u8(flags).view8();
+    this.combat.moved(g, flags, held);
+    const out = this.wFast.reset(MSG.MOVE).u8(g.netId).f32(x).f32(y).f32(z).f32(yaw).f32(pitch).u8(flags)
+      .u16(held).view8();
     for (const other of this.guests) if (other !== g && other.ready) other.link.send(out, false);
   }
 
@@ -258,9 +324,12 @@ export class HostRoom {
       const near = dx * dx + dy * dy + dz * dz <= REACH * REACH;
       const here = world.dimension === DIM_OVERWORLD && world.isLoaded(x, z);
       if (valid && near && here) {
+        const before = world.getBlock(x, y, z);
+        const spilled = this.spill(before, state, x, y, z);
         this.applyingFrom = g.netId;
-        world.setBlock(x, y, z, state, 'network');
+        if (world.setBlock(x, y, z, state, 'network')) reactToNetworkBlock(this.game.session, x, y, z, before, state, true);
         this.applyingFrom = 0;
+        if (spilled !== null) this.combat.loot(g, spilled);
       } else {
         deny.i32(x).u16(y).i32(z).u16(here ? world.getBlock(x, y, z) : previous);
         denied++;
@@ -271,6 +340,23 @@ export class HostRoom {
       new DataView(bytes.buffer, bytes.byteOffset).setUint16(denyCountAt, denied);
       this.send(g, bytes);
     }
+  }
+
+  /**
+   * O convidado quebrou um contêiner: o conteúdo é dele, e não do chão daqui.
+   * Esvazia antes da quebra, e o `removeContainerAt` não deixa cair nada.
+   */
+  private spill(before: number, state: number, x: number, y: number, z: number): Loot | null {
+    if (blockIdOf(before) === blockIdOf(state)) return null;
+    const c = this.game.session.tiles.at(x, y, z);
+    if (c === undefined) return null;
+    const drops: Loot['drops'] = [];
+    for (let i = 0; i < c.size; i++) {
+      const stack = c.slots[i];
+      if (stack !== null) drops.push([x + 0.5, y + 0.5, z + 0.5, stack]);
+    }
+    c.slots.fill(null);
+    return { drops, xp: 0, at: [x + 0.5, y + 0.5, z + 0.5] };
   }
 
   /**
@@ -290,11 +376,21 @@ export class HostRoom {
       const column = world.getChunk(cx, cz);
       if (column !== undefined) {
         reply(column.modified ? 1 : 0, column.modified ? serializeChunk(column) : null);
+        this.signText?.column(cx, cz, (bytes) => this.send(g, bytes));
         return;
       }
     }
     const stored = save === null ? undefined : await save.loadChunkData(DIM_OVERWORLD, cx, cz);
     reply(stored === undefined ? 0 : 2, stored ?? null);
+  }
+
+  /** Um convidado escreveu numa placa: grava aqui e passa aos outros. */
+  private signFrom(from: Guest, r: PacketReader): void {
+    const sync = this.signText;
+    const change = sync === null ? null : sync.apply(r);
+    if (sync === null || change === null) return;
+    const bytes = sync.write(change.x, change.y, change.z, change.lines);
+    for (const g of this.ready()) if (g !== from) this.send(g, bytes);
   }
 
   private saved(g: Guest, json: string): void {
@@ -329,8 +425,12 @@ export class HostRoom {
       return;
     }
     this.guests.splice(i, 1);
+    this.combat.refresh(this.ready());
+    this.containers.close(g);
+    this.sleep.left(g);
     this.avatars.remove(g.netId);
     for (const other of this.ready()) this.send(other, this.w.reset(MSG.LEAVE).u8(g.netId).view8());
+    if (g.ready) this.chat?.add(null, `${g.name} — ${t('net.left')}`);
     await this.persist(g);
     g.link.close();
     this.events.changed();
@@ -355,12 +455,14 @@ export class HostRoom {
       return;
     }
     this.flushBlocks();
+    this.containers.tick();
+    this.sleep.tick();
     this.ticks++;
     const { world, player, session } = this.game;
     const home = world.dimension === DIM_OVERWORLD;
     const flags = (player.sneaking ? MOVE_SNEAK : 0) | (player.flying ? MOVE_FLYING : 0) | (home ? 0 : MOVE_AWAY);
     const move = this.wFast.reset(MSG.MOVE).u8(0).f32(player.x).f32(player.y).f32(player.z)
-      .f32(player.yaw).f32(player.pitch).u8(flags).view8();
+      .f32(player.yaw).f32(player.pitch).u8(flags).u16(session.inventory.held?.item ?? 0xffff).view8();
     for (const g of this.guests) if (g.ready) g.link.send(move, false);
     for (const g of this.guests) {
       if (!g.ready) continue;

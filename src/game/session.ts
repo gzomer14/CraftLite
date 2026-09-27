@@ -465,14 +465,24 @@ export class Session {
     arrived(this, this.events, route);
   }
 
-  /** Clique direito: abre contêiner, ara, planta ou come; senão, coloca bloco. */
-  useHeld(): boolean {
+  /**
+   * Clique direito: abre contêiner, ara, planta ou come; senão, coloca bloco.
+   * O bloco mirado só responde no tick em que o botão desceu (`fresh`): um
+   * clique de 100 ms abria e fechava a porta (campo, 2026-09-27).
+   */
+  useHeld(fresh = true): boolean {
     // Montar num barco vence tudo: o barco fica no chão e a mira acerta o
     // bloco debaixo dele.
     if (this.vehicles.tryRide()) return true;
     const target = this.interaction.state.target;
-    if (target !== null && !this.placesFirst(target.x, target.y, target.z)
-      && this.useBlock(target.x, target.y, target.z)) return true;
+    // Quem abriu a porta não coloca bloco nela segurando o botão.
+    if (fresh) this.usedBlock = false;
+    else if (this.usedBlock) return true;
+    if (target !== null && fresh && !this.placesFirst(target.x, target.y, target.z)
+      && this.useBlock(target.x, target.y, target.z)) {
+      this.usedBlock = true;
+      return true;
+    }
     if (this.itemUser.use(this.inventory.held)) return true;
 
     if (this.interaction.tryPlace(this.inventory.held)) {
@@ -616,6 +626,7 @@ export class Session {
 
   /** Direção do arremesso, reusada — largar item não aloca. */
   private readonly dropDirection = createVec3();
+  private usedBlock = false;
 
   // --- contêineres no mundo: delegados a `game/tiles.ts` ----------------------
 

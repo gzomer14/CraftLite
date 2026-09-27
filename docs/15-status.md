@@ -9,7 +9,27 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-27 15:20 — **M20 no jogo: dá para jogar junto.** Pausa → **Abrir
+**Última atualização:** 2026-09-27 16:48 — **M20, segunda volta (depois do teste em aparelho).**
+A ligação e o save do convidado passaram em campo (*"saindo e voltando não perdi nenhum item"*).
+Corrigidos os quatro relatos (§4):
+- **O buraco aberto pelo outro jogador ficava escuro.** O bloco da rede não recalculava a luz.
+- **A porta abria e fechava num clique.** O botão direito seguro usava o bloco a cada tick. É do
+  jogo, não da rede.
+- **`Ctrl`+`D` abria "salvar favorito".** A repetição da tecla passava sem `preventDefault`.
+- **A roda do mouse "às vezes não funcionava".** A roda de alta resolução manda um dente em vários
+  eventos.
+
+`Ctrl`+`W` o Chrome não entrega a página nenhuma. O **F11 do jogo** faz tela cheia com o teclado
+travado, e **W duas vezes** corre.
+
+O multijogador ganhou:
+- nome em cima do boneco e chat;
+- mobs que miram, ferem e apanham do convidado, com o saque indo para quem matou;
+- baú, fornalha, funil e suporte de preparo para o convidado;
+- dormir juntos;
+- texto de placa sincronizado.
+
+Falta ver em aparelho (§6, item 0). Antes, 15:20 — **M20 no jogo: dá para jogar junto.** Pausa → **Abrir
 para a rede local** mostra um QR; no outro aparelho, título → **Entrar numa sala**, ler, mostrar a
 resposta, e o convidado cai direto no mundo do anfitrião: vê o que foi construído, põe e quebra
 bloco (o outro vê em 0–15 ms entre dois Chrome), vê o boneco do outro e os mobs, e ao sair **fica
@@ -83,7 +103,7 @@ compartilhável).
 | **M17** Alcance | menu Idioma (doc 08 §3.11) com `en`, primeira hora guiada, seed compartilhável | ✅ concluído em 2026-09-25 | **não visto em aparelho** (visto no Chrome headless, em pt e en, desktop e celular emulado) |
 | **M18** Casa em ordem, 2ª volta | cinco módulos abaixo do teto, memória de áudio com folga, varredura de idioma pelo destino | ✅ concluído em 2026-09-25 | — |
 | **M19** Pontas soltas | enderman no End, dragão que quebra, sopra e morre devagar, ilhas de fora e portal de passagem, tint no WebGL1 | ✅ concluído em 2026-09-25 | **não visto em aparelho** (End visto no Chrome headless) |
-| **M20** Jogar junto na mesma rede | multijogador por WebRTC só na rede local, sinalização por QR, sem servidor; o mundo e os dados do convidado só no aparelho do anfitrião | 🚧 **no jogo em 2026-09-27**: sala, entrada por QR (câmera ou webcam), blocos, bonecos, mobs, convidado salvo no anfitrião — dois Chrome, `npm run smoke:room` | **não visto em aparelho**; limites da primeira versão no §5 (sem chat, sem nome em cima, só na superfície, convidado não abre baú) |
+| **M20** Jogar junto na mesma rede | multijogador por WebRTC só na rede local, sinalização por QR, sem servidor; o mundo e os dados do convidado só no aparelho do anfitrião | 🚧 **no jogo, testado em aparelho em 2026-09-27** (ligação e save do convidado); segunda volta no mesmo dia: nome, chat, combate, baú e fornalha, cama, placa — dois Chrome, `npm run smoke:room` (16 passos) | a segunda volta **não vista em aparelho**; só na superfície, o convidado só mexe onde o anfitrião carregou, sem portal (§5) |
 | **M21** Mods | mods escritos no repositório, cada um um pedaço de bundle próprio, ligados e desligados na tela Mods; **desligados, a página baixa um arquivo só, o de antes** (teste e build cobram); mod de exemplo | ✅ concluído em 2026-09-27 | **não visto em aparelho** (visto no Chrome headless); na sala do M20, mods diferentes não entram |
 
 **O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
@@ -99,21 +119,21 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-27 15:20, com o M20 no jogo, com `npm test`, `npm run build`,
+Medidas em 2026-09-27 16:48, com a segunda volta do M20, com `npm test`, `npm run build`,
 `SIZE_BUDGET_KB=350 npm run size`, `npm run smoke`, `npm run smoke:mods`, `npm run smoke:net`,
 `npm run smoke:room` e `npm run smoke:camera`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, o jogo sem mod) | **307,1 KB**, worker 42,7 (304,7 antes do M20 no jogo: os ganchos — botões, `game/netgate.ts`, `playersave.ts`, o boneco do jogador no atlas — custaram 2,4 KB no pedaço principal; 302,2 antes do M21: a infraestrutura de mods custou 1,9 KB no pedaço principal, 0,3 no worker e 0,2 no HTML; 301,8 ao fechar o M19; 298,4 ao fechar o M17; o M19 somou as ilhas de fora e o portal de passagem, e o worker foi a 42,3; 282,5 antes do M17: o inglês e as chaves custaram 15,9; o worker, 41,8, não mudou um byte; 267,3 antes do M16; 265,7 ao fechar o M15; 257,9 antes do M15; 249,5 antes do M14; 240,0 antes do M10) | < 350 KB | `npm run size` |
-| Testes | **2362**, 123 arquivos (2334 antes do M20 no jogo; 2316 ao fechar o M21; 2290 antes do M21; 2281 ao fechar o M19; 2271 ao fechar o M17; 2235 antes do M17; 2164 antes do M16; 2156 ao fechar o M15; 2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
+| Bundle (gzip, o jogo sem mod) | **307,9 KB**, worker 42,7 (307,1 antes da segunda volta do M20: teclado, roda, F11 e a mira dos mobs por jogador custaram 0,8; 304,7 antes do M20 no jogo: os ganchos — botões, `game/netgate.ts`, `playersave.ts`, o boneco do jogador no atlas — custaram 2,4 KB no pedaço principal; 302,2 antes do M21: a infraestrutura de mods custou 1,9 KB no pedaço principal, 0,3 no worker e 0,2 no HTML; 301,8 ao fechar o M19; 298,4 ao fechar o M17; o M19 somou as ilhas de fora e o portal de passagem, e o worker foi a 42,3; 282,5 antes do M17: o inglês e as chaves custaram 15,9; o worker, 41,8, não mudou um byte; 267,3 antes do M16; 265,7 ao fechar o M15; 257,9 antes do M15; 249,5 antes do M14; 240,0 antes do M10) | < 350 KB | `npm run size` |
+| Testes | **2389**, 125 arquivos (2362 antes da segunda volta do M20; 2334 antes do M20 no jogo; 2316 ao fechar o M21; 2290 antes do M21; 2281 ao fechar o M19; 2271 ao fechar o M17; 2235 antes do M17; 2164 antes do M16; 2156 ao fechar o M15; 2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
 | Smoke test de navegador | **7 passos verdes**: carregar, criar, andar 10 s, quebrar, salvar, recarregar, conferir | verde | `npm run smoke` |
 | Smoke test da rede (M20.0) | **7 passos verdes**: dois Chrome, anfitrião e convidado pela página `rede.html`, trocando os códigos como uma pessoa; ligados em candidato `host` dos dois lados; ida e volta ~0,3 ms, perda 0/300, 6–18 MB/s. Com e sem mDNS (`SMOKE_NET_MDNS=1`). **Na mesma máquina — não prova a rede Wi-Fi** | verde | `npm run smoke:net` |
-| Smoke test da sala (M20) | **12 passos verdes**: dois Chrome, anfitrião cria mundo e põe bloco, abre a sala; o convidado entra pelo título trocando os códigos; vê o bloco (chunk modificado do anfitrião); blocos nos dois sentidos; bonecos; mobs perto dele; sai pelo menu e fica salvo no anfitrião **com o inventário**; **0 mundo e 0 chunk no banco do convidado**; nenhum erro | verde, 11 seguidas | `npm run smoke:room` |
+| Smoke test da sala (M20) | **16 passos verdes**: dois Chrome, anfitrião cria mundo e põe bloco, abre a sala; o convidado entra pelo título trocando os códigos; vê o bloco (chunk modificado do anfitrião); blocos nos dois sentidos; bonecos; mobs perto dele; **o nome em cima do boneco; o chat; o baú do anfitrião aberto pelo convidado (vê 3 diamantes, tira, some lá); o poço cavado pelo convidado com luz 15 no anfitrião**; sai pelo menu e fica salvo no anfitrião **com o inventário**; **0 mundo e 0 chunk no banco do convidado**; nenhum erro | verde; `SMOKE_SHOT=arquivo.png` guarda a tela do anfitrião com nome e chat | `npm run smoke:room` |
 | Bloco do anfitrião no convidado | **0–15 ms** por viagem, mediana 1–4 ms (5 viagens por rodada; eram até 214 ms antes de o lote sair na microtarefa, sem esperar o tick) | < 150 ms (aceite do M20) | `npm run smoke:room` |
 | Smoke test da câmera (M20) | **3 passos verdes**: a webcam falsa do Chrome filma o QR do anfitrião inclinado, borrado e com ruído; o leitor próprio lê em **205–410 ms** | verde | `npm run smoke:camera` |
 | Leitor de QR próprio | lê a partir de **~4,1 px por módulo** e com trapézio de até **30%** (borda de cima com 70% da de baixo); falha com 45% e a 3,3 px/módulo; **~10 ms** por quadro de 640×480 no Node (cinco leituras e a foto sintética em 59 ms) | < 120 ms/quadro | `tests/qrread.test.ts` |
-| Pedaços da rede (`n/` e `rede.html`) | **24,2 KB**: a sala do jogo (9,6), as peças em comum com a página de prova — ligação, sinal, base32, gerador e leitor de QR, câmera (9,9) —, a página de prova (4,0 + 0,8 do HTML). **Abrir ou entrar numa sala baixa 19,5 KB.** Fora do jogo sem sala, **dentro do precache** (a sala abre sem internet) | sem orçamento (o jogo sem sala é que tem) | `npm run size` |
+| Pedaços da rede (`n/` e `rede.html`) | **30,2 KB**: a sala do jogo (15,5; era 9,6 antes de chat, nomes, combate, contêiner, cama e placa), as peças em comum com a página de prova — ligação, sinal, base32, gerador e leitor de QR, câmera (9,9) —, a página de prova (4,0 + 0,8 do HTML). **Abrir ou entrar numa sala baixa 25,4 KB.** Fora do jogo sem sala, **dentro do precache** (a sala abre sem internet) | sem orçamento (o jogo sem sala é que tem) | `npm run size` |
 | Código de pareamento | **119 caracteres** com IP à vista, **138** com mDNS (72 e 84 bytes + CRC); QR versão 7–8, lido pelo OpenCV na captura da página | QR ≤ versão 8 | `tests/net.test.ts` |
 | Smoke test dos mods (M21) | **6 passos verdes**: sem mod, **um** arquivo de código; ligar pela tela Mods; o cristal no mundo, com luz 14; desligar volta a um arquivo e apaga a escolha; o mundo pede o mod | verde | `npm run smoke:mods` |
 | Pedaços que só baixam com mod (`m/`) | **45,6 KB**: ponto de entrada 1,9, mod de exemplo 0,6, worker com mods 0,4 + o worker de sempre como pedaço, 42,7 | sem orçamento (o jogo sem mod é que tem) | `npm run size` |
@@ -2260,6 +2280,53 @@ nome em cima do boneco; a sala é na superfície; o convidado só mexe onde o an
 carregadas; mobs não miram nem apanham do convidado; o convidado não abre contêiner, não dorme e
 não passa por portal; inventário e movimento do convidado são confiados.
 
+#### M20, segunda volta — 2026-09-27 16:48
+
+Pedido, depois de jogar em aparelho: *"Testei aqui e funcionou perfeitamente a conexão, inclusive
+saindo e voltando não perdi nenhum item"*, com quatro problemas e *"Vamos focar nas
+implementações restantes para tornar o multijogador melhor"*. Os problemas estão no §4. O que o
+multijogador ganhou:
+
+- **Nome em cima do boneco** (`net/nametags.ts`). É um rótulo HTML por jogador, posicionado a cada
+  quadro pela câmera do quadro. Não é texto no mundo como a placa, porque a tinta da placa some de
+  noite. Aparece através de parede, some a mais de 64 blocos e fica apagado com o jogador agachado.
+  O `GameHandles` ganhou `camera` e `canvas`.
+- **Chat** (`net/chat.ts`). `T` ou `Enter` abre a linha, e no toque abre pelo botão 💬. As
+  mensagens somem em 10 s. Entrou e saiu também vão para o chat. O texto é limpo, com teto de 100
+  caracteres, e entra como `textContent`.
+- **Mobs e convidado** (`net/hostcombat.ts`, `net/guestcombat.ts`).
+  - `Mobs.others` é a lista dos convidados. Com ela, cada mob mira o jogador vivo mais perto
+    (`entity/playerviews.ts`); sem sala ela é `null` e o tick é o de antes.
+  - O golpe, a flecha e a explosão viram `HURT`, que o convidado aplica pelo `hurtPlayer` dele,
+    com escudo e armadura.
+  - O golpe do convidado (espada, mão, flecha do arco) vira `ATTACK` com o slot do mob no
+    anfitrião, conferido pelo tipo. O drop e o XP do mob que ele mata voltam para o chão **dele**
+    (`LOOT`).
+  - Morto, no criativo ou espectador, o convidado não é alvo (`MOVE_UNTARGETABLE`).
+- **Baú, fornalha, funil, dispensador, suporte de preparo** (`net/containersync.ts`).
+  - O convidado pede com `OPEN` e recebe o registro do save (`tileFrom`). Com a tela aberta, os
+    dois lados comparam o registro 5 vezes por segundo e mandam só o que mudou: a barra da fornalha
+    anda no convidado, e o que ele tira some no anfitrião.
+  - Fechada a tela, a cópia local é esvaziada.
+  - Baú quebrado pelo convidado: o conteúdo vai para ele, e não para o chão do anfitrião.
+  - Baú quebrado no anfitrião com a tela aberta: a tela do convidado fecha.
+- **Dormir juntos** (`net/sleepsync.ts`). Com gente na sala, clicar na cama deita o jogador por até
+  30 s, ou até ele sair de perto. A noite passa quando todos estão deitados; as regras de sempre
+  (noite, sem monstro perto) continuam. Sozinho na sala, a cama é a de antes.
+- **Texto de placa** (`net/signsync.ts`). Viaja quando alguém escreve, e as placas de cada coluna
+  vão junto com o chunk.
+- **Item na mão no `MOVE`** (u16): serve à mira dos mobs, porque o bicho segue quem tem trigo. O
+  boneco ainda não desenha o item.
+- **Protocolo 2:** um build antigo não entra numa sala nova.
+
+Visto: `npm run smoke:room` com 16 passos verdes, e a captura do anfitrião com o nome sobre o
+convidado dentro do rio e o chat no canto. Testes novos:
+- `tests/netroom.test.ts`: o zumbi vai atrás do convidado mais perto e o golpe vira `HURT`; o
+  convidado morto não é alvo; o golpe do convidado mata e o saque vai para ele; slot trocado não
+  vale; placas; a luz do buraco;
+- `tests/netcontainers.test.ts`: duas sessões de verdade, com baú, fornalha e cama;
+- `tests/keyinput.test.ts`: teclado e roda.
+
 ## 4. Correções fora de marco
 
 Bugs anteriores encontrados durante o M5 e já corrigidos — ficam registrados porque explicam
@@ -2267,6 +2334,10 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-27 | `net/blockreact.ts`, `net/host.ts`, `net/guest.ts` | **O buraco aberto pelo outro jogador ficava escuro** (M20; campo, com captura). O bloco que chega pela rede entra por `world.setBlock(…, 'network')`, e a luz só é recalculada por quem muda o bloco (a interação, o fluido): ninguém a recalculava, nem no anfitrião nem no convidado. Agora os dois recalculam, e o anfitrião também cuida de fluido, contêiner e placa, como o caminho local. Regressão em `tests/netroom.test.ts` (sem a correção, falha — conferido) e no smoke da sala (luz 15 no fundo do poço). |
+| 2026-09-27 | `game/session.ts`, `input/playeractions.ts` | **Porta, alavanca e alçapão abriam e fechavam num clique** (desde a porta do M8; campo, como convidado, mas é do jogo). Com o botão direito seguro, o pedido de usar chega a cada tick (20 por segundo), e só colocar bloco tinha intervalo: um clique de 100 ms virava a porta duas vezes. Agora o bloco mirado só responde no tick em que o botão desceu, e segurar o botão sobre a porta não coloca o bloco da mão nela. Comer e colocar bloco seguem valendo com o botão seguro. Regressão em `tests/workshop.test.ts`. |
+| 2026-09-27 | `input/keyboard.ts`, `input/controls.ts`, `input/keybinds.ts` | **`Ctrl`+`D` (correr para a direita) abria "salvar favorito" do Chrome** (campo). A repetição da tecla segurada saía antes do `preventDefault`, e as teclas de andar nem estavam na lista do jogo. Agora toda tecla de ação, inclusive na repetição, é do jogo enquanto o mouse está travado. **`Ctrl`+`W` é reservado pelo Chrome** e só se segura com a Keyboard Lock API em tela cheia pedida pela página: o **F11 do jogo** faz isso (`input/keylock.ts`), e **W duas vezes** corre sem `Ctrl`. Regressão em `tests/keyinput.test.ts`. |
+| 2026-09-27 | `input/wheelsteps.ts`, `input/controls.ts` | **A roda do mouse "às vezes não funcionava"** (campo). Cada evento `wheel` andava uma casa; a roda de alta resolução, o touchpad e o Chrome no Linux mandam um dente em vários eventos pequenos, e a seleção dava voltas e parava onde estava. Agora evento grande anda uma casa e os pequenos somam até um dente. **Hipótese, não medida no mouse do usuário.** Regressão em `tests/keyinput.test.ts`. |
 | 2026-09-25 | `render/selection.ts`, `data/textures.ts`, `render/shaders/overlay.glsl.ts` | **A rachadura de quebra não aparecia nas faces laterais** (M2; campo: *"você começa a quebrar a árvore e ele não muda a textura (…), eu só consigo ver na parte de cima ou de baixo do tronco"*). As quatro faces laterais do cubo da rachadura estavam enroladas para dentro, e o passe desenha com `CULL_FACE`: só topo e base chegavam à tela, em **qualquer** bloco — no tronco, que se quebra de lado, a quebra parecia não andar. A correção de 2026-09-10 (tom da fissura, mais abaixo nesta tabela) tratou o sintoma errado. Agora as seis faces são anti-horárias vistas de fora, e a fissura ganhou um **contorno de um pixel no tom oposto** (canal verde da mesma textura), para a textura de dois tons, como a casca de bétula. Regressões em `tests/cracks.test.ts`. |
 | 2026-09-25 | `game/inventory.ts`, `ui/containers/screen.ts`, `game/workbench.ts`, `game/guide.ts` | **Fechar a mochila jogava no chão o que estava no cursor** (M4; campo: *"ao chegar no objetivo de construir quatro tábuas (…) o objetivo não foi atualizado"*). No celular, tocar no resultado da receita põe as tábuas no cursor; fechar a tela chamava `dropCursor` (o comentário dizia "devolve"), as tábuas iam para o chão e a dica do M17 nunca as via. Agora o fechamento **guarda** na mochila (`stowCursor`) e só joga o que não couber; o livro de receitas também guarda o cursor antes de preencher (com as tábuas na mão, "bancada" falhava em silêncio). A dica passou a contar o cursor e **não** a prévia do resultado (pulava para a bancada antes de o jogador tirar as tábuas). Regressões em `tests/firsthour.test.ts` e `tests/inventory.test.ts`. |
 | 2026-09-25 | `ui/hud.ts`, `ui/containers/slotview.ts` | **A barra de durabilidade só aparecia com a mochila aberta** (M4; pedido de campo). A hotbar do HUD ganhou a mesma barra (`paintDurability`, compartilhada), e o desgaste entrou na chave de redesenho do slot. Teste em `tests/durabilitybar.test.ts`. |
@@ -2471,22 +2542,41 @@ pistão —, e o da tela, a grade de slots de um lado e os painéis do outro. N�
 - **Firefox não foi testado** (o container só tem Chromium); o SDP do Firefox é lido nos testes
   a partir de um exemplo escrito à mão.
 
+**Pendências de 2026-09-27, 16:48 (M20, segunda volta)** — conferidas no código:
+
+- **A segunda volta não foi vista em aparelho**: nome, chat (e o teclado virtual do celular),
+  combate, baú e fornalha, cama, placa. E também **F11 com a trava de teclado** (headless não tem
+  a tela cheia de verdade; se o Chrome não entregar o F11 à página, fica a tela cheia do
+  navegador, sem trava) e a correção da **roda**, que é uma hipótese.
+- **O boneco não mostra o item na mão nem o golpe.** O item já viaja no `MOVE`.
+- **Fogo da bola do blaze e efeito do frasco da bruxa não chegam ao convidado**: o tiro acerta e
+  some, sem dano (`net/hostcombat.ts`).
+- **Mob só nasce perto do anfitrião** (`entity/spawn.ts` recebe só a posição dele), e o mob longe
+  do anfitrião, além da coluna carregada, fica parado.
+- **`game/session.ts` em 715 linhas** (704), **`entity/mobs.ts` em 716** (693; a escolha do mais
+  perto foi para `entity/playerviews.ts`) e **`net/host.ts` em 518** (416; combate, contêiner,
+  cama e placa já em módulos à parte).
+
+~~Sem chat e sem nome em cima do boneco~~, ~~mobs não miram no convidado nem apanham dele~~ e
+~~o convidado não abre contêiner nem dorme; texto de placa não viaja~~: **fechadas na segunda
+volta** (§3). Seguem abertas, abaixo: superfície só, o alcance do anfitrião e o inventário
+confiado.
+
 **Pendências abertas em 2026-09-27 (M20 no jogo)** — cada uma conferida no código:
 
 - **Nada da sala foi visto em aparelho.** Só dois Chrome no mesmo container. O critério de aceite
   do doc 14 — 30 min jogando juntos, o convidado sai e volta, **T0 anfitrião com um convidado
   acima de 30 FPS**, e a ligação que **não fecha** em outra rede — é do usuário (§6, item 0).
-- **Sem chat e sem nome em cima do boneco** (`net/avatars.ts` desenha só o modelo; nenhum pacote
-  de chat em `net/protocol.ts`). Quem entra e sai aparece como mensagem no HUD.
+- ~~Sem chat e sem nome em cima do boneco~~ — fechada na segunda volta.
 - **A sala é na superfície.** Com o anfitrião no Nether ou no End, os pedidos de bloco do
   convidado são recusados, os chunks saem do banco e o boneco do anfitrião some (`MOVE_AWAY`). O
   convidado não passa por portal (`follower.ts`: `travel.tick` devolve `false`).
 - **O convidado só mexe onde o anfitrião tem colunas carregadas** (`host.ts`, `world.isLoaded`):
   longe do anfitrião, além do alcance de visão dele, todo bloco é recusado.
-- **Mobs não miram no convidado nem apanham dele**: a IA do anfitrião só conhece o jogador do
-  anfitrião, e o golpe do convidado não vira pacote. Nascimento de mob também só olha o anfitrião.
-- **O convidado não abre contêiner nem dorme** (`follower.ts`, com mensagem na tela); a cama só
-  marca o ponto de renascer. Texto de placa não viaja (só o bloco).
+- ~~Mobs não miram no convidado nem apanham dele~~ — fechada na segunda volta (nascimento de mob
+  continua só perto do anfitrião).
+- ~~O convidado não abre contêiner nem dorme; texto de placa não viaja~~ — fechada na segunda
+  volta.
 - **Inventário e movimento do convidado são confiados** — desvio consciente do doc 12 §6
   (`host.ts`, comentário do módulo): o anfitrião não confere o item usado nem refaz o movimento.
   O alcance do pedido de bloco é 10, não 6 (folga do atraso).
@@ -2727,8 +2817,16 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
      saiu, com o mesmo inventário?
    - **No T0, como anfitrião com um convidado:** FPS no F3 (critério: acima de 30).
    - Um aparelho nos dados móveis tentando entrar: **não pode fechar a ligação**.
-   - Depois disso, o que o usuário priorizar dos limites do §5 (chat e nome em cima são os
-     candidatos naturais).
+   - **Segunda volta (16:48):**
+     - O nome em cima do outro, e o chat: `T` no computador, 💬 no celular.
+     - Um zumbi à noite indo atrás do convidado e batendo nele; o convidado matando uma vaca e
+       pegando a carne.
+     - O convidado abrindo o baú e a fornalha do anfitrião.
+     - Os dois dormindo: um deita e espera, o outro deita, e amanhece.
+     - Uma placa escrita por um e lida pelo outro.
+     - Porta com um clique só, roda do mouse, F11 e `Ctrl`+`W`, `Ctrl`+`D`.
+   - Depois disso, o que o usuário priorizar do §5: portal e outras dimensões, o alcance além do
+     anfitrião, mob nascendo perto do convidado, item na mão do boneco.
    - **Mods a pedido** continuam possíveis a qualquer momento (receita no §3, M21).
    - **No celular, o M21:** abrir o PWA sem mod e **offline** (o boot e o precache mudaram), ligar
      o Exemplo na tela Mods, pôr um Cristal de Luz de noite, desligar.

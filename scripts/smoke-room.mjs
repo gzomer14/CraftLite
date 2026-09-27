@@ -18,7 +18,7 @@
  */
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
-import { existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { extname, join, normalize } from 'node:path';
 import { conectar } from './cdp.mjs';
@@ -241,7 +241,79 @@ try {
     noAnfitriao.mobs > 0 && Math.abs(noConvidado.mobs - noAnfitriao.mobs) <= 1,
     `${noConvidado.mobs} no convidado; ${noAnfitriao.mobs} perto dele no anfitrião, de ${noAnfitriao.total}`);
 
-  // 9. O convidado guarda um item e sai pelo menu: fica no mundo do anfitrião.
+  // 9. O nome em cima do boneco: o convidado se afasta, o anfitrião olha para ele.
+  await guest.avaliar(`(() => {
+    const p = window.__craftlite.player;
+    p.setPosition(p.x + 6, p.y + 1, p.z);
+    return true;
+  })()`);
+  await esperar(800);
+  await host.avaliar(`(() => {
+    const p = window.__craftlite.player;
+    const g = window.__craftliteNet.room().guests[0];
+    p.yaw = Math.atan2(g.x - p.x, g.z - p.z);
+    // Para baixo é positivo: mira a cabeça dele, que pode estar num barranco.
+    p.pitch = Math.atan2(p.y + 1.62 - (g.y + 2.1), Math.hypot(g.x - p.x, g.z - p.z));
+    return true;
+  })()`);
+  const nome = await ate(host, "(() => { const e = document.querySelector('#name-tags div'); return e !== null && !e.hidden ? e.textContent : false; })()", 10000)
+    .catch(() => host.avaliar("document.querySelector('#name-tags div')?.textContent ?? 'nenhum'"));
+  passo('o anfitrião vê o nome do convidado em cima do boneco', nome === 'Visita', String(nome));
+
+  // 10. Chat: o convidado escreve, o anfitrião lê.
+  await guest.avaliar(`(() => {
+    const input = document.querySelector('#chat input');
+    input.value = 'oi, cheguei';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    return true;
+  })()`);
+  const lido = await ate(host, "document.querySelector('#chat .lines')?.textContent.includes('Visita: oi, cheguei') ?? false", 10000);
+  passo('o anfitrião lê no chat o que o convidado escreveu', lido === true);
+  // `SMOKE_SHOT=arquivo.png`: a tela do anfitrião agora (nome e chat), para ver com os olhos.
+  if (process.env.SMOKE_SHOT) {
+    await host.avaliar("(__smoke.botao(document, 'Voltar ao jogo')?.click(), true)");
+    await esperar(600);
+    const { data } = await host.enviar('Page.captureScreenshot', { format: 'png' });
+    writeFileSync(process.env.SMOKE_SHOT, Buffer.from(data, 'base64'));
+  }
+
+  // 11. Baú: o anfitrião guarda, o convidado abre e tira; o anfitrião fica sabendo.
+  const bau = JSON.parse(await host.avaliar(`(() => {
+    const { world, session } = window.__craftlite;
+    const g = window.__craftliteNet.room().guests[0];
+    const x = Math.floor(g.x) + 1, y = Math.floor(g.y), z = Math.floor(g.z) + 1;
+    const chest = window.__craftlite.items.get('chest').placesBlock;
+    world.setBlock(x, y, z, chest, 'player');
+    session.tiles.create(x, y, z, chest);
+    session.tiles.at(x, y, z).set(0, { item: window.__craftlite.items.get('diamond').id, count: 3, damage: 0 });
+    return JSON.stringify([x, y, z]);
+  })()`));
+  const [bx, by, bz] = bau;
+  await ate(guest, `window.__craftlite.world.getBlock(${bx}, ${by}, ${bz}) === __smoke.id('chest')`, 10000);
+  await guest.avaliar(`window.__craftlite.session.workbench.open(${bx}, ${by}, ${bz}), true`);
+  const viu = await ate(guest, `(() => { const s = window.__craftlite.session;
+    return s.workbench.openScreen === 'chest' && s.tiles.at(${bx}, ${by}, ${bz})?.get(0)?.count === 3; })()`, 10000);
+  await guest.avaliar(`window.__craftlite.session.tiles.at(${bx}, ${by}, ${bz}).set(0, null), true`);
+  const tirou = await ate(host, `window.__craftlite.session.tiles.at(${bx}, ${by}, ${bz}).get(0) === null`, 10000);
+  await guest.avaliar('window.__craftlite.session.workbench.closeScreen(), true');
+  passo('o convidado abre o baú do anfitrião, vê os 3 diamantes e o que tira some lá', viu === true && tirou === true);
+
+  // 12. Luz: o poço que o convidado cava fica claro no anfitrião (era escuro).
+  const poco = JSON.parse(await guest.avaliar(`(() => {
+    const { world, player } = window.__craftlite;
+    const x = Math.floor(player.x) - 1, z = Math.floor(player.z) + 2;
+    let y = 120;
+    while (y > 1 && world.getBlock(x, y, z) === 0) y--;
+    for (let d = 0; d < 3; d++) world.setBlock(x, y - d, z, 0, 'player');
+    return JSON.stringify([x, y - 2, z]);
+  })()`));
+  const claro = await ate(host, `window.__craftlite.world.getBlock(${poco[0]}, ${poco[1]}, ${poco[2]}) === 0
+    && window.__craftlite.world.getSkyLight(${poco[0]}, ${poco[1]}, ${poco[2]}) >= 12`, 10000)
+    .catch(() => false);
+  const luz = await host.avaliar(`window.__craftlite.world.getSkyLight(${poco[0]}, ${poco[1]}, ${poco[2]})`);
+  passo('o fundo do poço cavado pelo convidado recebe a luz do céu no anfitrião', claro === true, `luz ${luz}`);
+
+  // 13. O convidado guarda um item e sai pelo menu: fica no mundo do anfitrião.
   const idConvidado = await guest.avaliar(`(() => {
     window.__craftlite.session.inventory.set(8, { item: window.__craftlite.items.get('diamond').id, count: 7, damage: 0 });
     return localStorage.getItem('craftlite.netid');
@@ -257,7 +329,7 @@ try {
   passo('o convidado sai e fica guardado no mundo do anfitrião, com o inventário', guardado.diamantes === 7 && guardado.mundo,
     JSON.stringify(guardado));
 
-  // 10. Nada do mundo no banco do convidado.
+  // 14. Nada do mundo no banco do convidado.
   await ate(guest, "window.__smoke === undefined && document.readyState === 'complete' && document.getElementById('title-screen') !== null", 30000);
   const banco = await guest.avaliar(`new Promise((resolve) => {
     const open = indexedDB.open('craftlite');

@@ -634,13 +634,18 @@ O que dá para fazer sem servidor:
 - [ ] **Mais de um jogador no mundo**: o anel de chunks carregados, o nascimento de mobs, a mira
       dos mobs, o sono (todos na cama) e os portais passam a olhar para uma lista de jogadores, e
       não para um. **Com a sala fechada, a lista tem um jogador e o código faz o que faz hoje.**
-      **Não feito:** mobs, sono e portais seguem olhando só o anfitrião; o convidado não dorme nem
-      passa por portal, e a sala é na superfície (doc 15 §5).
+      **Em parte (2026-09-27, segunda volta):** a mira dos mobs olha a lista (cada mob mira o
+      jogador vivo mais perto) e o sono espera todos na cama. **Não feito:** o anel de chunks e o
+      nascimento de mobs seguem no anfitrião, e o convidado não passa por portal — a sala é na
+      superfície (doc 15 §5).
 - [ ] **Ver o outro**: o boneco do jogador (acabamento pós-M7) com nome em cima, interpolado com
       100 ms de atraso (doc 12 §5); item na mão; golpe e dano entre jogadores **desligado por
       padrão** (opção da sala). **Em parte:** o boneco interpolado (`net/avatars.ts`) e os mobs
-      do anfitrião no convidado (`net/mobsync.ts`); sem nome em cima e sem item na mão.
-- [ ] **Chat** curto, com teclado virtual no celular, e as mensagens de entrou/saiu.
+      do anfitrião no convidado (`net/mobsync.ts`); **nome em cima** desde a segunda volta
+      (`net/nametags.ts`). Sem item na mão (já viaja no `MOVE`); golpe entre jogadores não existe
+      (o padrão pedido é desligado).
+- [x] **Chat** curto, com teclado virtual no celular, e as mensagens de entrou/saiu. **Feito na
+      segunda volta** (`net/chat.ts`): `T`/`Enter` no computador, botão 💬 no toque.
 - [x] **Caiu a rede**: o convidado volta ao título com aviso, e o anfitrião salva o convidado na
       hora em que ele some. O anfitrião que fecha o jogo derruba a sala (não há migração de
       anfitrião). **Feito:** o convidado vê o aviso e volta ao título em 4 s; o anfitrião guarda o

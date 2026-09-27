@@ -43,6 +43,12 @@ export class Keybinds {
     return true;
   }
 
+  /** true se alguma ação usa a tecla (`code` físico). */
+  uses(code: string): boolean {
+    for (const c of this.codes.values()) if (c === code) return true;
+    return false;
+  }
+
   /** Ações que dividem a tecla de `id`, sem contar ela mesma. */
   conflicts(id: ActionId): ActionId[] {
     const code = this.codeFor(id);

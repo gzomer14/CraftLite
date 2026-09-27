@@ -175,6 +175,9 @@ describe('varredura do código', () => {
     // Conferência de mod (M21): a lista vai para o `console.warn` do
     // `mods/boot.ts`, para quem escreve mod; nunca aparece em jogo.
     ['src/mods/validate.ts', /./],
+    // Textos da página de prova de conexão (M20.0): dicionário próprio em pt e
+    // en, porque a página não pode importar os do jogo (`net/probetext.ts`).
+    ['src/net/probetext.ts', /./],
   ];
 
   it('nenhum texto de interface escrito direto no código', () => {

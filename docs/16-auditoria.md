@@ -12,6 +12,44 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-27 03:10 → 04:00 · M20.0: a prova de conexão
+
+**Pedido:** *"Agora vamos partir para implementação do M20 Multijogador"*.
+
+**Resultado:** começou pelo M20.0, como o doc 14 manda — a ligação direta entre dois aparelhos é o
+risco do marco e só se mede em aparelho. Entregue a página `rede.html`, fora do jogo, com as peças
+que o M20 vai reusar: sinalização compacta (SDP → 72–84 bytes → SDP mínimo remontado), código em
+texto base32 com CRC-16, gerador de QR próprio (conferido com o OpenCV), leitura por
+`BarcodeDetector`, e a ligação WebRTC com `iceServers: []` e dois canais. Depois de ligar, mede ida
+e volta, perda e velocidade e gera um relatório para copiar. `npm run smoke:net` liga dois Chrome na
+mesma máquina pela página, com e sem mDNS. Achado no caminho: com mDNS, a coleta de candidatos só
+terminava no tempo esgotado (4 s para o código aparecer); agora termina 600 ms depois do último
+candidato UDP. O jogo não mudou (304,7 KB). **Falta o teste do usuário em celular e computador na
+mesma rede Wi-Fi** (doc 15 §6, item 0). 2334 testes; smoke, smoke dos mods e smoke da rede verdes.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| + | `src/net/signal.ts` | sinal compacto: credenciais ICE, impressão digital DTLS, papel, candidatos; SDP remontado |
+| + | `src/net/base32.ts` | código em texto base32 com CRC-16 e correção de 0/1/8 |
+| + | `src/net/qr.ts` | gerador de QR (alfanumérico, nível M, versões 1–10) e pintura em canvas |
+| + | `src/net/scan.ts` | leitura de QR pela câmera com `BarcodeDetector` |
+| + | `src/net/link.ts` | ligação WebRTC sem STUN/TURN, dois canais, coleta com espera curta, par escolhido |
+| + | `src/net/probe.ts` | a página de prova: fluxo anfitrião/convidado, medições, relatório |
+| + | `src/net/probetext.ts` | textos da página em pt e en |
+| + | `rede.html` | a página, com o estilo inline |
+| ~ | `vite.config.ts` | entrada `rede`, saída em `n/`, fora do precache; plugin de boot só no `index.html` |
+| ~ | `scripts/size-report.mjs` | página de rede contada à parte do jogo |
+| + | `scripts/smoke-net.mjs` | dois Chrome se ligando pela página, com e sem mDNS |
+| ~ | `package.json` | `npm run smoke:net` |
+| + | `tests/net.test.ts` | código em texto, sinal com SDP de Chrome e Firefox, QR contra a norma, isolamento |
+| ~ | `tests/i18n.test.ts` | `net/probetext.ts` isento (dicionário próprio) |
+| ~ | `docs/14-roadmap.md` | M20 🚧; M20.0 construída; sinalização: feito e falta |
+| ~ | `docs/15-status.md` | data; §1; §2 (testes, smoke da rede, página, código); §3 M20; §5; §6 item 0 |
+| ~ | `docs/16-auditoria.md` | esta sessão |
+| ~ | `README.md` | M20 em andamento, 2334 testes, `smoke:net`, pasta `net/` |
+
+---
+
 ## 2026-09-27 02:15 → 03:07 · M21: mods
 
 **Pedido:** *"Pode começar pelo M21, os mods"*.

@@ -38,7 +38,10 @@ roteiro está no doc 15 §6. O **M21** (2026-09-27) abriu o jogo a **mods**: cad
 ligado, a página baixa o mesmo arquivo único de antes — o build e um smoke test de navegador
 (`npm run smoke:mods`) cobram isso —, e o primeiro mod, o de exemplo, traz um cristal que brilha e
 cura quem fica em cima. O **M20**, multijogador só na rede local (celular com computador, sem
-servidor), está planejado e começa por uma prova de conexão em dois aparelhos (doc 14).
+servidor), começou pela prova de conexão: a página `rede.html` liga dois aparelhos trocando um QR ou
+um código em texto e mede a ligação. Ela já liga dois navegadores na mesma máquina
+(`npm run smoke:net`); o resto do M20 espera o teste num celular e num computador de verdade (doc 15
+§6).
 
 - **M0 — esqueleto:** Vite + TypeScript strict, renderer WebGL2 próprio com fallback WebGL1,
   detecção de tier, loop de 20 Hz com interpolação, gerador procedural de texturas alimentando um
@@ -172,11 +175,12 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 2316 testes (vitest)
+npm test           # 2334 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
 npm run smoke      # abre o jogo num Chrome headless e joga o roteiro do doc 14 (precisa do build)
 npm run smoke:mods # liga e desliga o mod de exemplo e confere que o jogo sem mod baixa um arquivo só
+npm run smoke:net  # dois Chrome se ligam pela página de prova de rede (rede.html)
 npm run icons      # regenera os ícones do PWA
 ```
 
@@ -237,6 +241,7 @@ src/
     mesh/shapes.ts          formas não-cubo como caixas (desenho e colisão)
   workers/                  protocolo tipado + worker de chunk (e o worker com mods)
   mods/                     mods (M21): tipos, catálogo, carregadores, ponto de entrada; um mod por pasta
+  net/                      rede local (M20): sinal compacto, código em texto, QR, ligação WebRTC, página de prova
   render/                   gl, atlas, texgen, mesh, terrain, sky, selection, particles,
                             entityatlas, skingen, mobrender, pack (resource pack do jogador)
   entity/                   jogador, itens no chão, orbes de XP, barcos, mobs (store, spawn,
@@ -253,7 +258,7 @@ src/
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      2316 testes, incluindo orçamento de performance e de luz
+tests/                      2334 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios

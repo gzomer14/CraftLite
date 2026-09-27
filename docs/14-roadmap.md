@@ -547,7 +547,7 @@ dois marcos, e se ela falhar o desenho de sinalização muda antes de escrever o
 
 ---
 
-## M20 — Jogar junto na mesma rede ⬜
+## M20 — Jogar junto na mesma rede 🚧
 
 > Multijogador **só na rede local**, entre celular e computador, **sem servidor nenhum**. Um
 > aparelho abre uma sala a partir de um mundo dele; quem está na mesma rede entra. O mundo, e tudo
@@ -579,11 +579,21 @@ O que dá para fazer sem servidor:
       computador para ler o QR. **Se a prova falhar, o marco para e volta para decisão do
       usuário** — as alternativas (servidor de sinalização local, servidor na nuvem) mudam o que
       foi pedido.
+      **Construída em 2026-09-27, esperando os aparelhos:** `rede.html` (`src/net/probe.ts`), um
+      ponto de entrada à parte que o jogo não baixa. Mede 500 idas e voltas, a perda de 300
+      mensagens no canal rápido e a velocidade com 4 MB, e escreve um relatório para copiar.
+      `npm run smoke:net` liga dois Chrome na mesma máquina pela página, com e sem mDNS. O que
+      falta é o que só o usuário pode fazer: rodar em dois aparelhos numa rede Wi-Fi de verdade.
 - [ ] **A sinalização compacta** (`net/pairing.ts`): descrição reduzida ao que importa (chave
       ICE, impressão digital DTLS, candidatos) em ~100 bytes, com versão e verificação. Leitor de
       QR **escrito aqui** (zero dependência, doc 13), com `BarcodeDetector` quando o aparelho tem.
       O certificado do anfitrião fica guardado (`RTCCertificate` vai para o IndexedDB), então um
       convidado já pareado reconhece o mesmo anfitrião da próxima vez.
+      **Feito:** `net/signal.ts` (72–84 bytes, SDP remontado aceito pelo Chrome), `net/base32.ts`
+      (texto com CRC-16), `net/qr.ts` (gerador, conferido com o leitor do OpenCV), leitura por
+      `BarcodeDetector` (`net/scan.ts`). **Falta:** leitor de QR próprio para computador sem
+      `BarcodeDetector` (Windows, Linux) e o certificado guardado — os dois dependem do que a prova
+      mostrar.
 - [ ] **Abrir sala a partir do mundo** (pausa → *Abrir para a rede local*). Só o dono do mundo
       tem o botão, porque o mundo só existe no aparelho dele. Nome do anfitrião, limite de
       jogadores (**4 no total com anfitrião T0**, 6 em T1+), lista de quem está dentro com

@@ -23,12 +23,17 @@ export default defineConfig({
         index: resolve(__dirname, 'index.html'),
         main: resolve(__dirname, 'src/main.ts'),
         modboot: resolve(__dirname, 'src/mods/boot.ts'),
+        // Prova de conexão do M20 (M20.0): página à parte, sem o jogo.
+        rede: resolve(__dirname, 'rede.html'),
       },
       output: {
         // `a/` é o jogo; `m/` é o que só baixa com mod ligado. O relatório de
         // tamanho e o precache do service worker separam pela pasta.
-        entryFileNames: (chunk) => (chunk.name === 'modboot' ? 'm/[hash].js' : 'a/[hash].js'),
-        chunkFileNames: (chunk) => (isModChunk(chunk.facadeModuleId) ? 'm/[hash].js' : 'a/[hash].js'),
+        // `n/` é a página de rede (M20.0), que o jogo também não baixa.
+        entryFileNames: (chunk) => (chunk.name === 'modboot' ? 'm/[hash].js'
+          : chunk.name === 'rede' ? 'n/[hash].js' : 'a/[hash].js'),
+        chunkFileNames: (chunk) => (isModChunk(chunk.facadeModuleId) ? 'm/[hash].js'
+          : isNetChunk(chunk.facadeModuleId) ? 'n/[hash].js' : 'a/[hash].js'),
         assetFileNames: 'a/[hash][extname]',
       },
     },
@@ -67,6 +72,7 @@ export default defineConfig({
       transformIndexHtml: {
         order: 'post',
         handler(html, ctx) {
+          if (!ctx.filename.endsWith('index.html')) return html;
           const files = new Map<string, string>();
           for (const chunk of Object.values(ctx.bundle ?? {})) {
             if (chunk.type === 'chunk' && chunk.isEntry) files.set(chunk.name, chunk.fileName);
@@ -103,7 +109,8 @@ export default defineConfig({
           // liga o mod e o arquivo passa pela rede (stale-while-revalidate).
           const assets = listAssets(dist, dist)
             .filter((file) => file !== 'sw.js' && file !== 'index.html'
-              && file !== 'manifest.webmanifest' && !file.startsWith('m/'))
+              && file !== 'manifest.webmanifest' && !file.startsWith('m/')
+              && !file.startsWith('n/') && file !== 'rede.html')
             .map((file) => `./${file}`);
           writeFileSync(
             path,
@@ -133,4 +140,9 @@ function listAssets(dir: string, root: string): string[] {
 /** Pedaço que só existe por causa de um mod (`src/mods/<id>/`). */
 function isModChunk(facade: string | null): boolean {
   return facade !== null && /[\\/]src[\\/]mods[\\/][^\\/]+[\\/]/.test(facade);
+}
+
+/** Pedaço da página de rede (`src/net/`). */
+function isNetChunk(facade: string | null): boolean {
+  return facade !== null && /[\\/]src[\\/]net[\\/]/.test(facade);
 }

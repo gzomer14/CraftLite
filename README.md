@@ -45,7 +45,17 @@ rede se ligaram em ~0,1 s, com ~4,5 ms de ida e volta. **No mesmo dia, entrou no
 QR (câmera no celular, webcam no computador, com um leitor de QR escrito aqui) e o convidado entra
 no mundo do anfitrião — blocos nos dois sentidos, o boneco do outro, os mobs, e o convidado salvo
 **no aparelho do anfitrião**, sem deixar mundo nenhum no dele. Jogar sozinho não baixa nada disso.
-Ainda não visto em aparelho; sem chat e só na superfície, por enquanto (doc 15 §5).
+Testado em aparelho no mesmo dia (a ligação e o save do convidado passaram). Na segunda volta
+entraram:
+- nome em cima de cada jogador e chat;
+- mobs que miram e ferem o convidado, e apanham dele;
+- baú e fornalha para o convidado;
+- dormir juntos;
+- texto de placa.
+
+Na terceira volta, a sala passou a seguir o anfitrião entre dimensões: ele atravessa o portal e
+todos vão junto. O anfitrião mantém o mundo rodando em volta de cada convidado, e o boneco mostra
+o item na mão.
 
 - **M0 — esqueleto:** Vite + TypeScript strict, renderer WebGL2 próprio com fallback WebGL1,
   detecção de tier, loop de 20 Hz com interpolação, gerador procedural de texturas alimentando um
@@ -166,7 +176,7 @@ Abre em **2,8 s em 3G rápido** (critério: < 5 s) e aguentou **92 min de voo co
 erro**, com o heap estável e o anel de chunks fixo em 489 colunas ao longo de 67 mil blocos — os
 dois medidos por `npm run slow-network` e `npm run soak`, que dirigem um Chrome de verdade.
 
-**307 KB gzip** no total (código + worker + HTML + service worker, com o inglês; o que só baixa com mod ligado ou com sala aberta fica à parte), zero assets baixados
+**308 KB gzip** no total (código + worker + HTML + service worker, com o inglês; o que só baixa com mod ligado ou com sala aberta fica à parte), zero assets baixados
 além de dois ícones de PWA de 6,7 KB, gerados por código.
 
 Validado em aparelho alvo (**Galaxy J7 Metal**, Android 7, 2 GB, Mali-T830) em 2026-09-12:
@@ -179,21 +189,23 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 2362 testes (vitest)
+npm test           # 2398 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
 npm run smoke      # abre o jogo num Chrome headless e joga o roteiro do doc 14 (precisa do build)
 npm run smoke:mods # liga e desliga o mod de exemplo e confere que o jogo sem mod baixa um arquivo só
 npm run smoke:net  # dois Chrome se ligam pela página de prova de rede (rede.html)
-npm run smoke:room # dois Chrome jogam juntos: sala, blocos, bonecos, mobs, convidado salvo no anfitrião
+npm run smoke:room # dois Chrome jogam juntos: sala, blocos, nome, chat, baú, mobs, Nether, convidado salvo no anfitrião
 npm run smoke:camera # o leitor de QR próprio lê o QR da sala por uma webcam falsa
 npm run icons      # regenera os ícones do PWA
 ```
 
 **Teclado e mouse:** clique para jogar, `WASD` mover, `Espaço` pular, `Shift` agachar,
-`Ctrl` correr, botão esquerdo quebrar **ou atacar o mob mirado**, direito colocar (e usar cama,
+`Ctrl` ou `W` duas vezes correr, botão esquerdo quebrar **ou atacar o mob mirado**, direito colocar (e usar cama,
 baú, bancada, fornalha), botão do meio copiar bloco, `1`–`9` e roda do mouse trocam de item,
-`E` inventário, `Esc` pausa, `F3` debug. Espaço duas vezes alterna o voo no criativo.
+`E` inventário, `Esc` pausa, `F3` debug, `F11` tela cheia (no Chrome, com o teclado travado para
+o jogo: `Ctrl`+`W` deixa de fechar a aba), `T` chat numa sala. Espaço duas vezes alterna o voo no
+criativo.
 
 **Som:** o áudio só liga no primeiro clique ou toque (política de autoplay do navegador) e é
 todo sintetizado no boot — nada é baixado. Volume, música e legendas de som ficam nas opções.
@@ -264,7 +276,7 @@ src/
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      2362 testes, incluindo orçamento de performance e de luz
+tests/                      2398 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios

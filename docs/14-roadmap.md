@@ -631,16 +631,23 @@ O que dá para fazer sem servidor:
       configurações do aparelho dele — ao voltar, ele reaparece onde saiu, com o que tinha. O
       anfitrião salva no mesmo ritmo do save de hoje. **Feito**: o convidado manda o próprio
       `PlayerSave` a cada 10 s e ao sair; o anfitrião o grava com o `worldId` dele.
-- [ ] **Mais de um jogador no mundo**: o anel de chunks carregados, o nascimento de mobs, a mira
+- [x] **Mais de um jogador no mundo**: o anel de chunks carregados, o nascimento de mobs, a mira
       dos mobs, o sono (todos na cama) e os portais passam a olhar para uma lista de jogadores, e
       não para um. **Com a sala fechada, a lista tem um jogador e o código faz o que faz hoje.**
-      **Não feito:** mobs, sono e portais seguem olhando só o anfitrião; o convidado não dorme nem
-      passa por portal, e a sala é na superfície (doc 15 §5).
+      **Feito, com um desvio (2026-09-27, segunda e terceira voltas):** a mira dos mobs olha a
+      lista (cada mob mira o jogador vivo mais perto), o sono espera todos na cama, o anel de
+      chunks ganhou âncoras em volta de cada convidado e o spawn roda em volta de cada um.
+      **Desvio:** o portal é do anfitrião. A sala inteira segue a dimensão dele
+      (`net/dimensionsync.ts`), porque manter duas dimensões carregadas é o que o M7 evitou por
+      memória (doc 15 §3).
 - [ ] **Ver o outro**: o boneco do jogador (acabamento pós-M7) com nome em cima, interpolado com
       100 ms de atraso (doc 12 §5); item na mão; golpe e dano entre jogadores **desligado por
       padrão** (opção da sala). **Em parte:** o boneco interpolado (`net/avatars.ts`) e os mobs
-      do anfitrião no convidado (`net/mobsync.ts`); sem nome em cima e sem item na mão.
-- [ ] **Chat** curto, com teclado virtual no celular, e as mensagens de entrou/saiu.
+      do anfitrião no convidado (`net/mobsync.ts`); **nome em cima** desde a segunda volta
+      (`net/nametags.ts`) e **item na mão** desde a terceira volta. Sem o braço balançando; golpe
+      entre jogadores não existe (o padrão pedido é desligado).
+- [x] **Chat** curto, com teclado virtual no celular, e as mensagens de entrou/saiu. **Feito na
+      segunda volta** (`net/chat.ts`): `T`/`Enter` no computador, botão 💬 no toque.
 - [x] **Caiu a rede**: o convidado volta ao título com aviso, e o anfitrião salva o convidado na
       hora em que ele some. O anfitrião que fecha o jogo derruba a sala (não há migração de
       anfitrião). **Feito:** o convidado vê o aviso e volta ao título em 4 s; o anfitrião guarda o

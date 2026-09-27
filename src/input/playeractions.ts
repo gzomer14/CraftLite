@@ -24,6 +24,8 @@ export class PlayerActions {
   /** Botões dedicados do Modo B de toque (doc 09 §2.3). */
   modeBBreaking = false;
   modeBPlace = false;
+  /** O botão de usar já estava descido no tick anterior (`Session.useHeld`). */
+  private wasPlacing = false;
 
   constructor(controls: Controls, session: Session, camera: Camera, hand: HandRenderer) {
     this.controls = controls;
@@ -90,9 +92,10 @@ export class PlayerActions {
     if (!placing) session.cancelEating();
     if (placing) {
       // Clicar num mob (domar, tosquiar) vence colocar bloco.
-      if (!session.useOnMob(dir[0], dir[1], dir[2])) session.useHeld();
+      if (!session.useOnMob(dir[0], dir[1], dir[2])) session.useHeld(!this.wasPlacing);
       hand.swing();
     }
+    this.wasPlacing = placing;
     this.modeBPlace = false;
   }
 }

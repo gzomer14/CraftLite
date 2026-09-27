@@ -7,17 +7,25 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
-  MSG, PROTOCOL, PacketReader, PacketWriter, REFUSE, contentHash, readHello, readWelcome, writeHello, writeWelcome,
+  MOVE_AWAY, MSG, PROTOCOL, PacketReader, PacketWriter, REFUSE, contentHash, readHello, readWelcome, writeHello, writeWelcome,
 } from '../src/net/protocol';
 import { MobPuppets, writeMobs, MOB_RADIUS } from '../src/net/mobsync';
 import { HostRoom, REACH, type Guest } from '../src/net/host';
 import { localContent } from '../src/net/identity';
+import { Avatars } from '../src/net/avatars';
 import { MobStore } from '../src/entity/mobstore';
+import { Mobs } from '../src/entity/mobs';
+import { MOB_BY_NAME } from '../src/data/mobs';
+import { FLAG_IGNITES } from '../src/entity/projectile';
 import { World } from '../src/world/world';
 import { ChunkColumn } from '../src/world/chunk';
 import { STONE, makeState } from '../src/data/blocks';
 import { deserializeChunk } from '../src/save/serialize';
 import type { GameHandles } from '../src/game/netgate';
+import { Lighting } from '../src/world/lighting';
+import { computeChunkLight } from '../src/world/gen/terrain';
+import { reactToNetworkBlock } from '../src/net/blockreact';
+import { SignStore } from '../src/game/signs';
 
 describe('protocolo', () => {
   it('HELLO e WELCOME vão e voltam, com acento e emoji no nome', () => {
@@ -106,20 +114,57 @@ function fakeLink(): FakeLink {
   };
 }
 
-function setup(): { room: HostRoom; world: World; saved: string[] } {
+/** Um chão de pedra de Y=60 a 63, com a luz do céu já calculada. */
+function stoneFloor(world: World): void {
+  const stone = makeState(STONE);
+  for (let cx = -1; cx <= 1; cx++) {
+    for (let cz = -1; cz <= 1; cz++) {
+      const column = new ChunkColumn(cx, cz);
+      for (let y = 60; y < 64; y++) for (let x = 0; x < 16; x++) for (let z = 0; z < 16; z++) column.setBlock(x, y, z, stone);
+      computeChunkLight(column);
+      world.addChunk(column);
+    }
+  }
+}
+
+interface Rig { room: HostRoom; world: World; saved: string[]; mobs: Mobs; hostHits: number[]; hostDrops: number[] }
+
+function setup(): Rig {
   const world = new World(42);
-  for (let cx = -1; cx <= 1; cx++) for (let cz = -1; cz <= 1; cz++) world.addChunk(new ChunkColumn(cx, cz));
+  stoneFloor(world);
   const saved: string[] = [];
+  const hostHits: number[] = [];
+  const hostDrops: number[] = [];
+  const mobs = new Mobs(world, {
+    onDrop: (item) => { hostDrops.push(item); },
+    onXp: () => { /* sem orbe */ },
+    onSound: () => { /* sem som */ },
+    onHitPlayer: (damage) => { hostHits.push(damage); },
+    onExplode: () => { /* sem explosão */ },
+    onBreakBlock: () => { /* nada */ },
+    onArrow: () => { /* nada */ },
+  }, 16);
   const game = {
     world,
     player: { x: 0, y: 64, z: 0, yaw: 0, pitch: 0, sneaking: false, flying: false },
     session: {
       tick() { /* o tick do jogo */ },
-      mobs: { store: new MobStore(8) },
+      mobs,
+      projectiles: { onHit: null, onPotion: null },
+      combat: { explodeAt() { /* sem mundo */ } },
+      inventory: { held: null },
+      blockUse: { bed() { return false; } },
+      travel: { isTravelling: false },
+      spawner: { difficulty: 0 },
+      lighting: new Lighting(world),
+      signs: new SignStore(),
+      tiles: { create() { /* sem contêiner */ }, at() { return undefined; } },
+      fluids: { scheduleAround() { /* sem água */ } },
+      removeContainerAt() { /* sem contêiner */ },
       dayNight: { totalTicks: 1000, dayFactor: 1 },
       survival: { difficulty: 1 },
     },
-    pipeline: {},
+    pipeline: { setAnchors() { /* sem pipeline */ } },
     meta: { id: 'mundo-1', name: 'Mundo', seed: 'semente', seedHash: 42, gameMode: 'survival', spawn: [0, 64, 0] },
     save: null,
     hud: { showMessage() { /* sem tela */ } },
@@ -132,7 +177,7 @@ function setup(): { room: HostRoom; world: World; saved: string[] } {
   } as unknown as GameHandles;
   const room = new HostRoom(game, 'Anfitrião', 3, { changed() { /* lista */ }, message(name) { saved.push(name); } });
   room.start();
-  return { room, world, saved };
+  return { room, world, saved, mobs, hostHits, hostDrops };
 }
 
 type Internals = {
@@ -145,7 +190,7 @@ type Internals = {
 async function join(room: HostRoom, name: string, id: string, content = localContent()): Promise<{ g: Guest; link: FakeLink }> {
   const link = fakeLink();
   const g: Guest = {
-    netId: 0, name: '', playerId: '', link: link as never, x: 0, y: 0, z: 0, ready: false, record: null,
+    netId: 0, name: '', playerId: '', link: link as never, x: 0, y: 0, z: 0, dim: 0, ready: false, record: null,
   };
   await (room as unknown as Internals).hello(g, { protocol: PROTOCOL, content, name, playerId: id, mods: [] });
   return { g, link };
@@ -156,7 +201,7 @@ function types(link: FakeLink): number[] {
 }
 
 function blocksRequest(px: number, py: number, pz: number, entries: number[][]): Uint8Array {
-  const w = new PacketWriter().reset(MSG.BLOCKS).f32(px).f32(py).f32(pz).u16(entries.length);
+  const w = new PacketWriter().reset(MSG.BLOCKS).u8(0).f32(px).f32(py).f32(pz).u16(entries.length);
   for (const [x, y, z, state, prev] of entries) w.i32(x).u16(y).i32(z).u16(state).u16(prev);
   return w.view8().slice();
 }
@@ -198,6 +243,27 @@ describe('o anfitrião', () => {
     expect(types(a.link)).not.toContain(MSG.BLOCKS);
   });
 
+  it('o buraco aberto pelo convidado recebe a luz do céu (defeito de aparelho: ficava escuro)', async () => {
+    const { room, world } = setup();
+    const a = await join(room, 'A', 'aaaaaaaaaaaaaaaa');
+    const stone = makeState(STONE);
+    expect(world.getSkyLight(3, 62, 3)).toBe(0);
+    (room as unknown as Internals).onMessage(a.g, blocksRequest(2, 64, 2, [[3, 63, 3, 0, stone], [3, 62, 3, 0, stone]]), true);
+    expect(world.getBlock(3, 62, 3)).toBe(0);
+    expect(world.getSkyLight(3, 62, 3)).toBeGreaterThan(10);
+  });
+
+  it('no convidado, o bloco que chega do anfitrião também acende', () => {
+    const world = new World(42);
+    stoneFloor(world);
+    const lighting = new Lighting(world);
+    const session = { lighting, signs: { remove() { /* sem placa */ } } } as never;
+    const stone = makeState(STONE);
+    world.setBlock(5, 63, 5, 0, 'network');
+    reactToNetworkBlock(session, 5, 63, 5, stone, 0, false);
+    expect(world.getSkyLight(5, 63, 5)).toBeGreaterThan(10);
+  });
+
   it('pedido longe demais é recusado, com o estado de volta', async () => {
     const { room, world } = setup();
     const a = await join(room, 'A', 'aaaaaaaaaaaaaaaa');
@@ -213,7 +279,7 @@ describe('o anfitrião', () => {
     const a = await join(room, 'A', 'aaaaaaaaaaaaaaaa');
     a.link.sent.length = 0;
     const req = (id: number, cx: number, cz: number): Uint8Array =>
-      new PacketWriter().reset(MSG.CHUNK_REQ).u32(id).i32(cx).i32(cz).view8().slice();
+      new PacketWriter().reset(MSG.CHUNK_REQ).u32(id).i32(cx).i32(cz).u8(0).view8().slice();
     (room as unknown as Internals).onMessage(a.g, req(1, 0, 0), true);
     await Promise.resolve();
     world.setBlock(5, 70, 5, makeState(STONE), 'player');
@@ -244,5 +310,139 @@ describe('o anfitrião', () => {
     const a = await join(room, 'A', 'aaaaaaaaaaaaaaaa');
     expect(() => (room as unknown as Internals).onMessage(a.g, Uint8Array.from([MSG.BLOCKS, 0]), true)).not.toThrow();
     expect(room.guests).toHaveLength(1);
+  });
+});
+
+describe('mobs e convidados', () => {
+  const move = (x: number, y: number, z: number, flags = 0): Uint8Array =>
+    new PacketWriter().reset(MSG.MOVE).u8(0).f32(x).f32(y).f32(z).f32(0).f32(0).u8(flags).u16(0xffff).u8(0).view8().slice();
+
+  it('o zumbi vai atrás do convidado mais perto, e o golpe vira HURT para ele', async () => {
+    const { room, mobs, hostHits } = setup();
+    const a = await join(room, 'A', 'aaaaaaaaaaaaaaaa');
+    (room as unknown as Internals).onMessage(a.g, move(20.5, 64, 20.5), false);
+    a.link.sent.length = 0;
+    mobs.isDay = false;
+    mobs.spawn(MOB_BY_NAME.get('zombie')!.id, 21.5, 64, 20.5);
+    // O anfitrião longe: 40 blocos do zumbi.
+    const host = { x: -8, y: 64, z: -8, eyeY: 65.6, held: -1, alive: true };
+    for (let t = 0; t < 80; t++) mobs.tick(host);
+    expect(types(a.link)).toContain(MSG.HURT);
+    expect(hostHits).toEqual([]);
+  });
+
+  it('convidado morto ou no criativo não é alvo', async () => {
+    const { room, mobs, hostHits } = setup();
+    const a = await join(room, 'A', 'aaaaaaaaaaaaaaaa');
+    (room as unknown as Internals).onMessage(a.g, move(20.5, 64, 20.5, 16), false);
+    a.link.sent.length = 0;
+    mobs.isDay = false;
+    mobs.spawn(MOB_BY_NAME.get('zombie')!.id, 21.5, 64, 20.5);
+    const host = { x: -8, y: 64, z: -8, eyeY: 65.6, held: -1, alive: true };
+    for (let t = 0; t < 80; t++) mobs.tick(host);
+    expect(types(a.link)).not.toContain(MSG.HURT);
+    void hostHits;
+  });
+
+  it('o golpe do convidado mata no anfitrião, e o saque vai para ele (LOOT), não para o chão daqui', async () => {
+    const { room, mobs, hostDrops } = setup();
+    const a = await join(room, 'A', 'aaaaaaaaaaaaaaaa');
+    (room as unknown as Internals).onMessage(a.g, move(5.5, 64, 5.5), false);
+    a.link.sent.length = 0;
+    const cow = MOB_BY_NAME.get('cow')!.id;
+    const slot = mobs.spawn(cow, 6.5, 64, 5.5);
+    const attack = new PacketWriter().reset(MSG.ATTACK).u16(slot).u8(cow).f32(100).u8(0).view8().slice();
+    (room as unknown as Internals).onMessage(a.g, attack, true);
+    expect(mobs.store.active).toBe(0);
+    expect(types(a.link)).toContain(MSG.LOOT);
+    expect(hostDrops).toEqual([]);
+  });
+
+  it('golpe com tipo trocado (o slot virou outro mob no caminho) não vale', async () => {
+    const { room, mobs } = setup();
+    const a = await join(room, 'A', 'aaaaaaaaaaaaaaaa');
+    (room as unknown as Internals).onMessage(a.g, move(5.5, 64, 5.5), false);
+    const slot = mobs.spawn(MOB_BY_NAME.get('cow')!.id, 6.5, 64, 5.5);
+    const attack = new PacketWriter().reset(MSG.ATTACK).u16(slot).u8(MOB_BY_NAME.get('zombie')!.id).f32(100).u8(0).view8().slice();
+    (room as unknown as Internals).onMessage(a.g, attack, true);
+    expect(mobs.store.active).toBe(1);
+  });
+});
+
+describe('placas', () => {
+  it('o texto que o convidado escreve fica no anfitrião e vai aos outros', async () => {
+    const { room } = setup();
+    const a = await join(room, 'A', 'aaaaaaaaaaaaaaaa');
+    const b = await join(room, 'B', 'bbbbbbbbbbbbbbbb');
+    a.link.sent.length = 0;
+    b.link.sent.length = 0;
+    const sign = new PacketWriter().reset(MSG.SIGN).i32(3).u16(64).i32(3).str('["FERRARIA","do Zé"]').view8().slice();
+    (room as unknown as Internals).onMessage(a.g, sign, true);
+    const host = (room as unknown as { game: GameHandles }).game;
+    expect(host.session.signs.get(3, 64, 3)).toEqual(['FERRARIA', 'DO ZÉ', '', '']);
+    expect(types(b.link)).toContain(MSG.SIGN);
+    expect(types(a.link)).not.toContain(MSG.SIGN);
+  });
+
+  it('o texto que o anfitrião escreve vai a todos', async () => {
+    const { room } = setup();
+    const a = await join(room, 'A', 'aaaaaaaaaaaaaaaa');
+    a.link.sent.length = 0;
+    const host = (room as unknown as { game: GameHandles }).game;
+    host.session.signs.set(1, 64, 1, ['OLA']);
+    expect(types(a.link)).toContain(MSG.SIGN);
+  });
+});
+
+describe('fogo e frasco no convidado', () => {
+  const move = (x: number, y: number, z: number): Uint8Array =>
+    new PacketWriter().reset(MSG.MOVE).u8(0).f32(x).f32(y).f32(z).f32(0).f32(0).u8(0).u16(0xffff).u8(0).view8().slice();
+
+  it('a bola do blaze no convidado fere e põe fogo nele', async () => {
+    const { room } = setup();
+    const a = await join(room, 'A', 'aaaaaaaaaaaaaaaa');
+    (room as unknown as Internals).onMessage(a.g, move(5.5, 64, 5.5), false);
+    a.link.sent.length = 0;
+    const host = (room as unknown as { game: GameHandles }).game;
+    expect(host.session.projectiles.onHit!(5.5, 64.9, 5.5, 5, false, FLAG_IGNITES)).toBe(true);
+    const hurt = a.link.sent.find((m) => m[0] === MSG.HURT)!;
+    const r = new PacketReader(hurt);
+    r.u8();
+    expect(r.f32()).toBe(5);
+    r.u8(); r.f32(); r.f32();
+    expect(r.u16()).toBeGreaterThan(0);
+  });
+
+  it('o frasco da bruxa que quebra perto do convidado vai para ele (SPLASH); longe, não', async () => {
+    const { room } = setup();
+    const a = await join(room, 'A', 'aaaaaaaaaaaaaaaa');
+    (room as unknown as Internals).onMessage(a.g, move(5.5, 64, 5.5), false);
+    a.link.sent.length = 0;
+    const host = (room as unknown as { game: GameHandles }).game;
+    host.session.projectiles.onPotion!(6, 64.5, 6, 1);
+    host.session.projectiles.onPotion!(40, 64.5, 40, 1);
+    expect(types(a.link).filter((t) => t === MSG.SPLASH)).toHaveLength(1);
+  });
+});
+
+describe('item na mão do boneco', () => {
+  it('o item vai ao passe dos itens na altura da mão, e some com a mão vazia ou noutra dimensão', () => {
+    const avatars = new Avatars(null as never, null as never, null as never, () => 1);
+    avatars.add(3, 'A');
+    const added: number[][] = [];
+    const items = { add: (x: number, y: number, z: number, item: number) => { added.push([x, y, z, item]); } } as never;
+    avatars.move(3, 10, 64, 10, 0, 0, 0, 0xffff);
+    avatars.drawItems(items, 1);
+    expect(added).toEqual([]);
+    avatars.move(3, 10, 64, 10, 0, 0, 0, 42);
+    avatars.drawItems(items, 1);
+    expect(added).toHaveLength(1);
+    expect(added[0][3]).toBe(42);
+    expect(added[0][1]).toBeGreaterThan(64);
+    expect(added[0][1]).toBeLessThan(65.8);
+    expect(Math.hypot(added[0][0] - 10, added[0][2] - 10)).toBeLessThan(0.7);
+    avatars.move(3, 10, 64, 10, 0, 0, MOVE_AWAY, 42);
+    avatars.drawItems(items, 1);
+    expect(added).toHaveLength(1);
   });
 });

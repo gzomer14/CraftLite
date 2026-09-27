@@ -404,3 +404,43 @@ function spawnOf(noise: TerrainNoise): { x: number; z: number } {
   const [x, z] = findSpawnColumn(noise.field);
   return { x, z };
 }
+
+describe('âncoras (M20: os convidados de uma sala)', () => {
+  it('carrega em volta da âncora longe do jogador, sem malha, e mantém ao andar', () => {
+    const h = harness(2);
+    h.pipeline.setCenter(0, 0);
+    h.pipeline.anchorRadius = 1;
+    h.pipeline.setAnchors([20, 0]);
+    h.run(80);
+    const far = h.world.getChunk(20, 0);
+    expect(far).toBeDefined();
+    expect(far!.state).toBe(ChunkState.Generated);
+    // O jogador anda para longe dos dois: a âncora segura as colunas dela.
+    h.pipeline.setCenter(-16 * 10, 0);
+    h.run(10);
+    expect(h.world.getChunk(20, 0)).toBeDefined();
+    expect(h.world.getChunk(0, 0)).toBeUndefined();
+  });
+
+  it('sem âncora, o que era dela é descarregado', () => {
+    const h = harness(2);
+    h.pipeline.setCenter(0, 0);
+    h.pipeline.anchorRadius = 1;
+    h.pipeline.setAnchors([20, 0]);
+    h.run(60);
+    h.pipeline.setAnchors([]);
+    expect(h.world.getChunk(20, 0)).toBeUndefined();
+  });
+
+  it('coluna da âncora que entra no anel do jogador ganha malha', () => {
+    const h = harness(2);
+    h.pipeline.setCenter(0, 0);
+    h.pipeline.anchorRadius = 2;
+    h.pipeline.setAnchors([10, 0]);
+    h.run(80);
+    expect(h.world.getChunk(10, 0)!.state).toBe(ChunkState.Generated);
+    h.pipeline.setCenter(16 * 10, 0);
+    h.run(80);
+    expect(h.world.getChunk(10, 0)!.state).toBe(ChunkState.Ready);
+  });
+});

@@ -12,6 +12,115 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-27 17:11 · M20, terceira volta: dimensões, mundo em volta do convidado, item na mão
+
+**Pedido:** *"Pode seguir com o que ainda falta"*.
+
+**Resultado:**
+- **A sala segue o anfitrião entre dimensões:** ele atravessa o portal e os convidados aparecem ao
+  lado dele. Quem renasce ou entra em outra dimensão é trazido para perto dele. O convidado não
+  atravessa sozinho (desvio consciente: seriam duas dimensões carregadas no anfitrião).
+- **Âncoras no pipeline:** raio 3 carregado no anfitrião em volta de cada convidado, sem malha. O
+  convidado constrói longe, e os mobs andam e nascem perto dele.
+- **Item na mão do boneco.**
+- **Fogo da bola do blaze e frasco da bruxa no convidado.**
+- **Protocolo 3.**
+
+Portões: 2398 testes; lint, build e tamanho verdes (jogo 308,2 KB; sala 16,8 KB). Smoke da sala
+com 19 passos; o passo do bloco a 288 blocos falha sem as âncoras (conferido). Os outros smokes
+verdes. Não visto em aparelho.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| + | `src/net/dimensionsync.ts` | a sala segue o anfitrião (`DIMENSION`); âncoras e spawn em volta de cada convidado |
+| ~ | `src/world/pipeline.ts` | `setAnchors`/`anchorRadius`: colunas seguras em volta de outros pontos, sem malha; 659 → 714 linhas |
+| ~ | `src/entity/spawn.ts` | `CATEGORIES` exportado |
+| ~ | `src/render/scenefeed.ts` | gancho `extraItems` |
+| ~ | `src/net/avatars.ts` | item na mão (`held`, `drawItems`) |
+| ~ | `src/net/hostcombat.ts` | fogo no `HURT`; `SPLASH` do frasco |
+| ~ | `src/net/guestcombat.ts` | fogo e frasco aplicados no convidado |
+| ~ | `src/net/protocol.ts` | protocolo 3: `DIMENSION`, `SPLASH`, dimensão em `MOVE`/`BLOCKS`/`CHUNK_REQ` |
+| ~ | `src/net/host.ts` | dimensão de cada convidado; chunks e blocos de qualquer dimensão; mobs só para quem está na mesma |
+| ~ | `src/net/guest.ts` | dimensão nos pedidos; `DIMENSION`; item na mão |
+| ~ | `src/net/follower.ts` | comentário: o portal é do anfitrião |
+| ~ | `tests/pipeline.test.ts` | âncoras: carrega longe sem malha, solta ao tirar, malha ao entrar no anel |
+| ~ | `tests/netcontainers.test.ts` | `DIMENSION` e âncora no anfitrião; o convidado atravessa e aparece; spawn perto do convidado |
+| ~ | `tests/netroom.test.ts` | formato novo dos pacotes; fogo, frasco, item na mão |
+| ~ | `scripts/smoke-room.mjs` | 19 passos: bloco além do anel do anfitrião, Nether e volta; espada na mão |
+| ~ | `docs/12-multiplayer.md`, `docs/14-roadmap.md` | protocolo 3; "mais de um jogador" feito, com o desvio do portal |
+| ~ | `docs/15-status.md` | data; §1; §2; §3 terceira volta; §5; §6 item 0 |
+| ~ | `docs/16-auditoria.md` | esta sessão |
+| ~ | `README.md` | terceira volta, testes |
+
+---
+
+## 2026-09-27 16:48 · M20, segunda volta: relatos de campo e o multijogador completo
+
+**Pedido:** *"Testei aqui e funcionou perfeitamente a conexão, inclusive saindo e voltando não
+perdi nenhum item"*. Vieram quatro problemas (bloco escuro, nome em cima do jogador, `Ctrl`+`W` no
+navegador, roda do mouse) e depois mais um (a porta que abre e fecha num clique), com o pedido:
+*"Vamos focar nas implementações restantes para tornar o multijogador melhor"*.
+
+**Resultado:** os quatro problemas corrigidos, com regressão (doc 15 §4):
+- **Bloco escuro:** a luz não era recalculada no bloco vindo da rede.
+- **Porta:** o botão seguro usava o bloco a cada tick. É do jogo.
+- **Atalhos:** a repetição da tecla escapava do `preventDefault`. `Ctrl`+`W` só com a tela cheia
+  do jogo, no F11, e W duas vezes corre.
+- **Roda do mouse:** um dente em vários eventos.
+
+O multijogador ganhou nome em cima do boneco, chat, combate com mobs nos dois sentidos (o saque
+vai para quem matou), baú e fornalha para o convidado, dormir juntos e texto de placa. Protocolo 2.
+
+Portões: 2389 testes; lint, build e tamanho verdes. O jogo tem 307,9 KB (+0,8) e a sala 15,5 KB.
+Smoke da sala com 16 passos, os outros smokes verdes, e a captura conferida.
+
+Não visto em aparelho: F11 e a roda dependem do navegador e do mouse do usuário. Ficam para
+depois: portal e outras dimensões, o alcance além do anfitrião, mob nascendo perto do convidado e
+item na mão do boneco (doc 15 §5).
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| **Correções** | | |
+| + | `src/net/blockreact.ts` | luz, fluido, contêiner e placa depois de um bloco vindo da rede |
+| ~ | `src/game/session.ts` | `useHeld(fresh)`: o bloco mirado só responde no clique novo; 704 → 715 linhas |
+| ~ | `src/input/playeractions.ts` | passa se o botão de usar acabou de descer |
+| ~ | `src/input/keyboard.ts` | `claims` e `preventDefault` também na repetição |
+| ~ | `src/input/keybinds.ts` | `uses(code)` |
+| ~ | `src/input/controls.ts` | teclas do jogo seguradas, F11, W duas vezes corre, roda por `WheelSteps` |
+| + | `src/input/keylock.ts` | tela cheia pela página com a Keyboard Lock API |
+| + | `src/input/wheelsteps.ts` | roda do mouse: um dente, uma casa |
+| ~ | `src/data/strings/pt.ts`, `en.ts` | dica de teclado (W duas vezes, F11), chat, cama; saem `no_containers` e `no_sleep` |
+| **Multijogador** | | |
+| + | `src/net/nametags.ts` | nome em cima de cada jogador, pela câmera do quadro |
+| + | `src/net/chat.ts` | chat: linha de digitar, botão 💬, mensagens que somem |
+| + | `src/net/hostcombat.ts` | mira dos mobs nos convidados, `HURT` (golpe, flecha, explosão), `ATTACK` com saque para quem matou |
+| + | `src/net/guestcombat.ts` | golpe do convidado vira `ATTACK`; `LOOT` e `HURT` aplicados |
+| + | `src/net/containersync.ts` | contêiner do anfitrião aberto pelo convidado, sincronizado nos dois sentidos |
+| + | `src/net/sleepsync.ts` | dormir juntos: deitado por até 30 s, a noite passa com todos |
+| + | `src/net/signsync.ts` | texto de placa nos dois sentidos e junto com o chunk |
+| + | `src/entity/playerviews.ts` | o jogador vivo mais perto de um ponto |
+| ~ | `src/entity/mobs.ts` | `others`/`onHitOther`: com sala, cada mob mira o mais perto; 693 → 716 linhas |
+| ~ | `src/net/protocol.ts` | protocolo 2: `CHAT`, `ATTACK`, `LOOT`, `HURT`, `OPEN`…`CONTAINER_GONE`, `SLEEP`/`SLEEP_STATE`/`WAKE`, `SIGN`; item na mão e `MOVE_UNTARGETABLE` no `MOVE` |
+| ~ | `src/net/host.ts` | liga tudo isso; o conteúdo do baú quebrado pelo convidado vai para ele |
+| ~ | `src/net/guest.ts` | idem, do lado do convidado |
+| ~ | `src/net/mobsync.ts` | `hostSlot` de cada boneco de mob |
+| ~ | `src/net/follower.ts` | sai o bloqueio de contêiner e de cama (agora passam pela sala) |
+| ~ | `src/game/netgate.ts`, `src/main.ts` | `GameHandles` com `camera` e `canvas` |
+| **Testes e scripts** | | |
+| ~ | `tests/netroom.test.ts` | luz do buraco (nos dois lados), mobs miram e ferem o convidado, golpe com saque, slot trocado, placas |
+| + | `tests/netcontainers.test.ts` | duas sessões de verdade: baú, fornalha, cama |
+| + | `tests/keyinput.test.ts` | teclado (repetição, atalhos) e roda de alta resolução |
+| ~ | `tests/workshop.test.ts` | clique de 100 ms vira a alavanca uma vez; segurar não coloca bloco nela |
+| ~ | `scripts/smoke-room.mjs` | 16 passos: nome, chat, baú, luz do poço; `SMOKE_SHOT` guarda a tela do anfitrião |
+| **Documentos** | | |
+| ~ | `docs/12-multiplayer.md` | as mensagens do protocolo 2 |
+| ~ | `docs/14-roadmap.md` | chat ✅; mira, sono e nome em parte |
+| ~ | `docs/15-status.md` | data; §1; §2; §3 segunda volta; §4 quatro correções; §5; §6 item 0 |
+| ~ | `docs/16-auditoria.md` | esta sessão |
+| ~ | `README.md` | segunda volta, testes, teclas novas |
+
+---
+
 ## 2026-09-27 15:20 · M20 no jogo: sala, entrada por QR e leitor pela webcam
 
 **Pedido:** *"Pode seguir"* — o M20 no jogo, o pareamento lembrado e a leitura do QR pela webcam do

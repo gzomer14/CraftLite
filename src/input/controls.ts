@@ -12,6 +12,8 @@ import type { SettingsStore } from '../game/settings';
 import { Gamepads } from './gamepad';
 import { Keybinds } from './keybinds';
 import { Keyboard } from './keyboard';
+import { toggleGameFullscreen } from './keylock';
+import { WheelSteps } from './wheelsteps';
 import { Mouse } from './mouse';
 import { TouchControls } from './touch';
 import type { ActionId } from '../data/keybinds';
@@ -69,6 +71,9 @@ export class Controls {
   private readonly settings: SettingsStore;
   private readonly callbacks: ControlsCallbacks;
   private mousePlacing = false;
+  private readonly wheel = new WheelSteps();
+  /** Correndo por dois toques na tecla de andar para a frente. */
+  private tapSprint = false;
   private mouseBreaking = false;
   /** Estados de "alternar em vez de segurar" (doc 09 §4). */
   private sprintLatched = false;
@@ -92,6 +97,8 @@ export class Controls {
     this.callbacks = callbacks;
     this.keyboard = new Keyboard();
     this.mouse = new Mouse(canvas);
+    // Durante o jogo, as teclas de ação não servem de atalho ao navegador.
+    this.keyboard.claims = (code) => this.mouse.locked && keybinds.uses(code);
     this.touch = new TouchControls(canvas, settings);
 
     this.mouse.sensitivity = settings.get('lookSensitivity');
@@ -117,6 +124,8 @@ export class Controls {
 
     // `Escape` e os dígitos da hotbar são fixos (ver `data/keybinds.ts`).
     this.keyboard.bind('Escape', (down) => { if (down) callbacks.onPause(); });
+    // F11 é do jogo: tela cheia pela página, com o teclado travado (`keylock.ts`).
+    this.keyboard.bind('F11', (down) => { if (down) toggleGameFullscreen(); });
     for (let i = 0; i < 9; i++) {
       this.keyboard.bind(`Digit${i + 1}`, (down) => { if (down) callbacks.onHotbarSelect(i); });
     }
@@ -127,6 +136,19 @@ export class Controls {
     // Ctrl larga o stack inteiro; sozinho, larga um (doc 08 §3.5).
     this.bindAction('drop', (down) => {
       if (down) callbacks.onDropItem(this.keyboard.isDown(this.keybinds.codeFor('sprint')));
+    });
+
+    // Dois toques em frente correm, como no gênero: correr sem `Ctrl`, que
+    // com o `W` fecha a aba fora da tela cheia (`keylock.ts`).
+    let lastForward = 0;
+    this.bindAction('forward', (down) => {
+      if (!down) {
+        this.tapSprint = false;
+        return;
+      }
+      const now = performance.now();
+      if (now - lastForward < 300) this.tapSprint = true;
+      lastForward = now;
     });
 
     // Duplo toque no pulo alterna o voo no criativo (doc 06 §9).
@@ -180,7 +202,8 @@ export class Controls {
     canvas.addEventListener('wheel', (e) => {
       if (!this.mouse.locked) return;
       e.preventDefault();
-      callbacks.onHotbarScroll(e.deltaY > 0 ? 1 : -1);
+      const step = this.wheel.step(e.deltaY, e.deltaMode, e.timeStamp);
+      if (step !== 0) callbacks.onHotbarScroll(step);
     }, { passive: false });
   }
 
@@ -256,7 +279,7 @@ export class Controls {
     const jumpHeld = this.keyboard.isDown(keys.codeFor('jump')) || this.touch.buttons.jump || g.jump;
     const sneakHeld = this.keyboard.isDown(keys.codeFor('sneak'))
       || this.touch.buttons.sneak || g.sneak;
-    const sprintHeld = this.keyboard.isDown(keys.codeFor('sprint')) || t.sprint > 0 || g.sprint;
+    const sprintHeld = this.keyboard.isDown(keys.codeFor('sprint')) || this.tapSprint || t.sprint > 0 || g.sprint;
 
     this.state.jump = jumpHeld;
     this.state.sneak = this.settings.get('toggleSneak')
@@ -337,6 +360,7 @@ export class Controls {
     this.gamepad.reset();
     this.mouseBreaking = false;
     this.mousePlacing = false;
+    this.tapSprint = false;
     this.state.forward = 0;
     this.state.strafe = 0;
     this.state.breaking = false;

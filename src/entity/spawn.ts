@@ -106,7 +106,7 @@ export function capsForTier(maxMobs: number): SpawnCaps {
  * Ordem de rodízio das categorias. Neutros (lobo, enderman) entram no cap dos
  * hostis: eles competem pelo mesmo orçamento de mobs do aparelho.
  */
-const CATEGORIES: readonly MobCategory[] = ['hostile', 'passive', 'neutral', 'water', 'ambient'];
+export const CATEGORIES: readonly MobCategory[] = ['hostile', 'passive', 'neutral', 'water', 'ambient'];
 
 export class MobSpawner {
   private readonly world: World;

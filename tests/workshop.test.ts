@@ -682,3 +682,54 @@ describe('funil colado em contêiner: o toque coloca em vez de abrir', () => {
     expect(session.workbench.openScreen).toBe('chest');
   });
 });
+
+// --- clique direito seguro (campo, 2026-09-27) --------------------------------
+
+describe('botão direito seguro sobre porta e alavanca', () => {
+  /** Mira o topo do bloco em (0, GROUND + 1, -4), de cima. */
+  function aim(session: Session, player: Player): void {
+    player.setPosition(0.5, GROUND + 3, -2.5);
+    const eyeY = player.y + player.eyeHeight;
+    const dy = GROUND + 1.5 - eyeY;
+    const dz = -3.5 - player.z;
+    const length = Math.hypot(dy, dz);
+    session.interaction.updateTargetAlong(0, dy / length, dz / length);
+  }
+
+  it('um clique de 100 ms (dois ticks com o botão descido) vira a alavanca uma vez só', () => {
+    const { world, session, player } = rig();
+    put(session, 0, GROUND + 1, -4, 'lever');
+    aim(session, player);
+    const before = world.getBlock(0, GROUND + 1, -4);
+    expect(session.useHeld(true)).toBe(true);
+    const flipped = world.getBlock(0, GROUND + 1, -4);
+    expect(flipped).not.toBe(before);
+    for (let i = 0; i < 3; i++) session.useHeld(false);
+    expect(world.getBlock(0, GROUND + 1, -4)).toBe(flipped);
+  });
+
+  it('segurando o botão sobre a alavanca com pedra na mão, a pedra não é colocada', () => {
+    const { session, player } = rig();
+    put(session, 0, GROUND + 1, -4, 'lever');
+    session.inventory.set(0, makeStack(item('stone'), 8));
+    session.inventory.selected = 0;
+    aim(session, player);
+    session.useHeld(true);
+    for (let i = 0; i < 10; i++) session.useHeld(false);
+    expect(session.inventory.get(0)?.count).toBe(8);
+  });
+
+  it('segurando o botão longe de porta, o bloco segue sendo colocado', () => {
+    const { session, player } = rig();
+    session.inventory.set(0, makeStack(item('stone'), 8));
+    session.inventory.selected = 0;
+    aim(session, player);
+    session.useHeld(true);
+    for (let i = 0; i < 12; i++) {
+      session.interaction.tickBreaking(false, null);
+      aim(session, player);
+      session.useHeld(false);
+    }
+    expect(session.inventory.get(0)!.count).toBeLessThan(7);
+  });
+});

@@ -68,7 +68,16 @@ Todo pacote: `u8 type | payload`. Usar `DataView`, nunca JSON no caminho quente.
 > a coluna nunca mudou); um só `BLOCKS` em lote nos dois sentidos, com a posição de quem pede e o
 > estado anterior, e `BLOCK_DENY` na volta; mobs a 20 Hz sem delta (`MOBS`); o inventário não
 > viaja por slot — o convidado manda o próprio save a cada 10 s (`SAVE`). O clima não viaja: sai
-> do `totalTicks` (`TIME`). Chat não existe ainda. Detalhe no doc 15 §3, M20.
+> do `totalTicks` (`TIME`). Na segunda volta (protocolo 2) entraram:
+> - `CHAT`;
+> - `ATTACK`/`LOOT`/`HURT` (combate com mobs);
+> - `OPEN`/`CONTAINERS`/`CSET`/`CLOSE`/`CONTAINER_GONE` (contêineres, com o registro do save em
+>   JSON — mensagem rara);
+> - `SLEEP`/`SLEEP_STATE`/`WAKE`;
+> - `SIGN`.
+>
+> Na terceira volta (protocolo 3) entraram a dimensão no `MOVE`, no pedido de bloco e no de chunk,
+> `DIMENSION` (a sala segue o anfitrião) e `SPLASH` (frasco de poção). Detalhe no doc 15 §3, M20.
 
 ## 5. Predição e reconciliação
 

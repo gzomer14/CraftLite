@@ -25,6 +25,7 @@ import type { Controls } from '../input/controls';
 import type { SceneFeed } from '../render/scenefeed';
 import type { MobRenderer } from '../render/mobrender';
 import type { EntityAtlas } from '../render/entityatlas';
+import type { Camera } from '../render/camera';
 
 /** O jogo em andamento, visto pelo código de rede. */
 export interface GameHandles {
@@ -41,6 +42,9 @@ export interface GameHandles {
   sceneFeed: SceneFeed;
   mobRenderer: MobRenderer;
   entityAtlas: EntityAtlas;
+  /** A câmera do quadro e o canvas: os nomes em cima dos jogadores (`net/nametags.ts`). */
+  camera: Camera;
+  canvas: HTMLCanvasElement;
   /** Tier do aparelho: o limite da sala é 4 jogadores em T0, 6 acima (doc 14). */
   tier: number;
 }

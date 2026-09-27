@@ -14,17 +14,25 @@ export class Keyboard {
   private readonly onDown: (e: KeyboardEvent) => void;
   private readonly onUp: (e: KeyboardEvent) => void;
   private readonly onBlur: () => void;
+  /**
+   * Teclas lidas por `isDown` (andar, pular, correr) que o navegador não pode
+   * usar como atalho. Quem monta os controles decide — só durante o jogo.
+   */
+  claims: (code: string) => boolean = () => false;
 
   constructor(target: EventTarget = window) {
     this.onDown = (e) => {
-      if (e.repeat) return;
       if (isTypingTarget(e.target)) return;
-      this.down.add(e.code);
       const action = this.actions.get(e.code);
-      if (action !== undefined) {
-        e.preventDefault();
-        action(true);
-      }
+      // A tecla do jogo é do jogo **também na repetição e com Ctrl**: correr
+      // (`Ctrl`) indo para a direita (`D`) repetia a tecla, a repetição
+      // passava sem `preventDefault`, e o Chrome salvava a página nos
+      // favoritos (relato de campo, 2026-09-27). `Ctrl`+`W` o Chrome não
+      // entrega a página nenhuma: ver `input/keylock.ts`.
+      if (action !== undefined || this.claims(e.code)) e.preventDefault();
+      if (e.repeat) return;
+      this.down.add(e.code);
+      if (action !== undefined) action(true);
     };
     this.onUp = (e) => {
       this.down.delete(e.code);

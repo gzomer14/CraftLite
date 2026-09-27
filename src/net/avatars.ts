@@ -13,6 +13,7 @@
 import { modelOf } from '../data/mobmodels';
 import { PLAYER_LAYER, type EntityAtlas } from '../render/entityatlas';
 import type { MobRenderer } from '../render/mobrender';
+import type { ItemRenderer } from '../render/itemrender';
 import type { World } from '../world/world';
 import { MOVE_AWAY, MOVE_SNEAK } from './protocol';
 
@@ -26,12 +27,17 @@ export interface Avatar {
   yaw: number;
   pitch: number;
   flags: number;
+  /** O item na mão (id), ou −1. */
+  held: number;
   limbSwing: number;
   limbAmount: number;
   age: number;
   /** Ainda não chegou posição nenhuma: não desenha. */
   placed: boolean;
 }
+
+/** Quanto a mão fica para o lado do corpo. */
+const HAND_SIDE = 0.4;
 
 export class Avatars {
   readonly list: Avatar[] = [];
@@ -53,7 +59,7 @@ export class Avatars {
     }
     const a: Avatar = {
       netId, name, x: 0, y: 0, z: 0, prevX: 0, prevY: 0, prevZ: 0, tx: 0, ty: 0, tz: 0,
-      yaw: 0, pitch: 0, flags: 0, limbSwing: 0, limbAmount: 0, age: 0, placed: false,
+      yaw: 0, pitch: 0, flags: 0, held: -1, limbSwing: 0, limbAmount: 0, age: 0, placed: false,
     };
     this.list.push(a);
     return a;
@@ -71,11 +77,14 @@ export class Avatars {
   }
 
   /** Um `MOVE` chegou. */
-  move(netId: number, x: number, y: number, z: number, yaw: number, pitch: number, flags: number): void {
+  move(
+    netId: number, x: number, y: number, z: number, yaw: number, pitch: number, flags: number, held = 0xffff,
+  ): void {
     const a = this.get(netId);
     if (a === undefined) return;
     a.tx = x; a.ty = y; a.tz = z;
     a.yaw = yaw; a.pitch = pitch; a.flags = flags;
+    a.held = held === 0xffff ? -1 : held;
     if (!a.placed) {
       a.x = a.prevX = x; a.y = a.prevY = y; a.z = a.prevZ = z;
       a.placed = true;
@@ -98,6 +107,25 @@ export class Avatars {
       a.limbAmount += (step - a.limbAmount) * 0.4;
       a.limbSwing += Math.sqrt(dx * dx + dz * dz) * 3;
       a.age++;
+    }
+  }
+
+  /**
+   * O item na mão, no passe dos itens do chão: um cartão virado para a câmera
+   * na altura da mão direita, meio passo à frente do corpo.
+   */
+  drawItems(items: ItemRenderer, alpha: number): void {
+    for (let i = 0; i < this.list.length; i++) {
+      const a = this.list[i];
+      if (!a.placed || a.held < 0 || (a.flags & MOVE_AWAY) !== 0) continue;
+      const x = a.prevX + (a.x - a.prevX) * alpha;
+      const y = a.prevY + (a.y - a.prevY) * alpha;
+      const z = a.prevZ + (a.z - a.prevZ) * alpha;
+      // Frente (sen, cos) do `forwardFrom`; a direita é a frente girada.
+      const fx = Math.sin(a.yaw);
+      const fz = Math.cos(a.yaw);
+      const sneak = (a.flags & MOVE_SNEAK) !== 0 ? -0.15 : 0;
+      items.add(x + fx * 0.3 - fz * HAND_SIDE, y + 0.5 + sneak, z + fz * 0.3 + fx * HAND_SIDE, a.held, 0);
     }
   }
 

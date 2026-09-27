@@ -10,7 +10,7 @@
  * posição e mobs, onde um pacote velho não vale nada.
  */
 
-export const PROTOCOL = 1;
+export const PROTOCOL = 3;
 
 export const MSG = {
   /** Convidado → anfitrião: versão, conteúdo, nome, id estável, mods. */
@@ -30,12 +30,45 @@ export const MSG = {
   BLOCKS: 0x12,
   /** Anfitrião → convidado: o pedido não valeu, volte ao estado anterior. */
   BLOCK_DENY: 0x13,
+  /** Qualquer lado: o texto de uma placa (`net/signsync.ts`). */
+  SIGN: 0x14,
   MOVE: 0x20,
   JOIN: 0x21,
   LEAVE: 0x22,
   MOBS: 0x30,
+  /** Convidado → anfitrião: golpe num mob (slot do anfitrião, tipo, dano, pilhagem). */
+  ATTACK: 0x31,
+  /** Anfitrião → convidado: o que o mob que ele matou deixou (itens e XP). */
+  LOOT: 0x32,
+  /** Anfitrião → convidado: dano de mob, flecha ou explosão, com o empurrão e o fogo. */
+  HURT: 0x33,
+  /** Anfitrião → convidado: um frasco quebrou em x, y, z (quem estiver perto bebe). */
+  SPLASH: 0x34,
   SAVE: 0x40,
   TIME: 0x50,
+  /** Convidado → anfitrião: clicou na cama em x, y, z (`net/sleepsync.ts`). */
+  SLEEP: 0x51,
+  /** Anfitrião → convidado: deitado esperando, é dia, ou tem monstro; quantos na cama. */
+  SLEEP_STATE: 0x52,
+  /** Anfitrião → convidado: todos dormiram; o tempo do mundo novo. */
+  WAKE: 0x53,
+  /**
+   * Anfitrião → convidado: a sala está nesta dimensão, e o anfitrião aqui
+   * (`net/dimensionsync.ts`). O convidado atravessa junto.
+   */
+  DIMENSION: 0x54,
+  /** Convidado → anfitrião: o texto. Anfitrião → convidado: quem falou (netId) e o texto. */
+  CHAT: 0x60,
+  /** Convidado → anfitrião: quero abrir o contêiner em x, y, z (`net/containersync.ts`). */
+  OPEN: 0x70,
+  /** Anfitrião → convidado: registros de contêiner (resposta do `OPEN`, ou mudança). */
+  CONTAINERS: 0x71,
+  /** Convidado → anfitrião: o registro do contêiner que ele mexeu. */
+  CSET: 0x72,
+  /** Convidado → anfitrião: fechou a tela. */
+  CLOSE: 0x73,
+  /** Anfitrião → convidado: o contêiner que ele vê foi quebrado. */
+  CONTAINER_GONE: 0x74,
 } as const;
 
 /** Por que o anfitrião recusou. */
@@ -47,6 +80,11 @@ export const MOVE_FLYING = 2;
 export const MOVE_SWING = 4;
 /** O anfitrião está fora da superfície: o boneco dele some da sala. */
 export const MOVE_AWAY = 8;
+/** Morto, no criativo ou espectador: os mobs não o miram. */
+export const MOVE_UNTARGETABLE = 16;
+
+/** Causa de `HURT`, na ordem do `hurtPlayer`. */
+export const HURT_CAUSES = ['mob', 'arrow', 'explosion', 'breath'] as const;
 
 /** Escritor com buffer próprio, reusado: sem alocação por mensagem de tick. */
 export class PacketWriter {

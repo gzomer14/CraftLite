@@ -47,6 +47,12 @@ export interface WorldMeta {
    */
   spawnFound?: boolean;
   /**
+   * Mods ligados da última vez que o mundo foi salvo (M21). Mundo jogado sem
+   * mod não tem o campo; com ele, abrir sem esses mods pede para ligá-los
+   * (`mods/worldmods.ts`).
+   */
+  mods?: string[];
+  /**
    * Aldeias que não negociam com o jogador (M9): `[x, z, até, …]`, com o poço
    * como chave e o tick total do fim da má fama. Mundo antigo não tem o campo.
    */

@@ -7,6 +7,7 @@
  * entram no M4.
  */
 
+import { ACTIVE_MODS } from '../mods/active';
 import { BLOCK_BY_NAME, BLOCKS, type ToolKind } from './blocks';
 import { DYES, LEGACY_DYE_COUNT } from './dyes';
 import type { FoodEffect } from './effects';
@@ -632,6 +633,15 @@ for (const potion of POTIONS) {
     remainder: 'glass_bottle',
     food: { hunger: 0, saturation: 0, eatTicks: 32, alwaysEdible: true, drink: true, effects },
   });
+}
+
+// Itens de mod (M21): id fixo, `itemBase + posição` — ver `mods/types.ts`. Os
+// blocos de mod já viraram item no laço dos blocos, lá em cima.
+for (const mod of ACTIVE_MODS) {
+  const rows = mod.items ?? [];
+  for (let i = 0; i < rows.length; i++) {
+    register({ tex: `item/${rows[i].name}`, maxStack: 64, ...rows[i], id: (mod.itemBase ?? 0) + i });
+  }
 }
 
 /**

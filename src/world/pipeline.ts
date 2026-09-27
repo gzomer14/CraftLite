@@ -13,6 +13,7 @@ import { DIM_OVERWORLD } from '../data/dimensions';
 import { ChunkColumn, ChunkState, SECTIONS_PER_COLUMN, chunkKey } from './chunk';
 import { gatherSections, type SectionView } from './neighborhood';
 import type { World } from './world';
+import { ACTIVE_MODS } from '../mods/active';
 import type {
   GenResponse, MeshResponse, SectionMeshResult, SerializedSection, WorkerRequest, WorkerResponse,
 } from '../workers/protocol';
@@ -610,8 +611,19 @@ export class ChunkPipeline {
   }
 }
 
-/** Cria o worker real. Fica isolado para que os testes não precisem de bundler. */
+/**
+ * Cria o worker real. Fica isolado para que os testes não precisem de bundler.
+ *
+ * Com mod ligado (M21), sobe o worker que carrega os mesmos mods antes das
+ * tabelas; os ids vão no nome, que o worker lê sem esperar mensagem.
+ */
 function defaultWorkerFactory(index: number): WorkerLike {
+  if (ACTIVE_MODS.length > 0) {
+    return new Worker(new URL('../workers/chunk.modworker.ts', import.meta.url), {
+      type: 'module',
+      name: `chunk-${index}|${ACTIVE_MODS.map((mod) => mod.id).join(',')}`,
+    }) as unknown as WorkerLike;
+  }
   return new Worker(new URL('../workers/chunk.worker.ts', import.meta.url), {
     type: 'module',
     name: `chunk-${index}`,

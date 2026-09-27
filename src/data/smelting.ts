@@ -5,6 +5,8 @@
  * vêm da tabela de itens (`fuel`), porque é propriedade do item, não da receita.
  */
 
+import { modRows } from '../mods/active';
+
 /** Ticks para fundir um item. */
 export const SMELT_TICKS = 200;
 
@@ -39,4 +41,6 @@ export const SMELTING: readonly SmeltingRecipe[] = [
   { input: 'netherrack', output: 'nether_brick', xp: 0.1 },
   // Corante verde (M8): é o único que sai da fornalha, como no gênero.
   { input: 'cactus', output: 'green_dye', xp: 0.2 },
+  // Fundição de mod (M21).
+  ...modRows((mod) => mod.smelting),
 ];

@@ -194,6 +194,15 @@ export const PT = {
   'packs.accepted': '{0} aceitos.{1}',
   'packs.read_failed': 'Não deu para ler o pacote.',
   'packs.removing': 'Removendo…',
+  // mods (M21)
+  'title.mods': 'Mods',
+  'mods.intro': 'Mods acrescentam conteúdo ao jogo. Desligado, um mod não pesa nada: o jogo nem baixa o código dele. Ligar ou desligar recarrega o jogo.',
+  'mods.heavy': 'pode pesar em aparelho fraco',
+  'mods.apply': 'Recarregar para aplicar',
+  'mods.none_active': 'Nenhum mod ligado — o jogo está como veio.',
+  'mods.active': 'Ligados agora: {0}.',
+  'mods.world_needs': 'Este mundo foi jogado com mods que estão desligados: {0}. Ligar e recarregar? Depois é só abrir o mundo de novo.',
+  'mods.world_unknown': 'Este mundo usa mods que esta versão do jogo não tem: {0}.',
   'packs.removed': 'Pacote removido.',
   'packs.remove_failed': 'Não deu para remover.',
   // placa

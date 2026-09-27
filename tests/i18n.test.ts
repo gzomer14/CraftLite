@@ -172,6 +172,9 @@ describe('varredura do código', () => {
     ['src/ui/screens/options.ts', /'Português'/],
     // Caracteres do alfabeto da fonte, não texto.
     ['src/data/font.ts', /./],
+    // Conferência de mod (M21): a lista vai para o `console.warn` do
+    // `mods/boot.ts`, para quem escreve mod; nunca aparece em jogo.
+    ['src/mods/validate.ts', /./],
   ];
 
   it('nenhum texto de interface escrito direto no código', () => {

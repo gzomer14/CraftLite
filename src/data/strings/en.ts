@@ -192,6 +192,15 @@ export const EN: Readonly<Record<StringKey, string>> = {
   'packs.accepted': '{0} accepted.{1}',
   'packs.read_failed': 'Could not read the pack.',
   'packs.removing': 'Removing…',
+  // mods (M21)
+  'title.mods': 'Mods',
+  'mods.intro': 'Mods add content to the game. When off, a mod costs nothing: the game does not even download its code. Turning one on or off reloads the game.',
+  'mods.heavy': 'may be heavy on weak devices',
+  'mods.apply': 'Reload to apply',
+  'mods.none_active': 'No mods on — the game as it ships.',
+  'mods.active': 'On now: {0}.',
+  'mods.world_needs': 'This world was played with mods that are off: {0}. Turn them on and reload? Then just open the world again.',
+  'mods.world_unknown': 'This world uses mods this version of the game does not have: {0}.',
   'packs.removed': 'Pack removed.',
   'packs.remove_failed': 'Could not remove it.',
   // placa

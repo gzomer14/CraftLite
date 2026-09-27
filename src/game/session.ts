@@ -67,6 +67,7 @@ import {
 import { useOnMob } from './mobclick';
 import { arrived, enterDimension } from './dimensionhop';
 import { t } from '../core/i18n';
+import { attachModSystems } from '../mods/systems';
 
 /** A vara de pesca (M14): a linha só vive com ela na mão. */
 const FISHING_ROD = ITEM_BY_NAME.get('fishing_rod')?.id ?? -1;
@@ -260,6 +261,7 @@ export class Session {
     this.wireInteraction();
     wireSurvival(this, events);
     wireProjectiles(this, events);
+    attachModSystems(this);
 
     this.lastX = player.x;
     this.lastZ = player.z;

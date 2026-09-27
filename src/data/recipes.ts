@@ -7,6 +7,7 @@
  * A tabela é declarativa: acrescentar uma receita é uma entrada, nunca código.
  */
 
+import { modRows } from '../mods/active';
 import { ITEM_BY_NAME } from './items';
 import { DYES, DYE_SOURCES } from './dyes';
 
@@ -255,6 +256,8 @@ export const RECIPES: readonly Recipe[] = [
   { type: 'shaped', pattern: ['I.I', 'III'], key: { I: 'iron_ingot' },
     result: { item: 'minecart', count: 1 } },
   ...dyeRecipes(),
+  // Receitas de mod (M21), no fim: o livro de receitas as lista por último.
+  ...modRows((mod) => mod.recipes),
 ];
 
 /**

@@ -42,6 +42,9 @@
     <div class="bar"><i id="boot-bar"></i></div>
     <p id="boot-msg">iniciando…</p>
   </div>
-  <script type="module" src="/src/main.ts"></script>
+  <script>(function(){var m=null;try{m=localStorage.getItem('craftlite.mods')}catch(e){}
+    function go(src,alt){var s=document.createElement('script');s.type='module';s.crossOrigin='';
+      s.src=src;if(alt)s.onerror=function(){go(alt)};document.body.appendChild(s)}
+    m?go('/src/mods/boot.ts','/src/main.ts'):go('/src/main.ts')})()</script>
 </body>
 </html>

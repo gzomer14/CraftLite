@@ -17,9 +17,18 @@ export default defineConfig({
     chunkSizeWarningLimit: 300,
     modulePreload: { polyfill: false },
     rollupOptions: {
+      // Dois pontos de entrada (M21): o jogo, e o dos mods, que baixa os mods
+      // e depois importa o jogo. O `index.html` escolhe entre os dois.
+      input: {
+        index: resolve(__dirname, 'index.html'),
+        main: resolve(__dirname, 'src/main.ts'),
+        modboot: resolve(__dirname, 'src/mods/boot.ts'),
+      },
       output: {
-        entryFileNames: 'a/[hash].js',
-        chunkFileNames: 'a/[hash].js',
+        // `a/` é o jogo; `m/` é o que só baixa com mod ligado. O relatório de
+        // tamanho e o precache do service worker separam pela pasta.
+        entryFileNames: (chunk) => (chunk.name === 'modboot' ? 'm/[hash].js' : 'a/[hash].js'),
+        chunkFileNames: (chunk) => (isModChunk(chunk.facadeModuleId) ? 'm/[hash].js' : 'a/[hash].js'),
         assetFileNames: 'a/[hash][extname]',
       },
     },
@@ -30,9 +39,52 @@ export default defineConfig({
   },
   worker: {
     format: 'es',
+    rollupOptions: {
+      output: {
+        // O worker com mods e tudo o que ele divide (o worker de sempre, como
+        // pedaço, e cada mod) vão para `m/`: sem mod, nada disso é baixado.
+        entryFileNames: (chunk) => (chunk.name === 'chunk.modworker'
+          ? 'm/[name]-[hash].js' : 'assets/[name]-[hash].js'),
+        chunkFileNames: 'm/[hash].js',
+      },
+    },
   },
   server: { host: true },
   plugins: [
+    {
+      /*
+       * Mods (M21). O `index.html` não tem `<script type="module" src>`: um
+       * script de poucas linhas lê a lista de mods no `localStorage` e sobe o
+       * jogo (`main`) ou o ponto de entrada dos mods (`modboot`) — e, se este
+       * não carregar (ligado sem rede, fora do precache), o jogo sem mod. No build, os
+       * dois caminhos de fonte viram os arquivos finais, e o `main` ganha um
+       * `modulepreload` no `<head>` — a busca dele começa no mesmo instante em
+       * que começava quando era a tag do `<head>`, e o jogo sem mod não espera
+       * nem um arquivo a mais.
+       */
+      name: 'craftlite-mod-entry',
+      apply: 'build',
+      transformIndexHtml: {
+        order: 'post',
+        handler(html, ctx) {
+          const files = new Map<string, string>();
+          for (const chunk of Object.values(ctx.bundle ?? {})) {
+            if (chunk.type === 'chunk' && chunk.isEntry) files.set(chunk.name, chunk.fileName);
+          }
+          const main = files.get('main');
+          const modboot = files.get('modboot');
+          if (main === undefined || modboot === undefined) {
+            throw new Error('craftlite-mod-entry: faltou o pedaço main ou modboot no bundle');
+          }
+          // O `main` aparece duas vezes: o caminho sem mod e a volta para ele
+          // quando o ponto de entrada dos mods não carrega (offline, sem cache).
+          return html
+            .split("'/src/main.ts'").join(`'./${main}'`)
+            .replace("'/src/mods/boot.ts'", `'./${modboot}'`)
+            .replace('</title>', `</title>\n<link rel="modulepreload" crossorigin href="./${main}">`);
+        },
+      },
+    },
     {
       // O service worker versiona o cache pelo build (doc 11 §7). Injetar o
       // hash aqui evita que o jogador fique preso numa versão antiga.
@@ -47,9 +99,11 @@ export default defineConfig({
           // A lista de assets vai para o precache do SW: sem ela, "instalei o
           // PWA" não significava "funciona offline" — o bundle só entrava no
           // cache depois de uma partida com rede.
+          // O que é de mod (`m/`) fica fora: entra no cache quando o jogador
+          // liga o mod e o arquivo passa pela rede (stale-while-revalidate).
           const assets = listAssets(dist, dist)
             .filter((file) => file !== 'sw.js' && file !== 'index.html'
-              && file !== 'manifest.webmanifest')
+              && file !== 'manifest.webmanifest' && !file.startsWith('m/'))
             .map((file) => `./${file}`);
           writeFileSync(
             path,
@@ -74,4 +128,9 @@ function listAssets(dir: string, root: string): string[] {
     else out.push(relative(root, full).split('\\').join('/'));
   }
   return out;
+}
+
+/** Pedaço que só existe por causa de um mod (`src/mods/<id>/`). */
+function isModChunk(facade: string | null): boolean {
+  return facade !== null && /[\\/]src[\\/]mods[\\/][^\\/]+[\\/]/.test(facade);
 }

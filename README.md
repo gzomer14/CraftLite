@@ -33,7 +33,12 @@ mão, e a seed em código curto (`03NQ-K8NH`) para copiar e colar. O **M18** pô
 (módulos grandes cortados por papel, memória de áudio com folga) e o **M19** fechou as pontas
 soltas: enderman no End, o dragão que quebra, sopra e morre devagar, as ilhas de fora do End com
 o portal de passagem, e o tint de bioma no WebGL1. M16 a M19 ainda não vistos em aparelho — o
-roteiro está no doc 15 §6.
+roteiro está no doc 15 §6. O **M21** (2026-09-27) abriu o jogo a **mods**: cada mod é uma pasta em
+`src/mods/`, escrita a pedido, que o jogador liga e desliga na tela **Mods** do título. Sem mod
+ligado, a página baixa o mesmo arquivo único de antes — o build e um smoke test de navegador
+(`npm run smoke:mods`) cobram isso —, e o primeiro mod, o de exemplo, traz um cristal que brilha e
+cura quem fica em cima. O **M20**, multijogador só na rede local (celular com computador, sem
+servidor), está planejado e começa por uma prova de conexão em dois aparelhos (doc 14).
 
 - **M0 — esqueleto:** Vite + TypeScript strict, renderer WebGL2 próprio com fallback WebGL1,
   detecção de tier, loop de 20 Hz com interpolação, gerador procedural de texturas alimentando um
@@ -85,7 +90,7 @@ roteiro está no doc 15 §6.
   preso à linha sem uma única consulta de colisão. E **import/export de mundos**: um arquivo `.clw`
   com todas as dimensões, os baús e os veículos, que leva o mundo do celular para o computador sem
   passar por servidor nenhum. O multijogador P2P **saiu do escopo** deste marco por decisão do
-  projeto.
+  projeto, e voltou como M20, só na rede local.
 - **Dois estilos de textura**, ambos gerados por código e trocáveis em Opções → Vídeo. O
   **Clássico** é o procedural cru; o **Nítido** passa cada ladrilho por relevo direcional, realce,
   tom e chanfro de borda, e transforma as máscaras de item em sólidos iluminados — mesma silhueta
@@ -154,7 +159,7 @@ Abre em **2,8 s em 3G rápido** (critério: < 5 s) e aguentou **92 min de voo co
 erro**, com o heap estável e o anel de chunks fixo em 489 colunas ao longo de 67 mil blocos — os
 dois medidos por `npm run slow-network` e `npm run soak`, que dirigem um Chrome de verdade.
 
-**302 KB gzip** no total (código + worker + HTML + service worker, com o inglês), zero assets baixados
+**305 KB gzip** no total (código + worker + HTML + service worker, com o inglês; o que só baixa com mod ligado fica à parte), zero assets baixados
 além de dois ícones de PWA de 6,7 KB, gerados por código.
 
 Validado em aparelho alvo (**Galaxy J7 Metal**, Android 7, 2 GB, Mali-T830) em 2026-09-12:
@@ -167,10 +172,11 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 2290 testes (vitest)
+npm test           # 2316 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
 npm run smoke      # abre o jogo num Chrome headless e joga o roteiro do doc 14 (precisa do build)
+npm run smoke:mods # liga e desliga o mod de exemplo e confere que o jogo sem mod baixa um arquivo só
 npm run icons      # regenera os ícones do PWA
 ```
 
@@ -229,7 +235,8 @@ src/
     gen/structures.ts       dungeon, mina e aldeia a partir de peças declarativas
     mesh/greedy.ts          greedy meshing binário com AO
     mesh/shapes.ts          formas não-cubo como caixas (desenho e colisão)
-  workers/                  protocolo tipado + worker de chunk
+  workers/                  protocolo tipado + worker de chunk (e o worker com mods)
+  mods/                     mods (M21): tipos, catálogo, carregadores, ponto de entrada; um mod por pasta
   render/                   gl, atlas, texgen, mesh, terrain, sky, selection, particles,
                             entityatlas, skingen, mobrender, pack (resource pack do jogador)
   entity/                   jogador, itens no chão, orbes de XP, barcos, mobs (store, spawn,
@@ -242,11 +249,11 @@ src/
   input/                    controls (camada única), keyboard, mouse, touch, gamepad,
                             navegação e cursor de interface
   ui/                       HUD, controles de toque, tela cheia/orientação, debug
-    screens/                título, mundos, opções, texturas, pausa, morte
+    screens/                título, mundos, opções, texturas, mods, pausa, morte
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      2290 testes, incluindo orçamento de performance e de luz
+tests/                      2316 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios

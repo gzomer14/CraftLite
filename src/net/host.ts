@@ -193,6 +193,12 @@ export class HostRoom {
     };
     link.onMessage = (data, reliable) => this.onMessage(guest, new Uint8Array(data), reliable);
     link.onClose = () => { void this.drop(guest); };
+    link.onUnstable = (unstable) => {
+      if (!guest.ready) return;
+      const text = `${guest.name} — ${unstable ? t('net.unstable_guest') : t('net.stable')}`;
+      this.chat?.add(null, text);
+      this.game.hud.showMessage(text, 80);
+    };
     await link.accept(answer);
   }
 
@@ -444,7 +450,8 @@ export class HostRoom {
     this.worldSync.left(g);
     this.avatars.remove(g.netId);
     for (const other of this.ready()) this.send(other, this.w.reset(MSG.LEAVE).u8(g.netId).view8());
-    if (g.ready) this.chat?.add(null, `${g.name} — ${t('net.left')}`);
+    const why = g.link.closeReason;
+    if (g.ready) this.chat?.add(null, `${g.name} — ${t('net.left')}${why === '' ? '' : ` (${why})`}`);
     await this.persist(g);
     g.link.close();
     this.events.changed();

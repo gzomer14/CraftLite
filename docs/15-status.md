@@ -9,7 +9,13 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-28 11:41 — **Dois defeitos do J7 Metal (T0) corrigidos** (§4).
+**Última atualização:** 2026-09-28 12:11 — **A sala caía a cada 2–3 minutos com o J7 de anfitrião** (§4).
+O estado `disconnected` do WebRTC, que é passageiro, derrubava a sala. Agora a ligação instável é
+avisada e esperada por 20 s (`net/linkhealth.ts`), e toda queda mostra o motivo. **O app instalado
+ainda não abre no J7**: agora a tela preta de abertura aparece antes de fechar, então a orientação
+era parte do problema, mas não todo. O próximo passo é o registro de falhas do Android (§6, item 0).
+O relato também diz que desempenho, geração, som e o Nether com o convidado estão bons no J7. Antes,
+2026-09-28 11:41 — **Dois defeitos do J7 Metal (T0) corrigidos** (§4).
 - **Mochila, bancada e fornalha levavam 5–10 s por toque.** A folha de sprites ia ao CSS como
   `data:` URL de ~480 mil caracteres, e o Chrome a reprocessava por elemento. Agora é uma `blob:`
   URL: com a CPU 6× mais lenta, cada ação caiu de ~3 000 ms para 91–212 ms (`npm run bench:ui`).
@@ -145,8 +151,8 @@ Medidas em 2026-09-27 17:11, com a terceira volta do M20, com `npm test`, `npm r
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, o jogo sem mod) | **308,2 KB**, worker 42,7 (307,9 antes da terceira volta do M20: as âncoras do pipeline e o gancho de itens do `SceneFeed` custaram 0,3; 307,1 antes da segunda volta: teclado, roda, F11 e a mira dos mobs por jogador custaram 0,8; 304,7 antes do M20 no jogo: os ganchos — botões, `game/netgate.ts`, `playersave.ts`, o boneco do jogador no atlas — custaram 2,4 KB no pedaço principal; 302,2 antes do M21: a infraestrutura de mods custou 1,9 KB no pedaço principal, 0,3 no worker e 0,2 no HTML; 301,8 ao fechar o M19; 298,4 ao fechar o M17; o M19 somou as ilhas de fora e o portal de passagem, e o worker foi a 42,3; 282,5 antes do M17: o inglês e as chaves custaram 15,9; o worker, 41,8, não mudou um byte; 267,3 antes do M16; 265,7 ao fechar o M15; 257,9 antes do M15; 249,5 antes do M14; 240,0 antes do M10) | < 350 KB | `npm run size` |
-| Testes | **2399**, 125 arquivos (2398 antes da correção do J7; 2389 antes da terceira volta do M20; 2362 antes da segunda volta; 2334 antes do M20 no jogo; 2316 ao fechar o M21; 2290 antes do M21; 2281 ao fechar o M19; 2271 ao fechar o M17; 2235 antes do M17; 2164 antes do M16; 2156 ao fechar o M15; 2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
+| Bundle (gzip, o jogo sem mod) | **308,3 KB**, worker 42,7 (307,9 antes da terceira volta do M20: as âncoras do pipeline e o gancho de itens do `SceneFeed` custaram 0,3; 307,1 antes da segunda volta: teclado, roda, F11 e a mira dos mobs por jogador custaram 0,8; 304,7 antes do M20 no jogo: os ganchos — botões, `game/netgate.ts`, `playersave.ts`, o boneco do jogador no atlas — custaram 2,4 KB no pedaço principal; 302,2 antes do M21: a infraestrutura de mods custou 1,9 KB no pedaço principal, 0,3 no worker e 0,2 no HTML; 301,8 ao fechar o M19; 298,4 ao fechar o M17; o M19 somou as ilhas de fora e o portal de passagem, e o worker foi a 42,3; 282,5 antes do M17: o inglês e as chaves custaram 15,9; o worker, 41,8, não mudou um byte; 267,3 antes do M16; 265,7 ao fechar o M15; 257,9 antes do M15; 249,5 antes do M14; 240,0 antes do M10) | < 350 KB | `npm run size` |
+| Testes | **2404**, 126 arquivos (2399 antes da ligação instável; 2398 antes da correção do J7; 2389 antes da terceira volta do M20; 2362 antes da segunda volta; 2334 antes do M20 no jogo; 2316 ao fechar o M21; 2290 antes do M21; 2281 ao fechar o M19; 2271 ao fechar o M17; 2235 antes do M17; 2164 antes do M16; 2156 ao fechar o M15; 2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
 | Smoke test de navegador | **7 passos verdes**: carregar, criar, andar 10 s, quebrar, salvar, recarregar, conferir | verde | `npm run smoke` |
 | Smoke test da rede (M20.0) | **7 passos verdes**: dois Chrome, anfitrião e convidado pela página `rede.html`, trocando os códigos como uma pessoa; ligados em candidato `host` dos dois lados; ida e volta ~0,3 ms, perda 0/300, 6–18 MB/s. Com e sem mDNS (`SMOKE_NET_MDNS=1`). **Na mesma máquina — não prova a rede Wi-Fi** | verde | `npm run smoke:net` |
 | Toque nas telas de inventário, CPU 6× mais lenta | **91–212 ms** por ação (abrir o livro de receitas, tocar numa receita, tocar num slot); eram **~3 000 ms** com a folha de sprites como `data:` URL — no J7, 5–10 s | ≤ 600 ms | `npm run bench:ui` |
@@ -154,7 +160,7 @@ Medidas em 2026-09-27 17:11, com a terceira volta do M20, com `npm test`, `npm r
 | Bloco do anfitrião no convidado | **0–15 ms** por viagem, mediana 1–4 ms (5 viagens por rodada; eram até 214 ms antes de o lote sair na microtarefa, sem esperar o tick) | < 150 ms (aceite do M20) | `npm run smoke:room` |
 | Smoke test da câmera (M20) | **3 passos verdes**: a webcam falsa do Chrome filma o QR do anfitrião inclinado, borrado e com ruído; o leitor próprio lê em **205–410 ms** | verde | `npm run smoke:camera` |
 | Leitor de QR próprio | lê a partir de **~4,1 px por módulo** e com trapézio de até **30%** (borda de cima com 70% da de baixo); falha com 45% e a 3,3 px/módulo; **~10 ms** por quadro de 640×480 no Node (cinco leituras e a foto sintética em 59 ms) | < 120 ms/quadro | `tests/qrread.test.ts` |
-| Pedaços da rede (`n/` e `rede.html`) | **31,5 KB**: a sala do jogo (16,8; 15,5 na segunda volta; 9,6 antes de chat, nomes, combate, contêiner, cama e placa), as peças em comum com a página de prova — ligação, sinal, base32, gerador e leitor de QR, câmera (9,9) —, a página de prova (4,0 + 0,8 do HTML). **Abrir ou entrar numa sala baixa 26,7 KB.** Fora do jogo sem sala, **dentro do precache** (a sala abre sem internet) | sem orçamento (o jogo sem sala é que tem) | `npm run size` |
+| Pedaços da rede (`n/` e `rede.html`) | **32,1 KB**: a sala do jogo (17,0; 16,8 antes da ligação instável; 15,5 na segunda volta; 9,6 antes de chat, nomes, combate, contêiner, cama e placa), as peças em comum com a página de prova — ligação, sinal, base32, gerador e leitor de QR, câmera (9,9) —, a página de prova (4,0 + 0,8 do HTML). **Abrir ou entrar numa sala baixa 27,3 KB.** Fora do jogo sem sala, **dentro do precache** (a sala abre sem internet) | sem orçamento (o jogo sem sala é que tem) | `npm run size` |
 | Código de pareamento | **119 caracteres** com IP à vista, **138** com mDNS (72 e 84 bytes + CRC); QR versão 7–8, lido pelo OpenCV na captura da página | QR ≤ versão 8 | `tests/net.test.ts` |
 | Smoke test dos mods (M21) | **6 passos verdes**: sem mod, **um** arquivo de código; ligar pela tela Mods; o cristal no mundo, com luz 14; desligar volta a um arquivo e apaga a escolha; o mundo pede o mod | verde | `npm run smoke:mods` |
 | Pedaços que só baixam com mod (`m/`) | **45,6 KB**: ponto de entrada 1,9, mod de exemplo 0,6, worker com mods 0,4 + o worker de sempre como pedaço, 42,7 | sem orçamento (o jogo sem mod é que tem) | `npm run size` |
@@ -2394,6 +2400,7 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-28 | `net/link.ts`, `net/linkhealth.ts` | **A sala caía a cada 2–3 minutos com o J7 Metal de anfitrião** (M20; campo, com um S24 Ultra de convidado). A ligação tratava `disconnected` como o fim, e esse estado do WebRTC é passageiro: aparece quando as verificações de consentimento atrasam alguns segundos (Wi-Fi de celular antigo em economia de energia) e volta sozinho a `connected`. Agora `disconnected` é "instável": os dois lados avisam na tela e no chat e esperam 20 s. Só `failed`, `closed`, um canal fechado, um envio que falha na fila cheia, ou a espera esgotada, derrubam. **Toda queda mostra o motivo** (na tela do convidado e no chat do anfitrião), para o próximo teste dizer qual foi. O canal rápido também deixa de enfileirar posição quando a fila passa de 256 KB. A causa no aparelho é a mais provável, **não medida**: o smoke não consegue interromper a rede entre dois Chrome. Regressão em `tests/linkhealth.test.ts`. |
 | 2026-09-28 | `render/itemsprites.ts` | **Cada toque na mochila, bancada, fornalha e livro de receitas levava 5–10 s no J7 Metal** (T0, campo). O jogo rodava a 60 FPS. A folha de sprites (M4) ia ao CSS como `data:` URL de ~480 mil caracteres dentro de `--item-sheet`, e cada slot, receita e célula a resolvia a cada recálculo de estilo: 57 botões de receita recriados por toque. Agora é uma `blob:` URL. Medido com a CPU 6× mais lenta: ~3 000 ms por ação antes, 91–212 ms depois. Regressão em `npm run bench:ui` (orçamento de 600 ms) e em `tests/itemsprites.test.ts`. |
 | 2026-09-28 | `public/manifest.webmanifest`, `ui/screenmode.ts` | **O app instalado não abria no Android 8.1** (J7 Metal, campo: *"CraftLite não está respondendo, CraftLite parou"*). No navegador, o jogo abria. Causa provável, não reproduzida: `"orientation": "landscape"` no manifesto. O Android 8 derruba uma atividade translúcida que fixa orientação (*"Only fullscreen opaque activities can request orientation"*), e a tela de abertura do WebAPK é translúcida. A orientação saiu do manifesto — **desvio do doc 11 §7**, escrito em `ui/screenmode.ts`, que já trava a paisagem no primeiro toque. O Chrome do Android 8 parou no 138. **A conferir no aparelho**, desinstalando antes. |
 | 2026-09-27 | `net/blockreact.ts`, `net/host.ts`, `net/guest.ts` | **O buraco aberto pelo outro jogador ficava escuro** (M20; campo, com captura). O bloco que chega pela rede entra por `world.setBlock(…, 'network')`, e a luz só é recalculada por quem muda o bloco (a interação, o fluido): ninguém a recalculava, nem no anfitrião nem no convidado. Agora os dois recalculam, e o anfitrião também cuida de fluido, contêiner e placa, como o caminho local. Regressão em `tests/netroom.test.ts` (sem a correção, falha — conferido) e no smoke da sala (luz 15 no fundo do poço). |
@@ -2877,10 +2884,25 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
 ## 6. Próximo passo recomendado
 
 0. **No J7 Metal (2026-09-28):**
-   - Desinstalar o CraftLite instalado, abrir o site no Chrome, instalar de novo: abre?
-   - Na mochila, na bancada e na fornalha, o toque responde na hora?
-   - Se o app instalado ainda cair: *Adicionar à tela inicial → Criar atalho* (sem WebAPK)
-     contorna, e o relatório do aparelho (versão do Chrome) ajuda.
+   - ~~Mochila, bancada e fornalha lentas~~ — **resolvido, confirmado em campo.**
+   - **A sala com o J7 de anfitrião por 10 minutos ou mais.** Se aparecer *"ligação instável"*,
+     ela voltou sozinha? Se cair, o motivo aparece entre parênteses: anotar.
+   - **O app instalado ainda não abre.** Depois de tirar a orientação, a tela preta de abertura
+     aparece e fecha. Para achar a causa:
+     - `about://webapks` no Chrome do J7: versão do *Shell APK*, *Update Status* e o que ele diz
+       do manifesto (captura de tela);
+     - com um computador: depuração USB no J7, e `adb logcat -b crash` (ou
+       `adb logcat | findstr /i "AndroidRuntime webapk FATAL"`) enquanto abre o app. A primeira
+       linha de exceção diz a causa.
+     - Enquanto isso, *Adicionar à tela inicial → Criar atalho* abre sem o WebAPK.
+   - **O que falta medir no T0** (o resto do relato está bom: desempenho, geração, som, Nether
+     com convidado):
+     - o End a 30 FPS, com o dragão (M16);
+     - a cor de grama por bioma: planície → floresta → deserto com o F3 (M14);
+     - se o alcance de visão 5 cabe (M12);
+     - o FPS do J7 anfitrião com um convidado longe (as âncoras do M20);
+     - 30 minutos de sala;
+     - o PWA offline e os mods (M21), quando o app instalado abrir.
 
    **A sala do M20 em aparelho** (no jogo desde 2026-09-27; precisa ir para a `main` para sair
    no Pages). Celular e computador na mesma rede Wi-Fi:

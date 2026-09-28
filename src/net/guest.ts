@@ -85,7 +85,9 @@ export class GuestClient {
 
   private constructor(readonly link: Link, private readonly name: string) {
     link.onMessage = (data, reliable) => this.onMessage(new Uint8Array(data), reliable);
-    link.onClose = () => this.end(t('net.connection_lost'));
+    // O motivo, nos termos do WebRTC, vai junto: é o que o teste em aparelho precisa ler.
+    link.onClose = () => this.end(`${t('net.connection_lost')}\n(${link.closeReason || '?'})`);
+    link.onUnstable = (unstable) => this.events?.message(unstable ? t('net.unstable') : t('net.stable'));
   }
 
   /** Lê a oferta do anfitrião e prepara a resposta. */

@@ -18,11 +18,17 @@
 import {
   midOf, sdpFromSignal, signalFromSdp, type CandidateKind, type Signal,
 } from './signal';
+import { LinkHealth } from './linkhealth';
 
 /** Quanto esperar os candidatos. Na rede local, eles chegam em milissegundos. */
 const GATHER_TIMEOUT_MS = 4000;
 /** Sem candidato novo por este tempo, a coleta está pronta. */
 const GATHER_QUIET_MS = 600;
+/**
+ * Acima disto na fila do canal rápido, a posição nova é jogada fora: ela
+ * envelhece na fila, e a fila cheia é o que o Chrome derruba.
+ */
+const FAST_BUFFER_LIMIT = 256 * 1024;
 
 export interface CandidateInfo {
   type: string;
@@ -50,6 +56,18 @@ export class Link {
   readonly log: string[] = [];
   onOpen: (() => void) | null = null;
   onClose: (() => void) | null = null;
+  /**
+   * A ligação ficou instável (`true`) ou voltou (`false`): a sala avisa e
+   * espera, em vez de derrubar (`net/linkhealth.ts`).
+   */
+  onUnstable: ((unstable: boolean) => void) | null = null;
+  /** Por que caiu — vazio enquanto está de pé. */
+  get closeReason(): string {
+    return this.health.reason;
+  }
+  private readonly health = new LinkHealth();
+  private healthTimer: ReturnType<typeof setInterval> | undefined;
+  private closed = false;
   onMessage: ((data: ArrayBuffer, reliable: boolean) => void) | null = null;
   private readonly born = performance.now();
   private localMid = '0';
@@ -64,7 +82,13 @@ export class Link {
     for (const channel of [this.reliable, this.fast]) {
       channel.binaryType = 'arraybuffer';
       channel.onopen = () => this.checkOpen();
-      channel.onclose = () => this.note(`channel ${channel.label}: closed`);
+      channel.onclose = () => {
+        this.note(`channel ${channel.label}: closed`);
+        if (this.opened) {
+          this.health.channelClosed(channel.label);
+          this.fireClose();
+        }
+      };
       channel.onmessage = (e: MessageEvent) => {
         if (e.data instanceof ArrayBuffer) this.onMessage?.(e.data, channel === this.reliable);
       };
@@ -72,9 +96,23 @@ export class Link {
     this.pc.onicegatheringstatechange = () => this.note(`gathering: ${this.pc.iceGatheringState}`);
     this.pc.oniceconnectionstatechange = () => this.note(`ice: ${this.pc.iceConnectionState}`);
     this.pc.onconnectionstatechange = () => {
-      this.note(`connection: ${this.pc.connectionState}`);
       const s = this.pc.connectionState;
-      if (s === 'failed' || s === 'closed' || (s === 'disconnected' && this.opened)) this.onClose?.();
+      this.note(`connection: ${s}`);
+      // Antes de abrir, `disconnected` é só a negociação: quem espera é o pareamento.
+      if (!this.opened && s === 'disconnected') return;
+      const before = this.health.state;
+      const now = this.health.observe(s, performance.now());
+      if (now === 'dead') {
+        this.fireClose();
+      } else if (now === 'unstable' && before === 'ok') {
+        this.onUnstable?.(true);
+        this.healthTimer = setInterval(() => {
+          if (this.health.check(performance.now()) === 'dead') this.fireClose();
+        }, 1000);
+      } else if (now === 'ok' && before === 'unstable') {
+        clearInterval(this.healthTimer);
+        this.onUnstable?.(false);
+      }
     };
   }
 
@@ -108,11 +146,32 @@ export class Link {
 
   send(data: ArrayBuffer | Uint8Array, reliable: boolean): void {
     const channel = reliable ? this.reliable : this.fast;
-    if (channel.readyState === 'open') channel.send(data as ArrayBuffer);
+    if (channel.readyState !== 'open') return;
+    // Rede lenta (ou instável): posição velha não vale nada; a fila, sim.
+    if (!reliable && channel.bufferedAmount > FAST_BUFFER_LIMIT) return;
+    try {
+      channel.send(data as ArrayBuffer);
+    } catch {
+      // Fila cheia no confiável: o que devia chegar não chega mais.
+      if (reliable && this.opened) {
+        this.health.channelClosed(`${channel.label} (send)`);
+        this.fireClose();
+      }
+    }
   }
 
   close(): void {
+    clearInterval(this.healthTimer);
     this.pc.close();
+  }
+
+  /** Avisa uma vez só: fecha por qualquer caminho que chegue primeiro. */
+  private fireClose(): void {
+    if (this.closed) return;
+    this.closed = true;
+    clearInterval(this.healthTimer);
+    this.note(`closed: ${this.health.reason}`);
+    this.onClose?.();
   }
 
   /** O par de candidatos que venceu: por onde os dados estão passando. */

@@ -100,6 +100,7 @@ describe('mobs do convidado', () => {
 interface FakeLink {
   sent: Uint8Array[];
   isOpen: boolean;
+  closeReason: string;
   send(data: Uint8Array, reliable: boolean): void;
   close(): void;
   onMessage: ((data: ArrayBuffer, reliable: boolean) => void) | null;
@@ -108,7 +109,7 @@ interface FakeLink {
 
 function fakeLink(): FakeLink {
   return {
-    sent: [], isOpen: true, onMessage: null, onClose: null,
+    sent: [], isOpen: true, onMessage: null, onClose: null, closeReason: '',
     send(data) { this.sent.push(data.slice()); },
     close() { this.isOpen = false; },
   };

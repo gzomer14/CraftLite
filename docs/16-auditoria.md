@@ -12,6 +12,40 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-28 12:11 · A sala que caía com o J7 de anfitrião; o PWA ainda fechando
+
+**Pedido:** o usuário relatou três coisas do J7 Metal.
+- *"eu fico sendo desconectado a todo momento"*: com o J7 de anfitrião e um S24 Ultra de
+  convidado, a sala durava 2–3 minutos.
+- O app instalado ainda fecha, agora com uma tela preta antes.
+- Pergunta: *"Não me recordo quais testes faltava realizar no J7 Metal"*.
+
+**Resultado:**
+- **Queda da sala:** o estado `disconnected` do WebRTC, passageiro, derrubava a sala. Agora é
+  "instável", com aviso e 20 s de espera (`net/linkhealth.ts`). Toda queda mostra o motivo, e o
+  canal rápido não enfileira posição velha.
+- **PWA:** não resolvido. O roteiro de diagnóstico no aparelho (`about://webapks`, `adb logcat`)
+  está no doc 15 §6. A tela preta nova mostra que a orientação era parte da causa.
+- **Testes pendentes no T0:** listados no doc 15 §6, item 0.
+
+Portões: 2404 testes; lint, build e tamanho verdes (308,3 KB; sala 17,0 KB). `smoke:net`,
+`smoke:room` e `smoke:camera` verdes.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| + | `src/net/linkhealth.ts` | quando a ligação caiu de verdade: espera de 20 s em `disconnected`, motivo |
+| ~ | `src/net/link.ts` | usa a `LinkHealth`; `onUnstable`, `closeReason`; canal fechado derruba; limite na fila do canal rápido |
+| ~ | `src/net/host.ts` | aviso de convidado instável; o motivo da queda no chat |
+| ~ | `src/net/guest.ts` | aviso de ligação instável; o motivo na tela de queda |
+| ~ | `src/data/strings/pt.ts`, `en.ts` | `net.unstable`, `net.unstable_guest`, `net.stable` |
+| + | `tests/linkhealth.test.ts` | instável que volta, espera esgotada, `failed`/`closed`, canal fechado |
+| ~ | `tests/netroom.test.ts` | a ligação falsa com `closeReason` |
+| ~ | `docs/15-status.md` | data; §2; §4; §6 item 0 (diagnóstico do PWA e o que falta no T0) |
+| ~ | `docs/16-auditoria.md` | esta sessão |
+| ~ | `README.md` | testes |
+
+---
+
 ## 2026-09-28 11:41 · J7 Metal: telas de inventário lentas e o app instalado que não abria
 
 **Pedido:** o usuário testou num J7 Metal (T0, Android 8.1). O PWA instalado não abria

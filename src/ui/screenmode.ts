@@ -5,6 +5,12 @@
  * do usuário, `orientation.lock` não existe no iOS, e nenhum dos dois pode
  * derrubar o jogo. Quando a trava não funciona, o aviso "gire o aparelho" cobre
  * a diferença.
+ *
+ * **É só aqui que a paisagem é pedida** — desvio do doc 11 §7, que a punha no
+ * manifesto. Com `"orientation": "landscape"` no manifesto, o app instalado
+ * não abria no Android 8 ("CraftLite parou", J7 Metal, 2026-09-28): a tela de
+ * abertura do WebAPK é translúcida, e o Android 8 derruba a atividade
+ * translúcida que fixa orientação.
  */
 import { t } from '../core/i18n';
 

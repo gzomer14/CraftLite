@@ -12,6 +12,38 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-09-28 11:41 · J7 Metal: telas de inventário lentas e o app instalado que não abria
+
+**Pedido:** o usuário testou num J7 Metal (T0, Android 8.1). O PWA instalado não abria
+(*"CraftLite não está respondendo, CraftLite parou"*). O jogo rodava a 60 FPS, mas nas telas de
+inventário *"demora uns 5/10 segundos"* para cada toque.
+
+**Resultado:**
+- **Telas lentas:** medido antes de mexer. A folha de sprites, como `data:` URL de ~480 mil
+  caracteres numa variável CSS, custava ~3 000 ms por ação com a CPU 6× mais lenta. Com `blob:`
+  URL, 91–212 ms. Virou `npm run bench:ui`, com orçamento de 600 ms.
+- **App instalado:** a orientação fixa saiu do manifesto. É a falha conhecida do Android 8 com
+  atividade translúcida (o WebAPK); a paisagem continua pelo `ui/screenmode.ts`. Não reproduzido
+  aqui: fica para o aparelho, reinstalando.
+
+Portões: 2399 testes; lint, build e tamanho verdes (308,2 KB). `smoke`, `smoke:mods`,
+`smoke:room` e `bench:ui` verdes.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| ~ | `src/render/itemsprites.ts` | folha de sprites como `blob:` URL (`toSheetUrl`) |
+| ~ | `public/manifest.webmanifest` | sai `"orientation": "landscape"` |
+| ~ | `src/ui/screenmode.ts` | comentário: o desvio do doc 11 §7 e o motivo |
+| + | `scripts/bench-ui.mjs` | toque nas telas de inventário com a CPU 6× mais lenta, com orçamento |
+| ~ | `package.json` | `bench:ui` |
+| ~ | `tests/itemsprites.test.ts` | a folha vai ao CSS como `blob:` |
+| ~ | `tests/uihidden.test.ts` | o manifesto sem orientação, com o motivo |
+| ~ | `docs/15-status.md` | data; §2; §4 duas correções; §6 item 0 |
+| ~ | `docs/16-auditoria.md` | esta sessão |
+| ~ | `README.md` | testes e o comando novo |
+
+---
+
 ## 2026-09-27 17:11 · M20, terceira volta: dimensões, mundo em volta do convidado, item na mão
 
 **Pedido:** *"Pode seguir com o que ainda falta"*.

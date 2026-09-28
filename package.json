@@ -20,7 +20,8 @@
     "smoke:mods": "node scripts/smoke-mods.mjs",
     "smoke:net": "node scripts/smoke-net.mjs",
     "smoke:room": "node scripts/smoke-room.mjs",
-    "smoke:camera": "node scripts/smoke-camera.mjs"
+    "smoke:camera": "node scripts/smoke-camera.mjs",
+    "bench:ui": "node scripts/bench-ui.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.4.1",

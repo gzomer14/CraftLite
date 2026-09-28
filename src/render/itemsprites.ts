@@ -14,6 +14,7 @@
  * boot é o que evita 46 canvas vivos por tela.
  */
 
+import { decodeDataUrl } from '../core/dataurl';
 import { dyeRgbOf } from '../data/tints';
 import { BIOMES } from '../data/biomes';
 import { defOf, hasFrontTex, makeState, texOf } from '../data/blocks';
@@ -609,7 +610,7 @@ function blit(
 // ---------------------------------------------------------------------------
 
 export class ItemSprites {
-  /** `url(data:image/png;base64,...)`, pronto para `background-image`. */
+  /** `url(blob:…)`, pronto para `background-image` (ver `toSheetUrl`). */
   readonly cssUrl: string;
   readonly buildMs: number;
   private readonly sheet: ItemSheet;
@@ -624,7 +625,7 @@ export class ItemSprites {
   ) {
     const t0 = performance.now();
     this.sheet = buildItemSheet(source, overrides, options);
-    this.cssUrl = toDataUrl(this.sheet);
+    this.cssUrl = toSheetUrl(this.sheet);
     const { columns, rows } = this.sheet;
     for (let tile = 0; tile < columns * rows; tile++) {
       const x = columns > 1 ? ((tile % columns) / (columns - 1)) * 100 : 0;
@@ -685,7 +686,18 @@ export class ItemSprites {
   }
 }
 
-function toDataUrl(sheet: ItemSheet): string {
+/**
+ * A folha como `url(blob:…)`, e não `url(data:…)`.
+ *
+ * **Por que blob.** A folha vai numa variável CSS (`--item-sheet`) que cada
+ * slot, receita e célula resolve. Como `data:` URL eram ~480 mil caracteres de
+ * base64, e o Chrome reprocessa o valor da variável por elemento a cada
+ * recálculo de estilo: no J7 Metal (T0), **cada toque** na mochila, na
+ * bancada ou na fornalha levava 5–10 s (relato de campo, 2026-09-28). Medido
+ * com a CPU 6× mais lenta: ~3 000 ms por ação com `data:`, ~100 ms com
+ * `blob:` (doc 15 §4). Sem `URL.createObjectURL`, fica a `data:` de antes.
+ */
+function toSheetUrl(sheet: ItemSheet): string {
   const canvas = document.createElement('canvas');
   canvas.width = sheet.width;
   canvas.height = sheet.height;
@@ -694,5 +706,8 @@ function toDataUrl(sheet: ItemSheet): string {
   const image = ctx.createImageData(sheet.width, sheet.height);
   image.data.set(sheet.pixels);
   ctx.putImageData(image, 0, 0);
-  return `url(${canvas.toDataURL('image/png')})`;
+  const dataUrl = canvas.toDataURL('image/png');
+  const bytes = typeof URL.createObjectURL === 'function' ? decodeDataUrl(dataUrl) : null;
+  if (bytes === null) return `url(${dataUrl})`;
+  return `url(${URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'image/png' }))})`;
 }

@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { ITEM_ART, SHAPES } from '../src/data/itemart';
 import { ITEMS, itemDef, ITEM_BY_NAME } from '../src/data/items';
 import {
-  SPRITE_SIZE, buildItemSheet, drawBlockIsometric, drawItemArt, type SpriteSource,
+  ItemSprites, SPRITE_SIZE, buildItemSheet, drawBlockIsometric, drawItemArt, type SpriteSource,
 } from '../src/render/itemsprites';
 import { BLOCK_BY_NAME } from '../src/data/blocks';
 
@@ -186,5 +186,31 @@ describe('desenho por máscara', () => {
     const out = new Uint8ClampedArray(SPRITE_SIZE * SPRITE_SIZE * 4);
     drawItemArt(out, undefined);
     expect(opaquePixels(out)).toBe(0);
+  });
+});
+
+describe('a folha no CSS (relato de campo, 2026-09-28)', () => {
+  it('vai como blob: URL curta, e não como data: URL de centenas de milhares de caracteres', () => {
+    const g = globalThis as Record<string, unknown>;
+    const saved = { document: g.document, create: URL.createObjectURL };
+    const base64 = 'A'.repeat(400_000);
+    g.document = {
+      createElement: () => ({
+        width: 0, height: 0,
+        getContext: () => ({
+          createImageData: (w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4) }),
+          putImageData: () => undefined,
+        }),
+        toDataURL: () => `data:image/png;base64,${base64}`,
+      }),
+    };
+    URL.createObjectURL = () => 'blob:http://jogo/folha';
+    try {
+      const sprites = new ItemSprites(fakeSource());
+      expect(sprites.cssUrl).toBe('url(blob:http://jogo/folha)');
+    } finally {
+      g.document = saved.document;
+      URL.createObjectURL = saved.create;
+    }
   });
 });

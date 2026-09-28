@@ -189,7 +189,7 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 2398 testes (vitest)
+npm test           # 2399 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
 npm run smoke      # abre o jogo num Chrome headless e joga o roteiro do doc 14 (precisa do build)
@@ -197,6 +197,7 @@ npm run smoke:mods # liga e desliga o mod de exemplo e confere que o jogo sem mo
 npm run smoke:net  # dois Chrome se ligam pela página de prova de rede (rede.html)
 npm run smoke:room # dois Chrome jogam juntos: sala, blocos, nome, chat, baú, mobs, Nether, convidado salvo no anfitrião
 npm run smoke:camera # o leitor de QR próprio lê o QR da sala por uma webcam falsa
+npm run bench:ui   # toque nas telas de inventário com a CPU 6× mais lenta (orçamento de 600 ms)
 npm run icons      # regenera os ícones do PWA
 ```
 
@@ -276,7 +277,7 @@ src/
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      2398 testes, incluindo orçamento de performance e de luz
+tests/                      2399 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios

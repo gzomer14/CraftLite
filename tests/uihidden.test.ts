@@ -39,9 +39,13 @@ describe('index.html', () => {
 describe('manifest', () => {
   const manifest = JSON.parse(readFileSync('public/manifest.webmanifest', 'utf8'));
 
-  it('abre em tela cheia e em paisagem (doc 11 §7)', () => {
+  it('abre em tela cheia (doc 11 §7), e a paisagem fica com o jogo', () => {
     expect(manifest.display).toBe('fullscreen');
-    expect(manifest.orientation).toBe('landscape');
+    // Desvio do doc 11 §7 (2026-09-28): `orientation` no manifesto derrubava o
+    // app instalado no Android 8 ("CraftLite parou", J7 Metal) — a tela de
+    // abertura do WebAPK é translúcida, e o Android 8 não deixa atividade
+    // translúcida fixar orientação. Quem trava a paisagem é `ui/screenmode.ts`.
+    expect(manifest.orientation).toBeUndefined();
   });
 
   it('tem os dois tamanhos de ícone', () => {

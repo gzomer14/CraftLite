@@ -9,7 +9,17 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-27 17:11 — **M20, terceira volta: o que faltava.**
+**Última atualização:** 2026-09-28 11:41 — **Dois defeitos do J7 Metal (T0) corrigidos** (§4).
+- **Mochila, bancada e fornalha levavam 5–10 s por toque.** A folha de sprites ia ao CSS como
+  `data:` URL de ~480 mil caracteres, e o Chrome a reprocessava por elemento. Agora é uma `blob:`
+  URL: com a CPU 6× mais lenta, cada ação caiu de ~3 000 ms para 91–212 ms (`npm run bench:ui`).
+- **O app instalado (PWA) não abria no Android 8.1** (*"CraftLite parou"*). A causa provável é a
+  orientação fixa no manifesto, falha conhecida do Android 8 com a tela translúcida do WebAPK. A
+  orientação saiu do manifesto; a paisagem continua travada pelo jogo. **Não verificado em
+  aparelho**: é preciso desinstalar e instalar de novo.
+
+O jogo roda a 60 FPS no J7, pelo relato. Antes, 2026-09-27 17:11 — **M20, terceira volta: o que
+faltava.**
 - **A sala segue o anfitrião entre dimensões:** ele atravessa o portal e os convidados aparecem ao
   lado dele. Quem renasce na superfície com o anfitrião no Nether é trazido de volta.
 - **O anfitrião segura o mundo em volta de cada convidado:** âncoras do pipeline, raio 3, sem
@@ -136,9 +146,10 @@ Medidas em 2026-09-27 17:11, com a terceira volta do M20, com `npm test`, `npm r
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
 | Bundle (gzip, o jogo sem mod) | **308,2 KB**, worker 42,7 (307,9 antes da terceira volta do M20: as âncoras do pipeline e o gancho de itens do `SceneFeed` custaram 0,3; 307,1 antes da segunda volta: teclado, roda, F11 e a mira dos mobs por jogador custaram 0,8; 304,7 antes do M20 no jogo: os ganchos — botões, `game/netgate.ts`, `playersave.ts`, o boneco do jogador no atlas — custaram 2,4 KB no pedaço principal; 302,2 antes do M21: a infraestrutura de mods custou 1,9 KB no pedaço principal, 0,3 no worker e 0,2 no HTML; 301,8 ao fechar o M19; 298,4 ao fechar o M17; o M19 somou as ilhas de fora e o portal de passagem, e o worker foi a 42,3; 282,5 antes do M17: o inglês e as chaves custaram 15,9; o worker, 41,8, não mudou um byte; 267,3 antes do M16; 265,7 ao fechar o M15; 257,9 antes do M15; 249,5 antes do M14; 240,0 antes do M10) | < 350 KB | `npm run size` |
-| Testes | **2398**, 125 arquivos (2389 antes da terceira volta do M20; 2362 antes da segunda volta; 2334 antes do M20 no jogo; 2316 ao fechar o M21; 2290 antes do M21; 2281 ao fechar o M19; 2271 ao fechar o M17; 2235 antes do M17; 2164 antes do M16; 2156 ao fechar o M15; 2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
+| Testes | **2399**, 125 arquivos (2398 antes da correção do J7; 2389 antes da terceira volta do M20; 2362 antes da segunda volta; 2334 antes do M20 no jogo; 2316 ao fechar o M21; 2290 antes do M21; 2281 ao fechar o M19; 2271 ao fechar o M17; 2235 antes do M17; 2164 antes do M16; 2156 ao fechar o M15; 2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
 | Smoke test de navegador | **7 passos verdes**: carregar, criar, andar 10 s, quebrar, salvar, recarregar, conferir | verde | `npm run smoke` |
 | Smoke test da rede (M20.0) | **7 passos verdes**: dois Chrome, anfitrião e convidado pela página `rede.html`, trocando os códigos como uma pessoa; ligados em candidato `host` dos dois lados; ida e volta ~0,3 ms, perda 0/300, 6–18 MB/s. Com e sem mDNS (`SMOKE_NET_MDNS=1`). **Na mesma máquina — não prova a rede Wi-Fi** | verde | `npm run smoke:net` |
+| Toque nas telas de inventário, CPU 6× mais lenta | **91–212 ms** por ação (abrir o livro de receitas, tocar numa receita, tocar num slot); eram **~3 000 ms** com a folha de sprites como `data:` URL — no J7, 5–10 s | ≤ 600 ms | `npm run bench:ui` |
 | Smoke test da sala (M20) | **19 passos verdes**: dois Chrome, anfitrião cria mundo e põe bloco, abre a sala; o convidado entra pelo título trocando os códigos; vê o bloco (chunk modificado do anfitrião); blocos nos dois sentidos; bonecos; mobs perto dele; **o nome em cima do boneco; o chat; o baú do anfitrião aberto pelo convidado (vê 3 diamantes, tira, some lá); o poço cavado pelo convidado com luz 15 no anfitrião; o bloco do convidado além do anel do anfitrião (288 blocos com anel de 12 — sem as âncoras falha, conferido); o anfitrião no Nether e o convidado ao lado dele, e a volta**; sai pelo menu e fica salvo no anfitrião **com o inventário**; **0 mundo e 0 chunk no banco do convidado**; nenhum erro | verde; `SMOKE_SHOT=arquivo.png` guarda a tela do anfitrião com nome e chat | `npm run smoke:room` |
 | Bloco do anfitrião no convidado | **0–15 ms** por viagem, mediana 1–4 ms (5 viagens por rodada; eram até 214 ms antes de o lote sair na microtarefa, sem esperar o tick) | < 150 ms (aceite do M20) | `npm run smoke:room` |
 | Smoke test da câmera (M20) | **3 passos verdes**: a webcam falsa do Chrome filma o QR do anfitrião inclinado, borrado e com ruído; o leitor próprio lê em **205–410 ms** | verde | `npm run smoke:camera` |
@@ -2383,6 +2394,8 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-09-28 | `render/itemsprites.ts` | **Cada toque na mochila, bancada, fornalha e livro de receitas levava 5–10 s no J7 Metal** (T0, campo). O jogo rodava a 60 FPS. A folha de sprites (M4) ia ao CSS como `data:` URL de ~480 mil caracteres dentro de `--item-sheet`, e cada slot, receita e célula a resolvia a cada recálculo de estilo: 57 botões de receita recriados por toque. Agora é uma `blob:` URL. Medido com a CPU 6× mais lenta: ~3 000 ms por ação antes, 91–212 ms depois. Regressão em `npm run bench:ui` (orçamento de 600 ms) e em `tests/itemsprites.test.ts`. |
+| 2026-09-28 | `public/manifest.webmanifest`, `ui/screenmode.ts` | **O app instalado não abria no Android 8.1** (J7 Metal, campo: *"CraftLite não está respondendo, CraftLite parou"*). No navegador, o jogo abria. Causa provável, não reproduzida: `"orientation": "landscape"` no manifesto. O Android 8 derruba uma atividade translúcida que fixa orientação (*"Only fullscreen opaque activities can request orientation"*), e a tela de abertura do WebAPK é translúcida. A orientação saiu do manifesto — **desvio do doc 11 §7**, escrito em `ui/screenmode.ts`, que já trava a paisagem no primeiro toque. O Chrome do Android 8 parou no 138. **A conferir no aparelho**, desinstalando antes. |
 | 2026-09-27 | `net/blockreact.ts`, `net/host.ts`, `net/guest.ts` | **O buraco aberto pelo outro jogador ficava escuro** (M20; campo, com captura). O bloco que chega pela rede entra por `world.setBlock(…, 'network')`, e a luz só é recalculada por quem muda o bloco (a interação, o fluido): ninguém a recalculava, nem no anfitrião nem no convidado. Agora os dois recalculam, e o anfitrião também cuida de fluido, contêiner e placa, como o caminho local. Regressão em `tests/netroom.test.ts` (sem a correção, falha — conferido) e no smoke da sala (luz 15 no fundo do poço). |
 | 2026-09-27 | `game/session.ts`, `input/playeractions.ts` | **Porta, alavanca e alçapão abriam e fechavam num clique** (desde a porta do M8; campo, como convidado, mas é do jogo). Com o botão direito seguro, o pedido de usar chega a cada tick (20 por segundo), e só colocar bloco tinha intervalo: um clique de 100 ms virava a porta duas vezes. Agora o bloco mirado só responde no tick em que o botão desceu, e segurar o botão sobre a porta não coloca o bloco da mão nela. Comer e colocar bloco seguem valendo com o botão seguro. Regressão em `tests/workshop.test.ts`. |
 | 2026-09-27 | `input/keyboard.ts`, `input/controls.ts`, `input/keybinds.ts` | **`Ctrl`+`D` (correr para a direita) abria "salvar favorito" do Chrome** (campo). A repetição da tecla segurada saía antes do `preventDefault`, e as teclas de andar nem estavam na lista do jogo. Agora toda tecla de ação, inclusive na repetição, é do jogo enquanto o mouse está travado. **`Ctrl`+`W` é reservado pelo Chrome** e só se segura com a Keyboard Lock API em tela cheia pedida pela página: o **F11 do jogo** faz isso (`input/keylock.ts`), e **W duas vezes** corre sem `Ctrl`. Regressão em `tests/keyinput.test.ts`. |
@@ -2863,7 +2876,13 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
 
 ## 6. Próximo passo recomendado
 
-0. **A sala do M20 em aparelho** (no jogo desde 2026-09-27; precisa ir para a `main` para sair
+0. **No J7 Metal (2026-09-28):**
+   - Desinstalar o CraftLite instalado, abrir o site no Chrome, instalar de novo: abre?
+   - Na mochila, na bancada e na fornalha, o toque responde na hora?
+   - Se o app instalado ainda cair: *Adicionar à tela inicial → Criar atalho* (sem WebAPK)
+     contorna, e o relatório do aparelho (versão do Chrome) ajuda.
+
+   **A sala do M20 em aparelho** (no jogo desde 2026-09-27; precisa ir para a `main` para sair
    no Pages). Celular e computador na mesma rede Wi-Fi:
    - **Computador anfitrião:** abrir um mundo, pausa → *Abrir para a rede local*. No celular:
      título → *Entrar numa sala* → *Ler com a câmera*; o celular mostra a resposta, e o

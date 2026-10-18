@@ -32,7 +32,7 @@ function chromeBin() {
   throw new Error('Chrome não encontrado — aponte com a variável CHROME');
 }
 
-const URL_JOGO = process.env.SOAK_URL ?? 'https://gzomer14.github.io/CraftLite/';
+const URL_JOGO = process.env.SOAK_URL ?? 'https://craftlite.zomertech.com.br/';
 const MINUTOS = Number(process.env.SOAK_MIN ?? 120);
 const PORTA = Number(process.env.SOAK_PORT ?? 9333);
 const SAIDA = process.env.SOAK_OUT ?? join(process.cwd(), 'soak.json');

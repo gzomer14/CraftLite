@@ -31,7 +31,7 @@ function chromeBin() {
   throw new Error('Chrome não encontrado — aponte com a variável CHROME');
 }
 
-const URL_JOGO = process.env.URL ?? 'https://gzomer14.github.io/CraftLite/';
+const URL_JOGO = process.env.URL ?? 'https://craftlite.zomertech.com.br/';
 
 /** Perfis do DevTools, em bits/s e ms de latência. */
 const PERFIS = [

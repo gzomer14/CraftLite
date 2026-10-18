@@ -12,6 +12,30 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-10-18 14:06 · Domínio próprio: craftlite.zomertech.com.br
+
+**Pedido:** *"Vamos seguir com o URL craftlite.zomertech.com.br, faça um passo a passo do que
+preciso configurar, e já ajuste os scripts"*.
+
+**Resultado:**
+- O passo a passo (Cloudflare + GitHub Pages) foi entregue na conversa e resumido no doc 15 §6,
+  item 0a.
+- O jogo não precisou de mudança: `base: './'`, o manifesto e o escopo do service worker já são
+  relativos.
+- Os scripts que medem o jogo publicado agora apontam para o domínio novo. `SOAK_URL` e `URL`
+  continuam valendo.
+
+Portões: 2404 testes; lint, build e tamanho verdes (308,3 KB).
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| ~ | `scripts/soak.mjs` | URL padrão → `https://craftlite.zomertech.com.br/` |
+| ~ | `scripts/slow-network.mjs` | URL padrão → `https://craftlite.zomertech.com.br/` |
+| ~ | `docs/15-status.md` | data; §6 item 0a (configuração do domínio) |
+| ~ | `docs/16-auditoria.md` | esta sessão |
+
+---
+
 ## 2026-09-28 12:11 · A sala que caía com o J7 de anfitrião; o PWA ainda fechando
 
 **Pedido:** o usuário relatou três coisas do J7 Metal.

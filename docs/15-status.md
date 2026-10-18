@@ -9,7 +9,12 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-09-28 12:11 — **A sala caía a cada 2–3 minutos com o J7 de anfitrião** (§4).
+**Última atualização:** 2026-10-18 14:06 — **Domínio próprio: `craftlite.zomertech.com.br`.** O
+jogo já usa caminho relativo em tudo (`base: './'`, manifesto e escopo do service worker), então
+nada no código muda. Mudou o endereço padrão de `npm run soak` e `npm run slow-network`. **Falta a
+configuração do lado do usuário** (DNS no Cloudflare e domínio no GitHub Pages; §6, item 0a). Os
+mundos salvos no endereço antigo ficam lá, porque o armazenamento é separado por domínio. Portões
+sem mudança: 2404 testes e 308,3 KB. Antes, 2026-09-28 12:11 — **A sala caía a cada 2–3 minutos com o J7 de anfitrião** (§4).
 O estado `disconnected` do WebRTC, que é passageiro, derrubava a sala. Agora a ligação instável é
 avisada e esperada por 20 s (`net/linkhealth.ts`), e toda queda mostra o motivo. **O app instalado
 ainda não abre no J7**: agora a tela preta de abertura aparece antes de fechar, então a orientação
@@ -2882,6 +2887,14 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
 ---
 
 ## 6. Próximo passo recomendado
+
+0a. **Domínio próprio (2026-10-18), configuração do usuário:**
+   - no Cloudflare, um CNAME `craftlite` → `gzomer14.github.io`, só DNS (nuvem cinza);
+   - no GitHub, *Settings → Pages → Custom domain* = `craftlite.zomertech.com.br`, e depois
+     *Enforce HTTPS*.
+   - O deploy é por Actions, então não há arquivo `CNAME` no repositório.
+   - Depois, conferir que o jogo abre, instala como PWA e funciona offline no endereço novo.
+     O endereço antigo redireciona sozinho, mas os mundos salvos lá não vêm junto.
 
 0. **No J7 Metal (2026-09-28):**
    - ~~Mochila, bancada e fornalha lentas~~ — **resolvido, confirmado em campo.**

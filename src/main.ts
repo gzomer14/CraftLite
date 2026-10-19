@@ -14,7 +14,7 @@
  * módulo de interface montar lista com eles (`data/strings/localize.ts`).
  */
 import './data/strings/localize';
-import { htmlLang, t, tf } from './core/i18n';
+import { htmlLang, t } from './core/i18n';
 import { AudioEngine } from './audio/engine';
 import { AudioStart } from './audio/audiostart';
 import { EffectsBar } from './ui/effectsbar';
@@ -79,6 +79,7 @@ import { ObjectiveLine } from './ui/objectiveline';
 import { attachBlockFeedback } from './ui/blockfeedback';
 import { giveStartingKit } from './game/startingkit';
 import { warnStorage } from './save/storagewarning';
+import { saveAlerts } from './ui/savealerts';
 import { buildMapPalette } from './render/mapcolors';
 import { attachPadNotice } from './ui/padnotice';
 import { restorePlayer } from './game/playersave';
@@ -359,7 +360,7 @@ async function boot(): Promise<void> {
    * jogo de todo dia não expõe nada.
    */
   if (/[?&]smoke\b/.test(location.search)) {
-    (window as unknown as { __craftlite?: unknown }).__craftlite = { world, player, session, items: ITEM_BY_NAME, renderer, pipeline };
+    (window as unknown as { __craftlite?: unknown }).__craftlite = { world, player, session, items: ITEM_BY_NAME, renderer, pipeline, get save() { return save; } };
   }
   renderer.blockLightAt = (x, y, z) => (world.getSkyLight(x, y, z) << 4) | world.getBlockLight(x, y, z);
   // Item na mão (doc 01 §191). O passe é uma draw call e limpa a profundidade,
@@ -373,12 +374,9 @@ async function boot(): Promise<void> {
   const thumbnail = new Thumbnail();
 
   // O convidado (M20) não grava nada: o mundo e ele mesmo ficam no anfitrião.
-  const save = db === null || remote !== undefined
-    ? null
-    : new SaveGame(new SaveManager(db, meta.id), session, player, meta, {
-      onError: (message) => hud.showMessage(tf('store.save_failed', message), 120),
-      captureThumbnail: () => thumbnail.bytes(),
-    });
+  const alerts = saveAlerts(db, meta.id, hud);
+  const save = db === null || remote !== undefined ? null : new SaveGame(new SaveManager(db, meta.id),
+    session, player, meta, { ...alerts.options, captureThumbnail: () => thumbnail.bytes() });
 
   let restored = false;
   if (save !== null) {
@@ -448,7 +446,7 @@ async function boot(): Promise<void> {
     player, session, controls, hud, containerScreen, creativeScreen,
     touchUi: () => touchUi,
     openOptions: (back) => menu.openOptions(back),
-    saveAll: async () => { await save?.saveAll(); await leaveRoom(); },
+    saveAll: () => (save === null ? Promise.resolve(true) : alerts.trySave(save)), leaveRoom,
     onNetwork: remote === undefined ? () => { flow.togglePause(); openRoom(); } : undefined,
     networkLabel: () => roomButtonLabel(t('net.open_room')),
   });
@@ -456,6 +454,7 @@ async function boot(): Promise<void> {
     interaction, atlas, renderer, audio, settings, rumble: () => controls.gamepad.rumble(),
   });
   const pauseMenu = flow.pauseMenu;
+  if (save !== null) alerts.connect(save, flow, controls);
 
   /*
    * Mapa (M10). As cores saem das texturas na primeira abertura, não no boot:

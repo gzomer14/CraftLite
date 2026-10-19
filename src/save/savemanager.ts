@@ -33,6 +33,29 @@ export interface SaveStats {
   lastError: string | null;
 }
 
+/**
+ * Coluna que saiu da memória sem conseguir ir para o disco (M23).
+ *
+ * Guarda os bytes já comprimidos e a chave da dimensão em que ela vivia: a
+ * dimensão pode virar antes da nova tentativa.
+ */
+interface Orphan {
+  storeId: string;
+  cx: number;
+  cz: number;
+  data: Uint8Array;
+}
+
+/**
+ * true se a falha é de espaço (doc 11 §4). O IndexedDB rejeita com um
+ * `DOMException` de nome `QuotaExceededError`; o nome basta, e funciona com o
+ * erro que um teste monta à mão.
+ */
+export function isQuotaError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null
+    && (error as { name?: unknown }).name === 'QuotaExceededError';
+}
+
 export class SaveManager {
   private readonly db: SaveDatabase;
   private readonly worldId: string;
@@ -53,6 +76,16 @@ export class SaveManager {
    * gravação precisa poder esperar por ela. Ver o comentário de `flush`.
    */
   private flushing: Promise<void> | null = null;
+  /**
+   * Colunas descarregadas cuja gravação falhou, por `storeId|cx|cz` (M23).
+   *
+   * `saveAndForget` tirava a coluna de `dirty` antes de gravar, e a coluna já
+   * tinha saído da memória: com a cota cheia, o que foi construído longe do
+   * jogador sumia sem volta. Agora ela espera aqui, comprimida, e vai para o
+   * disco no próximo `flush` — e quem pedir a coluna antes disso a recebe
+   * daqui, e não da seed.
+   */
+  private readonly orphans = new Map<string, Orphan>();
 
   readonly stats: SaveStats = { pending: 0, lastSaveAt: 0, saving: false, lastError: null };
 
@@ -64,7 +97,15 @@ export class SaveManager {
    * save é chunk, então estourar a cota parava de gravar o mundo construído em
    * silêncio absoluto (doc 11 §4 pede o oposto). Quem liga isto é o `SaveGame`.
    */
-  onError: ((message: string) => void) | null = null;
+  onError: ((message: string, quota: boolean) => void) | null = null;
+
+  /**
+   * Avisado quando uma coluna gravada não abre (M23). Antes o `catch` devolvia
+   * `null` calado, a seed gerava o terreno por cima e a primeira mudança na
+   * coluna gravava a seed sobre o registro: o que foi construído ali sumia sem
+   * ninguém saber. Os bytes vão para a quarentena antes (`quarantineKey`).
+   */
+  onCorrupt: ((cx: number, cz: number) => void) | null = null;
 
   constructor(db: SaveDatabase, worldId: string) {
     this.db = db;
@@ -95,7 +136,7 @@ export class SaveManager {
   markDirty(chunk: ChunkColumn): void {
     if (!chunk.modified) return;
     this.dirty.set(chunkKey(chunk.cx, chunk.cz), chunk);
-    this.stats.pending = this.dirty.size;
+    this.stats.pending = this.dirty.size + this.orphans.size;
   }
 
   /** Um tick: conta para o autosave. */
@@ -121,7 +162,7 @@ export class SaveManager {
    */
   flush(): Promise<void> {
     if (this.flushing !== null) return this.flushing;
-    if (this.dirty.size === 0) return Promise.resolve();
+    if (this.dirty.size === 0 && this.orphans.size === 0) return Promise.resolve();
     this.flushing = this.runFlush().finally(() => { this.flushing = null; });
     return this.flushing;
   }
@@ -134,6 +175,7 @@ export class SaveManager {
     const storeId = this.chunkStoreId;
 
     try {
+      await this.retryOrphans();
       while (this.dirty.size > 0) {
         const batch: [number, number, Uint8Array][] = [];
         const keys: number[] = [];
@@ -146,7 +188,7 @@ export class SaveManager {
 
         await this.db.putChunks(storeId, batch);
         for (const key of keys) this.dirty.delete(key);
-        this.stats.pending = this.dirty.size;
+        this.stats.pending = this.dirty.size + this.orphans.size;
 
         // Devolve o controle ao navegador entre lotes.
         if (this.dirty.size > 0) await idle();
@@ -171,32 +213,93 @@ export class SaveManager {
     if (!chunk.modified) return;
     this.dirty.delete(chunkKey(chunk.cx, chunk.cz));
     const storeId = this.chunkStoreId;
+    let data: Uint8Array;
     try {
-      await this.db.putChunks(storeId, [[chunk.cx, chunk.cz, await compressChunk(chunk)]]);
+      data = await compressChunk(chunk);
     } catch (error) {
       this.reportError(error);
+      return;
     }
+    try {
+      await this.db.putChunks(storeId, [[chunk.cx, chunk.cz, data]]);
+    } catch (error) {
+      this.orphans.set(orphanKey(storeId, chunk.cx, chunk.cz), { storeId, cx: chunk.cx, cz: chunk.cz, data });
+      this.stats.pending = this.dirty.size + this.orphans.size;
+      this.reportError(error);
+    }
+  }
+
+  /** Tenta de novo as colunas órfãs; a que gravar sai da fila. */
+  private async retryOrphans(): Promise<void> {
+    for (const [key, orphan] of this.orphans) {
+      await this.db.putChunks(orphan.storeId, [[orphan.cx, orphan.cz, orphan.data]]);
+      this.orphans.delete(key);
+    }
+  }
+
+  /** Colunas descarregadas esperando nova tentativa de gravação. */
+  get orphanCount(): number {
+    return this.orphans.size;
   }
 
   /** Guarda e propaga a falha: o jogador precisa saber que parou de salvar. */
   private reportError(error: unknown): void {
     const message = error instanceof Error ? error.message : String(error);
     this.stats.lastError = message;
-    this.onError?.(message);
+    this.onError?.(message, isQuotaError(error));
   }
 
-  /** Carrega uma coluna salva, ou `null` se nunca foi modificada. */
+  /**
+   * Carrega uma coluna salva, ou `null` se nunca foi modificada.
+   *
+   * A órfã vem antes do banco: ela é mais nova que o que está lá. Volta para a
+   * memória e para `dirty`, que passa a ser o caminho dela até o disco.
+   */
   async loadChunk(cx: number, cz: number): Promise<ChunkColumn | null> {
+    const storeId = this.chunkStoreId;
+    const key = orphanKey(storeId, cx, cz);
+    const orphan = this.orphans.get(key);
+    let data: Uint8Array | undefined;
+    if (orphan !== undefined) {
+      data = orphan.data;
+    } else {
+      try {
+        data = await this.db.getChunk(storeId, cx, cz);
+      } catch {
+        // Banco indisponível: a seed é o que dá para mostrar.
+        return null;
+      }
+    }
+    if (data === undefined) return null;
     try {
-      const data = await this.db.getChunk(this.chunkStoreId, cx, cz);
-      if (data === undefined) return null;
       const chunk = await decompressChunk(data);
       chunk.modified = true; // veio do disco: continua sendo responsabilidade do save
+      if (orphan !== undefined) {
+        this.orphans.delete(key);
+        this.markDirty(chunk);
+      }
       return chunk;
     } catch {
-      // Chunk corrompido: melhor regenerar da seed que travar o mundo.
+      await this.quarantine(storeId, cx, cz, data);
       return null;
     }
+  }
+
+  /**
+   * Coluna que não abre (M23): os bytes vão para `quarantineKey` antes de a
+   * seed gerar por cima, e o jogador é avisado. *Desvio consciente do doc 14
+   * (M23), que pedia não sobrescrever até o jogador decidir:* uma tela de
+   * decisão para um registro que o jogo não sabe ler não teria o que oferecer
+   * além de "gerar de novo". Guardar o original deixa a recuperação possível
+   * depois, e o mundo segue.
+   */
+  private async quarantine(storeId: string, cx: number, cz: number, data: Uint8Array): Promise<void> {
+    try {
+      await this.db.put(STORE_SETTINGS, data, quarantineKey(storeId, cx, cz));
+    } catch {
+      // Sem espaço nem para isso: o aviso abaixo ainda vale.
+    }
+    this.onCorrupt?.(cx, cz);
   }
 
   /**
@@ -204,8 +307,11 @@ export class SaveManager {
    * o anfitrião no Nether ainda serve a superfície ao convidado.
    */
   async loadChunkData(dimension: number, cx: number, cz: number): Promise<Uint8Array | undefined> {
+    const storeId = dimensionIdFor(this.worldId, dimension);
+    const orphan = this.orphans.get(orphanKey(storeId, cx, cz));
+    if (orphan !== undefined) return orphan.data;
     try {
-      return await this.db.getChunk(dimensionIdFor(this.worldId, dimension), cx, cz);
+      return await this.db.getChunk(storeId, cx, cz);
     } catch {
       return undefined;
     }
@@ -383,6 +489,15 @@ export class SaveManager {
       // nada a fazer
     }
   }
+}
+
+function orphanKey(storeId: string, cx: number, cz: number): string {
+  return `${storeId}|${cx}|${cz}`;
+}
+
+/** Onde ficam os bytes de uma coluna que não abriu (M23). */
+export function quarantineKey(storeId: string, cx: number, cz: number): string {
+  return `${storeId}.corrupt.${cx}.${cz}`;
 }
 
 function chunkKey(cx: number, cz: number): number {

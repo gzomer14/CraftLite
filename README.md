@@ -57,6 +57,15 @@ Na terceira volta, a sala passou a seguir o anfitrião entre dimensões: ele atr
 todos vão junto. O anfitrião mantém o mundo rodando em volta de cada convidado, e o boneco mostra
 o item na mão.
 
+**Próximos marcos (2026-10-19).** Uma avaliação geral, ao retomar o projeto, montou o roteiro
+M22–M31 no doc 14: validar em aparelho e declarar o MVP (M22), corrigir os defeitos que ela achou
+(M23), pôr a casa em ordem (M24), abrir folga de atlas, bundle e áudio (M25) e, com ela, conteúdo
+novo — fogueira e caldeirão, bichos, templos e fundo do mar, invasão de saqueadores (M26–M29) —,
+a segunda volta da sala (M30) e o horizonte para aparelhos fortes (M31). O **M23** fechou no mesmo
+dia: o save não perde mais coluna quando a gravação falha, a cota cheia abre uma tela que pausa e
+oferece apagar outros mundos, mob pega fogo no fogo e apaga na água com a chama à vista, a mochila
+cabe num celular fraco deitado, e o canto de escada, que saía trocado, ficou certo.
+
 - **M0 — esqueleto:** Vite + TypeScript strict, renderer WebGL2 próprio com fallback WebGL1,
   detecção de tier, loop de 20 Hz com interpolação, gerador procedural de texturas alimentando um
   `TEXTURE_2D_ARRAY`, overlay de debug.
@@ -189,7 +198,7 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 2404 testes (vitest)
+npm test           # 2423 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
 npm run smoke      # abre o jogo num Chrome headless e joga o roteiro do doc 14 (precisa do build)
@@ -277,7 +286,7 @@ src/
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      2404 testes, incluindo orçamento de performance e de luz
+tests/                      2423 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios
@@ -294,7 +303,7 @@ docs/
   11-persistencia-e-saves.md IndexedDB, formato de save, PWA
   12-multiplayer.md         ganchos de arquitetura, protocolo P2P
   13-assets-e-arte.md       texturas procedurais, sprites, fonte, licença
-  14-roadmap.md             marcos com checklist e critérios de aceite (M0–M19 feitos)
+  14-roadmap.md             marcos com checklist e critérios de aceite (M0–M21 com só o M20 aberto; M22–M31 propostos)
   15-status.md              estado real: status por marco, pendências, próximo passo
   16-auditoria.md           histórico por sessão, com grid de arquivos
   mockups/                  14 wireframes SVG + generate.py

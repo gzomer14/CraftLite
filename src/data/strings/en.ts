@@ -578,6 +578,19 @@ export const EN: Readonly<Record<StringKey, string>> = {
   'objective.new': 'do something new',
   // save
   'store.save_failed': 'Save failed: {0}',
+  // cota cheia e coluna corrompida (M23, doc 11 §4)
+  'store.corrupt': 'Part of the world at ({0}, {1}) would not open and was generated again. The original was kept.',
+  'storefull.title': 'Storage full',
+  'storefull.body': 'The browser refused to save the world: it is out of space. Until space is freed, what you do is not saved.',
+  'storefull.usage': 'Used: {0} of {1}.',
+  'storefull.others': 'Other worlds on this device',
+  'storefull.none_other': 'There is no other world to delete. Export this world in Worlds and free space in the browser.',
+  'storefull.delete': 'Delete',
+  'storefull.retry': 'Try saving again',
+  'storefull.continue': 'Continue without saving',
+  'storefull.saving': 'Saving…',
+  'storefull.still_full': 'Still out of space.',
+  'storefull.later': 'Out of space: the world is not being saved.',
   // primeira hora guiada (M17)
   'hud.tip': 'Tip — {0}',
   'guide.log': 'Aim at a tree trunk and {0} until it breaks. Gather three.',

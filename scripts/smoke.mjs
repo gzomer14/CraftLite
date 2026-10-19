@@ -186,6 +186,25 @@ try {
   })()`));
   passo('quebra um bloco', alvo !== null && alvo.agora === 0, JSON.stringify(alvo?.pos));
 
+  // 4b. Cota cheia (M23, doc 11 §4): o banco recusa toda gravação, como no
+  // aparelho sem espaço. A tela tem que abrir e, com o espaço de volta, o
+  // "Tentar salvar de novo" grava e fecha — o bloco quebrado continua pendente
+  // e vai para o disco aí, o que o passo 6 confere depois de recarregar.
+  const cota = JSON.parse(await cdp.avaliar(`(async () => {
+    const c = window.__craftlite;
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function () { throw new DOMException('cheio', 'QuotaExceededError'); };
+    await c.save.saveAll();
+    const tela = window.__smoke.visivel('storage-full');
+    IDBObjectStore.prototype.put = put;
+    if (tela === null) return JSON.stringify({ aberta: false });
+    window.__smoke.botao(tela, 'Tentar salvar').click();
+    return JSON.stringify({ aberta: true });
+  })()`));
+  passo('cota cheia: a tela abre', cota.aberta === true);
+  await ate(cdp, "__smoke.visivel('storage-full') === null", 15000);
+  passo('cota cheia: com espaço de volta, "Tentar salvar de novo" grava e fecha', true);
+
   // 5. Salvar e sair pela pausa.
   await cdp.avaliar(`(async () => {
     __smoke.tecla('keydown', 'Escape'); __smoke.tecla('keyup', 'Escape');

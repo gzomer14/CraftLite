@@ -93,6 +93,18 @@ export function injectStyle(): void {
 @media (max-height:560px) and (orientation:landscape){
   #container-screen .grid{flex-flow:row wrap;align-items:flex-start;
     column-gap:calc(6 * var(--px,3px))}
+  /*
+   * M23: num T0 deitado (640×360) o painel ia a 410 px e o "Fechar" ficava
+   * em 354 — fora da tela, atrás de uma rolagem. Deitado, ele sobe para a
+   * linha do título, ao lado de "Receitas", onde sobra largura.
+   */
+  #container-screen{padding:2px}
+  #container-screen .panel{display:grid;grid-template-columns:1fr auto;
+    column-gap:calc(3 * var(--px,3px));align-items:center}
+  #container-screen .panel-header{grid-column:1;grid-row:1}
+  #container-screen .footer{grid-column:2;grid-row:1;margin-top:0;margin-bottom:calc(2 * var(--px,3px))}
+  #container-screen .panel-body,#container-screen .touch-hint{grid-column:1 / -1}
+  #container-screen .close{min-height:32px;padding:4px 12px}
 }
 /* Boneco: largura em unidades de modelo, para acompanhar a escala da GUI. */
 #container-screen .section.doll{align-items:flex-start}

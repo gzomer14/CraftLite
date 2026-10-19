@@ -41,9 +41,8 @@ import {
   type Welcome,
 } from './protocol';
 import type { Signal } from './signal';
+import { SaveCadence } from './savecadence';
 
-/** A cada quanto o convidado manda o próprio save ao anfitrião. */
-const SAVE_EVERY = 200;
 const MAX_BATCH = 4000;
 
 export type JoinOutcome =
@@ -78,7 +77,8 @@ export class GuestClient {
   private readonly outgoing: number[] = [];
   /** Aplicando o que veio da rede: nada disso volta para o anfitrião. */
   private applying = false;
-  private ticks = 0;
+  /** Quando o próprio save sai: a cada 10 s e quando o inventário muda (M23). */
+  private readonly saves = new SaveCadence();
   private outcome: ((o: JoinOutcome) => void) | null = null;
   private events: GuestEvents | null = null;
   private over = false;
@@ -332,7 +332,7 @@ export class GuestClient {
     this.link.send(this.wFast.reset(MSG.MOVE).u8(0).f32(p.x).f32(p.y).f32(p.z)
       .f32(p.yaw).f32(p.pitch).u8(flags).u16(session.inventory.held?.item ?? 0xffff)
       .u8(game.world.dimension).view8(), false);
-    if (++this.ticks % SAVE_EVERY === 0) this.sendSave();
+    if (this.saves.tick(session.inventory.slots, session.xp.level)) this.sendSave();
   }
 
   private flushBlocks(): void {

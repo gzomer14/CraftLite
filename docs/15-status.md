@@ -9,7 +9,24 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-10-18 14:06 — **Domínio próprio: `craftlite.zomertech.com.br`.** O
+**Última atualização:** 2026-10-19 17:47 — **M23 fechado: correções verificadas** (§3). O save não
+perde mais coluna quando a gravação falha (fila de nova tentativa), a cota cheia abre a tela do doc
+11 §4 (pausa, espaço usado, apagar outros mundos, tentar de novo), e a coluna corrompida vai para a
+quarentena com aviso. Mob pega fogo no fogo e apaga na água; a chama aparece no mob e na borda da
+tela do jogador. A dica de teclado saiu de cima da vida, a mochila cabe num T0 deitado com o
+*Fechar* à vista, e o convidado da sala manda o save quando o inventário muda. **Achados no
+caminho** (§4): a regra de canto de escada estava **trocada** desde o acabamento pós-M7, e trocar
+o modo de jogo pela pausa **fechava a sala** do M20. Portões: 2423 testes, 311,0 KB; `smoke` 9
+passos, `smoke:mods` 6, `smoke:room` 20, `bench:ui` com a mochila em 640×360. **Próximo passo de código: M24** (§6). Antes, 17:17 — **Avaliação geral e o roteiro M22–M31** (doc 14). O
+projeto foi retomado depois de três semanas. Portões e smokes verdes, sem mudança de código: 2404
+testes, 308,3 KB; `smoke` 7, `smoke:mods` 6, `smoke:room` 19, `bench:ui` 203 ms no pior caso. De
+M0 a M21, só o M20 está aberto (aparelho). A avaliação achou **defeitos pequenos de verdade** —
+coluna que se perde se a gravação falhar, cota cheia sem a tela do doc 11, mob que não pega fogo
+nem apaga, dica cobrindo a vida, mochila maior que a tela de um T0 deitado —, a **fogueira e o
+caldeirão** do doc 00 que nunca foram feitos, Firefox e Safari nunca testados, e os três tetos
+(atlas 223/256, áudio 2,92/3,5 MB, bundle 308/350) que limitam conteúdo novo. Tudo conferido no
+código e listado no §5; os marcos novos estão no doc 14. **Próximo passo de código: M23** (§6).
+Antes, 2026-10-18 14:06 — **Domínio próprio: `craftlite.zomertech.com.br`.** O
 jogo já usa caminho relativo em tudo (`base: './'`, manifesto e escopo do service worker), então
 nada no código muda. Mudou o endereço padrão de `npm run soak` e `npm run slow-network`. **Falta a
 configuração do lado do usuário** (DNS no Cloudflare e domínio no GitHub Pages; §6, item 0a). Os
@@ -136,6 +153,16 @@ compartilhável).
 | **M19** Pontas soltas | enderman no End, dragão que quebra, sopra e morre devagar, ilhas de fora e portal de passagem, tint no WebGL1 | ✅ concluído em 2026-09-25 | **não visto em aparelho** (End visto no Chrome headless) |
 | **M20** Jogar junto na mesma rede | multijogador por WebRTC só na rede local, sinalização por QR, sem servidor; o mundo e os dados do convidado só no aparelho do anfitrião | 🚧 **no jogo, testado em aparelho em 2026-09-27** (ligação e save do convidado); segunda e terceira voltas no mesmo dia: nome, chat, combate, baú e fornalha, cama, placa, **dimensões (a sala segue o anfitrião), mundo em volta de cada convidado, item na mão** — dois Chrome, `npm run smoke:room` (19 passos) | segunda e terceira voltas **não vistas em aparelho**; o critério de aceite do doc 14 (30 min, T0 acima de 30 FPS com convidado, dados móveis) é do usuário (§6) |
 | **M21** Mods | mods escritos no repositório, cada um um pedaço de bundle próprio, ligados e desligados na tela Mods; **desligados, a página baixa um arquivo só, o de antes** (teste e build cobram); mod de exemplo | ✅ concluído em 2026-09-27 | **não visto em aparelho** (visto no Chrome headless); na sala do M20, mods diferentes não entram |
+| **M22** Aparelho e MVP | domínio, PWA do J7, aceite do M20, roteiro de campo M16–M21, Firefox e Safari, declarar o MVP | ⬜ proposto em 2026-10-19 | do usuário |
+| **M23** Correções verificadas | coluna perdida na gravação, cota cheia (doc 11 §4), coluna corrompida em quarentena, fogo nos mobs e chama visível, dica fora da vida, mochila no T0 deitado, save do convidado, escada em quina de três — e a regra de canto de escada, que estava trocada | ✅ concluído em 2026-10-19 | **não visto em aparelho** (visto no Chromium, desktop e 640×360) |
+| **M24** Casa em ordem, 3ª volta | seis módulos acima de 700, doc 15 de volta a foto, CI nos PRs com smoke, smoke como root | ⬜ proposto em 2026-10-19 | **próximo de código** (§6) |
+| **M25** Folga para crescer | atlas, bundle e áudio com folga para os marcos de conteúdo | ⬜ proposto em 2026-10-19 | trava M26–M29 |
+| **M26** Aconchego | fogueira e caldeirão (doc 00), lanterna, vaso, moldura, tronco descascado, terracota e concreto | ⬜ proposto em 2026-10-19 | — |
+| **M27** Bichos | cavalo com sela, gato, coelho, peixes vivos, guia, etiqueta | ⬜ proposto em 2026-10-19 | — |
+| **M28** Lugares para achar | templos do deserto e da selva, fundo do mar, planalto de terracota, mapa do tesouro | ⬜ proposto em 2026-10-19 | — |
+| **M29** Ameaça | invasão de saqueadores, besta, tridente, fantasma noturno | ⬜ proposto em 2026-10-19 | — |
+| **M30** Sala, 2ª volta | golpe no boneco, inventário conferido, mods da sala sem tela, PvP opcional, teto de mobs por jogador | ⬜ proposto em 2026-10-19 | depende do aceite do M20 |
+| **M31** Horizonte | terreno distante, folhas e água que se mexem — só T1+ | ⬜ proposto em 2026-10-19 | — |
 
 **O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
 ele irá pesar muito o jogo e trazer muita complexidade por enquanto desnecessária"*. O
@@ -150,18 +177,23 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-27 17:11, com a terceira volta do M20, com `npm test`, `npm run build`,
+Medidas de novo em 2026-10-19 17:47, ao fechar o M23 (testes, bundle, os quatro smokes e o
+`bench:ui`). Antes, reconferidas em 2026-10-19 17:17, sem mudança de código e com os mesmos números (2404 testes,
+308,3 KB; `smoke`, `smoke:mods`, `smoke:room` e `bench:ui` verdes — no container, os smokes pedem
+`CHROME` apontando para um invólucro com `--no-sandbox`, porque roda como root; M24). Medidas em
+2026-09-27 17:11, com a terceira volta do M20, com `npm test`, `npm run build`,
 `SIZE_BUDGET_KB=350 npm run size`, `npm run smoke`, `npm run smoke:mods`, `npm run smoke:net`,
 `npm run smoke:room` e `npm run smoke:camera`.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, o jogo sem mod) | **308,3 KB**, worker 42,7 (307,9 antes da terceira volta do M20: as âncoras do pipeline e o gancho de itens do `SceneFeed` custaram 0,3; 307,1 antes da segunda volta: teclado, roda, F11 e a mira dos mobs por jogador custaram 0,8; 304,7 antes do M20 no jogo: os ganchos — botões, `game/netgate.ts`, `playersave.ts`, o boneco do jogador no atlas — custaram 2,4 KB no pedaço principal; 302,2 antes do M21: a infraestrutura de mods custou 1,9 KB no pedaço principal, 0,3 no worker e 0,2 no HTML; 301,8 ao fechar o M19; 298,4 ao fechar o M17; o M19 somou as ilhas de fora e o portal de passagem, e o worker foi a 42,3; 282,5 antes do M17: o inglês e as chaves custaram 15,9; o worker, 41,8, não mudou um byte; 267,3 antes do M16; 265,7 ao fechar o M15; 257,9 antes do M15; 249,5 antes do M14; 240,0 antes do M10) | < 350 KB | `npm run size` |
-| Testes | **2404**, 126 arquivos (2399 antes da ligação instável; 2398 antes da correção do J7; 2389 antes da terceira volta do M20; 2362 antes da segunda volta; 2334 antes do M20 no jogo; 2316 ao fechar o M21; 2290 antes do M21; 2281 ao fechar o M19; 2271 ao fechar o M17; 2235 antes do M17; 2164 antes do M16; 2156 ao fechar o M15; 2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
-| Smoke test de navegador | **7 passos verdes**: carregar, criar, andar 10 s, quebrar, salvar, recarregar, conferir | verde | `npm run smoke` |
+| Bundle (gzip, o jogo sem mod) | **311,0 KB**, worker 42,8 (308,3 antes do M23: a tela de cota cheia, os textos dela em `pt` e `en`, a borda de fogo e a cadência do save custaram 2,7; a regra de canto, 0,1 no worker; 307,9 antes da terceira volta do M20: as âncoras do pipeline e o gancho de itens do `SceneFeed` custaram 0,3; 307,1 antes da segunda volta: teclado, roda, F11 e a mira dos mobs por jogador custaram 0,8; 304,7 antes do M20 no jogo: os ganchos — botões, `game/netgate.ts`, `playersave.ts`, o boneco do jogador no atlas — custaram 2,4 KB no pedaço principal; 302,2 antes do M21: a infraestrutura de mods custou 1,9 KB no pedaço principal, 0,3 no worker e 0,2 no HTML; 301,8 ao fechar o M19; 298,4 ao fechar o M17; o M19 somou as ilhas de fora e o portal de passagem, e o worker foi a 42,3; 282,5 antes do M17: o inglês e as chaves custaram 15,9; o worker, 41,8, não mudou um byte; 267,3 antes do M16; 265,7 ao fechar o M15; 257,9 antes do M15; 249,5 antes do M14; 240,0 antes do M10) | < 350 KB | `npm run size` |
+| Testes | **2423**, 129 arquivos (2404 antes do M23; 2399 antes da ligação instável; 2398 antes da correção do J7; 2389 antes da terceira volta do M20; 2362 antes da segunda volta; 2334 antes do M20 no jogo; 2316 ao fechar o M21; 2290 antes do M21; 2281 ao fechar o M19; 2271 ao fechar o M17; 2235 antes do M17; 2164 antes do M16; 2156 ao fechar o M15; 2116 antes do M15; 2064 antes do M14) | manter verde | `npm test` |
+| Smoke test de navegador | **9 passos verdes**: carregar, criar, andar 10 s, quebrar, **cota cheia: a tela abre com o banco recusando, e com espaço de volta grava e fecha (M23)**, salvar, recarregar, conferir | verde | `npm run smoke` |
 | Smoke test da rede (M20.0) | **7 passos verdes**: dois Chrome, anfitrião e convidado pela página `rede.html`, trocando os códigos como uma pessoa; ligados em candidato `host` dos dois lados; ida e volta ~0,3 ms, perda 0/300, 6–18 MB/s. Com e sem mDNS (`SMOKE_NET_MDNS=1`). **Na mesma máquina — não prova a rede Wi-Fi** | verde | `npm run smoke:net` |
-| Toque nas telas de inventário, CPU 6× mais lenta | **91–212 ms** por ação (abrir o livro de receitas, tocar numa receita, tocar num slot); eram **~3 000 ms** com a folha de sprites como `data:` URL — no J7, 5–10 s | ≤ 600 ms | `npm run bench:ui` |
-| Smoke test da sala (M20) | **19 passos verdes**: dois Chrome, anfitrião cria mundo e põe bloco, abre a sala; o convidado entra pelo título trocando os códigos; vê o bloco (chunk modificado do anfitrião); blocos nos dois sentidos; bonecos; mobs perto dele; **o nome em cima do boneco; o chat; o baú do anfitrião aberto pelo convidado (vê 3 diamantes, tira, some lá); o poço cavado pelo convidado com luz 15 no anfitrião; o bloco do convidado além do anel do anfitrião (288 blocos com anel de 12 — sem as âncoras falha, conferido); o anfitrião no Nether e o convidado ao lado dele, e a volta**; sai pelo menu e fica salvo no anfitrião **com o inventário**; **0 mundo e 0 chunk no banco do convidado**; nenhum erro | verde; `SMOKE_SHOT=arquivo.png` guarda a tela do anfitrião com nome e chat | `npm run smoke:room` |
+| Toque nas telas de inventário, CPU 6× mais lenta | **91–268 ms** por ação (abrir o livro de receitas, tocar numa receita, tocar num slot; varia entre rodadas); eram **~3 000 ms** com a folha de sprites como `data:` URL — no J7, 5–10 s | ≤ 600 ms | `npm run bench:ui` |
+| Mochila num T0 deitado (640×360) | **cabe sem rolar**, *Fechar* à vista (M23; antes o painel ia a 410 px e o botão ficava em 354) | sem rolagem | `npm run bench:ui` |
+| Smoke test da sala (M20) | **20 passos verdes** (o 20º, do M23: trocar o modo de jogo pela pausa com o convidado dentro não fecha a sala): dois Chrome, anfitrião cria mundo e põe bloco, abre a sala; o convidado entra pelo título trocando os códigos; vê o bloco (chunk modificado do anfitrião); blocos nos dois sentidos; bonecos; mobs perto dele; **o nome em cima do boneco; o chat; o baú do anfitrião aberto pelo convidado (vê 3 diamantes, tira, some lá); o poço cavado pelo convidado com luz 15 no anfitrião; o bloco do convidado além do anel do anfitrião (288 blocos com anel de 12 — sem as âncoras falha, conferido); o anfitrião no Nether e o convidado ao lado dele, e a volta**; sai pelo menu e fica salvo no anfitrião **com o inventário**; **0 mundo e 0 chunk no banco do convidado**; nenhum erro | verde; `SMOKE_SHOT=arquivo.png` guarda a tela do anfitrião com nome e chat | `npm run smoke:room` |
 | Bloco do anfitrião no convidado | **0–15 ms** por viagem, mediana 1–4 ms (5 viagens por rodada; eram até 214 ms antes de o lote sair na microtarefa, sem esperar o tick) | < 150 ms (aceite do M20) | `npm run smoke:room` |
 | Smoke test da câmera (M20) | **3 passos verdes**: a webcam falsa do Chrome filma o QR do anfitrião inclinado, borrado e com ruído; o leitor próprio lê em **205–410 ms** | verde | `npm run smoke:camera` |
 | Leitor de QR próprio | lê a partir de **~4,1 px por módulo** e com trapézio de até **30%** (borda de cima com 70% da de baixo); falha com 45% e a 3,3 px/módulo; **~10 ms** por quadro de 640×480 no Node (cinco leituras e a foto sintética em 59 ms) | < 120 ms/quadro | `tests/qrread.test.ts` |
@@ -236,7 +268,7 @@ Física com as constantes do doc 06, raycast DDA com contorno, quebrar com está
 colocar com rotação, hotbar, iluminação por flood fill incremental, ciclo dia/noite.
 **Sem pendências.**
 
-### M3 — Mobile ⚠️
+### M3 — Mobile ✅
 Joystick flutuante, câmera por arraste, modos A/B, multitoque por `pointerId`, safe areas, tela
 cheia e trava de orientação, gamepad, PWA instalável e offline, escala dinâmica de resolução.
 
@@ -2398,6 +2430,81 @@ com o anel do anfitrião de 12 colunas; com as âncoras desligadas, esse passo f
 Testes novos em `tests/pipeline.test.ts` (âncoras), `tests/netcontainers.test.ts` (dimensão e
 spawn) e `tests/netroom.test.ts` (fogo, frasco, item na mão).
 
+### M23 — Correções verificadas ✅ — 2026-10-19
+
+Pedido: *"Pode seguir com o M23"*. Os oito itens do doc 14, cada um com regressão, e dois defeitos
+achados no caminho.
+
+- **Save que falha não perde mais coluna** (`save/savemanager.ts`). A coluna descarregada cuja
+  gravação falha fica numa fila de **órfãs**, comprimida e com a chave da dimensão dela. O próximo
+  `flush` tenta essas colunas primeiro. Quem pede a coluna antes disso recebe a da fila: o pipeline
+  (que a devolve a `dirty`) e o anfitrião da sala servindo um convidado.
+- **Cota cheia** (`ui/screens/storagefull.ts`, ligada por `ui/savealerts.ts` para o `main.ts`
+  ficar em 698).
+  - A falha chega com a marca de `QuotaExceededError` (`isQuotaError`).
+  - A tela pausa o mundo e mostra o espaço usado.
+  - Lista os **outros** mundos, do maior para o menor, com *Apagar* e confirmação.
+  - *Tentar salvar de novo* grava tudo e fecha se der certo.
+  - *Continuar sem salvar* fecha. A partir daí a falha volta a ser uma linha de HUD (sem a tela a
+    cada autosave), até um save inteiro dar certo (`SaveGameOptions.onSaved`).
+  - As ações vêm antes da lista: assim os botões cabem num T0 deitado.
+- **Coluna corrompida:** os bytes vão para `<mundo>.corrupt.<cx>.<cz>` no `STORE_SETTINGS`, e o
+  HUD avisa com as coordenadas. Desvio do doc 14 (sem tela de decisão), no comentário de
+  `quarantine`.
+- **Fogo nos mobs** (`entity/mobrules.ts`).
+  - Bloco de fogo nos pés ou na cabeça acende o mob por 8 s e fere 1 a cada meio segundo.
+  - Água nos pés apaga, e vence o sol.
+  - Imune ao fogo (blaze, porco zumbi, ghast) não acende.
+  - Partículas (`game/ambient.ts`, `emitBurningMobs`): duas fagulhas por tick em cada mob ardendo a
+    até 32 blocos, pelo emissor das tochas.
+  - **Borda de fogo na tela** do jogador (`ui/burnoverlay.ts`), embaixo do HUD, com
+    `Survival.burning`. O DOM só é tocado quando o estado muda.
+- **Dica de teclado** abaixo da mira (`HINT_CSS`), fora da faixa de vida e fome.
+- **Mochila num T0 deitado:** o que ficava fora era o *Fechar*. Na orientação deitada com até
+  560 px de altura, ele sobe para a linha do título (`screenstyle.ts`). `npm run bench:ui`
+  confere em 640×360 que a tela não rola.
+- **Save do convidado** (`net/savecadence.ts`): a cada 10 s como antes e, conferido uma vez por
+  segundo, quando a assinatura do inventário e do nível muda (FNV-1a, sem alocar).
+- **Revisão do próprio diff, antes do commit** (`ui/gameflow.ts`):
+  - *Salvar e Sair* com a gravação falhando recarregava a página logo depois de abrir a tela de
+    cota cheia, jogando fora o que não foi gravado. Agora fica na pausa, com o aviso.
+  - *Continuar sem salvar* aberto por cima da pausa devolve a pausa como estava.
+  - O `saveAll` do fluxo também saía da sala, e a troca de modo pela pausa o chama (§4). Agora são
+    duas peças, `saveAll` e `leaveRoom`. O `npm run smoke:room` ganhou o passo, que falha com o
+    código antigo (conferido).
+- **Escada** (`world/mesh/shapes.ts`, `stairCornerFrom`): a regra de canto foi desvirada (§4), a
+  quina de três entrou (escada igual do lado da curva mantém a reta) e o array por escada saiu. O
+  teste novo compara a parte alta **dos dois lados** da face compartilhada, para toda direção.
+  Com a regra antiga ele falha (conferido).
+
+**Visto no Chromium:**
+- a tela de cota cheia em 1280×720 e em 640×360;
+- a mochila em 640×360;
+- uma pirâmide de escadas com a quina certa;
+- a borda de fogo;
+- a dica abaixo da mira.
+
+**Não visto:** a fagulha no mob (o enquadramento da captura não pegou o zumbi; a escolha de quem
+solta está no teste). Nada do M23 foi visto em aparelho.
+
+### Avaliação de 2026-10-19 — M22 a M31 ⬜
+
+Pedido: *"De uma analisada geral detalhada, para entender o que falta de desenvolvimento, se possui
+Marcos pendentes, e também analise com detalhe para criar novos Marcos para deixar o jogo
+excelente, correções de bugs, tudo."*
+
+**Como foi feita.** Os quatro portões e os smokes de navegador (`smoke`, `smoke:mods`,
+`smoke:room`, `bench:ui`) rodados de novo; as tabelas dos docs 03–11 cruzadas com o código por
+`grep` (a lição do M11); o jogo aberto no Chromium em 1280×720 e em 640×360 com toque, com
+captura de tela; os sistemas citados no doc 15 como pendência pequena conferidos um a um.
+
+**O que ela confirmou:** o código de M0 a M21 está todo lá e verde; nenhuma tabela dos docs 04 e
+05 tem nome faltando no código; nenhum erro de página nos smokes. O único marco aberto é o M20, e
+o que falta nele é de aparelho e de duas voltas de código (M30).
+
+**O que ela achou** está no §5 (pendências verificadas em 2026-10-19), com o arquivo de cada uma, e
+virou o roteiro M22–M31 do doc 14.
+
 ## 4. Correções fora de marco
 
 Bugs anteriores encontrados durante o M5 e já corrigidos — ficam registrados porque explicam
@@ -2405,6 +2512,10 @@ mudanças em código de marcos "fechados":
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-10-19 | `world/mesh/shapes.ts` | **A regra de canto de escada estava trocada** desde o acabamento pós-M7 (2026-09-14). Um vizinho perpendicular do lado alto fazia canto **interno**, e no gênero (e pela geometria) é **externo**; com o vizinho do lado aberto, o contrário. Numa pirâmide de escadas, a quina saía com o degrau cheio. O teste antigo olhava só um lado da face compartilhada; o novo compara os dois. Mundo salvo não muda, porque o canto é derivado dos vizinhos e não fica no save: a escada já construída passa a mostrar o canto certo. Achado no M23. |
+| 2026-10-19 | `ui/gameflow.ts`, `main.ts` | **Trocar Criativo/Sobrevivência pela pausa fechava a sala da rede local** (M20 × modo de jogo). O fluxo tinha um `saveAll` só, que gravava **e** saía da sala (`leaveRoom`), e a troca de modo grava o mundo: o anfitrião fechava a sala, e o convidado era derrubado. Agora são duas peças, e só *Salvar e Sair* sai. Regressão no `npm run smoke:room`, que falha com o código antigo. Achado na revisão do M23. |
+| 2026-10-19 | `save/serialize.ts` | **Coluna corrompida deixava duas promessas rejeitadas sem dono** (`writer.write` e `writer.close` da descompressão), e o navegador mostrava "Uncaught (in promise)". A falha já chegava pelo `read`; agora as duas têm `catch`. Achado pelo teste do M23. |
+| 2026-10-19 | `save/savemanager.ts` | **Coluna descarregada perdida quando a gravação falhava** (M4): saía de `dirty` antes do `putChunks`. M23. |
 | 2026-09-28 | `net/link.ts`, `net/linkhealth.ts` | **A sala caía a cada 2–3 minutos com o J7 Metal de anfitrião** (M20; campo, com um S24 Ultra de convidado). A ligação tratava `disconnected` como o fim, e esse estado do WebRTC é passageiro: aparece quando as verificações de consentimento atrasam alguns segundos (Wi-Fi de celular antigo em economia de energia) e volta sozinho a `connected`. Agora `disconnected` é "instável": os dois lados avisam na tela e no chat e esperam 20 s. Só `failed`, `closed`, um canal fechado, um envio que falha na fila cheia, ou a espera esgotada, derrubam. **Toda queda mostra o motivo** (na tela do convidado e no chat do anfitrião), para o próximo teste dizer qual foi. O canal rápido também deixa de enfileirar posição quando a fila passa de 256 KB. A causa no aparelho é a mais provável, **não medida**: o smoke não consegue interromper a rede entre dois Chrome. Regressão em `tests/linkhealth.test.ts`. |
 | 2026-09-28 | `render/itemsprites.ts` | **Cada toque na mochila, bancada, fornalha e livro de receitas levava 5–10 s no J7 Metal** (T0, campo). O jogo rodava a 60 FPS. A folha de sprites (M4) ia ao CSS como `data:` URL de ~480 mil caracteres dentro de `--item-sheet`, e cada slot, receita e célula a resolvia a cada recálculo de estilo: 57 botões de receita recriados por toque. Agora é uma `blob:` URL. Medido com a CPU 6× mais lenta: ~3 000 ms por ação antes, 91–212 ms depois. Regressão em `npm run bench:ui` (orçamento de 600 ms) e em `tests/itemsprites.test.ts`. |
 | 2026-09-28 | `public/manifest.webmanifest`, `ui/screenmode.ts` | **O app instalado não abria no Android 8.1** (J7 Metal, campo: *"CraftLite não está respondendo, CraftLite parou"*). No navegador, o jogo abria. Causa provável, não reproduzida: `"orientation": "landscape"` no manifesto. O Android 8 derruba uma atividade translúcida que fixa orientação (*"Only fullscreen opaque activities can request orientation"*), e a tela de abertura do WebAPK é translúcida. A orientação saiu do manifesto — **desvio do doc 11 §7**, escrito em `ui/screenmode.ts`, que já trava a paisagem no primeiro toque. O Chrome do Android 8 parou no 138. **A conferir no aparelho**, desinstalando antes. |
@@ -2579,6 +2690,39 @@ mudanças em código de marcos "fechados":
 ---
 
 ## 5. Dependências entre pendências
+
+**Pendências do M23 (2026-10-19, 17:47):**
+
+- **Nada do M23 foi visto em aparelho.** O que mais pede olho: a tela de cota cheia no celular (é
+  difícil de provocar de verdade; o smoke simula a recusa do banco), a borda de fogo, e escadas em
+  L e em pirâmide.
+- **A fagulha do mob em chamas** só foi vista em teste, não na tela.
+- **O convidado da sala não vê mob pegando fogo:** `fireTicks` não viaja no `MOBS`.
+- **A quarentena não tem tela de recuperação:** os bytes ficam guardados, mas recuperar é manual.
+- **`world/mesh/shapes.ts` em 919 linhas** (899) e `save/savemanager.ts` em 509: o primeiro já
+  estava na lista do M24; o segundo é uma responsabilidade só.
+
+**Pendências verificadas em 2026-10-19 (avaliação geral)** — cada uma conferida no código ou na
+tela; viraram o M23–M25 do doc 14. **As oito do M23 fecharam no mesmo dia** (riscadas abaixo):
+
+- ~~**Coluna perdida se a gravação falha na descarga**~~ — fechada no M23.
+- ~~**Cota cheia não segue o doc 11 §4**~~ — fechada no M23.
+- ~~**Coluna corrompida some calada**~~ — fechada no M23 (quarentena e aviso).
+- ~~**Fogo nos mobs**~~ — fechada no M23.
+- ~~**A dica de teclado cobre os corações**~~, ~~**a mochila passa da tela de um T0 deitado**~~,
+  ~~**o convidado que cai perde até 10 s**~~ e ~~**escada em quina de três**~~ — fechadas no M23.
+- **Fogueira e caldeirão** (doc 00 §3, segundo círculo): nenhum dos dois existe (`grep` vazio).
+- **Firefox nunca rodou o jogo** (o doc 14 pede em todo marco); **Safari/iPhone nunca foi citado**.
+- **CI só na `main`** (`.github/workflows/pages.yml`): PR não passa pelos portões, e smoke não roda
+  em CI. Os scripts de smoke não sobem o Chrome como root sem `--no-sandbox`.
+- **Seis módulos de código acima de 700 linhas:** `ui/hud.ts` 738, `entity/mobs.ts` 716,
+  `game/session.ts` 715, `world/pipeline.ts` 714, `render/itemsprites.ts` 713,
+  `world/mesh/shapes.ts` 919 (899 antes do M23).
+- **Este documento tem 3 300 linhas e 318 KB**; parte do texto de setembro não vale mais (o
+  parágrafo abaixo de "Pendências abertas em 2026-09-24 (M14)" ainda diz que não há pendência de
+  funcionalidade). M24.
+- **Tetos que travam conteúdo:** atlas 223 de 256 camadas, áudio 2,92 de 3,5 MB, bundle 311,0 de
+  350 KB (308,3 antes do M23). M25.
 
 **P1 fechada em 2026-09-14: a causa é o navegador, e não há correção do lado do jogo.**
 Num Android, o sistema entrega os botões do controle como **tecla**, e o navegador fica com
@@ -2887,6 +3031,22 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
 ---
 
 ## 6. Próximo passo recomendado
+
+**Desde 2026-10-19 o roteiro é o M22–M31 do doc 14.** O **M23 fechou** no mesmo dia. O próximo
+passo **de código** é o **M24** (casa em ordem: módulos acima de 700, este documento enxuto, CI
+nos PRs), que vem antes da folga do M25 e do conteúdo. O próximo passo **do usuário** é o **M22**,
+que junta os itens 0a, 0 e 1 abaixo, mais Firefox e Safari. Os itens abaixo continuam valendo como
+roteiro detalhado de campo.
+
+**No celular, o M23** (num mundo de Sobrevivência):
+- tocar fogo num campo com vacas por perto: elas pegam fogo e soltam fagulha; um zumbi em chamas de
+  manhã que pula na água apaga;
+- entrar no fogo: a borda laranja aparece embaixo, por baixo dos corações, e some na água;
+- com o celular deitado, a mochila inteira na tela sem rolar, e o *Fechar* ao lado de *Receitas*;
+- um L de escadas e um telhado em pirâmide: o canto de fora fica com o quarto só, o de dentro
+  fecha o L;
+- na sala, o convidado pega um item e a ligação cai (desligar o Wi-Fi dele): ao voltar, o item
+  está lá.
 
 0a. **Domínio próprio (2026-10-18), configuração do usuário:**
    - no Cloudflare, um CNAME `craftlite` → `gzomer14.github.io`, só DNS (nuvem cinza);

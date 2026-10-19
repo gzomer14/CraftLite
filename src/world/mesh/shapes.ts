@@ -453,19 +453,27 @@ export const NOT_STAIRS = -1;
  *
  * Cada `nb*` é o estado da escada vizinha naquele lado, ou `NOT_STAIRS`. A
  * regra sai de uma exigência só, geométrica e verificável: **a superfície alta
- * das duas escadas tem que ser contínua pela face que elas dividem.**
+ * das duas escadas tem que ser contínua pela face que elas dividem** — dos dois
+ * lados da face, a parte alta cobre a mesma faixa.
  *
- *  - vizinho perpendicular **do lado alto** → canto **interno**: a escada ganha
- *    o quarto que falta para o L fechar em volta dele;
- *  - vizinho perpendicular **do lado aberto** → canto **externo**: a meia caixa
- *    encolhe para o quarto que sobra do lado de fora da curva.
+ *  - vizinho perpendicular **do lado alto** → canto **externo**: a metade alta
+ *    encolhe para o quarto que encosta na faixa alta dele;
+ *  - vizinho perpendicular **do lado aberto** → canto **interno**: a escada
+ *    ganha, no lado aberto, o quarto que encosta na faixa alta dele.
  *
- * Nos dois casos quem escolhe o quarto é o **lado alto do vizinho**: é ele que
- * diz para onde a curva vira. O interno vem depois e vence, como no gênero —
- * uma escada entre duas perpendiculares fecha a curva em vez de abrir.
+ * Nos dois casos quem escolhe o quarto é o **lado alto do vizinho**. O externo
+ * vem primeiro e vence, como no gênero.
+ *
+ * **M23 — a regra estava trocada** desde o acabamento pós-M7: o vizinho do lado
+ * alto fazia canto interno, e o teste só olhava o nosso lado da face. Num
+ * telhado em pirâmide, as quinas saíam com o degrau cheio em vez do quarto. E
+ * faltava a **quina de três**: a escada não vira canto se, do lado para onde a
+ * curva iria, há outra escada igual a ela — ela continua a fila reta, em vez de
+ * quebrá-la (o `canTakeShape` do gênero).
  *
  * Vizinho com o bit de "de cabeça para baixo" diferente não faz canto: as duas
  * metades altas estão em alturas diferentes e não há superfície para ligar.
+ * Sem alocação: roda por escada no mesher.
  */
 export function stairCornerFrom(
   bits: number, nbPlusX: number, nbMinusX: number, nbPlusZ: number, nbMinusZ: number,
@@ -473,19 +481,31 @@ export function stairCornerFrom(
   const tall = (bits & 3) ^ 1;
   const open = tall ^ 1;
   const top = bits & 4;
-  const neighbors = [nbPlusX, nbMinusX, nbPlusZ, nbMinusZ];
 
-  // Externo primeiro, para o interno poder sobrescrever.
-  let result = CORNER_NONE;
-  const front = neighbors[open];
-  if (isPerpendicularStair(front, tall, top)) {
-    result = CORNER_OUTER | (((front & 3) ^ 1) << 2);
-  }
-  const back = neighbors[tall];
+  const back = neighborAt(tall, nbPlusX, nbMinusX, nbPlusZ, nbMinusZ);
   if (isPerpendicularStair(back, tall, top)) {
-    result = CORNER_INNER | (((back & 3) ^ 1) << 2);
+    const backTall = (back & 3) ^ 1;
+    // A curva sai para o lado baixo do vizinho; lá não pode haver uma igual a nós.
+    const side = neighborAt(backTall ^ 1, nbPlusX, nbMinusX, nbPlusZ, nbMinusZ);
+    if (!isSameStair(side, bits)) return CORNER_OUTER | (backTall << 2);
   }
-  return result;
+  const front = neighborAt(open, nbPlusX, nbMinusX, nbPlusZ, nbMinusZ);
+  if (isPerpendicularStair(front, tall, top)) {
+    const frontTall = (front & 3) ^ 1;
+    const side = neighborAt(frontTall, nbPlusX, nbMinusX, nbPlusZ, nbMinusZ);
+    if (!isSameStair(side, bits)) return CORNER_INNER | (frontTall << 2);
+  }
+  return CORNER_NONE;
+}
+
+/** O vizinho no índice `dir` de `FACING_STEP`. */
+function neighborAt(dir: number, px: number, mx: number, pz: number, mz: number): number {
+  return dir === 0 ? px : dir === 1 ? mx : dir === 2 ? pz : mz;
+}
+
+/** true se o vizinho é escada virada para o mesmo lado e na mesma metade. */
+function isSameStair(nb: number, bits: number): boolean {
+  return nb !== NOT_STAIRS && (nb & 7) === (bits & 7);
 }
 
 /** true se o vizinho é escada, do mesmo lado de cima e de eixo perpendicular. */

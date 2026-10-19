@@ -757,6 +757,275 @@ futuro, se um dia fizer sentido — e então com outro desenho (dado sem código
 
 ---
 
+## Avaliação de 2026-10-19 — M22 a M31
+
+> Acrescentado em 2026-10-19, a pedido do usuário, ao retomar o projeto depois de três semanas:
+> *"De uma analisada geral detalhada, para entender o que falta de desenvolvimento, se possui
+> Marcos pendentes, e também analise com detalhe para criar novos Marcos para deixar o jogo
+> excelente, correções de bugs, tudo."*
+
+**A foto, conferida e não lembrada.** Portões verdes (2404 testes, lint, build, 308,3 KB de 350) e
+os smokes de navegador todos verdes na mesma tarde: jogo (7 passos), mods (6), sala (19) e o bench
+das telas de inventário (pior ação 203 ms com CPU 6× mais lenta). De M0 a M21, **só o M20 está
+aberto**, e o que falta nele é do aparelho (o critério de aceite de 30 min, o T0 anfitrião acima de
+30 FPS e os dados móveis) e de duas voltas de código (golpe no boneco, autoridade sobre o
+inventário). Nenhuma issue nem PR aberto no GitHub.
+
+**O que a avaliação achou** (cada item conferido no código, com o lugar, no doc 15 §5):
+
+- **Defeitos de verdade, pequenos:** coluna modificada que **se perde** se a gravação falhar na
+  descarga; o caminho do doc 11 §4 para cota cheia (pausar, explicar, oferecer apagar mundo) **não
+  existe** — só uma mensagem de 6 s; mob **não pega fogo** no fogo, **não apaga** na água, e nem mob
+  nem jogador **mostram a chama**; a dica de teclado cobre os corações enquanto o ponteiro está
+  solto; a mochila passa 50 px da tela de um T0 deitado (360 px) e pede rolagem; o convidado que
+  cai perde até 10 s.
+- **Dívida normativa:** a **fogueira** e o **caldeirão** do doc 00 §3 (segundo círculo) nunca
+  foram feitos; **Firefox** nunca rodou (o doc 14 pede todo marco) e **Safari/iPhone** nunca foi
+  sequer citado.
+- **Casa:** seis módulos de código acima de 700 linhas; o doc 15, que é o documento **de entrada**,
+  tem 3 300 linhas e 318 KB; o CI só roda na `main` (PR não passa pelos portões) e não roda smoke.
+- **O que trava conteúdo novo:** atlas em **223 de 256** camadas, áudio em **2,92 de 3,5 MB** e
+  bundle em **308 de 350 KB**. Os marcos de conteúdo abaixo cabem só se o M25 vier antes.
+
+### Ordem recomendada
+
+```
+M22 aparelho e MVP (do usuário, em paralelo com tudo)
+M23 correções ✅ ──► M24 casa em ordem ──► M25 folga ──► M26 aconchego ─┐
+                                                   ├─► M27 bichos    ├─► M29 ameaça
+                                                   └─► M28 lugares ──┘
+M30 sala, segunda volta (depois do aceite do M20 no M22)
+M31 horizonte (depois do M24; só T1+, o T0 não paga)
+```
+
+A regra que vale para todos é a do M20/M21: **quem não usa não paga**, e o T0 é o juiz. Conteúdo
+novo entra como linha de tabela e com o custo medido em bytes, camadas e memória de áudio.
+
+---
+
+## M22 — Aparelho e MVP ⬜
+
+> O que só o usuário pode fazer, juntado num lugar só. Hoje está espalhado pelo doc 15 §6 em
+> treze itens, alguns de setembro.
+
+- [ ] **Domínio próprio** (doc 15 §6, 0a): CNAME no Cloudflare, domínio no Pages, HTTPS; conferir
+      que o jogo abre, instala e funciona offline no endereço novo.
+- [ ] **O PWA que fecha no J7.** Primeiro o diagnóstico (`about://webapks`, `adb logcat -b crash`).
+      Sem o log, as duas hipóteses baratas para testar **uma de cada vez**: `display: standalone`
+      sem `display_override`, e um ícone `maskable` próprio (hoje é o mesmo arquivo do `any`).
+      Nenhuma das duas está provada.
+- [ ] **Aceite do M20:** 30 min de sala; o J7 anfitrião com um convidado longe (as âncoras) acima
+      de 30 FPS; um aparelho nos dados móveis **não** fecha a ligação.
+- [ ] **O roteiro de campo de M16–M21**, numa sessão só (End, dragão, idioma, seed, mods, PWA
+      offline) — doc 15 §6, item 1.
+- [ ] **Navegadores que nunca rodaram:** Firefox no computador e no Android; **Safari no iPhone**
+      (sem pointer lock e sem tela cheia de verdade no iPhone; o jogo tem que degradar, não
+      quebrar — doc 00 §4.4).
+- [ ] **Declarar o MVP** (critérios de "pronto" abaixo), com a data, no doc 15 e no README.
+
+**Critério de aceite:** os cinco critérios de "pronto" com medida de aparelho, e a lista de
+navegadores com resultado (funciona / degrada / quebra, e onde).
+
+---
+
+## M23 — Correções verificadas ✅
+
+> Defeitos achados na avaliação de 2026-10-19, todos conferidos no código. Cada um entra com
+> teste de regressão, como manda o CLAUDE.md. **Fechado em 2026-10-19** — detalhe no doc 15 §3.
+
+- [x] **Coluna perdida se a gravação falha na descarga** (`save/savemanager.ts`,
+      `saveAndForget`): a coluna sai de `dirty` **antes** do `putChunks`; se a gravação falhar
+      (cota cheia, aba fechando), ela já saiu da memória e não volta a nenhuma fila. Guardar o
+      comprimido numa fila de nova tentativa até gravar. **Feito:** a coluna órfã espera
+      comprimida, vai para o disco no próximo `flush`, e quem a pede antes disso (o pipeline ou o
+      convidado da sala) a recebe da fila, não da seed.
+- [x] **Cota cheia como o doc 11 §4 manda:** hoje `QuotaExceededError` vira uma linha de HUD de 6 s
+      (`main.ts`, `store.save_failed`) e o jogo segue sem salvar. Pausar, explicar e oferecer a tela
+      de mundos com o tamanho de cada um (que já existe, M7) para apagar. **Feito**
+      (`ui/screens/storagefull.ts`): a tela pausa, mostra o espaço usado, lista os outros mundos
+      do maior para o menor com *Apagar*, e tem *Tentar salvar de novo* e *Continuar sem salvar*.
+      *Desvio:* a lista está na própria tela, e não na tela de mundos — sair do mundo aberto com o
+      save falhando perderia o que não foi gravado.
+- [x] **Coluna corrompida some calada** (`savemanager.ts`, `loadChunk`): o `catch` devolve `null` e
+      o terreno da seed toma o lugar do que foi construído. Avisar o jogador e **não** sobrescrever
+      o registro até ele decidir (guardar os bytes originais para recuperar depois). **Feito com
+      desvio:** os bytes vão para a quarentena (`<mundo>.corrupt.<cx>.<cz>`) e o jogador é
+      avisado; não há tela de decisão, porque para um registro que o jogo não lê ela só poderia
+      oferecer "gerar de novo" (comentário de `quarantine`).
+- [x] **Fogo nos mobs** (`entity/mobrules.ts`, `environmentHarm`): bloco de fogo não acende o mob,
+      água não apaga (o zumbi que pega fogo de dia e pula no rio continua queimando), e nem o mob
+      nem o jogador **mostram a chama** — o jogador só vê o coração descer. Chama no modelo do mob
+      (camada no passe de entidades) e na borda da tela do jogador, os dois desligados com o fogo
+      apagado. **Feito:** fogo acende e fere, água apaga e vence o sol. *Desvio:* a chama do mob
+      é de partícula (duas fagulhas por tick, o emissor das tochas), não uma camada no passe de
+      entidades — custa zero draw call. A tela do jogador ganhou a borda de fogo
+      (`ui/burnoverlay.ts`), embaixo da vida. O convidado da sala não vê a chama dos mobs (o
+      `fireTicks` não viaja).
+- [x] **A dica de teclado cobre os corações** com o ponteiro solto (`ui/controlhint.ts`: a dica
+      fica a `30 × --px` do chão, na faixa da vida e da fome). Subir para cima da faixa ou para o
+      centro. **Feito:** logo abaixo da mira.
+- [x] **A mochila não cabe num T0 deitado:** em 640×360 o painel vai até 410 px e a tela rola
+      (conferido no Chrome com toque emulado). Compactar a linha de baixo ou a margem para caber
+      sem rolagem a partir de 360 px de altura. **Feito:** o que ficava fora era o botão
+      *Fechar*; deitado, ele sobe para a linha do título. `npm run bench:ui` cobra.
+- [x] **O convidado que cai perde até 10 s** (`net/guest.ts`, `SAVE_EVERY = 200`): mandar o save
+      também quando o inventário muda, com teto de um por segundo. **Feito**
+      (`net/savecadence.ts`).
+- [x] **Escada em quina de três** (doc 15 §6, item 13): `stairCornerFrom` não confere a escada de
+      mesma direção ao lado, que no gênero impede o canto. E a mesma função **aloca um array por
+      escada** no mesher (`const neighbors = [...]`), contra a regra do caminho quente. **Feito, e
+      achou um defeito maior:** a regra de canto estava **trocada** desde o acabamento pós-M7 —
+      vizinho do lado alto fazia canto interno, e é externo. O teste novo mede a continuidade dos
+      dois lados da face.
+- [x] **Doc 15 contradiz a si mesmo:** o cabeçalho do M3 no §3 ainda diz ⚠️ e o §1 diz validado.
+      *(Corrigido junto com esta avaliação.)*
+- [x] **Achados no caminho:** a coluna corrompida deixava duas promessas rejeitadas sem dono na
+      descompressão (`save/serialize.ts`), "Uncaught (in promise)" no console; e trocar o modo
+      de jogo pela pausa **fechava a sala** do M20, porque o mesmo `saveAll` gravava e saía da
+      sala (`ui/gameflow.ts`). Os dois corrigidos, com regressão.
+
+**Critério de aceite:** um teste de regressão por item; o smoke do jogo com uma gravação que falha
+de propósito (cota simulada) mostra a tela de cota cheia e não perde a coluna. **Cumprido:**
+`tests/savefailure.test.ts`, `mobfire.test.ts`, `m23polish.test.ts` e `staircorners.test.ts`;
+`npm run smoke` com dois passos novos (a tela abre com o banco recusando, e com o espaço de volta
+grava e fecha; o bloco quebrado continua quebrado depois de recarregar).
+
+---
+
+## M24 — Casa em ordem, terceira volta ⬜
+
+- [ ] **Módulos acima de 700 linhas** (fora as tabelas de dados): `ui/hud.ts` 738,
+      `entity/mobs.ts` 716, `game/session.ts` 715, `world/pipeline.ts` 714,
+      `render/itemsprites.ts` 713, `world/mesh/shapes.ts` 919 (899 antes do M23). Corte por papel, como no M18.
+- [ ] **O doc 15 de volta a ser foto:** 3 300 linhas e 318 KB, com parágrafos de setembro que não
+      valem mais (o §5 ainda diz "não há pendência de funcionalidade" no meio das pendências). O
+      histórico de cada volta vai para o doc 16, que já é o histórico; o 15 fica com o §1, as
+      métricas, uma linha de detalhe por marco, as pendências **abertas** e o próximo passo — meta
+      de ~600 linhas.
+- [ ] **CI nos PRs:** o `pages.yml` só roda em push na `main`, então um PR chega sem portão. Um
+      workflow de PR com os quatro portões, e o `npm run smoke` e o `smoke:mods` (o Chrome do
+      `ubuntu-latest` serve).
+- [ ] **Smoke como root:** os scripts não sobem o Chrome num container de root sem um invólucro com
+      `--no-sandbox` (conferido nesta avaliação). Pôr a flag sozinho quando `process.getuid() === 0`.
+
+**Critério de aceite:** nenhum módulo de código acima de 700; doc 15 abaixo de 800 linhas sem
+perder pendência aberta (conferir uma a uma); PR de teste com o CI vermelho num teste quebrado de
+propósito.
+
+---
+
+## M25 — Folga para crescer ⬜
+
+> Os três tetos que decidem quanto conteúdo cabe. Sem este marco, os M26–M29 juntos não cabem.
+
+- [ ] **Atlas:** 223 de 256 camadas. Uma segunda página de atlas (outro `TEXTURE_2D_ARRAY`,
+      escolhida por um bit do vértice) ou camadas compartilhadas por tint (como a lã do M13).
+      Medir o custo no T0 antes de escolher.
+- [ ] **Bundle:** 308,3 de 350 KB. O inglês embutido (~12 KB) vira pedaço sob demanda, como a sala
+      do M20 — o doc 15 já marcava como o primeiro candidato.
+- [ ] **Áudio:** 2,92 de 3,5 MB. Sons de mob gerados sob demanda na primeira vez que o mob aparece,
+      e não todos no boot.
+
+**Critério de aceite:** folga de **≥ 64 camadas**, **≥ 50 KB** de bundle e **≥ 1 MB** de áudio;
+abertura em 3G e T0 sem regressão.
+
+---
+
+## M26 — Aconchego ⬜
+
+> Blocos que deixam a base com cara de casa. Dois deles o doc 00 §3 já pedia.
+
+- [ ] **Fogueira** (doc 00 §3): luz, fumaça em partícula, cozinha quatro itens devagar sem
+      combustível, fere quem pisa, a água apaga.
+- [ ] **Caldeirão** (doc 00 §3, "poções/caldeirão"): guarda água de balde, enche frasco, apaga o
+      jogador em chamas.
+- [ ] **Lanterna** (pendurada e no chão), **vaso de flor**, **moldura de item** (mostra o item no
+      mundo pelo passe dos itens do chão).
+- [ ] **Tronco descascado** (machado no tronco) e **terracota** e **concreto** nas 16 cores pelo
+      tint, que não custa camada por cor.
+
+**Critério de aceite:** cada bloco é linha de tabela; a fogueira assa carne em ~30 s; 16 cores de
+concreto custam ≤ 2 camadas.
+
+---
+
+## M27 — Bichos ⬜
+
+- [ ] **Cavalo** com sela, montaria pelo sistema de veículos (`game/vehicles.ts`), domado
+      montando várias vezes; no toque, o joystick conduz.
+- [ ] **Gato** (domado com peixe; o creeper foge dele), **coelho** e **peixes vivos** (bacalhau e
+      salmão nadando; a pesca do M14 já tem o item).
+- [ ] **Guia** (laço) e **etiqueta de nome**, que impede o bicho de sumir.
+
+**Critério de aceite:** tick de 20 mobs sem regressão no `tests/mobs.test.ts`; vozes novas dentro
+do orçamento de áudio do M25.
+
+---
+
+## M28 — Lugares para achar ⬜
+
+> Hoje o mundo tem masmorra, mina, aldeia, poço do deserto, cabana, naufrágio, fortaleza e o End.
+> Falta motivo para atravessar o deserto, a selva e o mar.
+
+- [ ] **Templo do deserto** (armadilha de TNT, baús) e **templo da selva** (alavancas e flechas
+      — o circuito do M7 já faz).
+- [ ] **O fundo do mar:** hoje é água sobre areia. Alga e erva marinha (decoração do oceano) e
+      uma ruína submersa com baú.
+- [ ] **Um bioma de cor:** planalto de terracota (badlands), que reaproveita a terracota do M26.
+- [ ] **Mapa do tesouro** nos baús do naufrágio, levando a um baú enterrado (o mapa do M10 desenha
+      o X).
+
+**Critério de aceite:** geração de chunk ainda < 25 ms (`tests/perf.test.ts`); cada estrutura é
+linha de `data/structures.ts`; a seed de teste tem uma de cada a < 1 500 blocos do nascimento.
+
+---
+
+## M29 — Ameaça ⬜
+
+- [ ] **Patrulha e invasão de saqueadores**: o sino do M9 chama os aldeões para casa, o golem
+      defende; vencer a invasão dá recompensa.
+- [ ] **Besta** (crossbow), carregada e solta, e o **tridente** caindo do afogado.
+- [ ] **Fantasma noturno** para quem passa três noites sem dormir — dá função à cama além do
+      nascimento.
+
+**Critério de aceite:** a invasão inteira (até 3 ondas) num T0 acima de 30 FPS; tudo desligável
+na dificuldade Pacífico.
+
+---
+
+## M30 — Sala, segunda volta ⬜
+
+> Depende do aceite do M20 no M22. Fecha os dois itens marcados "em parte" no checklist do M20.
+
+- [ ] **O golpe no boneco** (braço balançando) e o dano no boneco (pisca vermelho).
+- [ ] **O anfitrião confere o inventário** (doc 12 §6): o item usado ou posto existe no
+      inventário que ele guarda do convidado. O movimento continua confiado (desvio do M20).
+- [ ] **Mods iguais sem tela:** o convidado liga só para a sessão os mods do anfitrião (o desenho
+      do M21), em vez da recusa com a lista.
+- [ ] **Golpe entre jogadores** como opção da sala, desligado por padrão (doc 14, M20).
+- [ ] **Teto de mobs por jogador**, não por sala (doc 15 §5: com mais gente cada um vê menos
+      bichos).
+
+**Critério de aceite:** `npm run smoke:room` com os passos novos; o mesmo critério de 30 min do
+M20, agora com três aparelhos.
+
+---
+
+## M31 — Horizonte ⬜
+
+> O jogo bonito para quem tem aparelho para isso, sem tirar um quadro do T0. Tudo opção de Vídeo,
+> desligada no preset T0.
+
+- [ ] **Terreno distante simplificado** além do alcance de visão (uma malha de altura por região,
+      sem blocos) — a montanha a 400 blocos aparece antes de o chunk chegar.
+- [ ] **Folhas e plantas balançando** no vertex shader, e **água com ondulação** e brilho do sol
+      (o shader do terreno não recebe tempo; nada nele se mexe).
+
+**Critério de aceite:** no T0, tudo desligado e `tests/perf.test.ts` igual; no S24 (T2) ligado,
+60 FPS com RD 16.
+
+---
+
 ## Testes obrigatórios (a manter verde desde M1)
 
 | Tipo | O que cobrir |

@@ -12,6 +12,65 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-10-19 23:14 · M26: aconchego
+
+**Pedido:** *"Pode seguir com o M26"* — depois do PR #10 (M25 e a correção do enderman) mesclado.
+A branch recomeçou da `main`, e a publicação no Pages do merge #10 passou.
+
+**Resultado:**
+- **44 blocos novos** (ids 245–288), todos linha de tabela: fogueira (acesa e apagada), caldeirão,
+  lanterna, vaso de flor, moldura de item, cinco troncos descascados, terracota, terracota e
+  concreto nas dezesseis cores. Mais a pepita de ferro.
+- **Fogueira:** luz 15, coluna de fumaça (partícula nova que sobe), assa quatro comidas em 30 s
+  sem combustível — o que a fundição transforma em comida —, fere quem está em cima (jogador e
+  mob, sem acender), balde ou pá apagam, isqueiro acende. **Caldeirão:** três níveis; balde,
+  frasco e frasco d'água; apaga quem pega fogo. **Vaso:** onze plantas, que voltam ao clique e
+  caem ao quebrar. **Moldura:** guarda um item, desenhado na parede pelo passe dos itens do chão
+  com uma pose nova do sprite. **Machado** descasca o tronco no mesmo eixo.
+- **Critério:** a carne fica pronta em 600 ticks; as 16 cores de concreto custam 1 camada (e as de
+  terracota, outra). O M26 custou 21 camadas (244 de 512) e 6,1 KB (305,7 de 350).
+- **Na sala:** moldura e comida da fogueira não viajam; o clique do convidado nelas é engolido
+  (o item fica na mão). Pendência do M30.
+- Visto no Chromium: a cena de dia e de noite (luz das lanternas e da fogueira), a parede de 48
+  cores (lã, terracota, concreto), os sprites no inventário (a moldura de frente, depois de
+  corrigida — saía como lasca de lado).
+- O detalhe do M25 desceu da foto (doc 15 §3) para o fim do `15-historico.md`.
+
+Portões: 2524 testes (134 arquivos); lint, build e tamanho verdes (305,7 KB em português, 318,7 em
+inglês). `smoke` 9, `smoke:mods` 6, `smoke:room` 20 e `bench:ui` (pior ação 142 ms) verdes.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| ~ | `src/data/blocks.ts` | `cozySpecs`: os 44 blocos; formas novas; campo `contactDamage` |
+| + | `src/data/cozy.ts` | plantas do vaso, tronco → descascado, tempo da fogueira, níveis do caldeirão |
+| + | `src/data/texturescozy.ts` | as 21 texturas do M26 |
+| ~ | `src/data/textures.ts` | junta as texturas do M26 antes das de mod |
+| ~ | `src/data/items.ts`, `src/data/itemart.ts` | pepita de ferro; o machado ganha `strip_log` |
+| ~ | `src/data/recipes.ts`, `src/data/smelting.ts`, `src/data/loot.ts` | receitas, argila → terracota, fogueira apagada dá fogueira; troncos descascados em `#logs` |
+| ~ | `src/data/strings/names.en.ts` | nomes em inglês |
+| + | `src/world/mesh/cozyshape.ts` | caixas de fogueira, caldeirão, lanterna, vaso e moldura |
+| ~ | `src/world/mesh/shapes.ts`, `src/world/mesh/blockinfo.ts` | `SHAPE_*` 34–38; `CPLX_DECOR` |
+| ~ | `src/world/mesh/complex.ts` | o recheio: chama, planta, água |
+| + | `src/game/campfire.ts` | a fogueira que assa |
+| + | `src/game/cozy.ts` | o clique nos blocos de casa; `stripLog`; `isWetCauldron`; `potContentsOf` |
+| ~ | `src/game/tiles.ts`, `src/game/container.ts`, `src/game/savegame.ts` | fogueira e moldura como tile entity, `shown`, `cook` no save |
+| ~ | `src/game/session.ts`, `src/game/sessionbuild.ts` | `cozy` na cadeia do clique; dano de contato e caldeirão molhado no tick |
+| ~ | `src/game/survival.ts`, `src/entity/mobrules.ts` | dano de contato |
+| ~ | `src/game/drops.ts` | a planta cai com o vaso |
+| ~ | `src/game/itemuse.ts`, `src/game/itemhelpers.ts` | `strip_log`; `HandContext` |
+| ~ | `src/game/interaction.ts` | lanterna no chão ou no teto; moldura na parede |
+| ~ | `src/game/ambient.ts`, `src/render/ambience.ts`, `src/render/particles.ts` | fumaça da fogueira |
+| ~ | `src/render/itemrender.ts`, `src/render/scenefeed.ts` | pose do sprite; item da moldura e comida na fogueira |
+| ~ | `src/render/itemsprites.ts` | moldura de frente no inventário |
+| ~ | `src/net/guest.ts` | `remoteTiles` no convidado |
+| + | `tests/cozy.test.ts` | 24 testes do M26 |
+| ~ | `tests/tints.test.ts` | conta só lã e cama |
+| ~ | `docs/14-roadmap.md` | M26 ✅ |
+| ~ | `docs/15-status.md`, `docs/15-historico.md` | M26 na foto; o detalhe do M25 para o histórico |
+| ~ | `README.md` | M26, tamanho, testes |
+
+---
+
 ## 2026-10-19 22:25 · Deploy da `main` vermelho: o enderman no alto da coluna do End
 
 **Pedido:** *"Recebi um erro no ci de publicação no github pages. Consegue verificar, depois de

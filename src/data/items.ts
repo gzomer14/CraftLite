@@ -109,7 +109,9 @@ export type ItemUse =
   | 'throw_snowball' | 'dye_sheep' | 'eat' | 'charge' | 'place_boat' | 'place_minecart'
   | 'ignite' | 'till' | 'plant' | 'open_map' | 'fish'
   // M16: encher o frasco na água e arremessar o olho do ender.
-  | 'fill_bottle' | 'throw_eye';
+  | 'fill_bottle' | 'throw_eye'
+  // M26: o machado descasca o tronco.
+  | 'strip_log';
 
 /**
  * Materiais de ferramenta (doc 05 §2).
@@ -635,6 +637,15 @@ for (const potion of POTIONS) {
   });
 }
 
+// --- apêndice do M26: a pepita de ferro, que a lanterna pede -----------------
+register({
+  id: nextId++,
+  name: 'iron_nugget',
+  display: 'Pepita de Ferro',
+  tex: 'item/iron_nugget',
+  maxStack: 64,
+});
+
 // Itens de mod (M21): id fixo, `itemBase + posição` — ver `mods/types.ts`. Os
 // blocos de mod já viraram item no laço dos blocos, lá em cima.
 for (const mod of ACTIVE_MODS) {
@@ -655,6 +666,7 @@ for (const def of items) {
   const uses: ItemUse[] = [];
   if (def.use !== undefined) uses.push(def.use);
   if (def.tool?.kind === 'hoe') uses.push('till');
+  if (def.tool?.kind === 'axe') uses.push('strip_log');
   if (def.placesMinecart === true) uses.push('place_minecart');
   if (def.placesBoat === true) uses.push('place_boat');
   if (def.charge !== undefined) uses.push('charge');

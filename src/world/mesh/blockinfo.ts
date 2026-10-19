@@ -13,6 +13,7 @@ import {
   SHAPE_BED, SHAPE_BELL, SHAPE_CAKE, SHAPE_CHEST, SHAPE_PISTON_HEAD, SHAPE_PLATE, SHAPE_RAIL, SHAPE_REPEATER, SHAPE_SIGN, SHAPE_SLAB,
   SHAPE_STAIRS, SHAPE_TORCH, SHAPE_TRAPDOOR, SHAPE_ANVIL, SHAPE_HOPPER, SHAPE_COMPARATOR,
   SHAPE_BREWING_STAND, SHAPE_PORTAL_FRAME, SHAPE_PORTAL_FRAME_EYE, SHAPE_PORTAL_PLANE, SHAPE_EGG,
+  SHAPE_CAMPFIRE, SHAPE_CAULDRON, SHAPE_FLOWER_POT, SHAPE_ITEM_FRAME, SHAPE_LANTERN,
 } from './shapes';
 import { layerOf, type LayerIndex } from '../../render/layers';
 import { tintIndexOf } from '../../data/tints';
@@ -60,6 +61,16 @@ export const CPLX_TORCH = 4;
  * contorno leem: abrir o baú não muda onde se esbarra nem onde se mira.
  */
 export const CPLX_CHEST = 5;
+/**
+ * Caixas com um **recheio** de outra textura (M26): a chama entre as toras da
+ * fogueira, a planta do vaso e a água do caldeirão.
+ *
+ * As caixas usam a textura da face, como `CPLX_BOXES`; o recheio usa a
+ * textura por estado (a chama e a planta) ou a da água. Em `CPLX_BOXES` as
+ * duas não convivem: lá, bloco com textura por estado pinta todas as faces
+ * com ela (`faceTexOf`), que é o que o pó de redstone quer e o vaso não.
+ */
+export const CPLX_DECOR = 6;
 
 /**
  * Quantas idades cabem na tabela de textura por estado (doc 04 §2.5).
@@ -87,6 +98,11 @@ const COMPLEX_BY_SHAPE: Record<string, number> = {
   portal_frame_eye: CPLX_BOXES,
   portal_plane: CPLX_BOXES,
   egg: CPLX_BOXES,
+  campfire: CPLX_DECOR,
+  cauldron: CPLX_DECOR,
+  flower_pot: CPLX_DECOR,
+  lantern: CPLX_BOXES,
+  item_frame: CPLX_BOXES,
   slab: CPLX_BOXES,
   carpet: CPLX_BOXES,
   flat: CPLX_BOXES,
@@ -124,6 +140,11 @@ const SHAPE_ID_BY_NAME: Record<string, number> = {
   portal_frame_eye: SHAPE_PORTAL_FRAME_EYE,
   portal_plane: SHAPE_PORTAL_PLANE,
   egg: SHAPE_EGG,
+  campfire: SHAPE_CAMPFIRE,
+  cauldron: SHAPE_CAULDRON,
+  lantern: SHAPE_LANTERN,
+  flower_pot: SHAPE_FLOWER_POT,
+  item_frame: SHAPE_ITEM_FRAME,
   slab: SHAPE_SLAB,
   carpet: SHAPE_CARPET,
   flat: SHAPE_FLAT,

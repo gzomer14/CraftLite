@@ -19,6 +19,7 @@ import { fortuneMultiplier, levelIn } from './enchanting';
 import { ITEM_BY_NAME, maxStackOf, type ItemStack } from '../data/items';
 import { canHarvest } from './interaction';
 import { hash3 } from '../core/rng';
+import { potContentsOf } from './cozy';
 import { stackTool, type ToolSpec } from '../data/items';
 import type { Session } from './session';
 
@@ -146,6 +147,12 @@ export function dropBlockLoot(session: Session, x: number, y: number, z: number,
   const held = session.inventory.held;
   const drops = rollDrops(state, stackTool(held), session.world.seed, x, y, z, held?.ench ?? 0);
   for (const stack of drops) session.items.spawn(x + 0.5, y + 0.25, z + 0.5, stack);
+  // Vaso com planta (M26): a planta cai junto com o vaso.
+  const plant = potContentsOf(state);
+  const plantItem = plant === null ? undefined : ITEM_BY_NAME.get(plant);
+  if (plantItem !== undefined) {
+    session.items.spawn(x + 0.5, y + 0.25, z + 0.5, { item: plantItem.id, count: 1, damage: 0 });
+  }
 }
 
 /** Orbe de experiência do bloco quebrado (doc 04 §2.2). */

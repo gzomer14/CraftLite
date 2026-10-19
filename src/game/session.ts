@@ -53,6 +53,7 @@ import { Travel, type TravelRoute } from './travel';
 import { DragonFight } from './dragonfight';
 import { breakPortalNear } from './portal';
 import { BlockUse } from './blockuse';
+import { isWetCauldron, type CozyBlocks } from './cozy';
 import { TRADE_REACH, Villages } from './village';
 import { Trading } from './trading';
 import { SpawnerBlocks } from '../entity/spawnerblocks';
@@ -61,7 +62,7 @@ import { Lighting } from '../world/lighting';
 import type { ChunkColumn } from '../world/chunk';
 import type { World } from '../world/world';
 import {
-  buildBlockUse, buildCombat, buildDragonFight, buildItemUser, buildTrading, buildTravel,
+  buildBlockUse, buildCombat, buildCozy, buildDragonFight, buildItemUser, buildTrading, buildTravel,
   buildVillages, buildWorkbench,
 } from './sessionbuild';
 import { useOnMob } from './mobclick';
@@ -168,6 +169,8 @@ export class Session {
   readonly spawners: SpawnerBlocks;
   /** Cama, porta e bolo: o clique que é do bloco (`game/blockuse.ts`). */
   readonly blockUse: BlockUse;
+  /** Fogueira, caldeirão, vaso e moldura (M26). */
+  readonly cozy: CozyBlocks;
 
   /** Os ganchos da interface; `mobclick.ts` e `dimensionhop.ts` também avisam por eles. */
   readonly events: SessionEvents;
@@ -239,6 +242,7 @@ export class Session {
       this.events.onSound?.('block/furnace', x, y, z);
     });
     this.blockUse = buildBlockUse(this, events);
+    this.cozy = buildCozy(this, events);
     this.villages = buildVillages(this, events);
     this.trading = buildTrading(this, events);
     this.combat = buildCombat(this, events);
@@ -316,12 +320,15 @@ export class Session {
     if (this.player.mode === 'survival') {
       // Pés ou cabeça dentro da chama: o corpo inteiro conta, senão dava para
       // atravessar o incêndio agachado.
-      const feet = defOf(this.world.getBlock(bx, Math.floor(this.player.y), bz));
+      const feetState = this.world.getBlock(bx, Math.floor(this.player.y), bz);
+      const feet = defOf(feetState);
       this.survival.tick({
         submerged: headBlock.name === 'water',
         inLava: this.player.inLava,
         onFire: feet.name === 'fire' || headBlock.name === 'fire',
-        inWater: this.player.inWater,
+        // O caldeirão com água apaga como o rio (M26).
+        inWater: this.player.inWater || isWetCauldron(feetState),
+        contactDamage: feet.contactDamage,
         suffocating: headBlock.opaque && headBlock.solid,
         y: this.player.y,
       });
@@ -500,6 +507,7 @@ export class Session {
     // mecanismos de clique, e a porta é a única que também abre na mão.
     if (this.redstone.use(x, y, z)) return true;
     if (this.blockUse.toggle(x, y, z)) return true;
+    if (this.cozy.use(x, y, z)) return true;
     if (this.openContainerAt(x, y, z)) return true;
     return this.blockUse.cake(x, y, z);
   }

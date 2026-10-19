@@ -23,6 +23,7 @@ import {
 } from '../world/mesh/shapes';
 import type { World } from '../world/world';
 import type { MobStore } from '../entity/mobstore';
+import type { Container } from './container';
 
 /** Raio do cubo sorteado, em blocos. Além disso a fagulha não se vê. */
 export const SPARK_RADIUS = 8;
@@ -101,6 +102,35 @@ export function emitBurningMobs(
       );
       count++;
     }
+  }
+  return count;
+}
+
+/** Raio em que a fumaça da fogueira sobe; mais longe, nem a coluna se vê. */
+export const SMOKE_RADIUS = 48;
+
+/**
+ * Fumaça das fogueiras acesas (M26). Ao contrário da fagulha de tocha, aqui
+ * não se sorteia posição: a fogueira é tile entity, e a lista delas
+ * (`Tiles.shown`) já é curta. Um floco a cada tick e pouco por fogueira faz a
+ * coluna contínua; o pool cheio para de aceitar, como sempre.
+ */
+export function emitCampfireSmoke(
+  world: World, shown: readonly Container[], px: number, pz: number,
+  emit: (x: number, y: number, z: number) => void,
+  random: () => number = Math.random,
+): number {
+  let count = 0;
+  for (let i = 0; i < shown.length; i++) {
+    const tile = shown[i];
+    if (tile.kind !== 'campfire') continue;
+    const dx = tile.x + 0.5 - px;
+    const dz = tile.z + 0.5 - pz;
+    if (dx * dx + dz * dz > SMOKE_RADIUS * SMOKE_RADIUS) continue;
+    if (defOf(world.getBlock(tile.x, tile.y, tile.z)).emission === 0) continue;
+    if (random() > 0.7) continue;
+    emit(tile.x + 0.5, tile.y + 0.6, tile.z + 0.5);
+    count++;
   }
   return count;
 }

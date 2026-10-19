@@ -795,7 +795,7 @@ inventário). Nenhuma issue nem PR aberto no GitHub.
 
 ```
 M22 aparelho e MVP (do usuário, em paralelo com tudo)
-M23 correções ✅ ──► M24 casa em ordem ✅ ──► M25 folga ✅ ──► M26 aconchego ─┐
+M23 correções ✅ ──► M24 casa em ordem ✅ ──► M25 folga ✅ ──► M26 aconchego ✅ ─┐
                                                    ├─► M27 bichos    ├─► M29 ameaça
                                                    └─► M28 lugares ──┘
 M30 sala, segunda volta (depois do aceite do M20 no M22)
@@ -960,21 +960,30 @@ abertura em 3G e T0 sem regressão. **Cumprido, menos o T0:** 289 camadas, 50,4 
 
 ---
 
-## M26 — Aconchego ⬜
+## M26 — Aconchego ✅
 
 > Blocos que deixam a base com cara de casa. Dois deles o doc 00 §3 já pedia.
+> **Fechado em 2026-10-19** — detalhe no doc 15 §3.
 
-- [ ] **Fogueira** (doc 00 §3): luz, fumaça em partícula, cozinha quatro itens devagar sem
-      combustível, fere quem pisa, a água apaga.
-- [ ] **Caldeirão** (doc 00 §3, "poções/caldeirão"): guarda água de balde, enche frasco, apaga o
-      jogador em chamas.
-- [ ] **Lanterna** (pendurada e no chão), **vaso de flor**, **moldura de item** (mostra o item no
-      mundo pelo passe dos itens do chão).
-- [ ] **Tronco descascado** (machado no tronco) e **terracota** e **concreto** nas 16 cores pelo
-      tint, que não custa camada por cor.
+- [x] **Fogueira** (doc 00 §3): luz, fumaça em partícula, cozinha quatro itens devagar sem
+      combustível, fere quem pisa, a água apaga. **Feito:** luz 15, coluna de fumaça, quatro casas
+      que assam o que a fornalha transforma em comida (30 s), 1 de dano a cada meio segundo em
+      cima dela (jogador e mob, sem acender); balde de água ou pá apagam, isqueiro acende.
+- [x] **Caldeirão** (doc 00 §3, "poções/caldeirão"): guarda água de balde, enche frasco, apaga o
+      jogador em chamas. **Feito**, com três níveis; o frasco d'água devolve um. *Desvio:* apagar
+      o jogador não gasta água, e a chuva não enche.
+- [x] **Lanterna** (pendurada e no chão), **vaso de flor**, **moldura de item** (mostra o item no
+      mundo pelo passe dos itens do chão). **Feito;** o vaso aceita onze plantas. *Desvio:* o
+      clique na moldura com item devolve o item (não gira), e o soco quebra a moldura.
+- [x] **Tronco descascado** (machado no tronco) e **terracota** e **concreto** nas 16 cores pelo
+      tint, que não custa camada por cor. **Feito.** *Desvio:* o concreto sai direto da bancada,
+      sem o pó que endurece na água.
 
 **Critério de aceite:** cada bloco é linha de tabela; a fogueira assa carne em ~30 s; 16 cores de
-concreto custam ≤ 2 camadas.
+concreto custam ≤ 2 camadas. **Cumprido:** 44 blocos novos, todos linhas da tabela (ids 245–288);
+a carne fica pronta em 600 ticks; as 16 cores de concreto custam **1** camada, e as de terracota,
+outra (`tests/cozy.test.ts`). O M26 inteiro custou 21 camadas de atlas (244 de 512) e 6,1 KB de
+bundle (305,7 de 350).
 
 ---
 

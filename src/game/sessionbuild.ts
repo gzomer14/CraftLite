@@ -8,6 +8,7 @@
 
 import { AIR } from '../data/blocks';
 import { BlockUse } from './blockuse';
+import { CozyBlocks } from './cozy';
 import { DragonFight } from './dragonfight';
 import { ItemUser } from './itemuser';
 import { PlayerCombat } from './playercombat';
@@ -75,6 +76,17 @@ export function buildBlockUse(s: Session, events: SessionEvents): BlockUse {
     sound: (name, x, y, z) => { events.onSound?.(name, x, y, z); },
     message: (text) => { events.onMessage?.(text); },
     setSpawn: (x, y, z) => { s.spawnX = x; s.spawnY = y; s.spawnZ = z; },
+  });
+}
+
+/** O clique nos blocos de casa (M26). */
+export function buildCozy(s: Session, events: SessionEvents): CozyBlocks {
+  return new CozyBlocks({
+    world: s.world, player: s.player, inventory: s.inventory, tiles: s.tiles,
+    changed: (x, y, z, previous, state) => { s.lighting.onBlockChanged(x, y, z, previous, state); },
+    sound: (name, x, y, z) => { events.onSound?.(name, x, y, z); },
+    drop: (stack, x, y, z) => { s.items.spawn(x, y, z, stack); },
+    wearHeld: () => { s.damageTool(); },
   });
 }
 

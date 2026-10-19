@@ -104,6 +104,8 @@ export const BLOCK_LOOT: Record<string, LootEntry> = {
   spruce_door_top: { drops: [{ item: 'spruce_door', count: 1 }] },
   // Fornalha quebrada enquanto queima continua sendo uma fornalha.
   furnace_lit: { drops: [{ item: 'furnace', count: 1 }] },
+  // M26: a fogueira apagada é a mesma fogueira.
+  campfire_off: { drops: [{ item: 'campfire', count: 1 }] },
   bed_head: { drops: [{ item: 'bed', count: 1 }] },
 
   // Nether (M7).

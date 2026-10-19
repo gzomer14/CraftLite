@@ -7,7 +7,7 @@
 
 import { defOf } from '../data/blocks';
 import { blockSound } from '../audio/synth';
-import { emitBurningMobs, emitTorchSparks } from '../game/ambient';
+import { emitBurningMobs, emitCampfireSmoke, emitTorchSparks } from '../game/ambient';
 import type { AudioEngine } from '../audio/engine';
 import type { Renderer } from './renderer';
 import type { Session } from '../game/session';
@@ -61,6 +61,7 @@ export class Ambience {
      */
     emitTorchSparks(session.world, player.x, player.y, player.z, 2, this.spark);
     emitBurningMobs(session.mobs.store, player.x, player.z, this.spark);
+    emitCampfireSmoke(session.world, session.tiles.shown, player.x, player.z, this.smoke);
     // Chuva: gotas em volta do jogador, no mesmo pool (doc 03 §8).
     const weather = session.weather;
     if (weather.isRaining) {
@@ -90,5 +91,9 @@ export class Ambience {
 
   private readonly spark = (x: number, y: number, z: number): void => {
     this.renderer.particles.emitFlame(x, y, z);
+  };
+
+  private readonly smoke = (x: number, y: number, z: number): void => {
+    this.renderer.particles.emitSmoke(x, y, z);
   };
 }

@@ -22,6 +22,7 @@ import { CORNER_NONE, stairs } from './stairshape';
 import {
   MOUNT_FLOOR, anvil, button, comparator, hopper, lever, mounted, piston, pistonHead, repeater,
 } from './machineshape';
+import { campfire, cauldron, flowerPot, itemFrame, lantern } from './cozyshape';
 
 /*
  * M24: trilho, escada e a caixa em si saíram para módulos próprios; daqui eles
@@ -81,6 +82,12 @@ export const SHAPE_PORTAL_FRAME_EYE = 31;
 export const SHAPE_PORTAL_PLANE = 32;
 /** Ovo do dragão (M16): quatro fatias que afinam para cima. */
 export const SHAPE_EGG = 33;
+/** Aconchego (M26): ver `cozyshape.ts`. */
+export const SHAPE_CAMPFIRE = 34;
+export const SHAPE_CAULDRON = 35;
+export const SHAPE_LANTERN = 36;
+export const SHAPE_FLOWER_POT = 37;
+export const SHAPE_ITEM_FRAME = 38;
 
 /** Espessura de tudo que é "chapa": alçapão, porta, placa, quadro, escada de mão. */
 const THIN = 3 / 16;
@@ -110,6 +117,11 @@ export const SHAPE_BY_NAME: Readonly<Record<string, number>> = {
   portal_frame_eye: SHAPE_PORTAL_FRAME_EYE,
   portal_plane: SHAPE_PORTAL_PLANE,
   egg: SHAPE_EGG,
+  campfire: SHAPE_CAMPFIRE,
+  cauldron: SHAPE_CAULDRON,
+  lantern: SHAPE_LANTERN,
+  flower_pot: SHAPE_FLOWER_POT,
+  item_frame: SHAPE_ITEM_FRAME,
   slab: SHAPE_SLAB,
   carpet: SHAPE_CARPET,
   flat: SHAPE_FLAT,
@@ -251,6 +263,16 @@ export function boxesFor(
       one(out, 2, 2 / 16, 7 / 16, 2 / 16, 14 / 16, 11 / 16, 14 / 16);
       one(out, 3, 3 / 16, 11 / 16, 3 / 16, 13 / 16, 14 / 16, 13 / 16);
       return one(out, 4, 5 / 16, 14 / 16, 5 / 16, 11 / 16, 1, 11 / 16);
+    case SHAPE_CAMPFIRE:
+      return campfire(out);
+    case SHAPE_CAULDRON:
+      return cauldron(out);
+    case SHAPE_LANTERN:
+      return lantern(state, out);
+    case SHAPE_FLOWER_POT:
+      return flowerPot(out);
+    case SHAPE_ITEM_FRAME:
+      return itemFrame(state, out);
     case SHAPE_RAIL:
       // O desenho é um quad só (ver `mesh/complex.ts`); a caixa existe para
       // quem pergunta pela forma — hoje ninguém, porque trilho não colide.

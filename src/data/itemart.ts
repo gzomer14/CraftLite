@@ -1036,6 +1036,8 @@ const SIMPLE: Record<string, [string, Rgb]> = {
   ender_eye: ['eye', [58, 172, 132]],
   magma_cream: ['round', [222, 112, 42]],
   gold_nugget: ['chunk', GOLD],
+  // M26: a pepita que a lanterna pede.
+  iron_nugget: ['chunk', IRON],
   glistering_melon_slice: ['round', [232, 170, 84]],
   golden_carrot: ['carrot', GOLD],
   fermented_spider_eye: ['eye', [150, 76, 62]],

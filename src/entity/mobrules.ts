@@ -5,7 +5,7 @@
  * Funções sem estado: quem guarda o pool e dispara os eventos é `Mobs`.
  */
 
-import { BLOCK_BY_NAME, LAVA, WATER, blockIdOf } from '../data/blocks';
+import { BLOCKS, BLOCK_BY_NAME, LAVA, WATER, blockIdOf } from '../data/blocks';
 import { ITEM_BY_NAME } from '../data/items';
 import { mobDef } from '../data/mobs';
 import { lootingBonus } from '../game/enchanting';
@@ -131,6 +131,9 @@ export function environmentHarm(
     s.fireTicks[i] = LAVA_FIRE_TICKS;
     if (tickCount % 10 === 0) return LAVA_DAMAGE;
   }
+  // Bloco que fere quem pisa (M26: a fogueira), sem acender o mob.
+  const contact = BLOCKS[feet]?.contactDamage ?? 0;
+  if (contact > 0 && def.traits.fireImmune !== true && tickCount % 10 === 0) return contact;
   if (def.traits.fireImmune !== true && (feet === FIRE || headIn(s, i, world) === FIRE)) {
     if (s.fireTicks[i] < FIRE_BLOCK_TICKS) s.fireTicks[i] = FIRE_BLOCK_TICKS;
     if (tickCount % 10 === 0) return FIRE_BLOCK_DAMAGE;

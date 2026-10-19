@@ -286,7 +286,27 @@ for (const [dye, color] of Object.entries(DYE_COLORS_EN)) {
   const bed = dye === 'red' ? 'bed' : `bed_${dye}`;
   THING_NAMES_EN[bed] = `${color} Bed`;
   THING_NAMES_EN[`${bed}_head`] = `${color} Bed`;
+  // M26: terracota e concreto nas dezesseis cores.
+  THING_NAMES_EN[`${dye}_terracotta`] = `${color} Terracotta`;
+  THING_NAMES_EN[`${dye}_concrete`] = `${color} Concrete`;
 }
+
+// M26: aconchego.
+Object.assign(THING_NAMES_EN, {
+  campfire: 'Campfire',
+  campfire_off: 'Campfire',
+  cauldron: 'Cauldron',
+  lantern: 'Lantern',
+  flower_pot: 'Flower Pot',
+  item_frame: 'Item Frame',
+  terracotta: 'Terracotta',
+  iron_nugget: 'Iron Nugget',
+  stripped_oak_log: 'Stripped Oak Log',
+  stripped_birch_log: 'Stripped Birch Log',
+  stripped_spruce_log: 'Stripped Spruce Log',
+  stripped_acacia_log: 'Stripped Acacia Log',
+  stripped_jungle_log: 'Stripped Jungle Log',
+});
 
 /** Ferramentas, armas e armaduras: material × peça, como `data/items.ts` monta. */
 const MATERIALS_EN: Record<string, string> = {

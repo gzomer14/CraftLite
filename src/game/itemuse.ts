@@ -40,6 +40,7 @@ import { plantSeed, tillSoil } from './farming';
 import { applyFoodEffects } from './food';
 import { consumeWithRemainder, fluidRay, itemIdOf, swapHeld } from './itemhelpers';
 import { fillBottle, throwEye } from './journeyuses';
+import { stripLog } from './cozy';
 import { FISHING_XP } from '../data/fishing';
 import type { FishingLine } from './fishing';
 import type { Fire } from '../world/fire';
@@ -416,6 +417,7 @@ export const ITEM_USES: Record<ItemUse, ItemUseHandler> = {
   fish,
   fill_bottle: fillBottle,
   throw_eye: throwEye,
+  strip_log: stripLog,
 };
 
 /** Os usos do item na mão, em ordem de tentativa (vazio se nenhum). */

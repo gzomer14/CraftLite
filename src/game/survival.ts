@@ -88,6 +88,8 @@ export interface SurvivalContext {
   inWater?: boolean;
   /** Cabeça dentro de bloco sólido e opaco. */
   suffocating: boolean;
+  /** Dano do bloco dos pés a cada meio segundo (M26: a fogueira). Ver `BlockDef.contactDamage`. */
+  contactDamage?: number;
   y: number;
 }
 
@@ -126,6 +128,8 @@ export class Survival implements EffectTarget {
   private suffocateTimer = 0;
   /** Ticks dentro do fogo desde o último dano. */
   private fireTimer = 0;
+  /** Ticks em pé num bloco que fere (M26) desde o último dano. */
+  private contactTimer = 0;
   /**
    * Ticks que o jogador continua pegando fogo depois de sair da chama (M16: a
    * bola de fogo do blaze). A água apaga; Resistência ao Fogo ignora.
@@ -274,6 +278,20 @@ export class Survival implements EffectTarget {
       }
     } else {
       this.fireTimer = 0;
+    }
+    /*
+     * Bloco que fere quem pisa (M26: a fogueira). Queima sem acender: sair de
+     * cima acaba com o dano, e Resistência ao Fogo o ignora como ignora a chama.
+     */
+    const contact = context.contactDamage ?? 0;
+    if (contact > 0 && !fireproof) {
+      this.contactTimer++;
+      if (this.contactTimer >= 10) {
+        this.contactTimer = 0;
+        this.damage(contact, 'fire');
+      }
+    } else {
+      this.contactTimer = 0;
     }
     // Void: abaixo de Y=−5, ignora invulnerabilidade e armadura.
     if (context.y < -5) this.damage(4, 'void', true);

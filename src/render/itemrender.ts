@@ -29,11 +29,24 @@ uniform vec2 uSheet;                        // colunas, linhas
 out vec2 vUv;
 void main() {
   vec2 local = aCorner + 0.5;
-  float tile = aCenterTile.w;
+  // w = tile + 65536 × pose (M26): 0 de frente para a câmera; 1..4 colado na
+  // parede de +X, −X, +Z, −Z; 5 deitado. Inteiros até 2^24 cabem num float.
+  float pose = floor(aCenterTile.w / 65536.0);
+  float tile = aCenterTile.w - pose * 65536.0;
   vec2 cell = vec2(mod(tile, uSheet.x), floor(tile / uSheet.x));
   // V invertido: a folha nasce com y para baixo, a tela com y para cima.
   vUv = (cell + vec2(local.x, 1.0 - local.y)) / uSheet;
-  vec3 world = aCenterTile.xyz + (uRight * aCorner.x + uUp * aCorner.y) * uSize;
+  vec3 right = uRight;
+  vec3 up = uUp;
+  if (pose > 0.5) {
+    up = vec3(0.0, 1.0, 0.0);
+    if (pose < 1.5) right = vec3(0.0, 0.0, 1.0);
+    else if (pose < 2.5) right = vec3(0.0, 0.0, -1.0);
+    else if (pose < 3.5) right = vec3(-1.0, 0.0, 0.0);
+    else if (pose < 4.5) right = vec3(1.0, 0.0, 0.0);
+    else { right = vec3(1.0, 0.0, 0.0); up = vec3(0.0, 0.0, -1.0); }
+  }
+  vec3 world = aCenterTile.xyz + (right * aCorner.x + up * aCorner.y) * uSize;
   gl_Position = uViewProj * vec4(world, 1.0);
 }
 `;
@@ -62,10 +75,21 @@ uniform vec2 uSheet;
 varying vec2 vUv;
 void main() {
   vec2 local = aCorner + 0.5;
-  float tile = aCenterTile.w;
+  float pose = floor(aCenterTile.w / 65536.0);
+  float tile = aCenterTile.w - pose * 65536.0;
   vec2 cell = vec2(mod(tile, uSheet.x), floor(tile / uSheet.x));
   vUv = (cell + vec2(local.x, 1.0 - local.y)) / uSheet;
-  vec3 world = aCenterTile.xyz + (uRight * aCorner.x + uUp * aCorner.y) * uSize;
+  vec3 right = uRight;
+  vec3 up = uUp;
+  if (pose > 0.5) {
+    up = vec3(0.0, 1.0, 0.0);
+    if (pose < 1.5) right = vec3(0.0, 0.0, 1.0);
+    else if (pose < 2.5) right = vec3(0.0, 0.0, -1.0);
+    else if (pose < 3.5) right = vec3(-1.0, 0.0, 0.0);
+    else if (pose < 4.5) right = vec3(1.0, 0.0, 0.0);
+    else { right = vec3(1.0, 0.0, 0.0); up = vec3(0.0, 0.0, -1.0); }
+  }
+  vec3 world = aCenterTile.xyz + (right * aCorner.x + up * aCorner.y) * uSize;
   gl_Position = uViewProj * vec4(world, 1.0);
 }
 `;
@@ -90,6 +114,10 @@ const CORNERS = new Float32Array([
 
 /** Tamanho do sprite no mundo, em blocos. */
 const ITEM_SIZE = 0.35;
+/** Passo da pose no `w` da instância (ver o shader). */
+const POSE_STEP = 65536;
+/** Pose do item deitado (M26: a comida na fogueira). */
+export const POSE_FLAT = 5;
 /** Amplitude e velocidade do flutuar. */
 const BOB_HEIGHT = 0.07;
 const BOB_SPEED = 0.06;
@@ -163,6 +191,22 @@ export class ItemRenderer {
     this.data[o + 1] = y + ITEM_SIZE * 0.5 + Math.sin(age * BOB_SPEED) * BOB_HEIGHT;
     this.data[o + 2] = z;
     this.data[o + 3] = tile;
+  }
+
+  /**
+   * Um item parado, sem flutuar nem girar (M26): o da moldura e o que assa na
+   * fogueira. `pose` 1..4 cola o sprite na parede (`FACING_STEP` + 1) e 5 o
+   * deita; `y` é o centro do sprite.
+   */
+  addStill(x: number, y: number, z: number, item: number, pose: number): void {
+    if (this.count >= this.capacity) return;
+    const tile = this.tiles.get(item);
+    if (tile === undefined) return;
+    const o = this.count++ * 4;
+    this.data[o] = x;
+    this.data[o + 1] = y;
+    this.data[o + 2] = z;
+    this.data[o + 3] = tile + pose * POSE_STEP;
   }
 
   get pending(): number {

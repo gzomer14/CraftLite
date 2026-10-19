@@ -10,7 +10,7 @@
 
 import { copyView, nearestView } from './playerviews';
 import { MOBS, mobDef, type GoalName, type MobDef, type ShotKind } from '../data/mobs';
-import { raycast } from '../world/raycast';
+import { TARGET_INTERVAL, updateTarget } from './mobtarget';
 import { GOALS, type AiContext, type Goal } from './ai/goals';
 import { VILLAGE_GOALS } from './ai/villagegoals';
 import { DRAGON_GOALS } from './ai/dragongoals';
@@ -23,14 +23,10 @@ export { BREED_COOLDOWN, GROW_TICKS, LOVE_TICKS } from './mobcare';
 export { rayBoxDistance } from './mobpick';
 import { Pathfinder, REQUESTS_PER_TICK } from './ai/pathfinder';
 import {
-  FLAG_ANGRY, FLAG_DYING, FLAG_PERSISTENT, FLAG_TAMED, MobStore, PATH_MAX, slimeHealth, slimeScale,
+  FLAG_ANGRY, FLAG_DYING, FLAG_PERSISTENT, MobStore, PATH_MAX, slimeHealth, slimeScale,
 } from './mobstore';
 import type { World } from '../world/world';
 
-/** Ticks entre buscas de alvo (doc 07 §2). */
-const TARGET_INTERVAL = 10;
-/** Ticks sem linha de visão até perder o alvo: 5 s. */
-const BLIND_LIMIT = 100;
 /**
  * Força da explosão do creeper (doc 07 §6). No Difícil o doc 06 §10 pede raio
  * maior: `explode()` deriva o raio de `power * 1.3`, então 3 → 3,9 blocos e
@@ -38,8 +34,6 @@ const BLIND_LIMIT = 100;
  */
 const CREEPER_POWER = 3;
 const CREEPER_POWER_HARD = 4;
-/** Aranha só fica hostil no escuro (doc 07 §2). */
-const SPIDER_LIGHT_LIMIT = 11;
 /** Ticks de piscada vermelha ao levar dano. */
 const HURT_TICKS = 10;
 /** Força do empurrão que o mob dá no jogador. */
@@ -370,82 +364,12 @@ export class Mobs {
 
   // --- alvo -----------------------------------------------------------------
 
-  /**
-   * Aquisição e perda de alvo (doc 07 §2): raio 16, ou 32 se provocado, com
-   * linha de visão. Perde depois de 5 s sem ver, ou passando de 2× o raio.
-   */
+  /** Aquisição e perda de alvo (`mobtarget.ts`). */
   private updateTarget(i: number): void {
-    const s = this.store;
-    const def = mobDef(s.type[i]);
-    if (!this.player.alive || !this.isHostileTo(i, def)) {
-      s.hasTarget[i] = 0;
-      return;
-    }
-
-    const range = s.hasFlag(i, FLAG_ANGRY) ? def.followRange * 2 : def.followRange;
-    const dx = this.player.x - s.x[i];
-    const dy = this.player.y - s.y[i];
-    const dz = this.player.z - s.z[i];
-    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
-    if (distance > range * 2) {
-      s.hasTarget[i] = 0;
-      s.blindTicks[i] = 0;
-      return;
-    }
-
-    const visible = distance <= range && this.hasLineOfSight(i);
-    if (visible) {
-      s.hasTarget[i] = 1;
-      s.blindTicks[i] = 0;
-      return;
-    }
-
-    if (s.hasTarget[i] === 1) {
-      s.blindTicks[i] += TARGET_INTERVAL;
-      if (s.blindTicks[i] > BLIND_LIMIT) {
-        s.hasTarget[i] = 0;
-        s.blindTicks[i] = 0;
-      }
-    }
-  }
-
-  private isHostileTo(i: number, def: MobDef): boolean {
-    if (this.difficulty === 0) return false;
-    const s = this.store;
-    // Domado nunca ataca o dono, nem quando apanha dele.
-    if (s.hasFlag(i, FLAG_TAMED)) return false;
-    if (s.hasFlag(i, FLAG_ANGRY)) return true;
-    if (def.category === 'hostile') {
-      // Aranha é neutra na luz (doc 07 §2).
-      if (def.traits.climbsWalls === true) {
-        return Math.max(this.ctx.blockLight, this.ctx.skyLight) <= SPIDER_LIGHT_LIMIT;
-      }
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Linha de visão do mob até os olhos do jogador.
-   *
-   * O doc sugere 4 amostras ao longo do segmento; usamos o raycast DDA que já
-   * existe, que é exato e custa proporcional à distância em blocos — e roda uma
-   * vez a cada 10 ticks por mob, não por frame.
-   */
-  private hasLineOfSight(i: number): boolean {
-    const s = this.store;
-    const ox = s.x[i];
-    const oy = s.eyeY(i);
-    const oz = s.z[i];
-    let dx = this.player.x - ox;
-    let dy = this.player.eyeY - oy;
-    let dz = this.player.z - oz;
-    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    if (distance < 0.001) return true;
-    dx /= distance; dy /= distance; dz /= distance;
-    const hit = raycast(this.world, ox, oy, oz, dx, dy, dz, distance);
-    return !hit.hit;
+    updateTarget(
+      this.store, i, this.world, this.player, this.difficulty,
+      Math.max(this.ctx.blockLight, this.ctx.skyLight),
+    );
   }
 
   // --- goals ----------------------------------------------------------------

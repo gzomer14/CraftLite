@@ -7,9 +7,9 @@
 
 import { Guide } from './guide';
 import { Journal } from './journal';
-import { freeStandY } from './spawnplacement';
+import { respawnPlayer } from './spawnplacement';
 import { AIR, BLOCK_BY_NAME, blockIdOf, defOf } from '../data/blocks';
-import { ITEM_BY_NAME, itemDef, stackTool, type ItemStack } from '../data/items';
+import { ITEM_BY_NAME, itemDef, type ItemStack } from '../data/items';
 import type { ContainerView } from './container';
 import { placesOnContainer, Tiles } from './tiles';
 import { Workbench, type OpenScreen } from './workbench';
@@ -26,7 +26,7 @@ import {
 } from './sessionwiring';
 import { DayNight } from './daynight';
 import { Weather } from './weather';
-import { rollDrops, rollXp } from './drops';
+import { dropBlockLoot, dropBlockXp } from './drops';
 import { skipDurability } from './enchanting';
 import { Experience } from './xp';
 import { Achievements } from './achievements';
@@ -56,9 +56,9 @@ import { BlockUse } from './blockuse';
 import { TRADE_REACH, Villages } from './village';
 import { Trading } from './trading';
 import { SpawnerBlocks } from '../entity/spawnerblocks';
-import { DIM_OVERWORLD, dimensionOf } from '../data/dimensions';
+import { dimensionOf } from '../data/dimensions';
 import { Lighting } from '../world/lighting';
-import { WORLD_HEIGHT, type ChunkColumn } from '../world/chunk';
+import type { ChunkColumn } from '../world/chunk';
 import type { World } from '../world/world';
 import {
   buildBlockUse, buildCombat, buildDragonFight, buildItemUser, buildTrading, buildTravel,
@@ -194,7 +194,7 @@ export class Session {
     this.player = player;
     this.events = events;
     const systems = new WorldSystems(world, {
-      spawnDrops: (x, y, z, state) => { this.spawnDrops(x, y, z, state); },
+      spawnDrops: (x, y, z, state) => { dropBlockLoot(this, x, y, z, state); },
       drop: (stack, x, y, z) => { this.items.spawn(x, y, z, stack); },
       sound: (name, x, y, z) => { this.events.onSound?.(name, x, y, z); },
     });
@@ -272,8 +272,8 @@ export class Session {
   private wireInteraction(): void {
     this.interaction.onBlockBroken = (x, y, z, state) => {
       this.survival.addExhaustion(EXHAUSTION.breakBlock);
-      this.spawnDrops(x, y, z, state);
-      this.spawnBlockXp(x, y, z, state);
+      dropBlockLoot(this, x, y, z, state);
+      dropBlockXp(this, x, y, z, state);
       this.removeContainerAt(x, y, z);
       this.signs.remove(x, y, z);
       this.fluids.scheduleAround(x, y, z);
@@ -577,27 +577,6 @@ export class Session {
     this.inventory.damageHeld(1, def.durability);
   }
 
-  private spawnDrops(x: number, y: number, z: number, state: number): void {
-    if (this.player.mode === 'creative') return;
-    const held = this.inventory.held;
-    const drops = rollDrops(
-      state, stackTool(held), this.world.seed, x, y, z, held?.ench ?? 0,
-    );
-    for (const stack of drops) {
-      this.items.spawn(x + 0.5, y + 0.25, z + 0.5, stack);
-    }
-  }
-
-  /** Orbe de experiência do bloco quebrado (doc 04 §2.2). */
-  private spawnBlockXp(x: number, y: number, z: number, state: number): void {
-    if (this.player.mode === 'creative') return;
-    const held = this.inventory.held;
-    const amount = rollXp(
-      state, stackTool(held), this.world.seed, x, y, z, held?.ench ?? 0,
-    );
-    if (amount > 0) this.orbs.spawn(x + 0.5, y + 0.5, z + 0.5, amount);
-  }
-
   /**
    * Registra que o jogador **passou a ter** um item, para as conquistas.
    * Vale para coleta do chão, craft e retirada da fornalha — os três caminhos
@@ -647,32 +626,9 @@ export class Session {
 
   // --- respawn --------------------------------------------------------------
 
-  /**
-   * Renasce no ponto da cama, se houver, senão no spawn do mundo.
-   * `spawnX`/`spawnZ` são o spawn do mundo, não o do jogador.
-   *
-   * Devolve true se a posição é exata (a cama). Sem cama, a altura é só um
-   * palpite enquanto a coluna não chegou: quem chama segura a física e deixa
-   * `trySpawn` assentar o jogador no topo da coluna quando ela carregar.
-   */
+  /** Renasce na cama ou no spawn do mundo (`spawnplacement.ts`). */
   respawn(spawnX: number, spawnZ: number): boolean {
-    this.survival.respawn();
-    /*
-     * Morrer fora da superfície devolve o jogador **à superfície**, não ao
-     * ponto de renascimento com o Nether ainda carregado: a cama fica do outro
-     * lado, e renascer com as coordenadas de lá dentro daqui é cair num mar de
-     * lava. A troca de dimensão é a mesma do portal, sem portal.
-     */
-    this.enterDimension(DIM_OVERWORLD);
-    const useBed = this.spawnY >= 0;
-    const x = useBed ? this.spawnX : spawnX;
-    const z = useBed ? this.spawnZ : spawnZ;
-    const chunk = this.world.getChunk(x >> 4, z >> 4);
-    const height = chunk?.heightMap[((z & 15) << 4) | (x & 15)] ?? 70;
-    const y = useBed ? this.spawnY : freeStandY(this.world, x, Math.min(height + 1, WORLD_HEIGHT - 2), z);
-    this.player.setPosition(x + 0.5, Math.min(y, WORLD_HEIGHT - 2), z + 0.5);
-    this.player.fallDistance = 0;
-    return useBed;
+    return respawnPlayer(this, spawnX, spawnZ);
   }
 
   /**

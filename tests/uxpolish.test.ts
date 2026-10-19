@@ -210,7 +210,8 @@ describe('5. o HUD não passa por baixo dos botões de toque', () => {
   });
 
   it('a barra de vida e fome desconta essa largura dos dois lados', () => {
-    const css = readFileSync('src/ui/hud.ts', 'utf8').replace(/\s+/g, '');
+    // O CSS do HUD mora em `hudstyle.ts` desde o M24.
+    const css = readFileSync('src/ui/hudstyle.ts', 'utf8').replace(/\s+/g, '');
     expect(css).toContain('max-width:calc(100vw-16px-2*var(--touch-pad,0px))');
   });
 });
@@ -222,7 +223,7 @@ describe('5. o HUD não passa por baixo dos botões de toque', () => {
  */
 describe('painel não vaza, e a escala responde', () => {
   const screenSrc = (readFileSync('src/ui/containers/screen.ts', 'utf8') + readFileSync('src/ui/containers/screenstyle.ts', 'utf8'));
-  const hudSrc = readFileSync('src/ui/hud.ts', 'utf8');
+  const hudSrc = readFileSync('src/ui/hud.ts', 'utf8') + readFileSync('src/ui/hudstyle.ts', 'utf8');
   const optionsSrc = readFileSync('src/ui/screens/options.ts', 'utf8');
 
   it('as colunas do painel são contêineres, não multi-coluna do CSS', () => {

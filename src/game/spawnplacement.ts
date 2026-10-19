@@ -7,9 +7,11 @@
  */
 
 import { defOf } from '../data/blocks';
+import { DIM_OVERWORLD } from '../data/dimensions';
 import { SEA_LEVEL, WORLD_HEIGHT } from '../world/chunk';
 import type { World } from '../world/world';
 import type { Player } from '../entity/player';
+import type { Session } from './session';
 
 /** Coluna do mundo em que o jogador está. */
 function columnOf(player: Player): { cx: number; cz: number } {
@@ -57,4 +59,34 @@ export function freeStandY(world: World, x: number, y: number, z: number): numbe
   while (feet < WORLD_HEIGHT - 2
     && (defOf(world.getBlock(x, feet, z)).solid || defOf(world.getBlock(x, feet + 1, z)).solid)) feet++;
   return feet;
+}
+
+/**
+ * Renasce no ponto da cama, se houver, senão no spawn do mundo.
+ * `spawnX`/`spawnZ` são o spawn do mundo, não o do jogador. Saiu da `Session`
+ * no M24 (ela passava de 700 linhas).
+ *
+ * Devolve true se a posição é exata (a cama). Sem cama, a altura é só um
+ * palpite enquanto a coluna não chegou: quem chama segura a física e deixa
+ * `trySpawn` assentar o jogador no topo da coluna quando ela carregar.
+ */
+export function respawnPlayer(session: Session, spawnX: number, spawnZ: number): boolean {
+  const { player, world } = session;
+  session.survival.respawn();
+  /*
+   * Morrer fora da superfície devolve o jogador **à superfície**, não ao
+   * ponto de renascimento com o Nether ainda carregado: a cama fica do outro
+   * lado, e renascer com as coordenadas de lá dentro daqui é cair num mar de
+   * lava. A troca de dimensão é a mesma do portal, sem portal.
+   */
+  session.enterDimension(DIM_OVERWORLD);
+  const useBed = session.spawnY >= 0;
+  const x = useBed ? session.spawnX : spawnX;
+  const z = useBed ? session.spawnZ : spawnZ;
+  const chunk = world.getChunk(x >> 4, z >> 4);
+  const height = chunk?.heightMap[((z & 15) << 4) | (x & 15)] ?? 70;
+  const y = useBed ? session.spawnY : freeStandY(world, x, Math.min(height + 1, WORLD_HEIGHT - 2), z);
+  player.setPosition(x + 0.5, Math.min(y, WORLD_HEIGHT - 2), z + 0.5);
+  player.fallDistance = 0;
+  return useBed;
 }

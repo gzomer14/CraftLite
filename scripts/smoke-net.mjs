@@ -14,8 +14,8 @@
  * multicast não resolve esse nome; `SMOKE_NET_MDNS=1` mantém o mDNS ligado
  * para quem roda numa máquina de verdade.
  *
- * Uso: `npm run build && npm run smoke:net`. Como root (container), aponte
- * `CHROME` para um invólucro com `--no-sandbox`.
+ * Uso: `npm run build && npm run smoke:net`. Como root (container), o
+ * `--no-sandbox` entra sozinho (`chrome.mjs`).
  */
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -23,18 +23,11 @@ import { existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { extname, join, normalize } from 'node:path';
 import { conectar } from './cdp.mjs';
+import { chromeBin, chromeFlags } from './chrome.mjs';
 
 const DIST = join(process.cwd(), 'dist');
 const TIPOS = { '.html': 'text/html', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json' };
 
-function chromeBin() {
-  const env = process.env.CHROME;
-  if (env !== undefined && env !== '') return env;
-  for (const caminho of ['/usr/bin/google-chrome-stable', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser']) {
-    if (existsSync(caminho)) return caminho;
-  }
-  throw new Error('Chrome não encontrado — aponte com a variável CHROME');
-}
 
 function servir() {
   const server = createServer((req, res) => {
@@ -91,7 +84,7 @@ if (!existsSync(join(DIST, 'rede.html'))) {
 const server = await servir();
 const url = `http://127.0.0.1:${server.address().port}/rede.html`;
 const mdns = process.env.SMOKE_NET_MDNS === '1';
-const chromes = [9341, 9342].map((porta) => spawn(chromeBin(), [
+const chromes = [9341, 9342].map((porta) => spawn(chromeBin(), [...chromeFlags(),
   '--headless=new', `--remote-debugging-port=${porta}`,
   `--user-data-dir=${mkdtempSync(join(tmpdir(), 'craftlite-net-'))}`,
   '--no-first-run', '--no-default-browser-check', '--lang=pt-BR',

@@ -1,5 +1,9 @@
 # 14 — Roadmap, Marcos e Critérios de Aceite
 
+> **Referências "doc 15 §N" escritas antes de 2026-10-19** apontam para o doc 15 daquela época, que
+> está inteiro em [15-historico.md](15-historico.md), com as mesmas seções. O doc 15 de hoje é a
+> foto enxuta do M24.
+
 Ordem de execução pensada para que **exista algo jogável cedo** e para que o risco técnico maior
 (performance em celular fraco) seja atacado no começo, não no fim.
 
@@ -791,7 +795,7 @@ inventário). Nenhuma issue nem PR aberto no GitHub.
 
 ```
 M22 aparelho e MVP (do usuário, em paralelo com tudo)
-M23 correções ✅ ──► M24 casa em ordem ──► M25 folga ──► M26 aconchego ─┐
+M23 correções ✅ ──► M24 casa em ordem ✅ ──► M25 folga ──► M26 aconchego ─┐
                                                    ├─► M27 bichos    ├─► M29 ameaça
                                                    └─► M28 lugares ──┘
 M30 sala, segunda volta (depois do aceite do M20 no M22)
@@ -892,25 +896,35 @@ grava e fecha; o bloco quebrado continua quebrado depois de recarregar).
 
 ---
 
-## M24 — Casa em ordem, terceira volta ⬜
+## M24 — Casa em ordem, terceira volta ✅
 
-- [ ] **Módulos acima de 700 linhas** (fora as tabelas de dados): `ui/hud.ts` 738,
+> **Fechado em 2026-10-19**, menos a prova do CI vermelho (abaixo) — detalhe no doc 15 §3.
+
+- [x] **Módulos acima de 700 linhas** (fora as tabelas de dados): `ui/hud.ts` 738,
       `entity/mobs.ts` 716, `game/session.ts` 715, `world/pipeline.ts` 714,
       `render/itemsprites.ts` 713, `world/mesh/shapes.ts` 919 (899 antes do M23). Corte por papel, como no M18.
-- [ ] **O doc 15 de volta a ser foto:** 3 300 linhas e 318 KB, com parágrafos de setembro que não
+      **Feito**, sem mudar importador (o que saiu é re-exportado). O maior módulo de código é o
+      `main.ts`, com 698, e **o teto virou teste** (`tests/modulesize.test.ts`).
+- [x] **O doc 15 de volta a ser foto:** 3 300 linhas e 318 KB, com parágrafos de setembro que não
       valem mais (o §5 ainda diz "não há pendência de funcionalidade" no meio das pendências). O
       histórico de cada volta vai para o doc 16, que já é o histórico; o 15 fica com o §1, as
       métricas, uma linha de detalhe por marco, as pendências **abertas** e o próximo passo — meta
-      de ~600 linhas.
-- [ ] **CI nos PRs:** o `pages.yml` só roda em push na `main`, então um PR chega sem portão. Um
+      de ~600 linhas. **Feito, com desvio:** o doc 15 de antes foi inteiro, sem edição, para
+      `docs/15-historico.md`, e não para o doc 16 — o 16 é um registro por sessão com grid de
+      arquivos, e a narrativa por marco não cabe nesse formato. O 15 novo tem ~360 linhas, e as
+      pendências foram conferidas uma a uma contra o §5 e o §6 antigos.
+- [x] **CI nos PRs:** o `pages.yml` só roda em push na `main`, então um PR chega sem portão. Um
       workflow de PR com os quatro portões, e o `npm run smoke` e o `smoke:mods` (o Chrome do
-      `ubuntu-latest` serve).
-- [ ] **Smoke como root:** os scripts não sobem o Chrome num container de root sem um invólucro com
+      `ubuntu-latest` serve). **Feito** (`.github/workflows/portoes.yml`).
+- [x] **Smoke como root:** os scripts não sobem o Chrome num container de root sem um invólucro com
       `--no-sandbox` (conferido nesta avaliação). Pôr a flag sozinho quando `process.getuid() === 0`.
+      **Feito** em `scripts/chrome.mjs`, que substituiu as oito cópias de `chromeBin()`.
 
 **Critério de aceite:** nenhum módulo de código acima de 700; doc 15 abaixo de 800 linhas sem
 perder pendência aberta (conferir uma a uma); PR de teste com o CI vermelho num teste quebrado de
-propósito.
+propósito. **Os dois primeiros cumpridos. O terceiro, pela metade:** o CI rodou **verde** no PR #9
+(3 min, os quatro portões e os dois smokes); a prova do vermelho fica para quando o usuário quiser
+um PR de teste.
 
 ---
 

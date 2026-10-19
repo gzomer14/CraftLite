@@ -17,10 +17,20 @@
  * nova — e o jogador atravessaria a escada que enxerga.
  */
 
-/** Uma caixa por 6 números: x0, y0, z0, x1, y1, z1, em fração de bloco. */
-export const BOX_STRIDE = 6;
-/** Nenhuma forma passa de 5 caixas (a cerca com os 4 braços). */
-export const MAX_BOXES = 5;
+import { BOX_STRIDE, MAX_BOXES, one } from './box';
+import { CORNER_NONE, stairs } from './stairshape';
+import {
+  MOUNT_FLOOR, anvil, button, comparator, hopper, lever, mounted, piston, pistonHead, repeater,
+} from './machineshape';
+
+/*
+ * M24: trilho, escada e a caixa em si saíram para módulos próprios; daqui eles
+ * são re-exportados para nenhum importador precisar mudar.
+ */
+export { BOX_STRIDE, MAX_BOXES } from './box';
+export { CORNER_INNER, CORNER_NONE, CORNER_OUTER, NOT_STAIRS, stairCornerFrom } from './stairshape';
+export * from './railshape';
+export { MOUNT_CEILING, MOUNT_FLOOR, PISTON_STEP, mountForDir } from './machineshape';
 
 /** Formas com geometria de caixa, na ordem em que `blockinfo.ts` as indexa. */
 export const SHAPE_NONE = 0;
@@ -72,64 +82,6 @@ export const SHAPE_PORTAL_PLANE = 32;
 /** Ovo do dragão (M16): quatro fatias que afinam para cima. */
 export const SHAPE_EGG = 33;
 
-/**
- * Formas de trilho nos bits 0..3 do estado (M7), na codificação do gênero.
- *
- * 0..1 são as retas, 2..5 as rampas (o nome diz para onde **sobe**) e 6..9 as
- * curvas (o nome diz quais dois lados a curva liga). Trilho motorizado e
- * detector só usam 0..5: curva com máquina dentro não existe.
- */
-export const RAIL_NS = 0;
-export const RAIL_EW = 1;
-export const RAIL_ASCEND_EAST = 2;
-export const RAIL_ASCEND_WEST = 3;
-export const RAIL_ASCEND_NORTH = 4;
-export const RAIL_ASCEND_SOUTH = 5;
-export const RAIL_CURVE_SE = 6;
-export const RAIL_CURVE_SW = 7;
-export const RAIL_CURVE_NW = 8;
-export const RAIL_CURVE_NE = 9;
-/** Bit de "energizado" do trilho motorizado e do detector. */
-export const RAIL_POWERED = 16;
-/** Primeira forma de rampa e primeira de curva, para as comparações de faixa. */
-export const RAIL_FIRST_SLOPE = RAIL_ASCEND_EAST;
-export const RAIL_FIRST_CURVE = RAIL_CURVE_SE;
-
-/** true se a forma é uma rampa. */
-export function railIsSlope(shape: number): boolean {
-  return shape >= RAIL_FIRST_SLOPE && shape < RAIL_FIRST_CURVE;
-}
-
-/** true se a forma é uma curva. */
-export function railIsCurve(shape: number): boolean {
-  return shape >= RAIL_FIRST_CURVE;
-}
-
-/**
- * Os dois lados que uma forma de trilho liga, nos índices de `FACING_STEP`
- * (0 = +X, 1 = −X, 2 = +Z, 3 = −Z). A rampa liga os dois lados do próprio eixo.
- */
-export const RAIL_LINKS: readonly (readonly [number, number])[] = [
-  [2, 3], // NS
-  [0, 1], // EW
-  [0, 1], // sobe para +X
-  [0, 1], // sobe para −X
-  [2, 3], // sobe para −Z
-  [2, 3], // sobe para +Z
-  [2, 0], // curva +Z/+X
-  [2, 1], // curva +Z/−X
-  [3, 1], // curva −Z/−X
-  [3, 0], // curva −Z/+X
-];
-
-/** Direção para onde a rampa sobe, ou −1 se a forma é plana. */
-export function railSlopeDir(shape: number): number {
-  if (!railIsSlope(shape)) return -1;
-  // A ordem das rampas é +X, −X, −Z, +Z; a de `FACING_STEP` é +X, −X, +Z, −Z.
-  const order = [0, 1, 3, 2];
-  return order[shape - RAIL_FIRST_SLOPE];
-}
-
 /** Espessura de tudo que é "chapa": alçapão, porta, placa, quadro, escada de mão. */
 const THIN = 3 / 16;
 /** Meia altura de laje e do degrau da escada. */
@@ -178,31 +130,6 @@ export const SHAPE_BY_NAME: Readonly<Record<string, number>> = {
   piston_head: SHAPE_PISTON_HEAD,
   rail: SHAPE_RAIL,
 };
-
-/**
- * Encaixe de alavanca e botão, nos bits 0..2 do estado (M7).
- *
- * 0..3 = a parede em que está pendurado, nas direções de `FACING_STEP`;
- * 4 = no chão; 5 = no teto. É a mesma codificação que `world/redstone.ts` usa
- * para achar o bloco de apoio, e por isso vive aqui, ao lado da geometria que
- * depende dela.
- */
-export const MOUNT_FLOOR = 4;
-export const MOUNT_CEILING = 5;
-
-/**
- * Direção do pistão nos bits 0..2: 0 = +X, 1 = −X, 2 = +Z, 3 = −Z, 4 = +Y,
- * 5 = −Y. Os quatro primeiros coincidem com `FACING_STEP` de propósito.
- */
-export const PISTON_STEP: readonly (readonly [number, number, number])[] = [
-  [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0], [0, -1, 0],
-];
-
-/** Encaixe cuja superfície fica na direção `dir` de `PISTON_STEP`. */
-export function mountForDir(dir: number): number {
-  if (dir < 4) return dir;
-  return dir === 4 ? MOUNT_CEILING : MOUNT_FLOOR;
-}
 
 /** Altura da colisão de cerca e portão fechado (doc 04 §3). */
 export const FENCE_COLLISION_HEIGHT = 1.5;
@@ -364,157 +291,6 @@ export function boundsFor(shape: number, state: number, out: Float32Array): void
 }
 
 const BOUNDS_BOXES = new Float32Array(MAX_BOXES * BOX_STRIDE);
-
-/** Escreve uma caixa em `out[i]` e devolve `i + 1` como contagem. */
-function one(
-  out: Float32Array, index: number,
-  x0: number, y0: number, z0: number, x1: number, y1: number, z1: number,
-): number {
-  const o = index * BOX_STRIDE;
-  out[o] = x0; out[o + 1] = y0; out[o + 2] = z0;
-  out[o + 3] = x1; out[o + 4] = y1; out[o + 5] = z1;
-  return index + 1;
-}
-
-/**
- * Escada, com as variantes de canto (doc 04 §3).
- *
- * bits 0–1 = para onde a **subida** aponta, bit 2 = de cabeça para baixo. O
- * **lado alto** — a metade em que fica o degrau — é `bits ^ 1` nos índices de
- * `FACING_STEP`, e é em torno dele que toda a geometria é descrita.
- *
- * `corner` vem de `stairCornerFrom` e **não ocupa bit nenhum do save**: ele é
- * derivado dos vizinhos na hora, como a conexão de cerca (doc 04 §2.5). Um save
- * feito antes dos cantos abre mostrando os cantos, sem migração.
- *
- * Três formas:
- * - **reta**: base de meia altura + meia caixa no lado alto;
- * - **canto externo**: a meia caixa vira um **quarto** — a interseção do lado
- *   alto com o lado alto do vizinho perpendicular;
- * - **canto interno**: a meia caixa mais o quarto que falta para fechar o L.
- */
-function stairs(state: number, corner: number, out: Float32Array): number {
-  const top = (state & 4) !== 0;
-  const baseY0 = top ? HALF : 0;
-  let count = one(out, 0, 0, baseY0, 0, 1, baseY0 + HALF, 1);
-
-  const y0 = top ? 0 : HALF;
-  const y1 = y0 + HALF;
-  const tall = (state & 3) ^ 1;
-  const kind = corner & 3;
-
-  if (kind === CORNER_NONE) {
-    count = halfBox(out, count, tall, y0, y1);
-    return count;
-  }
-
-  const quarter = (corner >>> 2) & 3;
-  if (kind === CORNER_OUTER) {
-    // Só a interseção das duas metades altas sobrevive.
-    return quarterBox(out, count, tall, quarter, y0, y1);
-  }
-  // Interno: a metade alta inteira mais o quarto que fecha a curva.
-  count = halfBox(out, count, tall, y0, y1);
-  return quarterBox(out, count, tall ^ 1, quarter, y0, y1);
-}
-
-/** Meia caixa no lado `dir` de `FACING_STEP`, entre `y0` e `y1`. */
-function halfBox(out: Float32Array, index: number, dir: number, y0: number, y1: number): number {
-  if (dir === 0) return one(out, index, HALF, y0, 0, 1, y1, 1);
-  if (dir === 1) return one(out, index, 0, y0, 0, HALF, y1, 1);
-  if (dir === 2) return one(out, index, 0, y0, HALF, 1, y1, 1);
-  return one(out, index, 0, y0, 0, 1, y1, HALF);
-}
-
-/** Um quarto: a interseção das metades `a` e `b`, que são de eixos diferentes. */
-function quarterBox(
-  out: Float32Array, index: number, a: number, b: number, y0: number, y1: number,
-): number {
-  // `a` é sempre do eixo X e `b` do eixo Z, ou o contrário; normaliza.
-  const xDir = a < 2 ? a : b;
-  const zDir = a < 2 ? b : a;
-  const x0 = xDir === 0 ? HALF : 0;
-  const x1 = xDir === 0 ? 1 : HALF;
-  const z0 = zDir === 2 ? HALF : 0;
-  const z1 = zDir === 2 ? 1 : HALF;
-  return one(out, index, x0, y0, z0, x1, y1, z1);
-}
-
-/** Formas de canto, nos bits 0–1 de `corner`. */
-export const CORNER_NONE = 0;
-export const CORNER_OUTER = 1;
-export const CORNER_INNER = 2;
-
-/** Vizinho que não é escada, para `stairCornerFrom`. */
-export const NOT_STAIRS = -1;
-
-/**
- * Forma de canto de uma escada, a partir dos bits dos quatro vizinhos.
- *
- * Cada `nb*` é o estado da escada vizinha naquele lado, ou `NOT_STAIRS`. A
- * regra sai de uma exigência só, geométrica e verificável: **a superfície alta
- * das duas escadas tem que ser contínua pela face que elas dividem** — dos dois
- * lados da face, a parte alta cobre a mesma faixa.
- *
- *  - vizinho perpendicular **do lado alto** → canto **externo**: a metade alta
- *    encolhe para o quarto que encosta na faixa alta dele;
- *  - vizinho perpendicular **do lado aberto** → canto **interno**: a escada
- *    ganha, no lado aberto, o quarto que encosta na faixa alta dele.
- *
- * Nos dois casos quem escolhe o quarto é o **lado alto do vizinho**. O externo
- * vem primeiro e vence, como no gênero.
- *
- * **M23 — a regra estava trocada** desde o acabamento pós-M7: o vizinho do lado
- * alto fazia canto interno, e o teste só olhava o nosso lado da face. Num
- * telhado em pirâmide, as quinas saíam com o degrau cheio em vez do quarto. E
- * faltava a **quina de três**: a escada não vira canto se, do lado para onde a
- * curva iria, há outra escada igual a ela — ela continua a fila reta, em vez de
- * quebrá-la (o `canTakeShape` do gênero).
- *
- * Vizinho com o bit de "de cabeça para baixo" diferente não faz canto: as duas
- * metades altas estão em alturas diferentes e não há superfície para ligar.
- * Sem alocação: roda por escada no mesher.
- */
-export function stairCornerFrom(
-  bits: number, nbPlusX: number, nbMinusX: number, nbPlusZ: number, nbMinusZ: number,
-): number {
-  const tall = (bits & 3) ^ 1;
-  const open = tall ^ 1;
-  const top = bits & 4;
-
-  const back = neighborAt(tall, nbPlusX, nbMinusX, nbPlusZ, nbMinusZ);
-  if (isPerpendicularStair(back, tall, top)) {
-    const backTall = (back & 3) ^ 1;
-    // A curva sai para o lado baixo do vizinho; lá não pode haver uma igual a nós.
-    const side = neighborAt(backTall ^ 1, nbPlusX, nbMinusX, nbPlusZ, nbMinusZ);
-    if (!isSameStair(side, bits)) return CORNER_OUTER | (backTall << 2);
-  }
-  const front = neighborAt(open, nbPlusX, nbMinusX, nbPlusZ, nbMinusZ);
-  if (isPerpendicularStair(front, tall, top)) {
-    const frontTall = (front & 3) ^ 1;
-    const side = neighborAt(frontTall, nbPlusX, nbMinusX, nbPlusZ, nbMinusZ);
-    if (!isSameStair(side, bits)) return CORNER_INNER | (frontTall << 2);
-  }
-  return CORNER_NONE;
-}
-
-/** O vizinho no índice `dir` de `FACING_STEP`. */
-function neighborAt(dir: number, px: number, mx: number, pz: number, mz: number): number {
-  return dir === 0 ? px : dir === 1 ? mx : dir === 2 ? pz : mz;
-}
-
-/** true se o vizinho é escada virada para o mesmo lado e na mesma metade. */
-function isSameStair(nb: number, bits: number): boolean {
-  return nb !== NOT_STAIRS && (nb & 7) === (bits & 7);
-}
-
-/** true se o vizinho é escada, do mesmo lado de cima e de eixo perpendicular. */
-function isPerpendicularStair(nb: number, tall: number, top: number): boolean {
-  if (nb === NOT_STAIRS) return false;
-  if ((nb & 4) !== top) return false;
-  // Eixo: 0/1 são X, 2/3 são Z. Perpendicular = eixos diferentes.
-  return ((nb & 3) >> 1) !== (tall >> 1);
-}
 
 /** Poste central mais um braço por vizinho conectado (cerca e grade). */
 function connected(out: Float32Array, half: number, height: number, connections: number): number {
@@ -763,157 +539,5 @@ function chest(out: Float32Array): number {
     out, count, 7 / 16, CHEST_BODY_TOP - 2 / 16, b,
     9 / 16, CHEST_BODY_TOP + 2 / 16, b + 1 / 16,
   );
-  return count;
-}
-
-// --- redstone (M7) ---------------------------------------------------------
-
-/**
- * Caixa descrita no referencial da **superfície de encaixe**: `u` e `v` correm
- * sobre a superfície, `w` é a distância a partir dela.
- *
- * É isso que permite alavanca e botão terem uma geometria só para os seis
- * encaixes possíveis, em vez de seis blocos de código quase iguais.
- */
-function mounted(
-  out: Float32Array, index: number, mount: number,
-  u0: number, v0: number, w0: number, u1: number, v1: number, w1: number,
-): number {
-  switch (mount) {
-    case 0: return one(out, index, 1 - w1, v0, u0, 1 - w0, v1, u1); // parede +X
-    case 1: return one(out, index, w0, v0, u0, w1, v1, u1);         // parede −X
-    case 2: return one(out, index, u0, v0, 1 - w1, u1, v1, 1 - w0); // parede +Z
-    case 3: return one(out, index, u0, v0, w0, u1, v1, w1);         // parede −Z
-    case MOUNT_CEILING: return one(out, index, u0, 1 - w1, v0, u1, 1 - w0, v1);
-    default: return one(out, index, u0, w0, v0, u1, w1, v1);        // chão
-  }
-}
-
-/**
- * Alavanca: a base presa na superfície mais a haste, que muda de lado conforme
- * ligada. Não há giro de 45° — dois estados e a haste pula de um lado ao outro,
- * que é o que se enxerga a 16 px.
- */
-function lever(state: number, out: Float32Array): number {
-  const mount = state & 7;
-  const on = (state & 8) !== 0;
-  let count = mounted(out, 0, mount, 5 / 16, 4 / 16, 0, 11 / 16, 12 / 16, 3 / 16);
-  const v0 = on ? 3 / 16 : 9 / 16;
-  count = mounted(out, count, mount, 7 / 16, v0, 2 / 16, 9 / 16, v0 + 4 / 16, 10 / 16);
-  return count;
-}
-
-/** Botão: uma pastilha na superfície, mais rasa quando apertada. */
-function button(state: number, out: Float32Array): number {
-  const mount = state & 7;
-  const depth = (state & 8) !== 0 ? 1 / 16 : 2 / 16;
-  return mounted(out, 0, mount, 5 / 16, 6 / 16, 0, 11 / 16, 10 / 16, depth);
-}
-
-/**
- * Repetidor: a base achatada mais duas tochinhas. A de trás anda para longe da
- * saída conforme o atraso (bits 2..3) — é assim que se lê o atraso sem HUD.
- */
-function repeater(state: number, out: Float32Array): number {
-  let count = one(out, 0, 0, 0, 0, 1, 2 / 16, 1);
-  const facing = state & 3;
-  const delay = (state >> 2) & 3;
-  count = torchNub(out, count, facing, 3 / 16);
-  count = torchNub(out, count, facing, (7 + delay * 2) / 16);
-  return count;
-}
-
-/**
- * Bigorna (M15): pé largo, cintura estreita e a mesa comprida. O comprimento
- * corre no eixo **perpendicular** ao olhar de quem a colocou, como no gênero:
- * o martelo bate de lado.
- */
-function anvil(facing: number, out: Float32Array): number {
-  const alongX = facing >= 2; // olhando em Z, a mesa corre em X
-  let count = one(out, 0, 2 / 16, 0, 2 / 16, 14 / 16, 4 / 16, 14 / 16);
-  count = alongX
-    ? one(out, count, 4 / 16, 4 / 16, 6 / 16, 12 / 16, 10 / 16, 10 / 16)
-    : one(out, count, 6 / 16, 4 / 16, 4 / 16, 10 / 16, 10 / 16, 12 / 16);
-  return alongX
-    ? one(out, count, 0, 10 / 16, 3 / 16, 1, 1, 13 / 16)
-    : one(out, count, 3 / 16, 10 / 16, 0, 13 / 16, 1, 1);
-}
-
-/**
- * Funil (M15): a tigela de cima, o corpo no meio e o bico. O bico aponta para
- * a saída — para baixo (5) ou para um dos lados (0..3, `PISTON_STEP`).
- */
-function hopper(output: number, out: Float32Array): number {
-  let count = one(out, 0, 0, 10 / 16, 0, 1, 1, 1);
-  count = one(out, count, 4 / 16, 4 / 16, 4 / 16, 12 / 16, 10 / 16, 12 / 16);
-  switch (output) {
-    case 0: return one(out, count, 12 / 16, 4 / 16, 6 / 16, 1, 8 / 16, 10 / 16);
-    case 1: return one(out, count, 0, 4 / 16, 6 / 16, 4 / 16, 8 / 16, 10 / 16);
-    case 2: return one(out, count, 6 / 16, 4 / 16, 12 / 16, 10 / 16, 8 / 16, 1);
-    case 3: return one(out, count, 6 / 16, 4 / 16, 0, 10 / 16, 8 / 16, 4 / 16);
-    default: return one(out, count, 6 / 16, 0, 6 / 16, 10 / 16, 4 / 16, 10 / 16);
-  }
-}
-
-/** Comparador (M15): tampo, duas tochinhas atrás e a da frente. */
-function comparator(facing: number, out: Float32Array): number {
-  let count = one(out, 0, 0, 0, 0, 1, 2 / 16, 1);
-  count = torchNub(out, count, facing, 2 / 16);
-  // As duas de trás ficam lado a lado, a 3/16 da face de trás.
-  const back = 11 / 16;
-  const y0 = 2 / 16;
-  const y1 = 5 / 16;
-  if (facing === 0 || facing === 1) {
-    const x = facing === 0 ? 1 - back - 2 / 16 : back;
-    count = one(out, count, x, y0, 3 / 16, x + 2 / 16, y1, 5 / 16);
-    return one(out, count, x, y0, 11 / 16, x + 2 / 16, y1, 13 / 16);
-  }
-  const z = facing === 2 ? 1 - back - 2 / 16 : back;
-  count = one(out, count, 3 / 16, y0, z, 5 / 16, y1, z + 2 / 16);
-  return one(out, count, 11 / 16, y0, z, 13 / 16, y1, z + 2 / 16);
-}
-
-/** Tochinha do repetidor a `back` blocos da face de saída. */
-function torchNub(
-  out: Float32Array, index: number, facing: number, back: number,
-): number {
-  const y0 = 2 / 16;
-  const y1 = 6 / 16;
-  const a = 7 / 16;
-  const b = 9 / 16;
-  if (facing === 0) return one(out, index, 1 - back - 2 / 16, y0, a, 1 - back, y1, b);
-  if (facing === 1) return one(out, index, back, y0, a, back + 2 / 16, y1, b);
-  if (facing === 2) return one(out, index, a, y0, 1 - back - 2 / 16, b, y1, 1 - back);
-  return one(out, index, a, y0, back, b, y1, back + 2 / 16);
-}
-
-/** Fundura do corpo do pistão medida a partir da face de trás. */
-const PISTON_BODY = 12 / 16;
-
-/**
- * Pistão: corpo de 12/16 mais a placa da frente.
- *
- * **Desvio consciente:** a textura é a mesma nas seis faces, porque o formato de
- * vértice não guarda rotação de textura (doc 01 §5.1). Quem diz para onde o
- * pistão aponta é a geometria — a placa da frente é levemente mais estreita que
- * o corpo, e o degrau entre as duas se vê de qualquer ângulo.
- */
-function piston(state: number, out: Float32Array): number {
-  const dir = state & 7;
-  const extended = (state & 8) !== 0;
-  const mount = mountForDir(dir ^ 1);
-  let count = mounted(out, 0, mount, 0, 0, 0, 1, 1, PISTON_BODY);
-  if (!extended) {
-    count = mounted(out, count, mount, 1 / 16, 1 / 16, PISTON_BODY, 15 / 16, 15 / 16, 1);
-  }
-  return count;
-}
-
-/** Braço do pistão: a haste que sai do corpo mais a placa da ponta. */
-function pistonHead(state: number, out: Float32Array): number {
-  const dir = state & 7;
-  const mount = mountForDir(dir ^ 1);
-  let count = mounted(out, 0, mount, 6 / 16, 6 / 16, 0, 10 / 16, 10 / 16, PISTON_BODY);
-  count = mounted(out, count, mount, 0, 0, PISTON_BODY, 1, 1, 1);
   return count;
 }

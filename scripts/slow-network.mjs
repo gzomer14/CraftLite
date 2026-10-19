@@ -10,26 +10,16 @@
  * service worker e mede zero.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { conectar } from './cdp.mjs';
+import { chromeBin, chromeFlags } from './chrome.mjs';
 
 /**
  * O Chrome instalado na máquina. `CHROME` no ambiente vence — em distro que
  * chama o binário de outro jeito, é a única coisa que precisa mudar.
  */
-function chromeBin() {
-  const env = process.env.CHROME;
-  if (env !== undefined && env !== '') return env;
-  for (const caminho of [
-    '/usr/bin/google-chrome-stable', '/usr/bin/google-chrome',
-    '/usr/bin/chromium', '/usr/bin/chromium-browser',
-  ]) {
-    if (existsSync(caminho)) return caminho;
-  }
-  throw new Error('Chrome não encontrado — aponte com a variável CHROME');
-}
 
 const URL_JOGO = process.env.URL ?? 'https://craftlite.zomertech.com.br/';
 
@@ -61,7 +51,7 @@ const resultados = [];
 for (const perfil of PERFIS) {
   const porta = 9400 + PERFIS.indexOf(perfil);
   const dir = mkdtempSync(join(tmpdir(), 'craftlite-rede-'));
-  const chrome = spawn(chromeBin(), [
+  const chrome = spawn(chromeBin(), [...chromeFlags(),
     '--headless=new', '--use-gl=angle', '--use-angle=gl-egl',
     `--remote-debugging-port=${porta}`, `--user-data-dir=${dir}`,
     '--no-first-run', '--no-default-browser-check', '--window-size=1280,720',

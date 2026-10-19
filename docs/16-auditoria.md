@@ -12,6 +12,39 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-10-19 17:17 · Avaliação geral e o roteiro M22–M31
+
+**Pedido:** *"De uma analisada geral detalhada, para entender o que falta de desenvolvimento, se
+possui Marcos pendentes, e também analise com detalhe para criar novos Marcos para deixar o jogo
+excelente, correções de bugs, tudo."*
+
+**Resultado:**
+- **Estado:** portões verdes (2404 testes, lint, build, 308,3 KB) e smokes verdes (`smoke` 7,
+  `smoke:mods` 6, `smoke:room` 19, `bench:ui` 203 ms). De M0 a M21, só o M20 está aberto, e falta
+  nele aparelho e duas voltas de código. Nenhuma issue nem PR aberto.
+- **Achados, conferidos no código:** coluna que se perde quando a gravação falha na descarga;
+  cota cheia sem a tela do doc 11 §4; coluna corrompida trocada pela seed sem aviso; mob que não
+  pega fogo no fogo nem apaga na água, e chama invisível em mob e jogador; dica de teclado sobre a
+  vida; mochila de 410 px numa tela de 360; até 10 s perdidos quando o convidado cai; escada em
+  quina de três; fogueira e caldeirão do doc 00 nunca feitos; Firefox e Safari nunca testados; CI
+  só na `main`; seis módulos acima de 700 linhas; doc 15 com 318 KB; atlas, áudio e bundle perto do
+  teto.
+- **Roteiro novo** no doc 14: M22 (aparelho e MVP), M23 (correções), M24 (casa em ordem), M25
+  (folga), M26 (aconchego), M27 (bichos), M28 (lugares), M29 (ameaça), M30 (sala, 2ª volta), M31
+  (horizonte), com ordem e critério de aceite.
+- **Nenhum código mudou.** Corrigido no doc 15 o cabeçalho do M3, que dizia ⚠️.
+
+Portões: 2404 testes; lint, build e tamanho verdes (308,3 KB).
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| ~ | `docs/14-roadmap.md` | seção "Avaliação de 2026-10-19" e os marcos M22–M31 |
+| ~ | `docs/15-status.md` | data; §1 com M22–M31; §2 reconferido; M3 ✅ no §3; avaliação no §3; pendências verificadas no §5; §6 aponta M23 e M22 |
+| ~ | `README.md` | parágrafo dos próximos marcos; linha do doc 14 na estrutura |
+| ~ | `docs/16-auditoria.md` | esta sessão |
+
+---
+
 ## 2026-10-18 14:06 · Domínio próprio: craftlite.zomertech.com.br
 
 **Pedido:** *"Vamos seguir com o URL craftlite.zomertech.com.br, faça um passo a passo do que

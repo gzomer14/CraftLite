@@ -9,7 +9,16 @@
 > conforme a implementação anda. Este aqui é **descritivo**: reflete o estado real do código e é
 > atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-10-18 14:06 — **Domínio próprio: `craftlite.zomertech.com.br`.** O
+**Última atualização:** 2026-10-19 17:17 — **Avaliação geral e o roteiro M22–M31** (doc 14). O
+projeto foi retomado depois de três semanas. Portões e smokes verdes, sem mudança de código: 2404
+testes, 308,3 KB; `smoke` 7, `smoke:mods` 6, `smoke:room` 19, `bench:ui` 203 ms no pior caso. De
+M0 a M21, só o M20 está aberto (aparelho). A avaliação achou **defeitos pequenos de verdade** —
+coluna que se perde se a gravação falhar, cota cheia sem a tela do doc 11, mob que não pega fogo
+nem apaga, dica cobrindo a vida, mochila maior que a tela de um T0 deitado —, a **fogueira e o
+caldeirão** do doc 00 que nunca foram feitos, Firefox e Safari nunca testados, e os três tetos
+(atlas 223/256, áudio 2,92/3,5 MB, bundle 308/350) que limitam conteúdo novo. Tudo conferido no
+código e listado no §5; os marcos novos estão no doc 14. **Próximo passo de código: M23** (§6).
+Antes, 2026-10-18 14:06 — **Domínio próprio: `craftlite.zomertech.com.br`.** O
 jogo já usa caminho relativo em tudo (`base: './'`, manifesto e escopo do service worker), então
 nada no código muda. Mudou o endereço padrão de `npm run soak` e `npm run slow-network`. **Falta a
 configuração do lado do usuário** (DNS no Cloudflare e domínio no GitHub Pages; §6, item 0a). Os
@@ -136,6 +145,16 @@ compartilhável).
 | **M19** Pontas soltas | enderman no End, dragão que quebra, sopra e morre devagar, ilhas de fora e portal de passagem, tint no WebGL1 | ✅ concluído em 2026-09-25 | **não visto em aparelho** (End visto no Chrome headless) |
 | **M20** Jogar junto na mesma rede | multijogador por WebRTC só na rede local, sinalização por QR, sem servidor; o mundo e os dados do convidado só no aparelho do anfitrião | 🚧 **no jogo, testado em aparelho em 2026-09-27** (ligação e save do convidado); segunda e terceira voltas no mesmo dia: nome, chat, combate, baú e fornalha, cama, placa, **dimensões (a sala segue o anfitrião), mundo em volta de cada convidado, item na mão** — dois Chrome, `npm run smoke:room` (19 passos) | segunda e terceira voltas **não vistas em aparelho**; o critério de aceite do doc 14 (30 min, T0 acima de 30 FPS com convidado, dados móveis) é do usuário (§6) |
 | **M21** Mods | mods escritos no repositório, cada um um pedaço de bundle próprio, ligados e desligados na tela Mods; **desligados, a página baixa um arquivo só, o de antes** (teste e build cobram); mod de exemplo | ✅ concluído em 2026-09-27 | **não visto em aparelho** (visto no Chrome headless); na sala do M20, mods diferentes não entram |
+| **M22** Aparelho e MVP | domínio, PWA do J7, aceite do M20, roteiro de campo M16–M21, Firefox e Safari, declarar o MVP | ⬜ proposto em 2026-10-19 | do usuário |
+| **M23** Correções verificadas | coluna perdida na gravação, cota cheia (doc 11 §4), coluna corrompida calada, fogo nos mobs e chama visível, dica sobre a vida, mochila no T0 deitado, save do convidado, escada em quina de três | ⬜ proposto em 2026-10-19 | **próximo de código** (§6) |
+| **M24** Casa em ordem, 3ª volta | seis módulos acima de 700, doc 15 de volta a foto, CI nos PRs com smoke, smoke como root | ⬜ proposto em 2026-10-19 | — |
+| **M25** Folga para crescer | atlas, bundle e áudio com folga para os marcos de conteúdo | ⬜ proposto em 2026-10-19 | trava M26–M29 |
+| **M26** Aconchego | fogueira e caldeirão (doc 00), lanterna, vaso, moldura, tronco descascado, terracota e concreto | ⬜ proposto em 2026-10-19 | — |
+| **M27** Bichos | cavalo com sela, gato, coelho, peixes vivos, guia, etiqueta | ⬜ proposto em 2026-10-19 | — |
+| **M28** Lugares para achar | templos do deserto e da selva, fundo do mar, planalto de terracota, mapa do tesouro | ⬜ proposto em 2026-10-19 | — |
+| **M29** Ameaça | invasão de saqueadores, besta, tridente, fantasma noturno | ⬜ proposto em 2026-10-19 | — |
+| **M30** Sala, 2ª volta | golpe no boneco, inventário conferido, mods da sala sem tela, PvP opcional, teto de mobs por jogador | ⬜ proposto em 2026-10-19 | depende do aceite do M20 |
+| **M31** Horizonte | terreno distante, folhas e água que se mexem — só T1+ | ⬜ proposto em 2026-10-19 | — |
 
 **O multijogador P2P saiu do escopo do M7** por decisão do usuário em 2026-09-13: *"acredito que
 ele irá pesar muito o jogo e trazer muita complexidade por enquanto desnecessária"*. O
@@ -150,7 +169,10 @@ Legenda: ✅ pronto · ⚠️ pronto com débito · 🚧 em andamento · ⬜ nã
 
 ## 2. Métricas atuais
 
-Medidas em 2026-09-27 17:11, com a terceira volta do M20, com `npm test`, `npm run build`,
+Reconferidas em 2026-10-19 17:17, sem mudança de código e com os mesmos números (2404 testes,
+308,3 KB; `smoke`, `smoke:mods`, `smoke:room` e `bench:ui` verdes — no container, os smokes pedem
+`CHROME` apontando para um invólucro com `--no-sandbox`, porque roda como root; M24). Medidas em
+2026-09-27 17:11, com a terceira volta do M20, com `npm test`, `npm run build`,
 `SIZE_BUDGET_KB=350 npm run size`, `npm run smoke`, `npm run smoke:mods`, `npm run smoke:net`,
 `npm run smoke:room` e `npm run smoke:camera`.
 
@@ -236,7 +258,7 @@ Física com as constantes do doc 06, raycast DDA com contorno, quebrar com está
 colocar com rotação, hotbar, iluminação por flood fill incremental, ciclo dia/noite.
 **Sem pendências.**
 
-### M3 — Mobile ⚠️
+### M3 — Mobile ✅
 Joystick flutuante, câmera por arraste, modos A/B, multitoque por `pointerId`, safe areas, tela
 cheia e trava de orientação, gamepad, PWA instalável e offline, escala dinâmica de resolução.
 
@@ -2398,6 +2420,24 @@ com o anel do anfitrião de 12 colunas; com as âncoras desligadas, esse passo f
 Testes novos em `tests/pipeline.test.ts` (âncoras), `tests/netcontainers.test.ts` (dimensão e
 spawn) e `tests/netroom.test.ts` (fogo, frasco, item na mão).
 
+### Avaliação de 2026-10-19 — M22 a M31 ⬜
+
+Pedido: *"De uma analisada geral detalhada, para entender o que falta de desenvolvimento, se possui
+Marcos pendentes, e também analise com detalhe para criar novos Marcos para deixar o jogo
+excelente, correções de bugs, tudo."*
+
+**Como foi feita.** Os quatro portões e os smokes de navegador (`smoke`, `smoke:mods`,
+`smoke:room`, `bench:ui`) rodados de novo; as tabelas dos docs 03–11 cruzadas com o código por
+`grep` (a lição do M11); o jogo aberto no Chromium em 1280×720 e em 640×360 com toque, com
+captura de tela; os sistemas citados no doc 15 como pendência pequena conferidos um a um.
+
+**O que ela confirmou:** o código de M0 a M21 está todo lá e verde; nenhuma tabela dos docs 04 e
+05 tem nome faltando no código; nenhum erro de página nos smokes. O único marco aberto é o M20, e
+o que falta nele é de aparelho e de duas voltas de código (M30).
+
+**O que ela achou** está no §5 (pendências verificadas em 2026-10-19), com o arquivo de cada uma, e
+virou o roteiro M22–M31 do doc 14.
+
 ## 4. Correções fora de marco
 
 Bugs anteriores encontrados durante o M5 e já corrigidos — ficam registrados porque explicam
@@ -2579,6 +2619,38 @@ mudanças em código de marcos "fechados":
 ---
 
 ## 5. Dependências entre pendências
+
+**Pendências verificadas em 2026-10-19 (avaliação geral)** — cada uma conferida no código ou na
+tela; viraram o M23–M25 do doc 14:
+
+- **Coluna perdida se a gravação falha na descarga** (`save/savemanager.ts`, `saveAndForget`): a
+  coluna sai de `dirty` antes do `putChunks`, e na falha já saiu da memória. Com a cota cheia, o que
+  foi construído longe do jogador some.
+- **Cota cheia não segue o doc 11 §4** (pausar, explicar, oferecer apagar mundo): a falha vira a
+  linha `store.save_failed` no HUD por 6 s (`main.ts`), e o jogo continua sem salvar.
+- **Coluna corrompida some calada** (`savemanager.ts`, `loadChunk`): o `catch` devolve `null` e a
+  seed gera o terreno por cima, sem aviso.
+- **Fogo nos mobs** (`entity/mobrules.ts`, `environmentHarm`): só sol e lava acendem; bloco de fogo
+  não, e a água não apaga. Nenhum passe de render lê `fireTicks` nem o `burnTicks` do jogador: **a
+  chama não aparece em ninguém**.
+- **A dica de teclado cobre os corações** com o ponteiro solto (`ui/controlhint.ts`; captura em
+  1280×720).
+- **A mochila passa da tela de um T0 deitado:** em 640×360, o painel vai a 410 px e a tela rola.
+- **O convidado que cai perde até 10 s** (`net/guest.ts`, `SAVE_EVERY = 200`).
+- **Escada em quina de três** não feita (`world/mesh/shapes.ts`, `stairCornerFrom`), e a função
+  aloca um array por escada no mesher.
+- **Fogueira e caldeirão** (doc 00 §3, segundo círculo): nenhum dos dois existe (`grep` vazio).
+- **Firefox nunca rodou o jogo** (o doc 14 pede em todo marco); **Safari/iPhone nunca foi citado**.
+- **CI só na `main`** (`.github/workflows/pages.yml`): PR não passa pelos portões, e smoke não roda
+  em CI. Os scripts de smoke não sobem o Chrome como root sem `--no-sandbox`.
+- **Seis módulos de código acima de 700 linhas:** `ui/hud.ts` 738, `entity/mobs.ts` 716,
+  `game/session.ts` 715, `world/pipeline.ts` 714, `render/itemsprites.ts` 713,
+  `world/mesh/shapes.ts` 899.
+- **Este documento tem 3 300 linhas e 318 KB**; parte do texto de setembro não vale mais (o
+  parágrafo abaixo de "Pendências abertas em 2026-09-24 (M14)" ainda diz que não há pendência de
+  funcionalidade). M24.
+- **Tetos que travam conteúdo:** atlas 223 de 256 camadas, áudio 2,92 de 3,5 MB, bundle 308,3 de
+  350 KB. M25.
 
 **P1 fechada em 2026-09-14: a causa é o navegador, e não há correção do lado do jogo.**
 Num Android, o sistema entrega os botões do controle como **tecla**, e o navegador fica com
@@ -2887,6 +2959,11 @@ M17 alcance (idioma e primeira hora) em paralelo com qualquer um.
 ---
 
 ## 6. Próximo passo recomendado
+
+**Desde 2026-10-19 o roteiro é o M22–M31 do doc 14.** O próximo passo **de código** é o **M23**
+(correções verificadas), na ordem da lista do doc 14 — a coluna perdida primeiro, porque perde
+construção. O próximo passo **do usuário** é o **M22**, que junta os itens 0a, 0 e 1 abaixo, mais
+Firefox e Safari. Os itens abaixo continuam valendo como roteiro detalhado de campo.
 
 0a. **Domínio próprio (2026-10-18), configuração do usuário:**
    - no Cloudflare, um CNAME `craftlite` → `gzomer14.github.io`, só DNS (nuvem cinza);

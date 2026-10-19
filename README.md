@@ -57,6 +57,12 @@ Na terceira volta, a sala passou a seguir o anfitrião entre dimensões: ele atr
 todos vão junto. O anfitrião mantém o mundo rodando em volta de cada convidado, e o boneco mostra
 o item na mão.
 
+**Próximos marcos (2026-10-19).** Uma avaliação geral, ao retomar o projeto, montou o roteiro
+M22–M31 no doc 14: validar em aparelho e declarar o MVP (M22), corrigir os defeitos que ela achou
+(M23), pôr a casa em ordem (M24), abrir folga de atlas, bundle e áudio (M25) e, com ela, conteúdo
+novo — fogueira e caldeirão, bichos, templos e fundo do mar, invasão de saqueadores (M26–M29) —,
+a segunda volta da sala (M30) e o horizonte para aparelhos fortes (M31).
+
 - **M0 — esqueleto:** Vite + TypeScript strict, renderer WebGL2 próprio com fallback WebGL1,
   detecção de tier, loop de 20 Hz com interpolação, gerador procedural de texturas alimentando um
   `TEXTURE_2D_ARRAY`, overlay de debug.
@@ -294,7 +300,7 @@ docs/
   11-persistencia-e-saves.md IndexedDB, formato de save, PWA
   12-multiplayer.md         ganchos de arquitetura, protocolo P2P
   13-assets-e-arte.md       texturas procedurais, sprites, fonte, licença
-  14-roadmap.md             marcos com checklist e critérios de aceite (M0–M19 feitos)
+  14-roadmap.md             marcos com checklist e critérios de aceite (M0–M21 com só o M20 aberto; M22–M31 propostos)
   15-status.md              estado real: status por marco, pendências, próximo passo
   16-auditoria.md           histórico por sessão, com grid de arquivos
   mockups/                  14 wireframes SVG + generate.py

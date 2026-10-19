@@ -12,6 +12,33 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-10-19 22:25 · Deploy da `main` vermelho: o enderman no alto da coluna do End
+
+**Pedido:** *"Recebi um erro no ci de publicação no github pages. Consegue verificar, depois de
+mesclar o pr para main, na etapa de testes"*.
+
+**Resultado:** o job `build` do `pages.yml` (run 39329727396, merge do PR #9) falhou em
+`tests/theend.test.ts` › *enderman no End*: `expected 19 to be 157` — o bloco embaixo do enderman
+era obsidiana, não pedra do End. O teste está assim desde o M19 (2026-09-25) e falhava ao acaso:
+fixava o `session.random`, mas o spawner tem o próprio, e ficava no `Math.random`. Reproduzido:
+**11 de 300 sementes** nasciam o enderman no alto de uma coluna de obsidiana. O defeito é do jogo
+(a regra aceitava qualquer chão sólido), não do teste: a regra ganhou chão por dimensão
+(`groundIn`), e no End é só pedra do End — 0 de 300 depois. O teste agora roda 100 sementes fixas;
+sem a correção, falha com o mesmo erro do deploy (semente 14). Vai junto com o M25, na mesma
+branch.
+
+Portões: 2436 testes (133 arquivos), lint, build e tamanho verdes (299,6 KB em português, 312,5 em
+inglês).
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| ~ | `src/data/mobs.ts` | `SpawnRule.groundIn`; o enderman só na pedra do End no End |
+| ~ | `src/entity/spawn.ts` | `isValidGround` usa o chão da dimensão carregada |
+| ~ | `tests/theend.test.ts` | spawner com aleatório fixo, 100 sementes |
+| ~ | `docs/15-status.md`, `docs/16-auditoria.md` | §4 e esta sessão |
+
+---
+
 ## 2026-10-19 22:15 · M25: folga para crescer
 
 **Pedido:** *"Pode seguir com o M25"* — o próximo marco de código, depois do PR #9 (M24) mesclado.

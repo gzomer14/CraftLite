@@ -17,6 +17,8 @@ abre com 299,6 KB** (folga 50,4). As vozes de mob são geradas na primeira vez q
 atlas vira duas páginas só na GPU que pede. Portões: 2436 testes; `smoke` 9, `smoke:mods` 6,
 `smoke:room` 20, `smoke:camera` 3, `bench:ui` ok. **Próximo passo de código: M26** (§6). Do
 usuário: **M22**.
+Depois, 2026-10-19 22:25: o teste do enderman no End, que falhava ao acaso desde o M19, derrubou o deploy
+da `main` — corrigido o defeito e o teste (§4).
 
 ---
 
@@ -249,6 +251,7 @@ Bugs de marcos fechados corrigidos depois, desde 2026-09-27. **Os de antes (≈1
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-10-19 | `data/mobs.ts`, `entity/spawn.ts`, `tests/theend.test.ts` | **O enderman às vezes nascia no alto de uma coluna de obsidiana do End** (M19), fora de alcance e ocupando a vaga dos hostis da ilha: a regra aceitava qualquer chão sólido. Ninguém viu no jogo; quem viu foi o teste, que deixava o spawner no `Math.random` e falhava em ~1 de 27 rodadas — e assim **derrubou o deploy do GitHub Pages** depois do merge do PR #9 (o CI do PR tinha passado por sorte). Agora a regra tem chão por dimensão (`groundIn`: no End, só pedra do End), e o teste roda 100 sementes fixas; sem a correção, 7 delas falham com o mesmo erro do deploy. |
 | 2026-10-19 | `world/mesh/shapes.ts` | **A regra de canto de escada estava trocada** desde o acabamento pós-M7 (2026-09-14). Um vizinho perpendicular do lado alto fazia canto **interno**, e no gênero (e pela geometria) é **externo**; com o vizinho do lado aberto, o contrário. Numa pirâmide de escadas, a quina saía com o degrau cheio. O teste antigo olhava só um lado da face compartilhada; o novo compara os dois. Mundo salvo não muda, porque o canto é derivado dos vizinhos e não fica no save: a escada já construída passa a mostrar o canto certo. Achado no M23. |
 | 2026-10-19 | `ui/gameflow.ts`, `main.ts` | **Trocar Criativo/Sobrevivência pela pausa fechava a sala da rede local** (M20 × modo de jogo). O fluxo tinha um `saveAll` só, que gravava **e** saía da sala (`leaveRoom`), e a troca de modo grava o mundo: o anfitrião fechava a sala, e o convidado era derrubado. Agora são duas peças, e só *Salvar e Sair* sai. Regressão no `npm run smoke:room`, que falha com o código antigo. Achado na revisão do M23. |
 | 2026-10-19 | `save/serialize.ts` | **Coluna corrompida deixava duas promessas rejeitadas sem dono** (`writer.write` e `writer.close` da descompressão), e o navegador mostrava "Uncaught (in promise)". A falha já chegava pelo `read`; agora as duas têm `catch`. Achado pelo teste do M23. |

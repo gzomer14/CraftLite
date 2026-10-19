@@ -142,6 +142,25 @@ try {
   console.log(`
 pior ação, CPU 6× mais lenta: ${pior} ms (orçamento 600 ms) — ${pior <= 600 ? 'ok' : 'ESTOUROU'}`);
   if (pior > 600) process.exitCode = 1;
+
+  /*
+   * M23: a mochila inteira num T0 deitado (640×360), com o "Fechar" à vista.
+   * Antes ela ia a 410 px e o botão ficava fora da tela.
+   */
+  await cdp.enviar('Emulation.setCPUThrottlingRate', { rate: 1 });
+  await cdp.enviar('Emulation.setDeviceMetricsOverride', {
+    width: 640, height: 360, deviceScaleFactor: 2, mobile: true, screenOrientation: { type: 'landscapePrimary', angle: 90 },
+  });
+  await cdp.avaliar("dispatchEvent(new Event('resize')), true");
+  await esperar(600);
+  const cabe = JSON.parse(await cdp.avaliar(`(() => {
+    const tela = document.getElementById('container-screen');
+    const fechar = tela.querySelector('.close').getBoundingClientRect();
+    return JSON.stringify({ rola: tela.scrollHeight - tela.clientHeight, fechar: Math.round(fechar.bottom), altura: innerHeight });
+  })()`));
+  const ok = cabe.rola <= 0 && cabe.fechar <= cabe.altura;
+  console.log(`mochila em 640×360: sobra ${-cabe.rola} px, "Fechar" termina em ${cabe.fechar} de ${cabe.altura} — ${ok ? 'ok' : 'NÃO CABE'}`);
+  if (!ok) process.exitCode = 1;
 } finally {
   cdp.fechar?.();
   chrome.kill();

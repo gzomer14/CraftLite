@@ -99,27 +99,42 @@ describe('escolha do canto a partir dos vizinhos', () => {
       .toBe(CORNER_NONE);
   });
 
-  it('vizinho perpendicular do lado alto faz canto interno', () => {
+  it('vizinho perpendicular do lado alto faz canto externo (M23: estava trocado)', () => {
     // Nossa metade alta em −X; vizinho em −X com metade alta em +Z.
     const bits = stairWithTall(1);
     const corner = stairCornerFrom(bits, NOT_STAIRS, stairWithTall(2), NOT_STAIRS, NOT_STAIRS);
-    expect(corner & 3).toBe(CORNER_INNER);
+    expect(corner & 3).toBe(CORNER_OUTER);
     // O quarto escolhido é o lado alto do vizinho.
     expect((corner >>> 2) & 3).toBe(2);
   });
 
-  it('vizinho perpendicular do lado aberto faz canto externo', () => {
+  it('vizinho perpendicular do lado aberto faz canto interno', () => {
     // Lado alto em −X ⇒ lado aberto em +X.
     const bits = stairWithTall(1);
     const corner = stairCornerFrom(bits, stairWithTall(3), NOT_STAIRS, NOT_STAIRS, NOT_STAIRS);
-    expect(corner & 3).toBe(CORNER_OUTER);
+    expect(corner & 3).toBe(CORNER_INNER);
     expect((corner >>> 2) & 3).toBe(3);
   });
 
-  it('entre duas perpendiculares, o interno vence e fecha a curva', () => {
+  it('entre duas perpendiculares, o externo vence, como no gênero', () => {
     const bits = stairWithTall(1);
     const corner = stairCornerFrom(bits, stairWithTall(3), stairWithTall(2), NOT_STAIRS, NOT_STAIRS);
-    expect(corner & 3).toBe(CORNER_INNER);
+    expect(corner & 3).toBe(CORNER_OUTER);
+  });
+
+  it('quina de três: com uma escada igual do lado da curva, continua reta', () => {
+    // Externo: vizinho do lado alto (−X) com metade alta em +Z; a curva sairia
+    // para −Z, e lá está uma escada igual à nossa — a fila reta continua.
+    const bits = stairWithTall(1);
+    expect(stairCornerFrom(bits, NOT_STAIRS, stairWithTall(2), NOT_STAIRS, bits))
+      .toBe(CORNER_NONE);
+    // Uma escada diferente ali não impede.
+    expect(stairCornerFrom(bits, NOT_STAIRS, stairWithTall(2), NOT_STAIRS, stairWithTall(2)) & 3)
+      .toBe(CORNER_OUTER);
+    // Interno: vizinho do lado aberto (+X) com metade alta em −Z; a curva
+    // encosta em −Z, e uma escada igual lá mantém a reta.
+    expect(stairCornerFrom(bits, stairWithTall(3), NOT_STAIRS, NOT_STAIRS, bits))
+      .toBe(CORNER_NONE);
   });
 
   it('lado de cima diferente não faz canto', () => {
@@ -133,34 +148,52 @@ describe('escolha do canto a partir dos vizinhos', () => {
 
 describe('continuidade entre duas escadas vizinhas', () => {
   /**
-   * Duas escadas lado a lado: a nossa em (0,0) com metade alta em −X, e a
-   * vizinha em (−1,0) com metade alta em +Z. Elas dividem o plano x = 0.
+   * A propriedade que define o canto certo, medida **dos dois lados** da face
+   * compartilhada (M23). Até o M23 o teste olhava só o nosso lado, e a regra
+   * de interno e externo saiu trocada sem ninguém ver: a nossa faixa alta
+   * batia numa parede baixa do vizinho.
    *
-   * A superfície alta tem que encostar: a faixa da nossa metade alta que fica
-   * do lado alto do vizinho precisa estar cheia dos dois lados.
+   * Para cada direção nossa e cada vizinho perpendicular, dos dois lados (alto
+   * e aberto): ao longo da face, a parte alta de cá e a de lá cobrem os mesmos
+   * pontos. O vizinho é reto (ele não vê a nossa escada no eixo dele).
    */
-  it('o canto interno liga as duas superfícies sem deixar buraco', () => {
-    const ours = 1 ^ 1; // metade alta em −X
-    const theirs = 2 ^ 1; // metade alta em +Z
-    const corner = stairCornerFrom(ours, NOT_STAIRS, theirs, NOT_STAIRS, NOT_STAIRS);
+  const STEP = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const UPPER = 0.75;
 
-    // Do nosso lado, a faixa alta continua cheia junto à face compartilhada.
-    expect(contains(ours, corner, 0.1, 0.75, 0.75)).toBe(true);
-    // E o canto interno acrescentou o quarto do lado +Z da metade aberta.
-    expect(contains(ours, corner, 0.75, 0.75, 0.75)).toBe(true);
-    // O quarto oposto continua aberto: senão não seria escada, seria bloco.
-    expect(contains(ours, corner, 0.75, 0.75, 0.25)).toBe(false);
+  it('dos dois lados da face, a parte alta cobre a mesma faixa', () => {
+    for (let ourTall = 0; ourTall < 4; ourTall++) {
+      const ours = ourTall ^ 1;
+      for (const side of [ourTall, ourTall ^ 1]) {
+        for (let theirTall = 0; theirTall < 4; theirTall++) {
+          if ((theirTall >> 1) === (ourTall >> 1)) continue; // mesmo eixo: não é canto
+          const theirs = theirTall ^ 1;
+          const nb = [NOT_STAIRS, NOT_STAIRS, NOT_STAIRS, NOT_STAIRS];
+          nb[side] = theirs;
+          const corner = stairCornerFrom(ours, nb[0], nb[1], nb[2], nb[3]);
+          const [sx, sz] = STEP[side];
+          for (const t of [0.1, 0.4, 0.6, 0.9]) {
+            // Ponto junto à face, do nosso lado e do lado do vizinho.
+            const ox = sx === 0 ? t : sx > 0 ? 0.99 : 0.01;
+            const oz = sz === 0 ? t : sz > 0 ? 0.99 : 0.01;
+            const tx = sx === 0 ? t : sx > 0 ? 0.01 : 0.99;
+            const tz = sz === 0 ? t : sz > 0 ? 0.01 : 0.99;
+            const here = contains(ours, corner, ox, UPPER, oz);
+            const there = contains(theirs, CORNER_NONE, tx, UPPER, tz);
+            expect(here, `alto ${ourTall}, vizinho em ${side} com alto ${theirTall}, t ${t}`).toBe(there);
+          }
+        }
+      }
+    }
   });
 
-  it('o canto externo deixa só o quarto de fora da curva', () => {
-    const ours = 1 ^ 1;
-    const theirs = 3 ^ 1; // metade alta em −Z
-    const corner = stairCornerFrom(ours, theirs, NOT_STAIRS, NOT_STAIRS, NOT_STAIRS);
-
-    // Sobra o quarto (−X, −Z).
-    expect(contains(ours, corner, 0.25, 0.75, 0.25)).toBe(true);
-    // O resto da metade alta foi embora.
-    expect(contains(ours, corner, 0.25, 0.75, 0.75)).toBe(false);
+  it('telhado em pirâmide: a quina fica com o quarto de dentro, não com o degrau cheio', () => {
+    // Quina NE de uma pirâmide: a nossa sobe para +Z (o centro), o vizinho em
+    // +Z é da beira leste e sobe para −X. Sobra só o quarto (−X, +Z).
+    const ours = 2 ^ 1;
+    const corner = stairCornerFrom(ours, NOT_STAIRS, NOT_STAIRS, 1 ^ 1, NOT_STAIRS);
+    expect(corner & 3).toBe(CORNER_OUTER);
+    expect(contains(ours, corner, 0.25, UPPER, 0.75)).toBe(true);
+    expect(contains(ours, corner, 0.75, UPPER, 0.75)).toBe(false);
   });
 });
 

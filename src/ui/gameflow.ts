@@ -30,7 +30,13 @@ export interface GameFlowDeps {
   touchUi: () => TouchUi;
   /** Opções a partir da pausa; `back` volta para ela. */
   openOptions: (back: () => void) => void;
-  saveAll: () => Promise<void>;
+  /** Grava tudo; `false` se a gravação falhou (M23: aí "Salvar e Sair" não recarrega). */
+  saveAll: () => Promise<boolean>;
+  /**
+   * Fecha a sala ou se despede dela (M20). À parte do `saveAll` desde o M23:
+   * juntos, trocar o modo de jogo pela pausa — que grava — fechava a sala.
+   */
+  leaveRoom: () => Promise<void>;
   /** Sala na rede local (M20); ausente para o convidado, que não abre sala. */
   onNetwork?: () => void;
   networkLabel?: () => string;
@@ -68,7 +74,15 @@ export class GameFlow {
       onSaveAndQuit: () => {
         this.pauseMenu.setStatus(t('pause.saving'));
         void (async () => {
-          await deps.saveAll();
+          /*
+           * Com a gravação falhando (cota cheia, M23), recarregar jogaria fora
+           * o que não foi gravado — e a tela de cota cheia, que acabou de abrir.
+           */
+          if (!await deps.saveAll()) {
+            this.pauseMenu.setStatus(t('storefull.later'));
+            return;
+          }
+          await deps.leaveRoom();
           // Recarregar é a saída honesta para voltar ao título: garante que nada
           // do mundo antigo (workers, VBOs, listeners) sobreviva ao próximo.
           location.reload();

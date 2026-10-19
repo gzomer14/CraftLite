@@ -273,6 +273,39 @@ try {
   })()`);
   const lido = await ate(host, "document.querySelector('#chat .lines')?.textContent.includes('Visita: oi, cheguei') ?? false", 10000);
   passo('o anfitrião lê no chat o que o convidado escreveu', lido === true);
+
+  // 10b. Trocar o modo de jogo pela pausa grava o mundo — e até o M23 o mesmo
+  // `saveAll` fechava a sala. O convidado tem que continuar dentro.
+  const esc = "window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', key: 'Escape', bubbles: true })), true";
+  const pausaAntes = await host.avaliar("__smoke.visivel('pause-menu')");
+  if (pausaAntes !== true) {
+    await host.avaliar(esc);
+    await ate(host, "__smoke.visivel('pause-menu')", 10000);
+  }
+  // O save da troca de modo é inteiro (chunks, miniatura) e leva segundos; a
+  // sala fechava logo **depois** dele. O embrulho conta os saves terminados,
+  // e a sala é conferida meio segundo depois de cada um.
+  await host.avaliar(`(() => {
+    const s = window.__craftlite.save;
+    const original = s.saveAll.bind(s);
+    window.__savesFeitos = 0;
+    s.saveAll = async () => { await original(); window.__savesFeitos++; };
+    return true;
+  })()`);
+  const salaDepoisDoSave = async (n) => {
+    await host.avaliar("__smoke.botao(__smoke.tela('pause-menu'), 'Mudar para').click(), true");
+    await ate(host, `window.__savesFeitos >= ${n}`, 30000);
+    await esperar(500);
+    return host.avaliar(`(() => {
+      const r = window.__craftliteNet?.room();
+      if (r === null || r === undefined || r.open !== true) return 'sala fechada';
+      return r.guests.filter((g) => g.ready).map((g) => g.name).join(',');
+    })()`);
+  };
+  const aindaLa = await salaDepoisDoSave(1);
+  await salaDepoisDoSave(2); // volta ao modo de antes
+  if (pausaAntes !== true) await host.avaliar(esc);
+  passo('trocar o modo de jogo pela pausa não fecha a sala', aindaLa === 'Visita', String(aindaLa));
   // `SMOKE_SHOT=arquivo.png`: a tela do anfitrião agora (nome e chat), para ver com os olhos.
   if (process.env.SMOKE_SHOT) {
     await host.avaliar("(__smoke.botao(document, 'Voltar ao jogo')?.click(), true)");

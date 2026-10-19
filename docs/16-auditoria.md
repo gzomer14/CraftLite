@@ -12,6 +12,67 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-10-19 17:47 · M23: correções verificadas
+
+**Pedido:** *"Pode seguir com o M23"*.
+
+**Resultado:**
+- **Save:**
+  - a coluna descarregada não se perde mais quando a gravação falha (fila de órfãs);
+  - a cota cheia abre a tela do doc 11 §4;
+  - a coluna corrompida vai para a quarentena, com aviso.
+- **Fogo:** o mob pega fogo no fogo e apaga na água; a chama aparece no mob (partícula) e na borda
+  da tela do jogador.
+- **Tela:** a dica de teclado está abaixo da mira; a mochila cabe em 640×360, com o *Fechar* na
+  linha do título.
+- **Sala:** o save do convidado sai também quando o inventário muda (até um por segundo).
+- **Escada:** a quina de três entrou, sem alocação no mesher. **A regra de canto estava trocada
+  desde 2026-09-14** (doc 15 §4) e foi desvirada, com um teste que mede os dois lados da face.
+- **Achados no caminho:**
+  - promessas rejeitadas sem dono na descompressão de coluna corrompida;
+  - na revisão do diff: trocar o modo de jogo pela pausa **fechava a sala** do M20 (o `saveAll`
+    também saía dela), e *Salvar e Sair* com a cota cheia recarregava a página por cima da tela
+    nova.
+
+Portões: 2423 testes (129 arquivos); lint, build e tamanho verdes (311,0 KB, +2,7). Smokes
+verdes: `smoke` 9 passos (+2, cota cheia), `smoke:mods` 6, `smoke:room` 20 (+1, troca de modo com
+a sala aberta). `bench:ui` passa, com a mochila conferida em 640×360.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| ~ | `src/save/savemanager.ts` | fila de colunas órfãs; `isQuotaError`; quarentena e `onCorrupt` |
+| ~ | `src/save/serialize.ts` | `catch` nas promessas de escrita da descompressão |
+| ~ | `src/game/savegame.ts` | `onError` com a marca de cota; `onCorrupt` e `onSaved` |
+| + | `src/ui/screens/storagefull.ts` | tela de cota cheia e a regra `QuotaGate` |
+| + | `src/ui/savealerts.ts` | liga os avisos do save à HUD, à tela e à pausa |
+| ~ | `src/main.ts` | usa `saveAlerts` (698 linhas); `saveAll` e `leaveRoom` separados; `save` no gancho do smoke |
+| ~ | `src/ui/gameflow.ts` | `saveAll` devolve se gravou; *Salvar e Sair* não recarrega com falha; `leaveRoom` à parte |
+| ~ | `src/entity/mobrules.ts` | fogo acende e fere, água apaga |
+| ~ | `src/game/ambient.ts` | `emitBurningMobs` |
+| ~ | `src/render/ambience.ts` | fagulha nos mobs em chamas |
+| ~ | `src/game/survival.ts` | `burning` |
+| + | `src/ui/burnoverlay.ts` | borda de fogo na tela |
+| ~ | `src/ui/hudfeed.ts` | atualiza a borda de fogo |
+| ~ | `src/ui/controlhint.ts` | `HINT_CSS` abaixo da mira |
+| ~ | `src/ui/containers/screenstyle.ts` | *Fechar* na linha do título com a tela deitada e baixa |
+| + | `src/net/savecadence.ts` | quando o convidado manda o save |
+| ~ | `src/net/guest.ts` | usa `SaveCadence` |
+| ~ | `src/world/mesh/shapes.ts` | regra de canto desvirada, quina de três, sem array |
+| ~ | `src/data/strings/pt.ts`, `en.ts` | textos da cota cheia e da coluna corrompida |
+| ~ | `scripts/smoke.mjs` | passos da cota cheia |
+| ~ | `scripts/bench-ui.mjs` | a mochila em 640×360 |
+| ~ | `scripts/smoke-room.mjs` | a troca de modo com a sala aberta não a fecha |
+| + | `tests/savefailure.test.ts` | órfãs, quarentena, cota até a UI |
+| + | `tests/mobfire.test.ts` | fogo, água, imunes, fagulha, `burning` |
+| + | `tests/m23polish.test.ts` | dica e cadência do save do convidado |
+| ~ | `tests/staircorners.test.ts` | regra desvirada, quina de três, continuidade dos dois lados |
+| ~ | `docs/14-roadmap.md` | M23 ✅ com desvios |
+| ~ | `docs/15-status.md` | data; §1, §2, §3 (M23), §4, §5, §6 |
+| ~ | `README.md` | M23 e contagem de testes |
+| ~ | `docs/16-auditoria.md` | esta sessão |
+
+---
+
 ## 2026-10-19 17:17 · Avaliação geral e o roteiro M22–M31
 
 **Pedido:** *"De uma analisada geral detalhada, para entender o que falta de desenvolvimento, se

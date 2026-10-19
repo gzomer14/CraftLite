@@ -131,6 +131,11 @@ export class Survival implements EffectTarget {
    * bola de fogo do blaze). A água apaga; Resistência ao Fogo ignora.
    */
   burnTicks = 0;
+  /**
+   * Em chamas neste tick: fogo, lava ou ainda ardendo (M23). Só a tela lê —
+   * até o M23 o jogador pegava fogo sem ver a chama, só o coração descendo.
+   */
+  burning = false;
 
   /** Chamado ao morrer. */
   onDeath: ((cause: DamageCause) => void) | null = null;
@@ -168,7 +173,7 @@ export class Survival implements EffectTarget {
    */
   tick(context: SurvivalContext): void {
     if (this.invulnerable > 0) this.invulnerable--;
-    if (this.isDead) return;
+    if (this.isDead) { this.burning = false; return; }
 
     this.effects.tick(this);
     this.consumeExhaustion();
@@ -253,6 +258,7 @@ export class Survival implements EffectTarget {
     if (context.inWater === true || context.submerged || fireproof) this.burnTicks = 0;
     else if (this.burnTicks > 0) this.burnTicks--;
     if (context.inLava && !fireproof) this.damage(4, 'lava');
+    this.burning = !fireproof && (context.onFire || context.inLava || this.burnTicks > 0);
     /*
      * Fogo: metade do dano da lava e a cada meio segundo, não a cada tick.
      *

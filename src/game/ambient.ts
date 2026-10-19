@@ -22,6 +22,7 @@ import {
   FACING_STEP, MOUNT_FLOOR, TORCH_FLOOR_TOP, TORCH_WALL_TOP, TORCH_WALL_Y1,
 } from '../world/mesh/shapes';
 import type { World } from '../world/world';
+import type { MobStore } from '../entity/mobstore';
 
 /** Raio do cubo sorteado, em blocos. Além disso a fagulha não se vê. */
 export const SPARK_RADIUS = 8;
@@ -66,6 +67,40 @@ export function emitTorchSparks(
       );
     }
     count++;
+  }
+  return count;
+}
+
+/** Raio em que o mob em chamas solta fagulha; mais longe a fagulha não se vê. */
+export const BURN_RADIUS = 32;
+
+/**
+ * Chama no mob que arde (M23): duas fagulhas por tick, sorteadas no corpo. Até
+ * o M23 o zumbi queimando de manhã só piscava ao levar o dano — de longe não
+ * dava para saber que ele ia morrer sozinho. Usa o mesmo emissor da tocha, e o
+ * pool cheio para de aceitar como sempre.
+ */
+export function emitBurningMobs(
+  store: MobStore, px: number, pz: number,
+  emit: (x: number, y: number, z: number) => void,
+  random: () => number = Math.random,
+): number {
+  let count = 0;
+  for (let i = 0; i < store.active; i++) {
+    if (store.fireTicks[i] <= 0) continue;
+    const dx = store.x[i] - px;
+    const dz = store.z[i] - pz;
+    if (dx * dx + dz * dz > BURN_RADIUS * BURN_RADIUS) continue;
+    const width = store.width(i);
+    const height = store.height(i);
+    for (let k = 0; k < 2; k++) {
+      emit(
+        store.x[i] + (random() - 0.5) * width,
+        store.y[i] + random() * height,
+        store.z[i] + (random() - 0.5) * width,
+      );
+      count++;
+    }
   }
   return count;
 }

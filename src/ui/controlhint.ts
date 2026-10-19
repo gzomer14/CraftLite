@@ -9,6 +9,18 @@ import type { Controls } from '../input/controls';
 import type { Gamepads } from '../input/gamepad';
 import type { TouchMode } from '../game/settings';
 
+/**
+ * Logo abaixo da mira, e não colada no chão (M23). Em `bottom: 30 × --px` a
+ * dica caía na faixa da vida e da fome (`bottom: 33 × --px` no `hud.ts`), e
+ * com o ponteiro solto o jogador não via os corações. Abaixo da mira ela fica
+ * no meio da tela, onde se lê "clique para jogar", e acima de qualquer aviso.
+ * `pre-line` porque a linha do controle entra como um segundo parágrafo.
+ */
+export const HINT_CSS = `#hint{position:fixed;left:50%;top:calc(50% + 14 * var(--px, 3px));
+    transform:translateX(-50%);padding:6px 12px;background:#00000080;color:#fff;
+    font:12px/1.4 ui-monospace,monospace;pointer-events:none;transition:opacity .3s;
+    text-align:center;max-width:90vw;z-index:5;white-space:pre-line}`;
+
 export function showHint(
   controls: Controls, isTouch: boolean, gamepads: Gamepads, touchMode: TouchMode,
 ): void {
@@ -40,11 +52,7 @@ export function showHint(
 
   document.body.appendChild(hint);
   const style = document.createElement('style');
-  // `pre-line` porque a linha do controle entra como um segundo parágrafo.
-  style.textContent = `#hint{position:fixed;left:50%;bottom:calc(30 * var(--px, 3px));
-    transform:translateX(-50%);padding:6px 12px;background:#00000080;color:#fff;
-    font:12px/1.4 ui-monospace,monospace;pointer-events:none;transition:opacity .3s;
-    text-align:center;max-width:90vw;z-index:5;white-space:pre-line}`;
+  style.textContent = HINT_CSS;
   document.head.appendChild(style);
 
   if (isTouch) {

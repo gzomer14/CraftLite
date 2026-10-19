@@ -791,7 +791,7 @@ inventário). Nenhuma issue nem PR aberto no GitHub.
 
 ```
 M22 aparelho e MVP (do usuário, em paralelo com tudo)
-M23 correções ──► M24 casa em ordem ──► M25 folga ──► M26 aconchego ─┐
+M23 correções ✅ ──► M24 casa em ordem ──► M25 folga ──► M26 aconchego ─┐
                                                    ├─► M27 bichos    ├─► M29 ameaça
                                                    └─► M28 lugares ──┘
 M30 sala, segunda volta (depois do aceite do M20 no M22)
@@ -828,42 +828,67 @@ navegadores com resultado (funciona / degrada / quebra, e onde).
 
 ---
 
-## M23 — Correções verificadas ⬜
+## M23 — Correções verificadas ✅
 
 > Defeitos achados na avaliação de 2026-10-19, todos conferidos no código. Cada um entra com
-> teste de regressão, como manda o CLAUDE.md.
+> teste de regressão, como manda o CLAUDE.md. **Fechado em 2026-10-19** — detalhe no doc 15 §3.
 
-- [ ] **Coluna perdida se a gravação falha na descarga** (`save/savemanager.ts`,
+- [x] **Coluna perdida se a gravação falha na descarga** (`save/savemanager.ts`,
       `saveAndForget`): a coluna sai de `dirty` **antes** do `putChunks`; se a gravação falhar
       (cota cheia, aba fechando), ela já saiu da memória e não volta a nenhuma fila. Guardar o
-      comprimido numa fila de nova tentativa até gravar.
-- [ ] **Cota cheia como o doc 11 §4 manda:** hoje `QuotaExceededError` vira uma linha de HUD de 6 s
+      comprimido numa fila de nova tentativa até gravar. **Feito:** a coluna órfã espera
+      comprimida, vai para o disco no próximo `flush`, e quem a pede antes disso (o pipeline ou o
+      convidado da sala) a recebe da fila, não da seed.
+- [x] **Cota cheia como o doc 11 §4 manda:** hoje `QuotaExceededError` vira uma linha de HUD de 6 s
       (`main.ts`, `store.save_failed`) e o jogo segue sem salvar. Pausar, explicar e oferecer a tela
-      de mundos com o tamanho de cada um (que já existe, M7) para apagar.
-- [ ] **Coluna corrompida some calada** (`savemanager.ts`, `loadChunk`): o `catch` devolve `null` e
+      de mundos com o tamanho de cada um (que já existe, M7) para apagar. **Feito**
+      (`ui/screens/storagefull.ts`): a tela pausa, mostra o espaço usado, lista os outros mundos
+      do maior para o menor com *Apagar*, e tem *Tentar salvar de novo* e *Continuar sem salvar*.
+      *Desvio:* a lista está na própria tela, e não na tela de mundos — sair do mundo aberto com o
+      save falhando perderia o que não foi gravado.
+- [x] **Coluna corrompida some calada** (`savemanager.ts`, `loadChunk`): o `catch` devolve `null` e
       o terreno da seed toma o lugar do que foi construído. Avisar o jogador e **não** sobrescrever
-      o registro até ele decidir (guardar os bytes originais para recuperar depois).
-- [ ] **Fogo nos mobs** (`entity/mobrules.ts`, `environmentHarm`): bloco de fogo não acende o mob,
+      o registro até ele decidir (guardar os bytes originais para recuperar depois). **Feito com
+      desvio:** os bytes vão para a quarentena (`<mundo>.corrupt.<cx>.<cz>`) e o jogador é
+      avisado; não há tela de decisão, porque para um registro que o jogo não lê ela só poderia
+      oferecer "gerar de novo" (comentário de `quarantine`).
+- [x] **Fogo nos mobs** (`entity/mobrules.ts`, `environmentHarm`): bloco de fogo não acende o mob,
       água não apaga (o zumbi que pega fogo de dia e pula no rio continua queimando), e nem o mob
       nem o jogador **mostram a chama** — o jogador só vê o coração descer. Chama no modelo do mob
       (camada no passe de entidades) e na borda da tela do jogador, os dois desligados com o fogo
-      apagado.
-- [ ] **A dica de teclado cobre os corações** com o ponteiro solto (`ui/controlhint.ts`: a dica
+      apagado. **Feito:** fogo acende e fere, água apaga e vence o sol. *Desvio:* a chama do mob
+      é de partícula (duas fagulhas por tick, o emissor das tochas), não uma camada no passe de
+      entidades — custa zero draw call. A tela do jogador ganhou a borda de fogo
+      (`ui/burnoverlay.ts`), embaixo da vida. O convidado da sala não vê a chama dos mobs (o
+      `fireTicks` não viaja).
+- [x] **A dica de teclado cobre os corações** com o ponteiro solto (`ui/controlhint.ts`: a dica
       fica a `30 × --px` do chão, na faixa da vida e da fome). Subir para cima da faixa ou para o
-      centro.
-- [ ] **A mochila não cabe num T0 deitado:** em 640×360 o painel vai até 410 px e a tela rola
+      centro. **Feito:** logo abaixo da mira.
+- [x] **A mochila não cabe num T0 deitado:** em 640×360 o painel vai até 410 px e a tela rola
       (conferido no Chrome com toque emulado). Compactar a linha de baixo ou a margem para caber
-      sem rolagem a partir de 360 px de altura.
-- [ ] **O convidado que cai perde até 10 s** (`net/guest.ts`, `SAVE_EVERY = 200`): mandar o save
-      também quando o inventário muda, com teto de um por segundo.
-- [ ] **Escada em quina de três** (doc 15 §6, item 13): `stairCornerFrom` não confere a escada de
+      sem rolagem a partir de 360 px de altura. **Feito:** o que ficava fora era o botão
+      *Fechar*; deitado, ele sobe para a linha do título. `npm run bench:ui` cobra.
+- [x] **O convidado que cai perde até 10 s** (`net/guest.ts`, `SAVE_EVERY = 200`): mandar o save
+      também quando o inventário muda, com teto de um por segundo. **Feito**
+      (`net/savecadence.ts`).
+- [x] **Escada em quina de três** (doc 15 §6, item 13): `stairCornerFrom` não confere a escada de
       mesma direção ao lado, que no gênero impede o canto. E a mesma função **aloca um array por
-      escada** no mesher (`const neighbors = [...]`), contra a regra do caminho quente.
-- [ ] **Doc 15 contradiz a si mesmo:** o cabeçalho do M3 no §3 ainda diz ⚠️ e o §1 diz validado.
+      escada** no mesher (`const neighbors = [...]`), contra a regra do caminho quente. **Feito, e
+      achou um defeito maior:** a regra de canto estava **trocada** desde o acabamento pós-M7 —
+      vizinho do lado alto fazia canto interno, e é externo. O teste novo mede a continuidade dos
+      dois lados da face.
+- [x] **Doc 15 contradiz a si mesmo:** o cabeçalho do M3 no §3 ainda diz ⚠️ e o §1 diz validado.
       *(Corrigido junto com esta avaliação.)*
+- [x] **Achados no caminho:** a coluna corrompida deixava duas promessas rejeitadas sem dono na
+      descompressão (`save/serialize.ts`), "Uncaught (in promise)" no console; e trocar o modo
+      de jogo pela pausa **fechava a sala** do M20, porque o mesmo `saveAll` gravava e saía da
+      sala (`ui/gameflow.ts`). Os dois corrigidos, com regressão.
 
 **Critério de aceite:** um teste de regressão por item; o smoke do jogo com uma gravação que falha
-de propósito (cota simulada) mostra a tela de cota cheia e não perde a coluna.
+de propósito (cota simulada) mostra a tela de cota cheia e não perde a coluna. **Cumprido:**
+`tests/savefailure.test.ts`, `mobfire.test.ts`, `m23polish.test.ts` e `staircorners.test.ts`;
+`npm run smoke` com dois passos novos (a tela abre com o banco recusando, e com o espaço de volta
+grava e fecha; o bloco quebrado continua quebrado depois de recarregar).
 
 ---
 
@@ -871,7 +896,7 @@ de propósito (cota simulada) mostra a tela de cota cheia e não perde a coluna.
 
 - [ ] **Módulos acima de 700 linhas** (fora as tabelas de dados): `ui/hud.ts` 738,
       `entity/mobs.ts` 716, `game/session.ts` 715, `world/pipeline.ts` 714,
-      `render/itemsprites.ts` 713, `world/mesh/shapes.ts` 899. Corte por papel, como no M18.
+      `render/itemsprites.ts` 713, `world/mesh/shapes.ts` 919 (899 antes do M23). Corte por papel, como no M18.
 - [ ] **O doc 15 de volta a ser foto:** 3 300 linhas e 318 KB, com parágrafos de setembro que não
       valem mais (o §5 ainda diz "não há pendência de funcionalidade" no meio das pendências). O
       histórico de cada volta vai para o doc 16, que já é o histórico; o 15 fica com o §1, as

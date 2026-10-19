@@ -10,6 +10,7 @@ import { ITEM_BY_NAME } from '../data/items';
 import { dimensionOf } from '../data/dimensions';
 import { clockFrame, compassFrame, spinFrame } from './dials';
 import { updateDebugSource } from './debugsource';
+import { BurnOverlay } from './burnoverlay';
 import type { AudioEngine } from '../audio/engine';
 import type { GameLoop } from '../core/loop';
 import type { Controls } from '../input/controls';
@@ -53,6 +54,7 @@ export class HudFeed {
   private readonly d: HudFeedDeps;
   /** A fonte do F3, reusada — o overlay lê daqui, nunca de um objeto novo. */
   readonly debugSource: DebugSource;
+  private readonly burn = new BurnOverlay();
 
   constructor(deps: HudFeedDeps) {
     this.d = deps;
@@ -108,6 +110,7 @@ export class HudFeed {
     hud.setStats(survival.health, survival.hunger, survival.air, MAX_AIR, session.armorPoints);
     hud.setExperience(session.xp.level, session.xp.progress);
     effectsBar.update(survival.effects, survival.absorption);
+    this.burn.update(session.player.mode === 'survival' && survival.burning);
     this.d.bossBar?.update(session.dragonFight.bossHealth);
     hud.setFps(loop.stats.fps, settings.get('showFps'));
     if (touchUi !== null) {

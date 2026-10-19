@@ -7,7 +7,7 @@
 
 import { defOf } from '../data/blocks';
 import { blockSound } from '../audio/synth';
-import { emitTorchSparks } from '../game/ambient';
+import { emitBurningMobs, emitTorchSparks } from '../game/ambient';
 import type { AudioEngine } from '../audio/engine';
 import type { Renderer } from './renderer';
 import type { Session } from '../game/session';
@@ -60,6 +60,7 @@ export class Ambience {
      * aparece nem em T0. O emissor desiste sozinho quando o pool enche.
      */
     emitTorchSparks(session.world, player.x, player.y, player.z, 2, this.spark);
+    emitBurningMobs(session.mobs.store, player.x, player.z, this.spark);
     // Chuva: gotas em volta do jogador, no mesmo pool (doc 03 §8).
     const weather = session.weather;
     if (weather.isRaining) {

@@ -21,7 +21,7 @@ import { Container, Furnace, type ContainerKind } from './container';
 import { BrewingStand } from './brewing';
 import type { SignRecord } from './signs';
 import { TICKS_PER_DAY } from './daynight';
-import { AUTOSAVE_TICKS, type SaveManager } from '../save/savemanager';
+import { AUTOSAVE_TICKS, isQuotaError, type SaveManager } from '../save/savemanager';
 import type { PlayerSave, WorldMeta } from '../save/db';
 import type { Player } from '../entity/player';
 import type { Session, VehicleRecord } from './session';
@@ -60,8 +60,15 @@ export interface ContainerRecord {
 }
 
 export interface SaveGameOptions {
-  /** Chamado quando a gravação falha, para a UI avisar. */
-  onError?: (message: string) => void;
+  /**
+   * Chamado quando a gravação falha, para a UI avisar. `quota` diz se foi falta
+   * de espaço, que o doc 11 §4 trata com tela própria (M23).
+   */
+  onError?: (message: string, quota: boolean) => void;
+  /** Uma coluna gravada não abriu e foi gerada de novo (M23). */
+  onCorrupt?: (cx: number, cz: number) => void;
+  /** Um `saveAll` inteiro gravou sem falha (M23: a cota voltou a ter espaço). */
+  onSaved?: () => void;
   /**
    * Miniatura do mundo em PNG, ou `null` se não houver uma pronta.
    *
@@ -97,7 +104,8 @@ export class SaveGame {
     this.meta = meta;
     this.options = options;
     // Falha ao gravar chunk também é falha de save, e chega ao mesmo aviso.
-    manager.onError = (message) => this.options.onError?.(message);
+    manager.onError = (message, quota) => this.options.onError?.(message, quota);
+    manager.onCorrupt = (cx, cz) => this.options.onCorrupt?.(cx, cz);
   }
 
   get worldMeta(): WorldMeta {
@@ -154,7 +162,7 @@ export class SaveGame {
       await this.manager.setDimension(dimension);
       await this.loadDimensionState();
     } catch (error) {
-      this.options.onError?.(error instanceof Error ? error.message : String(error));
+      this.reportError(error);
     }
   }
 
@@ -299,8 +307,9 @@ export class SaveGame {
       await this.manager.saveWorldMeta(this.meta);
       const png = this.options.captureThumbnail?.() ?? null;
       if (png !== null) await this.manager.saveThumbnail(png);
+      this.options.onSaved?.();
     } catch (error) {
-      this.options.onError?.(error instanceof Error ? error.message : String(error));
+      this.reportError(error);
     }
   }
 
@@ -317,6 +326,10 @@ export class SaveGame {
     map.dirty.clear();
     map.forgotten.clear();
     await this.manager.saveMapRegions(changed, forgotten, [...map.regions.keys()]);
+  }
+
+  private reportError(error: unknown): void {
+    this.options.onError?.(error instanceof Error ? error.message : String(error), isQuotaError(error));
   }
 
   /**

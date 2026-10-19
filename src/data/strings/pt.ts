@@ -580,6 +580,19 @@ export const PT = {
   'objective.new': 'faça algo novo',
   // save
   'store.save_failed': 'Falha ao salvar: {0}',
+  // cota cheia e coluna corrompida (M23, doc 11 §4)
+  'store.corrupt': 'Uma parte do mundo em ({0}, {1}) não abriu e foi gerada de novo. O original foi guardado.',
+  'storefull.title': 'Armazenamento cheio',
+  'storefull.body': 'O navegador não deixou gravar o mundo: o espaço acabou. Até liberar espaço, o que você fizer não fica salvo.',
+  'storefull.usage': 'Usado: {0} de {1}.',
+  'storefull.others': 'Outros mundos neste aparelho',
+  'storefull.none_other': 'Não há outro mundo para apagar. Exporte este mundo em Mundos e libere espaço no navegador.',
+  'storefull.delete': 'Apagar',
+  'storefull.retry': 'Tentar salvar de novo',
+  'storefull.continue': 'Continuar sem salvar',
+  'storefull.saving': 'Salvando…',
+  'storefull.still_full': 'Ainda sem espaço.',
+  'storefull.later': 'Sem espaço: o mundo não está sendo salvo.',
   // primeira hora guiada (M17)
   'hud.tip': 'Dica — {0}',
   'guide.log': 'Mire num tronco de árvore e {0} até ele quebrar. Junte três.',

@@ -322,8 +322,13 @@ async function pipeThrough(
   data: Uint8Array, stream: { readable: ReadableStream; writable: WritableStream },
 ): Promise<Uint8Array> {
   const writer = stream.writable.getWriter();
-  void writer.write(data);
-  void writer.close();
+  /*
+   * Com dado corrompido, `write` e `close` rejeitam junto com o `read` abaixo.
+   * Quem decide é o `read`; sem o `catch` aqui as duas rejeições ficavam sem
+   * dono e viravam "Uncaught (in promise)" no console (achado no M23).
+   */
+  writer.write(data).catch(ignore);
+  writer.close().catch(ignore);
 
   const reader = stream.readable.getReader();
   const chunks: Uint8Array[] = [];
@@ -343,4 +348,8 @@ async function pipeThrough(
     offset += part.length;
   }
   return out;
+}
+
+function ignore(): void {
+  // A falha chega pelo `reader.read()`.
 }

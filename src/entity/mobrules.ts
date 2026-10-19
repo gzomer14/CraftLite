@@ -5,7 +5,7 @@
  * Funções sem estado: quem guarda o pool e dispara os eventos é `Mobs`.
  */
 
-import { LAVA, blockIdOf } from '../data/blocks';
+import { BLOCK_BY_NAME, LAVA, WATER, blockIdOf } from '../data/blocks';
 import { ITEM_BY_NAME } from '../data/items';
 import { mobDef } from '../data/mobs';
 import { lootingBonus } from '../game/enchanting';
@@ -95,6 +95,10 @@ const SUNLIGHT_FIRE_TICKS = 160;
 /** Dano de lava por meio segundo, e quanto tempo o mob continua queimando. */
 const LAVA_DAMAGE = 4;
 const LAVA_FIRE_TICKS = 100;
+/** Bloco de fogo (M23): acende como o sol e fere como o jogador ferido nele. */
+const FIRE = BLOCK_BY_NAME.get('fire')?.id ?? -1;
+const FIRE_BLOCK_TICKS = 160;
+const FIRE_BLOCK_DAMAGE = 1;
 
 /**
  * Fogo, lava, void e sol: acende o fogo e devolve o dano deste tick (0 =
@@ -109,12 +113,27 @@ export function environmentHarm(
   s: MobStore, i: number, world: World, isDay: boolean, skyLight: number, tickCount: number,
 ): number {
   const def = mobDef(s.type[i]);
+  /*
+   * M23: até aqui só sol e lava acendiam o mob — o zumbi atravessava o
+   * incêndio do campo sem pegar fogo —, e nada apagava: o que pegou fogo de
+   * dia e pulou no rio continuava queimando até o fim. Água vem por último e
+   * vence tudo, inclusive o sol, como para o jogador (`survival.ts`).
+   */
+  const feet = blockIdOf(world.getBlock(Math.floor(s.x[i]), Math.floor(s.y[i] + 0.1), Math.floor(s.z[i])));
+  if (feet === WATER) {
+    s.fireTicks[i] = 0;
+    return s.y[i] < -4 ? 4 : 0;
+  }
   if (def.traits.burnsInSunlight === true && isDay && skyLight >= 15 && s.fireTicks[i] <= 0) {
     s.fireTicks[i] = SUNLIGHT_FIRE_TICKS;
   }
-  if (def.traits.fireImmune !== true && inLava(s, i, world)) {
+  if (def.traits.fireImmune !== true && feet === LAVA) {
     s.fireTicks[i] = LAVA_FIRE_TICKS;
     if (tickCount % 10 === 0) return LAVA_DAMAGE;
+  }
+  if (def.traits.fireImmune !== true && (feet === FIRE || headIn(s, i, world) === FIRE)) {
+    if (s.fireTicks[i] < FIRE_BLOCK_TICKS) s.fireTicks[i] = FIRE_BLOCK_TICKS;
+    if (tickCount % 10 === 0) return FIRE_BLOCK_DAMAGE;
   }
   if (s.fireTicks[i] > 0 && def.traits.fireImmune !== true) {
     s.fireTicks[i]--;
@@ -123,9 +142,9 @@ export function environmentHarm(
   return s.y[i] < -4 ? 4 : 0;
 }
 
-/** true se os pés do mob estão dentro de lava. */
-function inLava(s: MobStore, i: number, world: World): boolean {
+/** O bloco na altura da cabeça do mob. */
+function headIn(s: MobStore, i: number, world: World): number {
   return blockIdOf(world.getBlock(
-    Math.floor(s.x[i]), Math.floor(s.y[i] + 0.1), Math.floor(s.z[i]),
-  )) === LAVA;
+    Math.floor(s.x[i]), Math.floor(s.y[i] + s.height(i) * 0.85), Math.floor(s.z[i]),
+  ));
 }

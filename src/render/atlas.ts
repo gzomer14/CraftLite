@@ -5,6 +5,14 @@
  * independente de quantos blocos diferentes ela tem.
  * WebGL1 → atlas 2D 256×256 (16×16 tiles) com padding para evitar bleeding.
  *
+ * **Duas páginas (M25):** o vértice endereça 512 camadas, e o GLES 3.0 só
+ * garante 256 por array. Se o jogo tiver mais camadas do que a GPU aceita num
+ * array, o atlas vira duas texturas e os programas que o amostram compilam com
+ * `ATLAS_PAGES` (`shaders/atlaspages.ts`). Com as 223 camadas de hoje, e numa
+ * GPU que aceita 2048, é uma página só, como sempre foi. Para ver as duas
+ * páginas funcionando sem esperar o conteúdo crescer: `?atlasLayers=128` na
+ * URL (`render/gl.ts`).
+ *
  * Nada é baixado: os pixels vêm do motor procedural (doc 13). O único jeito de
  * um pixel de fora entrar é o resource pack do próprio jogador — ver
  * `render/pack.ts` e o `overrides` do construtor.
@@ -16,6 +24,8 @@ import { applyFinish } from './texfinish';
 import { buildLayerIndex, type LayerIndex } from './layers';
 import { TEX_SIZE, renderRecipe, type Canvas16, type TexRecipe } from './texgen';
 import type { AnyGL, GlContext } from './gl';
+import { MAX_ATLAS_LAYERS } from './vertex';
+import { ATLAS_HIGH_UNIT } from './shaders/atlaspages';
 
 const MIP_LEVELS = 3; // 16×16, 8×8, 4×4 (doc 01 §5.2: mipmaps até nível 2)
 
@@ -30,6 +40,10 @@ export interface AtlasLayer {
 
 export class Atlas {
   readonly texture: WebGLTexture;
+  /** A segunda página (M25), ou `null` com uma página só. */
+  readonly textureHigh: WebGLTexture | null = null;
+  /** Primeira camada da segunda página; 0 com uma página só. */
+  readonly split: number = 0;
   readonly isArray: boolean;
   /** Lado do atlas 2D no fallback; 0 em WebGL2. */
   readonly atlasSize: number;
@@ -75,6 +89,9 @@ export class Atlas {
     this.isArray = ctx.gl2 !== null;
 
     const pixels = buildPixels(this.layers, this.layerIndex, overrides, style);
+    if (pixels.length > MAX_ATLAS_LAYERS) {
+      throw new Error(`Atlas com ${pixels.length} camadas; o vértice endereça ${MAX_ATLAS_LAYERS}.`);
+    }
     this.layerCount = pixels.length;
     this.averages = computeAverages(pixels);
     this.pixelData = pixels;
@@ -82,7 +99,17 @@ export class Atlas {
     if (ctx.gl2 !== null) {
       this.atlasSize = 0;
       this.tilesPerRow = 0;
-      this.texture = uploadArray(ctx.gl2, pixels);
+      const perPage = ctx.caps.maxArrayLayers;
+      if (pixels.length <= perPage) {
+        this.texture = uploadArray(ctx.gl2, pixels);
+      } else {
+        if (pixels.length > perPage * 2) {
+          throw new Error(`Atlas com ${pixels.length} camadas; a GPU aceita ${perPage} por página, e são duas.`);
+        }
+        this.split = perPage;
+        this.texture = uploadArray(ctx.gl2, pixels.slice(0, perPage));
+        this.textureHigh = uploadArray(ctx.gl2, pixels.slice(perPage));
+      }
     } else {
       // Menor potência de 2 que comporta todas as camadas em grade.
       let tiles = 1;
@@ -137,6 +164,21 @@ export class Atlas {
     gl.bindTexture(this.isArray ? (gl as WebGL2RenderingContext).TEXTURE_2D_ARRAY : gl.TEXTURE_2D, this.texture);
   }
 
+  /** `#define`s dos programas que amostram o atlas: `ATLAS_PAGES` com duas páginas. */
+  get defines(): readonly string[] {
+    return this.textureHigh === null ? [] : ['ATLAS_PAGES'];
+  }
+
+  /** Liga a segunda página e passa o corte ao programa ativo. Com uma página, nada. */
+  bindHigh(uHigh: WebGLUniformLocation | null, uSplit: WebGLUniformLocation | null): void {
+    if (this.textureHigh === null) return;
+    const gl = this.gl as WebGL2RenderingContext;
+    gl.activeTexture(gl.TEXTURE0 + ATLAS_HIGH_UNIT);
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.textureHigh);
+    gl.uniform1i(uHigh, ATLAS_HIGH_UNIT);
+    gl.uniform1f(uSplit, this.split);
+  }
+
   /**
    * Substitui camadas já na GPU por arte do jogador (doc 13 §7).
    *
@@ -154,9 +196,10 @@ export class Atlas {
       this.pixelData[entry.layer] = data;
       if (this.isArray) {
         const gl2 = gl as WebGL2RenderingContext;
-        gl2.bindTexture(gl2.TEXTURE_2D_ARRAY, this.texture);
+        const high = this.textureHigh !== null && entry.layer >= this.split;
+        gl2.bindTexture(gl2.TEXTURE_2D_ARRAY, high ? this.textureHigh : this.texture);
         gl2.texSubImage3D(
-          gl2.TEXTURE_2D_ARRAY, 0, 0, 0, entry.layer,
+          gl2.TEXTURE_2D_ARRAY, 0, 0, 0, high ? entry.layer - this.split : entry.layer,
           TEX_SIZE, TEX_SIZE, 1, gl2.RGBA, gl2.UNSIGNED_BYTE, new Uint8Array(data.buffer),
         );
       } else {

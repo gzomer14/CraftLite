@@ -12,6 +12,90 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-10-19 22:25 · Deploy da `main` vermelho: o enderman no alto da coluna do End
+
+**Pedido:** *"Recebi um erro no ci de publicação no github pages. Consegue verificar, depois de
+mesclar o pr para main, na etapa de testes"*.
+
+**Resultado:** o job `build` do `pages.yml` (run 39329727396, merge do PR #9) falhou em
+`tests/theend.test.ts` › *enderman no End*: `expected 19 to be 157` — o bloco embaixo do enderman
+era obsidiana, não pedra do End. O teste está assim desde o M19 (2026-09-25) e falhava ao acaso:
+fixava o `session.random`, mas o spawner tem o próprio, e ficava no `Math.random`. Reproduzido:
+**11 de 300 sementes** nasciam o enderman no alto de uma coluna de obsidiana. O defeito é do jogo
+(a regra aceitava qualquer chão sólido), não do teste: a regra ganhou chão por dimensão
+(`groundIn`), e no End é só pedra do End — 0 de 300 depois. O teste agora roda 100 sementes fixas;
+sem a correção, falha com o mesmo erro do deploy (semente 14). Vai junto com o M25, na mesma
+branch.
+
+Portões: 2436 testes (133 arquivos), lint, build e tamanho verdes (299,6 KB em português, 312,5 em
+inglês).
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| ~ | `src/data/mobs.ts` | `SpawnRule.groundIn`; o enderman só na pedra do End no End |
+| ~ | `src/entity/spawn.ts` | `isValidGround` usa o chão da dimensão carregada |
+| ~ | `tests/theend.test.ts` | spawner com aleatório fixo, 100 sementes |
+| ~ | `docs/15-status.md`, `docs/16-auditoria.md` | §4 e esta sessão |
+
+---
+
+## 2026-10-19 22:15 · M25: folga para crescer
+
+**Pedido:** *"Pode seguir com o M25"* — o próximo marco de código, depois do PR #9 (M24) mesclado.
+A branch recomeçou da `main`.
+
+**Resultado:**
+- **Bundle:** o inglês virou o pacote `l/`, que o `index.html` baixa só em inglês, em paralelo e
+  antes do jogo; exportar e importar mundo, créditos, editor de placa e cota cheia foram para o
+  pedaço `u/`, importado por URL na primeira vez que se usa. **Português 299,6 KB** (folga 50,4),
+  inglês 312,5 (+1,3); `u/` 4,6. Separar os dois idiomas foi medido e descartado (o gzip
+  comprime melhor junto).
+- **Áudio:** voz de mob gerada na primeira vez que toca, num orçamento de 1,5 MB que despeja o mob
+  ouvido há mais tempo. Boot 0,74 MB, pico 2,46 (folga 1,04 do teto de 3,5).
+- **Atlas:** a camada ganhou o 9º bit do vértice (o tint foi de 6 para 5 bits): teto de 512, 223
+  usadas. Com a GPU abaixo do necessário, o atlas vira duas páginas; forçado com
+  `?atlasLayers=128`, o Chromium desenhou igual.
+- **3G rápido**, lado a lado com o build de antes (local, sem gzip): 5,96 → 5,64 s em português,
+  5,82 → 5,81 em inglês. No Chromium: em português o jogo baixa um arquivo de código só; em
+  inglês, dois, sem erro.
+- O detalhe do M24 desceu da foto (doc 15 §3) para o fim do `15-historico.md`.
+
+Portões: 2436 testes (133 arquivos); lint, build e tamanho verdes (orçamento cobrado no inglês:
+312,5 de 350). `smoke` 9, `smoke:mods` 6, `smoke:room` 20, `smoke:camera` 3 e `bench:ui` (pior
+ação 233 ms, mochila em 640×360) verdes.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| + | `src/data/strings/pack.en.ts` | entrada do pacote do inglês (`l/`): textos e nomes de conteúdo |
+| + | `src/data/strings/langpack.ts` | tipos do pacote e o registro global; as medidas no comentário |
+| ~ | `src/core/i18n.ts` | o inglês vem do pacote; sem ele, português |
+| ~ | `src/data/strings/localize.ts` | `nameTables()` lida na hora, não no import |
+| ~ | `index.html` | decide o idioma e baixa o pacote do inglês antes do jogo |
+| + | `src/ui/later.ts` | entrada do pedaço "depois" (`u/`) |
+| + | `src/ui/lategate.ts` | `later()` por URL e `LazyScreen` |
+| ~ | `src/ui/menuflow.ts` | exportar e importar pelo `u/` |
+| ~ | `src/ui/savealerts.ts` | a tela de cota cheia nasce na primeira falta de espaço |
+| ~ | `src/main.ts` | créditos e placa por `LazyScreen`; `audio` no gancho do smoke |
+| ~ | `vite.config.ts` | entradas `l/` e `u/`, URL do pedaço "depois" |
+| + | `src/audio/voicecache.ts` | grupos de voz por mob e orçamento de 1,5 MB |
+| ~ | `src/audio/engine.ts` | voz de mob sob demanda, despejo, 400 ms para o primeiro som |
+| ~ | `src/data/tints.ts` | `MAX_TINTS` 64 → 32 |
+| ~ | `src/render/vertex.ts` | 9º bit da camada; `MAX_ATLAS_LAYERS` 512 |
+| ~ | `src/render/mesh.ts` | passa a camada a `packWord0` |
+| + | `src/render/shaders/atlaspages.ts` | `atlasTexel` com duas páginas (`ATLAS_PAGES`) |
+| ~ | `src/render/shaders/terrain.glsl.ts`, `overlay.glsl.ts` | camada de 9 bits; leitura por `atlasTexel` |
+| ~ | `src/render/{atlas,terrain,selection,hand}.ts` | página alta, `uAtlasHigh`/`uAtlasSplit` |
+| ~ | `src/render/gl.ts` | `?atlasLayers=N` para teste |
+| ~ | `scripts/size-report.mjs` | baldes `l/` e `u/`; orçamento no inglês |
+| ~ | `scripts/smoke.mjs` | espera a tela de cota cheia vir do `u/` |
+| + | `tests/langpack.test.ts`, `tests/voicecache.test.ts`, `tests/atlasroom.test.ts` | o pacote, as vozes e a folga de atlas |
+| ~ | `tests/{vertex,bootchooser,modsisolation,mods,i18n,firsthour}.test.ts` | tint de 5 bits, camada de 9, idioma do navegador, pacote carregado |
+| ~ | `docs/14-roadmap.md` | M25 ✅ com os números |
+| ~ | `docs/15-status.md`, `docs/15-historico.md` | M25 na foto; o detalhe do M24 para o histórico |
+| ~ | `README.md` | M25, tamanho, testes |
+
+---
+
 ## 2026-10-19 18:41 · M24: casa em ordem, terceira volta
 
 **Pedido:** *"PR mesclado, pode seguir"* — o próximo marco de código, depois do PR #8 (M23)

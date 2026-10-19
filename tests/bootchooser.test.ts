@@ -24,7 +24,8 @@ function runChooser(stored: string | null): FakeScript[] {
     body: { appendChild: (s: FakeScript) => { added.push(s); } },
   };
   const localStorage = { getItem: () => stored };
-  new Function('document', 'localStorage', code)(document, localStorage);
+  // Português: o pacote do inglês (M25) não entra; ele tem o próprio teste (`langpack.test.ts`).
+  new Function('document', 'localStorage', 'navigator', code)(document, localStorage, { language: 'pt-BR' });
   return added;
 }
 

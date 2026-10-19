@@ -91,7 +91,7 @@ export function createContext(canvas: HTMLCanvasElement, vsync = true): GlContex
   const caps: GlCaps = {
     webgl2: gl2 !== null,
     maxTextureSize: gl.getParameter(gl.MAX_TEXTURE_SIZE) as number,
-    maxArrayLayers: gl2 ? (gl2.getParameter(gl2.MAX_ARRAY_TEXTURE_LAYERS) as number) : 0,
+    maxArrayLayers: gl2 ? arrayLayerLimit(gl2.getParameter(gl2.MAX_ARRAY_TEXTURE_LAYERS) as number) : 0,
     instancing: gl2 !== null || extInstanced !== null,
     vao: gl2 !== null || extVao !== null,
     uint32Indices: gl2 !== null || extUint !== null,
@@ -103,6 +103,17 @@ export function createContext(canvas: HTMLCanvasElement, vsync = true): GlContex
   };
 
   return { gl, gl2, caps, canvas, extVao, extInstanced };
+}
+
+/**
+ * Camadas por array. `?atlasLayers=N` na URL baixa o teto (M25): é como se vê o
+ * atlas em duas páginas (`render/atlas.ts`) numa GPU que aceita 2048 — o caso
+ * das que só aceitam 256, que o conteúdo de hoje ainda não alcança.
+ */
+function arrayLayerLimit(reported: number): number {
+  const forced = typeof location === 'undefined'
+    ? NaN : Number(new URLSearchParams(location.search).get('atlasLayers'));
+  return forced > 0 ? Math.min(forced, reported) : reported;
 }
 
 /** Compila e linka um programa. Erros de shader são fatais — falham no boot, não no loop. */

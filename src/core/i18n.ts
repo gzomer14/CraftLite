@@ -18,10 +18,16 @@
  * Os textos de interface ficam em `data/strings/pt.ts` e `en.ts`; os nomes de
  * conteúdo (bloco, item, mob…) continuam na tabela de cada um, em português, e
  * o inglês deles entra por `data/strings/localize.ts`.
+ *
+ * **Desde o M25 o inglês não está no jogo:** é um pacote à parte
+ * (`data/strings/langpack.ts`), que o `index.html` baixa só quando o idioma é
+ * inglês, pela mesma regra de `detect()` (há teste). Sem o pacote — não
+ * chegou —, o jogo abre em português. Nos testes, quem quer inglês importa
+ * `data/strings/pack.en`.
  */
 
 import { PT, type StringKey } from '../data/strings/pt';
-import { EN } from '../data/strings/en';
+import type { EnglishPack, LangPacks } from '../data/strings/langpack';
 import { STORAGE_KEY } from '../game/settings';
 
 export type Lang = 'pt' | 'en';
@@ -59,8 +65,14 @@ function detect(): Lang {
   return resolveLang(stored, typeof navigator === 'undefined' ? undefined : navigator.language);
 }
 
-let current: Lang = detect();
-let table: Readonly<Record<StringKey, string>> = current === 'en' ? EN : PT;
+/** O pacote do inglês, se esta página o carregou. */
+export function englishPack(): EnglishPack | undefined {
+  return (globalThis as { __CRAFTLITE_LANGS__?: LangPacks }).__CRAFTLITE_LANGS__?.en;
+}
+
+/** Inglês pedido e o pacote não chegou: português, e não chaves cruas. */
+let current: Lang = detect() === 'en' && englishPack() !== undefined ? 'en' : 'pt';
+let table: Readonly<Record<StringKey, string>> = current === 'en' ? englishPack()?.ui ?? PT : PT;
 
 /** O idioma em uso. */
 export function lang(): Lang {
@@ -72,8 +84,10 @@ export function lang(): Lang {
  * recarregando, porque as constantes de módulo já leram os textos.
  */
 export function setLanguage(next: Lang): void {
+  const en = englishPack();
+  if (next === 'en' && en === undefined) throw new Error('pack.en not loaded');
   current = next;
-  table = next === 'en' ? EN : PT;
+  table = next === 'en' && en !== undefined ? en.ui : PT;
 }
 
 /** O texto da chave no idioma em uso. */

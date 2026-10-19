@@ -435,27 +435,39 @@ describe('guarda-costas da luta', () => {
 });
 
 describe('enderman no End (M19)', () => {
+  /*
+   * O spawner tem o próprio aleatório (`MobSpawner.random`): o `session.random`
+   * do `endSession` não chega nele. Com `Math.random`, este teste falhava uma
+   * vez em ~27 — o enderman no alto de uma coluna de obsidiana —, e foi assim
+   * que derrubou o deploy da `main` em 2026-10-19. Agora roda 100 sementes
+   * fixas; sem o `groundIn` da regra, 14, 32, 43, 59, 66, 79 e 95 falham.
+   */
   it('é o único que nasce na ilha, e nasce em cima da pedra do End', () => {
-    const { world, session } = endSession();
+    const world = endWorld();
     const enderman = MOB_BY_NAME.get('enderman')!.id;
-    const spawner = session.spawner;
-    spawner.isDay = false;
-    spawner.isNight = true;
-    let total = 0;
-    for (let cycle = 0; cycle < 400 && total < 3; cycle++) {
-      for (const category of ['hostile', 'neutral', 'passive', 'ambient', 'water'] as const) {
-        total += spawner.runCycle(category, 0.5, END_ISLAND_Y + 1, 12.5);
-      }
-    }
-    expect(total).toBeGreaterThan(0);
-    const s = session.mobs.store;
     const endStone = BLOCK_BY_NAME.get('end_stone')!.id;
-    for (let i = 0; i < s.active; i++) {
-      // O dragão e os cristais nascem pela luta, não pelo spawner.
-      if (s.type[i] === DRAGON || s.type[i] === CRYSTAL) continue;
-      expect(s.type[i]).toBe(enderman);
-      const below = blockIdOf(world.getBlock(Math.floor(s.x[i]), Math.floor(s.y[i]) - 1, Math.floor(s.z[i])));
-      expect(below).toBe(endStone);
+    for (let seed = 1; seed <= 100; seed++) {
+      const session = new Session(world, new Player(0.5, END_ISLAND_Y + 1, 12.5), events());
+      const spawner = session.spawner;
+      let state = seed;
+      spawner.random = () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state / 4294967296; };
+      spawner.isDay = false;
+      spawner.isNight = true;
+      let total = 0;
+      for (let cycle = 0; cycle < 400 && total < 3; cycle++) {
+        for (const category of ['hostile', 'neutral', 'passive', 'ambient', 'water'] as const) {
+          total += spawner.runCycle(category, 0.5, END_ISLAND_Y + 1, 12.5);
+        }
+      }
+      expect(total, `semente ${seed}`).toBeGreaterThan(0);
+      const s = session.mobs.store;
+      for (let i = 0; i < s.active; i++) {
+        // O dragão e os cristais nascem pela luta, não pelo spawner.
+        if (s.type[i] === DRAGON || s.type[i] === CRYSTAL) continue;
+        expect(s.type[i], `semente ${seed}`).toBe(enderman);
+        const below = blockIdOf(world.getBlock(Math.floor(s.x[i]), Math.floor(s.y[i]) - 1, Math.floor(s.z[i])));
+        expect(below, `semente ${seed}`).toBe(endStone);
+      }
     }
   });
 });

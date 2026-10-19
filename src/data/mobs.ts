@@ -139,6 +139,8 @@ export interface SpawnRule {
   light: 'dark' | 'bright' | 'any';
   /** Nomes de bloco aceitos como chão. Vazio = qualquer bloco sólido. */
   ground: readonly string[];
+  /** Chão de uma dimensão só, no lugar de `ground` quando ela é a carregada. */
+  groundIn?: { readonly dimension: number; readonly ground: readonly string[] };
   /** Nasce dentro de água em vez de sobre um chão sólido. */
   inWater?: boolean;
   minY: number;
@@ -213,9 +215,11 @@ export const SPAWN_RULES: Record<string, SpawnRule> = {
   /*
    * Enderman: na superfície e no End (M19), onde é o único que nasce — a ilha
    * ficava vazia fora da luta, e é dele a pérola para mais olhos. No End o
-   * escuro vale sempre (não há céu), e o chão é a pedra do End.
+   * escuro vale sempre (não há céu), e o chão é a pedra do End: sem o
+   * `groundIn`, às vezes ele nascia no alto de uma coluna de obsidiana, fora
+   * de alcance e ocupando a vaga dos hostis da ilha.
    */
-  enderman: { light: 'dark', ground: [], minY: 0, maxY: 127, biomes: [], packMin: 1, packMax: 1, weight: 2, dimension: [0, 2] },
+  enderman: { light: 'dark', ground: [], groundIn: { dimension: 2, ground: ['end_stone'] }, minY: 0, maxY: 127, biomes: [], packMin: 1, packMax: 1, weight: 2, dimension: [0, 2] },
   spider: { light: 'dark', ground: [], minY: 0, maxY: 127, biomes: [], packMin: 1, packMax: 2, weight: 8 },
   zombie: { light: 'dark', ground: [], minY: 0, maxY: 127, biomes: [], packMin: 3, packMax: 4, weight: 12 },
   skeleton: { light: 'dark', ground: [], minY: 0, maxY: 127, biomes: [], packMin: 1, packMax: 3, weight: 10 },

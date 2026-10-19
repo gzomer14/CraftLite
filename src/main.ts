@@ -51,10 +51,9 @@ import { SaveDatabase, isAvailable as saveAvailable, type WorldMeta } from './sa
 import { SaveManager } from './save/savemanager';
 import { MenuFlow, newWorldMeta } from './ui/menuflow';
 import { DeathScreen } from './ui/screens/death';
-import { CreditsScreen } from './ui/screens/credits';
 import { BossBar } from './ui/bossbar';
 import { ACHIEVEMENTS } from './data/achievements';
-import { SignEditor } from './ui/screens/signeditor';
+import { LazyScreen } from './ui/lategate';
 import { SignTextPass } from './render/signtext';
 import { SceneFeed } from './render/scenefeed';
 import { Ambience } from './render/ambience';
@@ -278,7 +277,7 @@ async function boot(): Promise<void> {
     spawned = false;
   };
   const deathScreen = new DeathScreen({ onRespawn: respawn, onQuit: respawn });
-  const creditsScreen = new CreditsScreen(() => { /* o jogo segue de onde estava */ });
+  const creditsScreen = new LazyScreen((late) => new late.CreditsScreen(() => { /* o jogo segue de onde estava */ }));
 
   const session = new Session(world, player, {
     onDimensionChange: (dimension) => {
@@ -311,7 +310,7 @@ async function boot(): Promise<void> {
      */
     onSignEdit: (x, y, z, lines) => {
       controls.mouse.exitLock();
-      signEditor.open(x, y, z, lines);
+      signEditor.use((editor) => editor.open(x, y, z, lines));
     },
     onPickup: () => {
       if (settings.get('vibration')) navigator.vibrate?.(6);
@@ -325,10 +324,10 @@ async function boot(): Promise<void> {
     // O fim da jornada (M16): de volta do End, com o dragão derrubado.
     onCredits: () => {
       controls.mouse.exitLock();
-      creditsScreen.show({
+      creditsScreen.use((credits) => credits.show({
         stats: session.journal.stats.values, days: session.dayNight.day + 1,
         achievements: session.achievements.count, achievementTotal: ACHIEVEMENTS.length,
-      });
+      }));
     },
     onHurt: () => {
       hud.flashDamage();
@@ -360,7 +359,7 @@ async function boot(): Promise<void> {
    * jogo de todo dia não expõe nada.
    */
   if (/[?&]smoke\b/.test(location.search)) {
-    (window as unknown as { __craftlite?: unknown }).__craftlite = { world, player, session, items: ITEM_BY_NAME, renderer, pipeline, get save() { return save; } };
+    (window as unknown as { __craftlite?: unknown }).__craftlite = { world, player, session, items: ITEM_BY_NAME, renderer, pipeline, audio, get save() { return save; } };
   }
   renderer.blockLightAt = (x, y, z) => (world.getSkyLight(x, y, z) << 4) | world.getBlockLight(x, y, z);
   // Item na mão (doc 01 §191). O passe é uma draw call e limpa a profundidade,
@@ -471,13 +470,13 @@ async function boot(): Promise<void> {
   });
   flow.mapScreen = mapScreen;
 
-  const signEditor = new SignEditor({
+  const signEditor = new LazyScreen((late) => new late.SignEditor({
     onDone: (x, y, z, lines) => {
       session.writeSign(x, y, z, lines);
       audio.playUi('ui/click', 0.5);
     },
     onClose: () => { /* o jogo continua rodando: a placa não pausa nada */ },
-  });
+  }));
 
   const touchUi = new TouchUi(settings, controls.touch.buttons, {
     onPause: () => flow.togglePause(),

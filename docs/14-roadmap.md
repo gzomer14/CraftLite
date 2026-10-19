@@ -795,7 +795,7 @@ inventário). Nenhuma issue nem PR aberto no GitHub.
 
 ```
 M22 aparelho e MVP (do usuário, em paralelo com tudo)
-M23 correções ✅ ──► M24 casa em ordem ✅ ──► M25 folga ──► M26 aconchego ─┐
+M23 correções ✅ ──► M24 casa em ordem ✅ ──► M25 folga ✅ ──► M26 aconchego ─┐
                                                    ├─► M27 bichos    ├─► M29 ameaça
                                                    └─► M28 lugares ──┘
 M30 sala, segunda volta (depois do aceite do M20 no M22)
@@ -928,20 +928,35 @@ um PR de teste.
 
 ---
 
-## M25 — Folga para crescer ⬜
+## M25 — Folga para crescer ✅
 
 > Os três tetos que decidem quanto conteúdo cabe. Sem este marco, os M26–M29 juntos não cabem.
+> **Fechado em 2026-10-19** — detalhe e números no doc 15 §3.
 
-- [ ] **Atlas:** 223 de 256 camadas. Uma segunda página de atlas (outro `TEXTURE_2D_ARRAY`,
+- [x] **Atlas:** 223 de 256 camadas. Uma segunda página de atlas (outro `TEXTURE_2D_ARRAY`,
       escolhida por um bit do vértice) ou camadas compartilhadas por tint (como a lã do M13).
-      Medir o custo no T0 antes de escolher.
-- [ ] **Bundle:** 308,3 de 350 KB. O inglês embutido (~12 KB) vira pedaço sob demanda, como a sala
-      do M20 — o doc 15 já marcava como o primeiro candidato.
-- [ ] **Áudio:** 2,92 de 3,5 MB. Sons de mob gerados sob demanda na primeira vez que o mob aparece,
-      e não todos no boot.
+      Medir o custo no T0 antes de escolher. **Feito:** a camada ganhou o 9º bit do vértice
+      (tirado do tint, que tinha 6 bits para 20 cores) — teto de **512** —, e o atlas vira duas
+      páginas só na GPU que não aceita todas as camadas num array (`ATLAS_PAGES`). Hoje, com 223
+      camadas, nenhum aparelho paga nada; com duas páginas forçadas (`?atlasLayers=128`) o
+      Chromium desenha igual. *Não medido no T0* (não há como, sem conteúdo acima de 256 ou sem
+      uma GPU de 256 por array).
+- [x] **Bundle:** 308,3 de 350 KB. O inglês embutido (~12 KB) vira pedaço sob demanda, como a sala
+      do M20 — o doc 15 já marcava como o primeiro candidato. **Feito, e mais:** o inglês é um
+      pacote à parte que o `index.html` baixa só para quem joga em inglês, em paralelo com o jogo;
+      e um pedaço "depois" (`u/`) leva export/import de mundo, créditos, editor de placa e a tela de
+      cota cheia, baixados na primeira vez que se usam. **Em português o jogo abre com 299,6 KB**
+      (folga 50,4); em inglês, 312,5 (1,3 acima do de antes). *Medido e descartado:* separar os
+      dois idiomas — o português sozinho comprime para quase o que ele economizava.
+- [x] **Áudio:** 2,92 de 3,5 MB. Sons de mob gerados sob demanda na primeira vez que o mob aparece,
+      e não todos no boot. **Feito** na primeira vez que o mob **faz som** (`audio/voicecache.ts`):
+      o boot renderiza 0,74 MB, e as vozes ficam num orçamento de 1,5 MB, saindo a do mob ouvido há
+      mais tempo. Pico: 2,46 MB.
 
 **Critério de aceite:** folga de **≥ 64 camadas**, **≥ 50 KB** de bundle e **≥ 1 MB** de áudio;
-abertura em 3G e T0 sem regressão.
+abertura em 3G e T0 sem regressão. **Cumprido, menos o T0:** 289 camadas, 50,4 KB (em português) e
+1,04 MB (atlas e áudio cobrados por teste; o bundle, pelo `size-report`); 3G rápido lado a lado com o build de antes, servidos localmente: 5,96 →
+5,64 s em português e 5,82 → 5,81 s em inglês (média de duas). O T0 é do M22.
 
 ---
 

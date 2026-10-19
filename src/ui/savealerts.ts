@@ -9,7 +9,8 @@
 import { t, tf } from '../core/i18n';
 import { STORE_WORLDS, type SaveDatabase, type WorldMeta } from '../save/db';
 import type { SaveGameOptions } from '../game/savegame';
-import { StorageFullScreen } from './screens/storagefull';
+import { later } from './lategate';
+import type { StorageFullDeps, StorageFullScreen } from './screens/storagefull';
 
 interface Hudlike { showMessage(text: string, ticks?: number): void }
 interface Pausable { paused: boolean }
@@ -33,11 +34,27 @@ export function saveAlerts(db: SaveDatabase | null, worldId: string, hud: Hudlik
   };
   /** A pausa de antes da tela: aberta por cima da pausa, fechar não solta o mundo. */
   let wasPaused = false;
+  /** Como montar a tela; existe depois do `connect`. A tela só nasce na primeira falta de espaço. */
+  let build: (() => Promise<StorageFullScreen>) | null = null;
+  /**
+   * A tela vem do pedaço "depois" (M25): a primeira falta de espaço espera o
+   * download (do cache, em instantes) e só então decide entre tela e aviso.
+   */
+  const firstQuota = (message: string): void => {
+    const pending = build;
+    if (pending === null) return;
+    build = null;
+    void pending().then((made) => {
+      screen = made;
+      if (made.handleFailure(true)) hud.showMessage(t('storefull.later'), 120);
+    }, () => hud.showMessage(tf('store.save_failed', message), 120));
+  };
   return {
     trySave,
     options: {
       onError: (message, quota) => {
         failed = true;
+        if (quota && screen === null && build !== null) { firstQuota(message); return; }
         if (screen !== null && !screen.handleFailure(quota)) return;
         hud.showMessage(quota && screen !== null ? t('storefull.later') : tf('store.save_failed', message), 120);
       },
@@ -46,7 +63,7 @@ export function saveAlerts(db: SaveDatabase | null, worldId: string, hud: Hudlik
     },
     connect(save, flow, controls) {
       if (db === null) return;
-      screen = new StorageFullScreen(worldId, {
+      const deps: StorageFullDeps = {
         listWorlds: () => db.getAll<WorldMeta>(STORE_WORLDS),
         removeWorld: (id) => db.deleteWorld(id),
         estimate: () => db.estimate(),
@@ -58,7 +75,8 @@ export function saveAlerts(db: SaveDatabase | null, worldId: string, hud: Hudlik
           controls.mouse.exitLock();
         },
         resume: () => { flow.paused = wasPaused; },
-      });
+      };
+      build = async () => new (await later()).StorageFullScreen(worldId, deps);
     },
   };
 }

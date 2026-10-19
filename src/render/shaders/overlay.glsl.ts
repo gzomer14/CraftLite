@@ -6,6 +6,8 @@
  * terreno — sem isso o contorno pisca conforme o ângulo da câmera.
  */
 
+import { ATLAS_TEXEL_300 } from './atlaspages';
+
 export const LINE_VS_300 = `#version 300 es
 precision highp float;
 layout(location = 0) in vec3 aPos;
@@ -63,6 +65,7 @@ precision mediump float;
 precision mediump sampler2DArray;
 in vec2 vUv;
 uniform sampler2DArray uAtlas;
+${ATLAS_TEXEL_300}
 uniform float uLayer;
 uniform vec4 uCrackColor;
 out vec4 fragColor;
@@ -73,7 +76,7 @@ vec4 crack(float core, float ring) {
   return vec4(color, max(core * uCrackColor.a, edge * CRACK_EDGE_ALPHA));
 }
 void main() {
-  vec4 texel = texture(uAtlas, vec3(vUv, uLayer));
+  vec4 texel = atlasTexel(vUv, uLayer, vUv);
   // Vermelho zerado = fissura; verde zerado = fissura ou contorno (M2, corrigido
   // em 2026-09-25). A cor vem de fora porque depende do brilho do bloco — preta
   // some em tronco escuro, clara some em areia —, e o contorno no tom oposto

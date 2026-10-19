@@ -9,6 +9,7 @@
 
 import { TINT_COUNT, TINT_DYE_BASE } from '../../data/tints';
 import { COLORMAP_KINDS, COLORMAP_SIZE } from '../biometint';
+import { ATLAS_TEXEL_300 } from './atlaspages';
 
 /**
  * Tabela de tints indexada pelo campo `tint` do vértice (M13: uniform, montada
@@ -68,11 +69,12 @@ void main() {
 
   uint face  = (w0 >> 27) & 7u;
 
-  float layer = float(w1 & 255u);
+  // Camada em 9 bits (M25): os 8 baixos na palavra 1, o alto no topo da 0.
+  float layer = float((w1 & 255u) | (((w0 >> 31) & 1u) << 8));
   float bl    = float((w1 >> 8) & 15u);
   float sl    = float((w1 >> 12) & 15u);
   uint ao     = (w1 >> 16) & 3u;
-  uint tint   = ((w1 >> 18) & 15u) | (((w0 >> 30) & 3u) << 4);
+  uint tint   = ((w1 >> 18) & 15u) | (((w0 >> 30) & 1u) << 4);
   float u    = float((w1 >> 22) & 31u);
   float v    = float((w1 >> 27) & 31u);
 
@@ -110,6 +112,7 @@ in float vDye;
 in float vFogDepth;
 
 uniform sampler2DArray uAtlas;
+${ATLAS_TEXEL_300}
 uniform vec3 uFogColor;
 uniform float uFogDensity;
 uniform vec3 uMediumTint;     // M14: tom de dentro da água ou da lava; branco no ar
@@ -117,7 +120,7 @@ uniform vec3 uMediumTint;     // M14: tom de dentro da água ou da lava; branco 
 out vec4 fragColor;
 
 void main() {
-  vec4 texel = texture(uAtlas, vec3(fract(vUv.xy), vUv.z));
+  vec4 texel = atlasTexel(fract(vUv.xy), vUv.z, vUv.xy);
 #ifdef ALPHA_TEST
   if (texel.a < 0.5) discard;
   // Corante só tinge pixel de alfa cheio: madeira e travesseiro da cama são

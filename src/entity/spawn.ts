@@ -352,7 +352,9 @@ export class MobSpawner {
 
   private isValidGround(rule: SpawnRule, x: number, y: number, z: number): boolean {
     const def = defOf(this.world.getBlock(x, y, z));
-    if (rule.ground.length > 0) return rule.ground.indexOf(def.name) >= 0;
+    const ground = rule.groundIn !== undefined && rule.groundIn.dimension === this.world.dimension
+      ? rule.groundIn.ground : rule.ground;
+    if (ground.length > 0) return ground.indexOf(def.name) >= 0;
     // Regra geral: chão sólido e opaco. Folha, vidro e laje não valem (doc 07 §4).
     if (!def.solid || !def.opaque) return false;
     if (def.name === 'bedrock') return false;

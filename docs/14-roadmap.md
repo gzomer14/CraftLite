@@ -922,9 +922,9 @@ grava e fecha; o bloco quebrado continua quebrado depois de recarregar).
 
 **Critério de aceite:** nenhum módulo de código acima de 700; doc 15 abaixo de 800 linhas sem
 perder pendência aberta (conferir uma a uma); PR de teste com o CI vermelho num teste quebrado de
-propósito. **Os dois primeiros cumpridos. O terceiro não:** o workflow só roda quando um PR é
-aberto, e nenhum foi aberto nesta sessão. O primeiro PR mostra se o CI roda; a prova do vermelho
-fica para quando o usuário quiser um PR de teste.
+propósito. **Os dois primeiros cumpridos. O terceiro, pela metade:** o CI rodou **verde** no PR #9
+(3 min, os quatro portões e os dois smokes); a prova do vermelho fica para quando o usuário quiser
+um PR de teste.
 
 ---
 

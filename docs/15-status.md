@@ -57,7 +57,7 @@ Portões: 2424 testes, 311,2 KB; `smoke` 9, `smoke:mods` 6, `smoke:room` 20, `be
 | **M21** Mods | mods escritos no repositório, cada um um pedaço de bundle próprio, ligados e desligados na tela Mods; **desligados, a página baixa um arquivo só, o de antes** (teste e build cobram); mod de exemplo | ✅ concluído em 2026-09-27 | **não visto em aparelho** (visto no Chrome headless); na sala do M20, mods diferentes não entram |
 | **M22** Aparelho e MVP | domínio, PWA do J7, aceite do M20, roteiro de campo M16–M21, Firefox e Safari, declarar o MVP | ⬜ proposto em 2026-10-19 | do usuário |
 | **M23** Correções verificadas | coluna perdida na gravação, cota cheia (doc 11 §4), coluna corrompida em quarentena, fogo nos mobs e chama visível, dica fora da vida, mochila no T0 deitado, save do convidado, escada em quina de três — e a regra de canto de escada, que estava trocada | ✅ concluído em 2026-10-19 | **não visto em aparelho** (visto no Chromium, desktop e 640×360) |
-| **M24** Casa em ordem, 3ª volta | seis módulos cortados por papel (e um teste que cobra o teto de 700), este documento de volta a foto, CI nos PRs com smoke, smoke como root | ✅ concluído em 2026-10-19 | o CI ainda não rodou: roda no primeiro PR |
+| **M24** Casa em ordem, 3ª volta | seis módulos cortados por papel (e um teste que cobra o teto de 700), este documento de volta a foto, CI nos PRs com smoke, smoke como root | ✅ concluído em 2026-10-19 | CI **verde** na primeira rodada (PR #9, 3 min); falta vê-lo vermelho num teste quebrado de propósito |
 | **M25** Folga para crescer | atlas, bundle e áudio com folga para os marcos de conteúdo | ⬜ proposto em 2026-10-19 | **próximo de código** (§6); trava M26–M29 |
 | **M26** Aconchego | fogueira e caldeirão (doc 00), lanterna, vaso, moldura, tronco descascado, terracota e concreto | ⬜ proposto em 2026-10-19 | — |
 | **M27** Bichos | cavalo com sela, gato, coelho, peixes vivos, guia, etiqueta | ⬜ proposto em 2026-10-19 | — |
@@ -200,7 +200,7 @@ Pedido: *"PR mesclado, pode seguir"* — o próximo de código depois do M23.
   doc 16: o 16 é um registro por sessão, com grid de arquivos, e 2 800 linhas de narrativa por
   marco não cabem nesse formato.
 - **CI nos PRs** (`.github/workflows/portoes.yml`): testes, lint, build, orçamento, `npm run smoke`
-  e `npm run smoke:mods` em todo pull request. **Ainda não rodou** — roda no primeiro PR aberto.
+  e `npm run smoke:mods` em todo pull request. **Rodou verde no PR #9** (3 min, 2026-10-19).
 - **Smoke como root:** os oito scripts de navegador tinham cada um a sua cópia de `chromeBin()`; agora
   é `scripts/chrome.mjs`, que acha também o Chromium do Playwright e põe `--no-sandbox` sozinho como
   root. `smoke`, `smoke:net` e `smoke:camera` rodaram como root sem invólucro.

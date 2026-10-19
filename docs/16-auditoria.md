@@ -24,8 +24,8 @@ mesclado. A branch recomeçou da `main`.
 - **Doc 15 de 3 453 para 362 linhas.** O de antes foi inteiro, sem edição, para
   `docs/15-historico.md`. As pendências abertas foram conferidas uma a uma contra o §5 e o §6
   antigos e, as de código, no código.
-- **CI em todo PR** (`portoes.yml`): os quatro portões e dois smokes. **Ainda não rodou**: roda no
-  primeiro PR.
+- **CI em todo PR** (`portoes.yml`): os quatro portões e dois smokes. Rodou **verde** no PR #9,
+  em 3 min (docs atualizados no mesmo PR, depois da rodada).
 - **Smoke como root**: as oito cópias de `chromeBin()` viraram `scripts/chrome.mjs`, que acha o
   Chromium do Playwright e põe `--no-sandbox` como root.
 - De passagem: `railSlopeDir` criava um array por chamada.
@@ -59,7 +59,7 @@ invólucro.
 | + | `tests/modulesize.test.ts` | teto de 700 linhas |
 | ~ | `tests/uxpolish.test.ts` | lê o CSS do HUD em `hudstyle.ts` |
 | + | `docs/15-historico.md` | o doc 15 inteiro até 2026-10-19 |
-| ~ | `docs/15-status.md` | reescrito como foto |
+| ~ | `docs/15-status.md` | reescrito como foto; depois, o CI verde do PR #9 |
 | ~ | `docs/14-roadmap.md` | M24 ✅ com desvio; nota sobre as referências antigas ao doc 15 |
 | ~ | `README.md` | M24, contagem de testes, `15-historico.md` na estrutura |
 | ~ | `docs/16-auditoria.md` | esta sessão |

@@ -7,8 +7,15 @@
  * greedy meshing pode ter 16 tiles de comprimento, e 4 bits só chegam a 15; e a
  * posição usa 9 bits por eixo, pelo motivo abaixo.
  *
- * palavra 0:  x:9 | y:9 | z:9 | face:3 | tintAlto:2
+ * palavra 0:  x:9 | y:9 | z:9 | face:3 | tintAlto:1 | texLayerAlto:1
  * palavra 1:  texLayer:8 | blockLight:4 | skyLight:4 | ao:2 | tintBaixo:4 | u:5 | v:5
+ *
+ * **M25 (2026-10-19):** a camada de atlas ganhou o 9º bit — teto de **512
+ * camadas**, para o conteúdo dos M26–M29 caber (o atlas estava em 223 de 256).
+ * O bit saiu do tint, que tinha 6 bits para 20 cores em uso e ficou com 5 (32).
+ * Desvio consciente do doc 02 §3 (teto de 256): o GLES 3.0 garante só 256
+ * camadas por array, e o atlas vira duas páginas na GPU que não aceitar mais
+ * (`render/atlas.ts`).
  *
  * **M13 (2026-09-22):** o tint passou de 2 para 6 bits (64 cores: grama, folha,
  * água e os dezesseis corantes de `data/tints.ts`). Os 4 bits saíram do
@@ -60,15 +67,19 @@ export const TINT_WATER = 3;
 /** Sub-blocos por bloco na posição empacotada. */
 export const POSITION_SCALE = 16;
 
+/** Teto de camadas de atlas que o vértice endereça (9 bits, M25). */
+export const MAX_ATLAS_LAYERS = 512;
+
 export function packWord0(
-  x16: number, y16: number, z16: number, face: number, tint = 0,
+  x16: number, y16: number, z16: number, face: number, tint = 0, texLayer = 0,
 ): number {
   return (
     (x16 & 0x1ff) |
     ((y16 & 0x1ff) << 9) |
     ((z16 & 0x1ff) << 18) |
     ((face & 0x7) << 27) |
-    (((tint >> 4) & 0x3) << 30)
+    (((tint >> 4) & 0x1) << 30) |
+    (((texLayer >> 8) & 0x1) << 31)
   ) >>> 0;
 }
 

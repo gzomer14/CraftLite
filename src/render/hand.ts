@@ -39,6 +39,8 @@ import { createProgram, uniformLocations, type GlContext } from './gl';
 import type { Atlas } from './atlas';
 import { isUprightFace } from './mesh';
 import type { ItemSheet } from './itemsprites';
+import { ATLAS_TEXEL_300 } from './shaders/atlaspages';
+import { withDefines } from './shaders/terrain.glsl';
 
 /** FOV da mão, menor que o do mundo (doc 01 §191). Exportado para o teste
  * poder conferir que a pose cai dentro do frustum. */
@@ -106,6 +108,7 @@ const FLOATS_PER_VERTEX = ITEM_FLOATS_PER_VERTEX;
 
 const UNIFORMS = [
   'uProj', 'uModel', 'uAtlas', 'uSprites', 'uAtlasTiles', 'uSheet', 'uMode', 'uColor',
+  'uAtlasHigh', 'uAtlasSplit',
 ] as const;
 
 const VS_300 = `#version 300 es
@@ -134,6 +137,7 @@ in vec2 vUv;
 in float vLayer;
 in float vShade;
 uniform sampler2DArray uAtlas;
+${ATLAS_TEXEL_300}
 uniform sampler2D uSprites;
 uniform vec2 uSheet;
 uniform float uMode;      // 0 = bloco, 1 = item, 2 = mão vazia
@@ -142,7 +146,7 @@ out vec4 fragColor;
 void main() {
   vec4 texel;
   if (uMode < 0.5) {
-    texel = texture(uAtlas, vec3(vUv, vLayer));
+    texel = atlasTexel(vUv, vLayer, vUv);
   } else if (uMode < 1.5) {
     vec2 cell = vec2(mod(vLayer, uSheet.x), floor(vLayer / uSheet.x));
     texel = texture(uSprites, (cell + vec2(vUv.x, 1.0 - vUv.y)) / uSheet);
@@ -317,7 +321,9 @@ export class HandRenderer {
     const gl = ctx.gl;
     const use300 = ctx.gl2 !== null;
 
-    this.program = createProgram(gl, use300 ? VS_300 : VS_100, use300 ? FS_300 : FS_100, 'hand');
+    this.program = createProgram(
+      gl, use300 ? VS_300 : VS_100, withDefines(use300 ? FS_300 : FS_100, atlas.defines), 'hand',
+    );
     this.uniforms = uniformLocations(gl, this.program, UNIFORMS);
 
     /*
@@ -469,6 +475,7 @@ export class HandRenderer {
 
     this.atlas.bind(0);
     gl.uniform1i(this.uniforms.uAtlas, 0);
+    this.atlas.bindHigh(this.uniforms.uAtlasHigh, this.uniforms.uAtlasSplit);
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, this.sprites);
     gl.uniform1i(this.uniforms.uSprites, 1);

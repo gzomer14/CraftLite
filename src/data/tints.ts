@@ -17,8 +17,12 @@ export const TINT_FOLIAGE = 2;
 export const TINT_WATER = 3;
 /** Índice do primeiro corante: `TINT_DYE_BASE + posição em DYES`. */
 export const TINT_DYE_BASE = 4;
-/** Teto do campo de tint no vértice (6 bits). */
-export const MAX_TINTS = 64;
+/**
+ * Teto do campo de tint no vértice (5 bits). Eram 6 bits (64) até o M25,
+ * para 20 cores em uso; o bit que sobrou virou o 9º bit da camada de atlas
+ * (`render/vertex.ts`).
+ */
+export const MAX_TINTS = 32;
 /** Quantas entradas a tabela tem de fato. */
 export const TINT_COUNT = TINT_DYE_BASE + DYES.length;
 

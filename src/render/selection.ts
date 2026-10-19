@@ -11,6 +11,7 @@ import {
   CRACK_FS_100, CRACK_FS_300, CRACK_VS_100, CRACK_VS_300,
   LINE_FS_100, LINE_FS_300, LINE_VS_100, LINE_VS_300,
 } from './shaders/overlay.glsl';
+import { withDefines } from './shaders/terrain.glsl';
 import type { Atlas } from './atlas';
 import type { Mat4 } from '../core/math';
 
@@ -73,6 +74,7 @@ export function crackToneFor(brightness: number): { tone: number; alpha: number 
 
 const CRACK_UNIFORMS = [
   'uViewProj', 'uOrigin', 'uScale', 'uAtlas', 'uAtlasTiles', 'uLayer', 'uCrackColor',
+  'uAtlasHigh', 'uAtlasSplit',
 ] as const;
 
 /** Caixa envolvente de um bloco cúbico — o padrão de quem não passa forma. */
@@ -107,7 +109,8 @@ export class SelectionPass {
     this.lineBuffer = createBuffer(gl, EDGES);
 
     this.crackProgram = createProgram(
-      gl, use300 ? CRACK_VS_300 : CRACK_VS_100, use300 ? CRACK_FS_300 : CRACK_FS_100, 'crack',
+      gl, use300 ? CRACK_VS_300 : CRACK_VS_100,
+      withDefines(use300 ? CRACK_FS_300 : CRACK_FS_100, atlas.defines), 'crack',
     );
     this.crackUniforms = uniformLocations(gl, this.crackProgram, CRACK_UNIFORMS);
     const crackData = buildCrackCube();
@@ -197,6 +200,7 @@ export class SelectionPass {
 
     this.atlas.bind(0);
     gl.uniform1i(this.crackUniforms.uAtlas, 0);
+    this.atlas.bindHigh(this.crackUniforms.uAtlasHigh, this.crackUniforms.uAtlasSplit);
     if (!this.atlas.isArray) {
       gl.uniform2f(this.crackUniforms.uAtlasTiles, this.atlas.tilesPerRow, 1 / this.atlas.tilesPerRow);
     }

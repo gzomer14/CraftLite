@@ -18,7 +18,7 @@ import type { Mat4 } from '../core/math';
 const UNIFORMS = [
   'uViewProj', 'uChunkOrigin', 'uDayFactor', 'uMinSkyLight',
   'uAtlas', 'uAtlasTiles', 'uFogColor', 'uFogDensity', 'uTints', 'uMediumTint',
-  'uClimate', 'uColormap', 'uClimateInv', 'uBiomeTint',
+  'uClimate', 'uColormap', 'uClimateInv', 'uBiomeTint', 'uAtlasHigh', 'uAtlasSplit',
 ] as const;
 
 /** Unidades de textura do tint de bioma; o atlas fica na 0. */
@@ -56,7 +56,8 @@ export class TerrainPass {
     const vs = withDefines(
       use300 ? TERRAIN_VS_300 : TERRAIN_VS_100, biomeTint !== null ? ['BIOME_TINT'] : [],
     );
-    const fs = use300 ? TERRAIN_FS_300 : TERRAIN_FS_100;
+    // Duas páginas de atlas (M25): só quando a GPU não aceita todas as camadas num array.
+    const fs = withDefines(use300 ? TERRAIN_FS_300 : TERRAIN_FS_100, atlas.defines);
 
     this.opaque = createProgram(ctx.gl, vs, fs, 'terrain');
     this.cutout = createProgram(ctx.gl, vs, withDefines(fs, ['ALPHA_TEST']), 'terrain-cutout');
@@ -75,6 +76,7 @@ export class TerrainPass {
 
     this.atlas.bind(0);
     gl.uniform1i(u.uAtlas, 0);
+    this.atlas.bindHigh(u.uAtlasHigh, u.uAtlasSplit);
     if (!this.atlas.isArray) {
       gl.uniform2f(u.uAtlasTiles, this.atlas.tilesPerRow, 1 / this.atlas.tilesPerRow);
     }

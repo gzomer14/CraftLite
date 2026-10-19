@@ -24,12 +24,8 @@ import { MOBS } from '../mobs';
 import { POTIONS } from '../potions';
 import { STATS } from '../stats';
 import { PROFESSIONS } from '../villagers';
-import { lang, type Lang } from '../../core/i18n';
+import { englishPack, lang, type Lang } from '../../core/i18n';
 import { ACTIVE_MODS } from '../../mods/active';
-import {
-  ACHIEVEMENT_TEXT_EN, BIOME_NAMES_EN, DIMENSION_NAMES_EN, EFFECT_NAMES_EN, ENCHANT_NAMES_EN,
-  MOB_NAMES_EN, PROFESSION_NAMES_EN, STAT_NAMES_EN, THING_NAMES_EN,
-} from './names.en';
 
 interface Named { name: string; display: string }
 
@@ -41,35 +37,36 @@ export interface NameTable {
   en: Readonly<Record<string, string>>;
 }
 
-const ACHIEVEMENT_TITLES_EN: Record<string, string> = {};
-const ACHIEVEMENT_DESCRIPTIONS_EN: Record<string, string> = {};
-for (const [name, [title, description]] of Object.entries(ACHIEVEMENT_TEXT_EN)) {
-  ACHIEVEMENT_TITLES_EN[name] = title;
-  ACHIEVEMENT_DESCRIPTIONS_EN[name] = description;
-}
+const NONE: Readonly<Record<string, string>> = {};
 
 /**
- * O inglês de blocos e itens, com o dos mods ligados (M21). Sem mod, é a
- * própria tabela de `names.en.ts`, sem cópia.
+ * Todas as tabelas com `display`, com o inglês **do pacote carregado**
+ * (`data/strings/pack.en.ts`, M25). Sem o pacote os mapas vêm vazios, e
+ * localizar para `en` deixa o português.
+ *
+ * Os nomes dos mods ligados (M21) entram junto com os de blocos e itens.
  */
-const THINGS_EN: Readonly<Record<string, string>> = ACTIVE_MODS.length === 0
-  ? THING_NAMES_EN
-  : Object.assign({}, THING_NAMES_EN, ...ACTIVE_MODS.map((mod) => mod.en));
-
-/** Todas as tabelas com `display`, para localizar e para o teste varrer. */
-export const NAME_TABLES: readonly NameTable[] = [
-  { label: 'BLOCKS', rows: BLOCKS, en: THINGS_EN },
-  { label: 'ITEMS', rows: ITEMS, en: THINGS_EN },
-  { label: 'POTIONS', rows: POTIONS, en: THING_NAMES_EN },
-  { label: 'MOBS', rows: MOBS, en: MOB_NAMES_EN },
-  { label: 'BIOMES', rows: BIOMES, en: BIOME_NAMES_EN },
-  { label: 'ACHIEVEMENTS', rows: ACHIEVEMENTS, en: ACHIEVEMENT_TITLES_EN },
-  { label: 'EFFECTS', rows: EFFECTS, en: EFFECT_NAMES_EN },
-  { label: 'ENCHANTS', rows: ENCHANTS, en: ENCHANT_NAMES_EN },
-  { label: 'PROFESSIONS', rows: PROFESSIONS, en: PROFESSION_NAMES_EN },
-  { label: 'STATS', rows: STATS, en: STAT_NAMES_EN },
-  { label: 'DIMENSIONS', rows: DIMENSIONS, en: DIMENSION_NAMES_EN },
-];
+export function nameTables(): NameTable[] {
+  const names = englishPack()?.names;
+  const things: Readonly<Record<string, string>> = ACTIVE_MODS.length === 0
+    ? names?.things ?? NONE
+    : Object.assign({}, names?.things ?? NONE, ...ACTIVE_MODS.map((mod) => mod.en));
+  const titles: Record<string, string> = {};
+  for (const [name, [title]] of Object.entries(names?.achievements ?? {})) titles[name] = title;
+  return [
+    { label: 'BLOCKS', rows: BLOCKS, en: things },
+    { label: 'ITEMS', rows: ITEMS, en: things },
+    { label: 'POTIONS', rows: POTIONS, en: names?.things ?? NONE },
+    { label: 'MOBS', rows: MOBS, en: names?.mobs ?? NONE },
+    { label: 'BIOMES', rows: BIOMES, en: names?.biomes ?? NONE },
+    { label: 'ACHIEVEMENTS', rows: ACHIEVEMENTS, en: titles },
+    { label: 'EFFECTS', rows: EFFECTS, en: names?.effects ?? NONE },
+    { label: 'ENCHANTS', rows: ENCHANTS, en: names?.enchants ?? NONE },
+    { label: 'PROFESSIONS', rows: PROFESSIONS, en: names?.professions ?? NONE },
+    { label: 'STATS', rows: STATS, en: names?.stats ?? NONE },
+    { label: 'DIMENSIONS', rows: DIMENSIONS, en: names?.dimensions ?? NONE },
+  ];
+}
 
 /** O português de cada linha, guardado na primeira troca para poder voltar. */
 const ptDisplay = new Map<Named, string>();
@@ -80,7 +77,8 @@ const ptDescription = new Map<Named, string>();
  * testes chamam de novo para voltar ao português.
  */
 export function localizeContent(target: Lang): void {
-  for (const table of NAME_TABLES) {
+  const descriptions = englishPack()?.names.achievements ?? {};
+  for (const table of nameTables()) {
     for (const row of table.rows) {
       if (row === undefined) continue;
       if (!ptDisplay.has(row)) ptDisplay.set(row, row.display);
@@ -91,7 +89,7 @@ export function localizeContent(target: Lang): void {
   for (const def of ACHIEVEMENTS) {
     if (!ptDescription.has(def)) ptDescription.set(def, def.description);
     const pt = ptDescription.get(def) ?? def.description;
-    def.description = target === 'en' ? ACHIEVEMENT_DESCRIPTIONS_EN[def.name] ?? pt : pt;
+    def.description = target === 'en' ? descriptions[def.name]?.[1] ?? pt : pt;
   }
 }
 

@@ -18,6 +18,7 @@ import { BLOCK_BY_NAME, makeState } from '../src/data/blocks';
 import { ACHIEVEMENT_BY_NAME, isUnlocked } from '../src/data/achievements';
 import { ITEM_BY_NAME, itemId, makeStack, type ItemStack } from '../src/data/items';
 import { CRAFT_RESULT } from '../src/game/inventory';
+import '../src/data/strings/pack.en';
 import { setLanguage } from '../src/core/i18n';
 import type { Settings } from '../src/game/settings';
 

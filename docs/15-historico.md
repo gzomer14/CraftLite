@@ -3460,3 +3460,35 @@ Ao terminar qualquer entrega — marco, correção ou ajuste:
 4. Refaça as métricas do §2 (`npm test`, `npm run build`, `npm run size`).
 5. Registre os arquivos tocados em [16-auditoria.md](16-auditoria.md).
 6. Atualize a data de "Última atualização" no topo.
+
+---
+
+## Acrescentado em 2026-10-19 22:15 — o detalhe do M24, que saiu da foto ao fechar o M25
+
+### M24 — Casa em ordem, terceira volta ✅ — 2026-10-19
+
+Pedido: *"PR mesclado, pode seguir"* — o próximo de código depois do M23.
+
+- **Seis módulos abaixo de 700, por papel** (nenhum importador mudou: quem saiu é re-exportado):
+  - `world/mesh/shapes.ts` 919 → 543: a caixa em `box.ts`, a escada em `stairshape.ts`, o trilho
+    em `railshape.ts`, alavanca, botão, repetidor, comparador, pistão, bigorna e funil em
+    `machineshape.ts`;
+  - `ui/hud.ts` 738 → 565: o CSS e o ícone da fome em `hudstyle.ts`;
+  - `entity/mobs.ts` 716 → 640: alvo, hostilidade e linha de visão em `mobtarget.ts`;
+  - `game/session.ts` 715 → 671: o renascimento em `spawnplacement.ts`, o drop de bloco em
+    `drops.ts`;
+  - `world/pipeline.ts` 714 → 660: os tipos em `pipelinetypes.ts`;
+  - `render/itemsprites.ts` 713 → 644: o mostrador da bússola e do relógio em `dialsprite.ts`.
+  - **E o teto virou teste** (`tests/modulesize.test.ts`): módulo de código acima de 700 linhas
+    reprova o `npm test`. Tabelas de `src/data/` ficam de fora.
+  - De passagem: `railSlopeDir` criava um array por chamada (tick do carrinho); saiu da função.
+- **Este documento:** de 3 453 para ~360 linhas. O documento inteiro de antes está, sem edição, em
+  [15-historico.md](15-historico.md). *Desvio consciente do doc 14*, que mandava o histórico para o
+  doc 16: o 16 é um registro por sessão, com grid de arquivos, e 2 800 linhas de narrativa por
+  marco não cabem nesse formato.
+- **CI nos PRs** (`.github/workflows/portoes.yml`): testes, lint, build, orçamento, `npm run smoke`
+  e `npm run smoke:mods` em todo pull request. **Rodou verde no PR #9** (3 min, 2026-10-19).
+- **Smoke como root:** os oito scripts de navegador tinham cada um a sua cópia de `chromeBin()`; agora
+  é `scripts/chrome.mjs`, que acha também o Chromium do Playwright e põe `--no-sandbox` sozinho como
+  root. `smoke`, `smoke:net` e `smoke:camera` rodaram como root sem invólucro.
+

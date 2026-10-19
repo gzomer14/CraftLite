@@ -180,18 +180,21 @@ try {
   // aparelho sem espaço. A tela tem que abrir e, com o espaço de volta, o
   // "Tentar salvar de novo" grava e fecha — o bloco quebrado continua pendente
   // e vai para o disco aí, o que o passo 6 confere depois de recarregar.
-  const cota = JSON.parse(await cdp.avaliar(`(async () => {
-    const c = window.__craftlite;
-    const put = IDBObjectStore.prototype.put;
+  // A tela vem do pedaço "depois" (`u/`, M25): ela abre quando ele chega.
+  await cdp.avaliar(`(async () => {
+    window.__smoke.put = IDBObjectStore.prototype.put;
     IDBObjectStore.prototype.put = function () { throw new DOMException('cheio', 'QuotaExceededError'); };
-    await c.save.saveAll();
+    await window.__craftlite.save.saveAll();
+    return true;
+  })()`);
+  const aberta = await ate(cdp, "__smoke.visivel('storage-full') !== null", 15000).catch(() => false);
+  await cdp.avaliar(`(() => {
+    IDBObjectStore.prototype.put = window.__smoke.put;
     const tela = window.__smoke.visivel('storage-full');
-    IDBObjectStore.prototype.put = put;
-    if (tela === null) return JSON.stringify({ aberta: false });
-    window.__smoke.botao(tela, 'Tentar salvar').click();
-    return JSON.stringify({ aberta: true });
-  })()`));
-  passo('cota cheia: a tela abre', cota.aberta === true);
+    if (tela !== null) window.__smoke.botao(tela, 'Tentar salvar').click();
+    return true;
+  })()`);
+  passo('cota cheia: a tela abre (vinda do pedaço u/)', aberta === true);
   await ate(cdp, "__smoke.visivel('storage-full') === null", 15000);
   passo('cota cheia: com espaço de volta, "Tentar salvar de novo" grava e fecha', true);
 

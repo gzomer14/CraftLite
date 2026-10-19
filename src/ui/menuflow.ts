@@ -11,7 +11,7 @@
  */
 
 import { seedFromString } from '../core/rng';
-import { archiveFileName, exportWorld, importWorld } from '../save/archive';
+import { later } from './lategate';
 import { newWorldId, type SaveDatabase, type WorldMeta, STORE_WORLDS } from '../save/db';
 import { clearPack, decodeImage, loadPack, readPack, savePack } from '../render/pack';
 import { WORLD_HEIGHT } from '../world/chunk';
@@ -199,6 +199,8 @@ export class MenuFlow {
    */
   private async exportWorld(meta: WorldMeta): Promise<void> {
     if (this.db === null) throw new Error(t('store.no_export'));
+    // O exportador vem do pedaço "depois" (M25): quase ninguém exporta.
+    const { archiveFileName, exportWorld } = await later();
     const bytes = await exportWorld(this.db, meta.id);
     const blob = new Blob([bytes as BlobPart], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
@@ -215,6 +217,7 @@ export class MenuFlow {
   private async importWorld(file: File): Promise<string> {
     if (this.db === null) throw new Error(t('store.no_import'));
     const bytes = new Uint8Array(await file.arrayBuffer());
+    const { importWorld } = await later();
     const meta = await importWorld(this.db, bytes);
     return meta.name;
   }

@@ -12,12 +12,13 @@
 import { describe, expect, it, afterEach } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
+import '../src/data/strings/pack.en';
 import { PT } from '../src/data/strings/pt';
 import { EN } from '../src/data/strings/en';
 import {
   decimal, lang, langFromNavigator, resolveLang, setLanguage, t, tf,
 } from '../src/core/i18n';
-import { NAME_TABLES, localizeContent } from '../src/data/strings/localize';
+import { localizeContent, nameTables } from '../src/data/strings/localize';
 import { ACHIEVEMENTS, ACHIEVEMENT_BY_NAME, objectiveFor } from '../src/data/achievements';
 import { ITEM_BY_NAME } from '../src/data/items';
 import { BLOCK_BY_NAME } from '../src/data/blocks';
@@ -108,7 +109,7 @@ describe('nomes de conteúdo', () => {
   it('toda linha de toda tabela tem nome em inglês, sem cara de português', () => {
     const missing: string[] = [];
     const leaks: string[] = [];
-    for (const table of NAME_TABLES) {
+    for (const table of nameTables()) {
       for (const row of table.rows) {
         if (row === undefined) continue;
         const en = table.en[row.name];

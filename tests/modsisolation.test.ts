@@ -87,8 +87,11 @@ describe('isolamento dos mods', () => {
   });
 
   it('o jogo não tem `import()`: nada de ajudante de pré-carga no pedaço principal', () => {
-    // `game/netgate.ts` baixa a sala (M20) por URL, sem o ajudante do Vite.
-    const allowed = new Set(['mods/boot.ts', 'mods/loaders.ts', 'workers/chunk.modworker.ts', 'game/netgate.ts']);
+    // `game/netgate.ts` baixa a sala (M20) por URL, sem o ajudante do Vite; o
+    // `ui/lategate.ts`, as telas raras (M25), do mesmo jeito.
+    const allowed = new Set([
+      'mods/boot.ts', 'mods/loaders.ts', 'workers/chunk.modworker.ts', 'game/netgate.ts', 'ui/lategate.ts',
+    ]);
     const dynamic = SOURCES.filter((file) => !allowed.has(rel(file)))
       .filter((file) => importsOf(file).some((imp) => imp.dynamic))
       .map(rel);

@@ -2,7 +2,7 @@
  *  fora do lugar aqui vira geometria errada. */
 import { describe, expect, it } from 'vitest';
 import {
-  AO_LEVELS, BYTES_PER_VERTEX_PACKED, FACE_NORMALS, POSITION_SCALE,
+  AO_LEVELS, BYTES_PER_VERTEX_PACKED, FACE_NORMALS, MAX_ATLAS_LAYERS, POSITION_SCALE,
   packWord0, packWord1, writeFloatVertex,
 } from '../src/render/vertex';
 
@@ -72,14 +72,29 @@ describe('formato de vértice', () => {
    * M13 (2026-09-22): o tint tem 6 bits — 4 na palavra 1, 2 no topo da
    * palavra 0 —, para caber grama, folha, água e os dezesseis corantes.
    */
-  it('o tint de 6 bits se divide entre as duas palavras e volta inteiro', () => {
-    for (const tint of [0, 3, 4, 19, 63]) {
+  it('o tint de 5 bits se divide entre as duas palavras e volta inteiro', () => {
+    // M25: eram 6 bits; o que sobrou virou o 9º bit da camada.
+    for (const tint of [0, 3, 4, 19, 31]) {
       const w0 = packWord0(1, 2, 3, 4, tint);
       const w1 = packWord1(7, 1, 2, 3, tint, 4, 5);
-      const back = ((w1 >>> 18) & 15) | (((w0 >>> 30) & 3) << 4);
+      const back = ((w1 >>> 18) & 15) | (((w0 >>> 30) & 1) << 4);
       expect(back).toBe(tint);
       expect(unpack0(w0)).toEqual(unpack0(packWord0(1, 2, 3, 4)));
     }
+  });
+
+  it('a camada tem 9 bits: até 511, sem tocar no tint nem na posição (M25)', () => {
+    for (const layer of [0, 1, 255, 256, 300, 511]) {
+      for (const tint of [0, 19, 31]) {
+        const w0 = packWord0(100, 200, 50, 3, tint, layer);
+        const w1 = packWord1(layer, 1, 2, 3, tint, 4, 5);
+        // A mesma conta do shader de terreno.
+        expect((w1 & 255) | (((w0 >>> 31) & 1) << 8), `camada ${layer}`).toBe(layer);
+        expect(((w1 >>> 18) & 15) | (((w0 >>> 30) & 1) << 4)).toBe(tint);
+        expect(unpack0(w0)).toEqual(unpack0(packWord0(100, 200, 50, 3)));
+      }
+    }
+    expect(MAX_ATLAS_LAYERS).toBe(512);
   });
 
   it('campos não vazam um no outro', () => {

@@ -14,6 +14,7 @@ import { acceptMods, modProblems } from '../src/mods/validate';
 import { MOD_BLOCK_FIRST, MOD_BLOCK_LAST, MOD_ITEM_FIRST, type ModDef } from '../src/mods/types';
 import { MOD_CATALOG, MODS_STORAGE_KEY } from '../src/mods/catalog';
 import { MOD_LOADERS } from '../src/mods/loaders';
+import { MAX_ATLAS_LAYERS } from '../src/render/vertex';
 
 type Global = { __CRAFTLITE_MODS__?: readonly ModDef[] };
 
@@ -244,9 +245,10 @@ describe('catálogo, carregadores e boot contam a mesma história', () => {
     const { accepted, problems } = acceptMods(all);
     expect(problems).toEqual([]);
     expect(accepted).toHaveLength(all.length);
-    // O WebGL1 desenha num atlas 2D de 16×16 ladrilhos: 256 é teto duro.
+    // O teto é o do vértice: 9 bits, 512 camadas desde o M25 (o atlas 2D do
+    // WebGL1 cresce a grade, e o array do WebGL2 vira duas páginas).
     const game = await loadGame(accepted);
-    expect(game.layers.buildLayerIndex().count).toBeLessThanOrEqual(256);
+    expect(game.layers.buildLayerIndex().count).toBeLessThanOrEqual(MAX_ATLAS_LAYERS);
   });
 
   it('a chave de armazenamento é a mesma no index.html, no boot e no catálogo', () => {

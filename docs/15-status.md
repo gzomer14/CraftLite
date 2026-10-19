@@ -9,12 +9,14 @@
 > Os documentos 00 a 14 são **normativos**: descrevem o que o jogo deve ser. Este é **descritivo**:
 > reflete o código de hoje e é atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-10-19 18:41 — **M24 fechado: casa em ordem, terceira volta** (§3). Os seis
-módulos acima de 700 linhas foram cortados por papel, e o teto virou teste. Este documento voltou a
-ser foto (de 3 453 para ~360 linhas; o de antes, inteiro, no [histórico](15-historico.md)). Todo
-PR passa pelos portões e pelos dois smokes no CI, e os smokes rodam como root sem invólucro.
-Portões: 2424 testes, 311,2 KB; `smoke` 9, `smoke:mods` 6, `smoke:room` 20, `bench:ui` ok.
-**Próximo passo de código: M25** (§6). Do usuário: **M22**.
+**Última atualização:** 2026-10-19 22:15 — **M25 fechado: folga para crescer** (§3). O inglês saiu
+do pedaço do jogo para um pacote que só quem joga em inglês baixa, e as telas raras (exportar e
+importar mundo, créditos, placa, cota cheia) foram para um pedaço "depois": **em português o jogo
+abre com 299,6 KB** (folga 50,4). As vozes de mob são geradas na primeira vez que o mob faz som
+(boot 0,74 MB, pico 2,46). A camada de atlas ganhou o 9º bit do vértice — teto de **512** —, e o
+atlas vira duas páginas só na GPU que pede. Portões: 2436 testes; `smoke` 9, `smoke:mods` 6,
+`smoke:room` 20, `smoke:camera` 3, `bench:ui` ok. **Próximo passo de código: M26** (§6). Do
+usuário: **M22**.
 
 ---
 
@@ -58,8 +60,8 @@ Portões: 2424 testes, 311,2 KB; `smoke` 9, `smoke:mods` 6, `smoke:room` 20, `be
 | **M22** Aparelho e MVP | domínio, PWA do J7, aceite do M20, roteiro de campo M16–M21, Firefox e Safari, declarar o MVP | ⬜ proposto em 2026-10-19 | do usuário |
 | **M23** Correções verificadas | coluna perdida na gravação, cota cheia (doc 11 §4), coluna corrompida em quarentena, fogo nos mobs e chama visível, dica fora da vida, mochila no T0 deitado, save do convidado, escada em quina de três — e a regra de canto de escada, que estava trocada | ✅ concluído em 2026-10-19 | **não visto em aparelho** (visto no Chromium, desktop e 640×360) |
 | **M24** Casa em ordem, 3ª volta | seis módulos cortados por papel (e um teste que cobra o teto de 700), este documento de volta a foto, CI nos PRs com smoke, smoke como root | ✅ concluído em 2026-10-19 | CI **verde** na primeira rodada (PR #9, 3 min); falta vê-lo vermelho num teste quebrado de propósito |
-| **M25** Folga para crescer | atlas, bundle e áudio com folga para os marcos de conteúdo | ⬜ proposto em 2026-10-19 | **próximo de código** (§6); trava M26–M29 |
-| **M26** Aconchego | fogueira e caldeirão (doc 00), lanterna, vaso, moldura, tronco descascado, terracota e concreto | ⬜ proposto em 2026-10-19 | — |
+| **M25** Folga para crescer | atlas de 512 camadas (duas páginas quando a GPU pede), inglês e telas raras fora do pedaço do jogo, vozes de mob sob demanda | ✅ concluído em 2026-10-19 | **não visto em aparelho**; as duas páginas nunca rodaram numa GPU de 256 por array |
+| **M26** Aconchego | fogueira e caldeirão (doc 00), lanterna, vaso, moldura, tronco descascado, terracota e concreto | ⬜ proposto em 2026-10-19 | **próximo de código** (§6) |
 | **M27** Bichos | cavalo com sela, gato, coelho, peixes vivos, guia, etiqueta | ⬜ proposto em 2026-10-19 | — |
 | **M28** Lugares para achar | templos do deserto e da selva, fundo do mar, planalto de terracota, mapa do tesouro | ⬜ proposto em 2026-10-19 | — |
 | **M29** Ameaça | invasão de saqueadores, besta, tridente, fantasma noturno | ⬜ proposto em 2026-10-19 | — |
@@ -75,16 +77,17 @@ O multijogador saiu do escopo do M7 por decisão do usuário (2026-09-13) e volt
 
 ## 2. Métricas atuais
 
-Medidas em 2026-10-19 18:41 (ao fechar o M24) com os quatro portões, `npm run smoke`, `smoke:mods`,
-`smoke:room` e `bench:ui`; as de aparelho e de sessão longa são de setembro, com a data na linha.
+Medidas em 2026-10-19 22:15 (ao fechar o M25) com os quatro portões, `npm run smoke`, `smoke:mods`,
+`smoke:room`, `smoke:camera` e `bench:ui`; as de aparelho e de sessão longa são de setembro, com a data na linha.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, o jogo sem mod) | **311,2 KB**, worker 42,8 (311,0 antes do M24, pelos limites de módulo novos; 308,3 antes do M23; a série completa está no [histórico](15-historico.md)) | < 350 KB | `npm run size` |
-| Testes | **2424**, 130 arquivos (2423 antes do M24; 2404 antes do M23) | manter verde | `npm test` |
-| Smoke test de navegador | **9 passos verdes**: carregar, criar, andar 10 s, quebrar, **cota cheia: a tela abre com o banco recusando, e com espaço de volta grava e fecha (M23)**, salvar, recarregar, conferir | verde | `npm run smoke` |
+| Bundle (gzip, o jogo sem mod) | **299,6 KB em português** (folga 50,4) e **312,5 em inglês** (o jogo + o pacote `l/`, 12,9); eram 311,2 nos dois antes do M25 (311,0 antes do M24; 308,3 antes do M23; a série completa está no [histórico](15-historico.md)). O orçamento cobra o inglês, o caminho mais pesado | < 350 KB | `npm run size` |
+| Pedaço "depois" (`u/`) | **4,6 KB**: exportar e importar mundo, créditos, editor de placa, cota cheia; baixado na primeira vez que se usa uma delas, e no precache (abre offline) | fora do orçamento de abertura | `npm run size` |
+| Testes | **2436**, 133 arquivos (2424 antes do M25; 2423 antes do M24; 2404 antes do M23) | manter verde | `npm test` |
+| Smoke test de navegador | **9 passos verdes**: carregar, criar, andar 10 s, quebrar, **cota cheia: a tela abre com o banco recusando (desde o M25 vinda do pedaço `u/`), e com espaço de volta grava e fecha (M23)**, salvar, recarregar, conferir | verde | `npm run smoke` |
 | Smoke test da rede (M20.0) | **7 passos verdes**: dois Chrome, anfitrião e convidado pela página `rede.html`, trocando os códigos como uma pessoa; ligados em candidato `host` dos dois lados; ida e volta ~0,3 ms, perda 0/300, 6–18 MB/s. Com e sem mDNS (`SMOKE_NET_MDNS=1`). **Na mesma máquina — não prova a rede Wi-Fi** | verde | `npm run smoke:net` |
-| Toque nas telas de inventário, CPU 6× mais lenta | **91–268 ms** por ação (abrir o livro de receitas, tocar numa receita, tocar num slot; varia entre rodadas); eram **~3 000 ms** com a folha de sprites como `data:` URL — no J7, 5–10 s | ≤ 600 ms | `npm run bench:ui` |
+| Toque nas telas de inventário, CPU 6× mais lenta | **91–268 ms** por ação (abrir o livro de receitas, tocar numa receita, tocar num slot; varia entre rodadas; 233 no pior ao fechar o M25); eram **~3 000 ms** com a folha de sprites como `data:` URL — no J7, 5–10 s | ≤ 600 ms | `npm run bench:ui` |
 | Mochila num T0 deitado (640×360) | **cabe sem rolar**, *Fechar* à vista (M23; antes o painel ia a 410 px e o botão ficava em 354) | sem rolagem | `npm run bench:ui` |
 | Smoke test da sala (M20) | **20 passos verdes**: dois Chrome; o convidado entra pelo título trocando os códigos; blocos nos dois sentidos; bonecos, nome e chat; **trocar o modo de jogo pela pausa não fecha a sala** (M23); baú do anfitrião; luz do poço; bloco além do anel do anfitrião; a sala segue o anfitrião ao Nether e de volta; o convidado sai salvo no anfitrião; **0 mundo e 0 chunk no banco do convidado** | verde | `npm run smoke:room` |
 | Bloco do anfitrião no convidado | **0–15 ms** por viagem, mediana 1–4 ms (5 viagens por rodada; eram até 214 ms antes de o lote sair na microtarefa, sem esperar o tick) | < 150 ms (aceite do M20) | `npm run smoke:room` |
@@ -97,8 +100,8 @@ Medidas em 2026-10-19 18:41 (ao fechar o M24) com os quatro portões, `npm run s
 | Textos de interface | **~500 chaves**, as mesmas em `pt` e `en` (o compilador cobra); **nenhum literal com cara de português** fora de `data/strings/pt.ts` e dos campos de nome das tabelas | varredura verde | `tests/i18n.test.ts` |
 | Geração de chunk do End nas ilhas de fora | **~2,8 ms** (1089 chunks em ~3 s, com o santuário) | < 25 ms | `tests/theend.test.ts` |
 | Primeira hora guiada | três troncos de bétula → **picareta de pedra**, só pelo livro de receitas, com a dica andando a cada passo | aceite do M17 | `tests/firsthour.test.ts` |
-| Camadas de atlas | **223** com o M16 (+11: verruga, suporte, pedra do End, moldura com e sem olho, portal do End, ovo); **212** com a oficina (+11: bigorna, funil, dispensador, liberador, comparador, observador); 201 com a selva; 194 antes do M14 | ≤ 256 (doc 02 §3) | `buildLayerIndex()` |
-| Memória de áudio | **2,924 MB** (M18: taxa exata de Nyquist por receita, teto do teste baixado para 3,2); antes **3,442 MB** com as vozes do blaze, da bruxa, do dragão e do cristal (§5: perto do teto de novo); **3,140 MB** no M15 (3,497 no M14, colado no teto): degrau de ¼ da taxa para som grave, sem tirar nenhum (§4) | < 3,5 MB | `tests/audio.test.ts` |
+| Camadas de atlas | **223 de 512** (folga 289; o teto era 256 até o M25) — **223** com o M16 (+11: verruga, suporte, pedra do End, moldura com e sem olho, portal do End, ovo); **212** com a oficina (+11: bigorna, funil, dispensador, liberador, comparador, observador); 201 com a selva; 194 antes do M14 | folga ≥ 64 (M25) | `tests/atlasroom.test.ts` |
+| Memória de áudio | **boot 0,74 MB, pico 2,46** (M25: as vozes de mob nascem na primeira vez que o mob faz som, num orçamento de 1,5 MB que despeja o mob ouvido há mais tempo; a primeira voz do zumbi levou 43 ms no Chromium). Tudo renderizado daria **2,924 MB** (M18: taxa exata de Nyquist por receita, teto do teste baixado para 3,2); antes **3,442 MB** com as vozes do blaze, da bruxa, do dragão e do cristal (§5: perto do teto de novo); **3,140 MB** no M15 (3,497 no M14, colado no teto): degrau de ¼ da taxa para som grave, sem tirar nenhum (§4) | < 3,5 MB, folga ≥ 1 MB no pico (M25) | `tests/voicecache.test.ts`, `tests/audio.test.ts` |
 | Mapa explorado (M10) | **0,23 ms por segundo de jogo**; 500 blocos = 16 regiões, ~146 KB; voando a 20 blocos/s, zero buraco | < 1 ms/s; ≤ 64 regiões | `tests/journal.test.ts` |
 | Geração de chunk | **6,4 ms** (mediana; 6,2 antes do rio) | < 25 ms | `tests/perf.test.ts` |
 | Clima do tint de bioma, thread principal | **8–9 µs por chunk** (até 32 por quadro) | < 60 µs | `tests/perf.test.ts` |
@@ -131,7 +134,7 @@ Medidas em 2026-10-19 18:41 (ao fechar o M24) com os quatro portões, `npm run s
 | Render em T0 | **2,7 ms** de 33,3 ms de orçamento | ≤ 8 ms (soma do doc 02 §2) | overlay F3 no aparelho |
 | Heap em T0 | **20 MB**, estável na sessão | sem crescimento | overlay F3 no aparelho |
 | FPS em celular atual | **75, T2, RD 16, escala 1,00, render 2,6 ms** (S24 Ultra) | — | teste manual |
-| Abertura em 3G rápido | **2,82 s** até a tela de título (2026-09-25, 301,8 KB); o M21 mediu +0,5% lado a lado | < 5 s (PROMPT.md §11) | `npm run slow-network` com `URL` local |
+| Abertura em 3G rápido | **2,82 s** até a tela de título (2026-09-25, 301,8 KB); o M21 mediu +0,5% lado a lado; o M25, lado a lado com o build de antes (servidos localmente, sem gzip): **5,96 → 5,64 s em português**, 5,82 → 5,81 s em inglês | < 5 s (PROMPT.md §11) | `npm run slow-network` com `URL` local |
 | Sessão longa (voo contínuo) | **92,5 min, 0 erros, 0 travamentos** | 2 h sem crash (PROMPT.md §11) | `npm run soak` |
 | Heap na sessão longa | **37,8 MB no início, 44,2 no fim**; média por faixa de 15 min entre 42,8 e 47,2 | sem crescimento | `npm run soak` |
 | FPS na sessão longa | mediana **60**, mínimo 50, nenhuma amostra abaixo de 30 | 30 estáveis | `npm run soak` |
@@ -176,34 +179,42 @@ relatos de campo estão no [histórico](15-historico.md)** — `grep` pelo marco
 | M20 🚧 | sala na rede local por WebRTC sem servidor, QR com leitor próprio, o convidado salvo no anfitrião, combate, contêineres, cama, placa, dimensões, âncoras do pipeline | `src/net/` (entrada em `game/netgate.ts`); o desenho no histórico, "M20 no jogo" |
 | M21 | mods escritos no repositório, cada um um pedaço de bundle; sem mod, um arquivo só | `src/mods/`; a receita abaixo |
 | M23 | save que não perde coluna, tela de cota cheia, quarentena de coluna corrompida, fogo nos mobs com chama à vista, mochila no T0 deitado, cadência do save do convidado, canto de escada certo | `save/savemanager.ts`, `ui/screens/storagefull.ts`, `entity/mobrules.ts`, `world/mesh/stairshape.ts` |
-| M24 | ver abaixo | — |
+| M24 | seis módulos cortados por papel e o teto de 700 linhas como teste, este documento de volta a foto, CI nos PRs com smoke, smoke como root | `tests/modulesize.test.ts`, `.github/workflows/portoes.yml`, `scripts/chrome.mjs` |
+| M25 | ver abaixo | — |
 
-### M24 — Casa em ordem, terceira volta ✅ — 2026-10-19
+### M25 — Folga para crescer ✅ — 2026-10-19
 
-Pedido: *"PR mesclado, pode seguir"* — o próximo de código depois do M23.
+Pedido: *"Pode seguir com o M25"*. Aceite do doc 14: folga de ≥ 64 camadas, ≥ 50 KB de bundle e
+≥ 1 MB de áudio, sem regressão na abertura. **Cumprido, menos o T0** (que é do M22).
 
-- **Seis módulos abaixo de 700, por papel** (nenhum importador mudou: quem saiu é re-exportado):
-  - `world/mesh/shapes.ts` 919 → 543: a caixa em `box.ts`, a escada em `stairshape.ts`, o trilho
-    em `railshape.ts`, alavanca, botão, repetidor, comparador, pistão, bigorna e funil em
-    `machineshape.ts`;
-  - `ui/hud.ts` 738 → 565: o CSS e o ícone da fome em `hudstyle.ts`;
-  - `entity/mobs.ts` 716 → 640: alvo, hostilidade e linha de visão em `mobtarget.ts`;
-  - `game/session.ts` 715 → 671: o renascimento em `spawnplacement.ts`, o drop de bloco em
-    `drops.ts`;
-  - `world/pipeline.ts` 714 → 660: os tipos em `pipelinetypes.ts`;
-  - `render/itemsprites.ts` 713 → 644: o mostrador da bússola e do relógio em `dialsprite.ts`.
-  - **E o teto virou teste** (`tests/modulesize.test.ts`): módulo de código acima de 700 linhas
-    reprova o `npm test`. Tabelas de `src/data/` ficam de fora.
-  - De passagem: `railSlopeDir` criava um array por chamada (tick do carrinho); saiu da função.
-- **Este documento:** de 3 453 para ~360 linhas. O documento inteiro de antes está, sem edição, em
-  [15-historico.md](15-historico.md). *Desvio consciente do doc 14*, que mandava o histórico para o
-  doc 16: o 16 é um registro por sessão, com grid de arquivos, e 2 800 linhas de narrativa por
-  marco não cabem nesse formato.
-- **CI nos PRs** (`.github/workflows/portoes.yml`): testes, lint, build, orçamento, `npm run smoke`
-  e `npm run smoke:mods` em todo pull request. **Rodou verde no PR #9** (3 min, 2026-10-19).
-- **Smoke como root:** os oito scripts de navegador tinham cada um a sua cópia de `chromeBin()`; agora
-  é `scripts/chrome.mjs`, que acha também o Chromium do Playwright e põe `--no-sandbox` sozinho como
-  root. `smoke`, `smoke:net` e `smoke:camera` rodaram como root sem invólucro.
+- **Bundle — o inglês e as telas raras saíram do pedaço do jogo.**
+  - O inglês (textos e nomes de conteúdo) é o pacote `l/`, entrada própria do build
+    (`data/strings/pack.en.ts`), que se registra em `globalThis.__CRAFTLITE_LANGS__`. O script do
+    `index.html` decide o idioma como `core/i18n.ts` (opção salva, senão `navigator.language`) e,
+    em inglês, baixa o pacote **junto** com o jogo e antes dele (`async = false`). O português
+    segue embutido. `localize.ts` lê as tabelas de nomes na hora (`nameTables()`), não no import.
+  - O pedaço "depois" (`u/`, `ui/later.ts`) leva exportar e importar mundo, créditos, editor de
+    placa e a tela de cota cheia. `ui/lategate.ts` o importa **por URL**, como a sala do M20 (sem o
+    `__vitePreload`), e `LazyScreen` faz a tela parecer fechada até chegar. Está no precache.
+  - *Medido e descartado:* tirar os **dois** idiomas do jogo. O gzip comprime melhor junto, e o
+    pacote do português sozinho (~10,2 KB) comia quase tudo o que economizava (~10,5).
+  - **Desvio:** quem joga em inglês baixa 1,3 KB a mais que antes (312,5), em dois arquivos
+    paralelos. O `size-report` cobra o orçamento nesse caminho, o pior.
+- **Áudio — voz de mob sob demanda** (`audio/voicecache.ts`, `audio/engine.ts`). Cada mob é um
+  grupo (`mob/zombie`); o grupo é gerado na primeira vez que um som dele toca, e as vozes ficam num
+  orçamento de 1,5 MB que despeja o mob ouvido há mais tempo (nunca o que acabou de entrar). Se a
+  geração passar de 400 ms, aquele primeiro som não toca (atrasado soaria errado); o próximo, sim.
+  Um resource pack que troca uma voz segue valendo. Com os 21 mobs tocados, 1,46 MB residente.
+- **Atlas — 512 camadas.** O tint cedeu um bit (6 → 5, `MAX_TINTS` 32; usa 20) para o 9º bit da
+  camada, no bit 31 da palavra 0 do vértice (`render/vertex.ts`). Quando a GPU aceita menos camadas
+  por array do que o atlas tem, ele vira duas páginas (`ATLAS_PAGES`, `render/shaders/atlaspages.ts`):
+  o shader escolhe a página pela camada, com `textureGrad` e as derivadas fora do `if`. Hoje (223
+  camadas) nenhum aparelho paga nada. `?atlasLayers=N` força o limite para teste: com 128, o
+  Chromium desenhou igual (0,35% de pixel diferente, de chunk distante chegando em outro tempo). O
+  WebGL1 já crescia o atlas 2D sozinho.
+- **Testes novos:** `tests/langpack.test.ts` (o script do `index.html` decide igual ao `i18n`),
+  `tests/voicecache.test.ts` e `tests/atlasroom.test.ts`; o smoke espera a tela de cota cheia vir
+  do `u/`.
 
 ### Como escrever um mod (a receita)
 
@@ -226,7 +237,7 @@ Pedido: *"PR mesclado, pode seguir"* — o próximo de código depois do M23.
 6. **Teste do mod** em `tests/`, carregando o jogo com ele (`loadGame([mod])` em
    `tests/mods.test.ts` é o molde). Um mod pode ser pesado; o jogo sem ele, não — os portões e o
    `npm run smoke:mods` continuam valendo.
-7. **Limites:** atlas de 256 camadas no total (o jogo usa 223; o exemplo, 1) — o teste soma todos os
+7. **Limites:** atlas de 512 camadas no total (o jogo usa 223; o exemplo, 1) — o teste soma todos os
    mods do catálogo; mob, som, estrutura e conquista de mod ainda não têm tabela aberta.
 
 ---
@@ -273,7 +284,9 @@ registro de campo). O que fechou está no histórico.
 | A quarentena guarda a coluna corrompida, mas recuperar é manual (não há tela) | `save/savemanager.ts` | — |
 | O jogo usa o primeiro controle ligado e ignora o resto | `input/gamepad.ts` (`firstConnected`) | — (sem multijogador local) |
 | O worker de sempre sai duas vezes no `dist/` (em `assets/` e como pedaço em `m/`, 42,8 KB que só baixam com mod) | `vite.config.ts` | — |
-| Folga: atlas 223 de 256 camadas, áudio 2,92 de 3,5 MB, bundle 311,2 de 350 KB | `npm run size`, `tests/audio.test.ts` | **M25** |
+| As duas páginas de atlas só rodaram com o limite forçado (`?atlasLayers`), nunca numa GPU que diz 256; e o caminho do WebGL1 não foi exercitado no M25 | `render/atlas.ts` | quando o atlas passar de 256 |
+| A primeira voz de um mob não toca se gerá-la passar de 400 ms (no Chromium: 43 ms; no T0, não medido) | `audio/engine.ts` (`LATE_PLAY_MS`) | M22 (medir) |
+| A prova do CI vermelho (um PR com teste quebrado de propósito) | `.github/workflows/portoes.yml` | quando o usuário quiser |
 
 ### De aparelho — não vistos, ou não medidos
 
@@ -288,6 +301,7 @@ registro de campo). O que fechou está no histórico.
 | M17: a primeira hora no celular, de preferência com alguém que nunca jogou; o jogo em inglês; copiar e colar a seed | 2026-09-25 | M22 |
 | M21: o PWA sem mod e **offline** (o boot e o precache mudaram), e o mod de exemplo | 2026-09-27 | M22 |
 | M23: a tela de cota cheia, a borda de fogo e a fagulha no mob, escadas em L e em pirâmide, a mochila deitada | 2026-10-19 | M22 |
+| M25: o jogo em inglês e **offline** (o pacote `l/` e o pedaço `u/` vêm do precache), exportar e importar mundo, a placa, o primeiro som de cada mob no T0 | 2026-10-19 | M22 |
 | No T0: a cor de grama por bioma (duas leituras de textura por vértice) e se o RD 5 cabe | 2026-09-23/24 | M22 |
 | Firefox (computador e Android) e **Safari no iPhone**: nunca rodaram | — | M22 |
 | Do acabamento de setembro, nunca olhados com atenção em aparelho: nuvens (custo de preenchimento), fogo que se espalha, contorno em alto contraste e modo daltônico, o boneco do inventário com as quatro peças de armadura, o Modo A de toque, `.clw` exportado e reimportado de verdade, `.ogg` real num resource pack | 2026-09-14 | M22 |
@@ -309,9 +323,10 @@ Estão nos comentários dos módulos; os que mudam o que o jogador vê:
 
 ## 6. Próximo passo recomendado
 
-**De código: o M25** (folga para crescer, doc 14). Os marcos de conteúdo M26–M29 não cabem nos
-tetos de hoje — atlas 223/256, áudio 2,92/3,5 MB, bundle 311,2/350 KB. O primeiro candidato do
-bundle é o inglês embutido (~12 KB), que vira pedaço sob demanda como a sala do M20.
+**De código: o M26** (aconchego, doc 14): fogueira e caldeirão (o doc 00 §3 já pedia), lanterna,
+vaso, moldura de item, tronco descascado, terracota e concreto pelo tint. Com o M25 há folga: 289
+camadas, 50,4 KB de bundle em português, 1,04 MB de áudio no pico. Tela nova e rara pode ir para o
+pedaço `u/` (`ui/later.ts`); som novo de mob já nasce sob demanda.
 
 **Do usuário: o M22** (aparelho e MVP). O roteiro, numa sessão de celular, em ordem:
 

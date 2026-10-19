@@ -9,9 +9,15 @@
  *    fora do frame, com `OfflineAudioContext`.
  * 3. **Pool de vozes** (16, ou 8 em T0). Estourou, rouba a mais antiga; o caro
  *    é o `PannerNode`, então eles são reusados em vez de recriados.
+ *
+ * **Desde o M25, as vozes de mob não são renderizadas no boot** (`voicecache.ts`):
+ * as de um mob nascem na primeira vez que ele faz som — e esse primeiro som
+ * toca assim que fica pronto, se ainda fizer sentido —, e as ouvidas há mais
+ * tempo saem quando o orçamento estoura.
  */
 
 import { SOUNDS, buildGraph, durationOf, rateFor, type Recipe } from './synth';
+import { VOICE_BUDGET_BYTES, VoiceCache, groupsOf } from './voicecache';
 import { BUSES, busFor, type Bus } from '../data/soundbuses';
 import { t } from '../core/i18n';
 
@@ -19,6 +25,16 @@ export type { Bus };
 
 /** Alcance de um som posicional, em blocos (doc 10 §1). */
 const MAX_DISTANCE = 16;
+/**
+ * O primeiro som de um mob espera a voz dele ser renderizada. Passado isto, o
+ * momento já foi: melhor calar que tocar o grito de um golpe de meio segundo atrás.
+ */
+const LATE_PLAY_MS = 400;
+/** Os sons sob demanda, por grupo (um grupo por mob), e o grupo de cada som. */
+const VOICE_GROUPS = groupsOf(Object.keys(SOUNDS));
+const GROUP_OF = new Map<string, string>();
+for (const [group, names] of VOICE_GROUPS) for (const name of names) GROUP_OF.set(name, group);
+
 /** Variação aleatória de pitch e volume a cada disparo (doc 10 §1). */
 const PITCH_JITTER = 0.1;
 const GAIN_JITTER = 0.1;
@@ -84,8 +100,12 @@ export class AudioEngine {
 
   /** Amostras do pack do jogador, por nome de som. */
   private readonly overrides: ReadonlyMap<string, Uint8Array>;
-  /** Quantos sons vieram do pack em vez da síntese — o relatório da tela. */
-  private overridden = 0;
+  /** Quais sons vieram do pack em vez da síntese — o relatório da tela. */
+  private readonly overridden = new Set<string>();
+  /** As vozes de mob na memória (M25). */
+  private readonly voiceCache = new VoiceCache(VOICE_BUDGET_BYTES);
+  /** Renderizações de grupo em andamento, para não renderizar duas vezes. */
+  private readonly loadingGroups = new Map<string, Promise<void>>();
 
   constructor(options: AudioOptions = {}) {
     this.voiceCount = options.voices ?? 16;
@@ -95,7 +115,12 @@ export class AudioEngine {
 
   /** Sons substituídos pelo pack do jogador. */
   get packSounds(): number {
-    return this.overridden;
+    return this.overridden.size;
+  }
+
+  /** Bytes das vozes de mob na memória agora (M25). */
+  get voiceBytes(): number {
+    return this.voiceCache.resident;
   }
 
   get enabled(): boolean {
@@ -241,8 +266,14 @@ export class AudioEngine {
     x: number | null, y: number | null, z: number | null,
   ): void {
     const ctx = this.ctx;
+    if (ctx === null) return;
     const buffer = this.buffers.get(name);
-    if (ctx === null || buffer === undefined) return;
+    const group = GROUP_OF.get(name);
+    if (buffer === undefined) {
+      if (group !== undefined) this.playWhenReady(name, group, gain, bus, x, y, z);
+      return;
+    }
+    if (group !== undefined) this.voiceCache.touch(group, performance.now());
     const target = this.busGains.get(bus);
     if (target === undefined) return;
 
@@ -304,22 +335,63 @@ export class AudioEngine {
     }
   }
 
-  /** Renderiza todas as receitas, uma por `OfflineAudioContext`. */
+  /** Renderiza as receitas do boot (as que não são de mob), uma por `OfflineAudioContext`. */
   private async renderAll(): Promise<void> {
-    const names = Object.keys(SOUNDS);
-    for (const name of names) {
-      // Cada receita renderiza na taxa de que precisa (`rateFor`): o passo na
-      // areia não guarda banda que o próprio lowpass jogou fora. Vale ~28% da
-      // memória de áudio, que em T0 é memória de verdade.
-      const recipe = SOUNDS[name];
-      const sample = await this.decodeOverride(name);
-      if (sample !== null) {
-        this.buffers.set(name, sample);
-        this.overridden++;
-        continue;
-      }
-      const buffer = await renderAtRate(recipe, rateFor(recipe, this.sampleRate));
+    for (const name of Object.keys(SOUNDS)) {
+      if (GROUP_OF.has(name)) continue;
+      const buffer = await this.renderOne(name);
       if (buffer !== null) this.buffers.set(name, buffer);
+    }
+  }
+
+  /**
+   * Um som: a amostra do pack, se houver, senão a receita. Cada receita
+   * renderiza na taxa de que precisa (`rateFor`): o passo na areia não guarda
+   * banda que o próprio lowpass jogou fora.
+   */
+  private async renderOne(name: string): Promise<AudioBuffer | null> {
+    const sample = await this.decodeOverride(name);
+    if (sample !== null) {
+      this.overridden.add(name);
+      return sample;
+    }
+    const recipe = SOUNDS[name];
+    return renderAtRate(recipe, rateFor(recipe, this.sampleRate));
+  }
+
+  /** O primeiro som de um mob: renderiza a voz dele e toca, se ainda for a hora. */
+  private playWhenReady(
+    name: string, group: string, gain: number, bus: Bus,
+    x: number | null, y: number | null, z: number | null,
+  ): void {
+    const asked = performance.now();
+    void this.loadGroup(group).then(() => {
+      if (performance.now() - asked > LATE_PLAY_MS || !this.buffers.has(name)) return;
+      this.playBuffer(name, gain, bus, x, y, z);
+    });
+  }
+
+  private loadGroup(group: string): Promise<void> {
+    let loading = this.loadingGroups.get(group);
+    if (loading === undefined) {
+      loading = this.renderGroup(group).finally(() => { this.loadingGroups.delete(group); });
+      this.loadingGroups.set(group, loading);
+    }
+    return loading;
+  }
+
+  /** Renderiza as vozes de um mob e despeja as dos ouvidos há mais tempo, se passar do orçamento. */
+  private async renderGroup(group: string): Promise<void> {
+    const names = VOICE_GROUPS.get(group) ?? [];
+    let bytes = 0;
+    for (const name of names) {
+      const buffer = await this.renderOne(name);
+      if (buffer === null) continue;
+      this.buffers.set(name, buffer);
+      bytes += buffer.length * buffer.numberOfChannels * 4;
+    }
+    for (const evicted of this.voiceCache.add(group, bytes, performance.now())) {
+      for (const name of VOICE_GROUPS.get(evicted) ?? []) this.buffers.delete(name);
     }
   }
 

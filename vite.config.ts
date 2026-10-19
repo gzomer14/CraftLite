@@ -5,6 +5,9 @@ import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 /** A sala na rede local (M20): o pedaço que o jogo baixa só ao abrir ou entrar numa sala. */
 const NET_ENTRY = resolve(__dirname, 'src/net/room.ts');
 let netChunkRef = '';
+/** O pedaço "depois" (M25): telas e funções raras, baixadas na primeira vez que alguém pede. */
+const LATER_ENTRY = resolve(__dirname, 'src/ui/later.ts');
+let laterChunkRef = '';
 
 // Alvo es2017: roda em WebView do Android 7+ (ver doc 01 §1).
 export default defineConfig(({ command }) => ({
@@ -13,7 +16,10 @@ export default defineConfig(({ command }) => ({
    * No servidor de desenvolvimento, a sala vem do fonte; no build, o plugin
    * `craftlite-net-chunk` troca o nome pela URL do pedaço emitido.
    */
-  define: command === 'serve' ? { __CRAFTLITE_NET_URL__: JSON.stringify('/src/net/room.ts') } : {},
+  define: command === 'serve' ? {
+    __CRAFTLITE_NET_URL__: JSON.stringify('/src/net/room.ts'),
+    __CRAFTLITE_LATER_URL__: JSON.stringify('/src/ui/later.ts'),
+  } : {},
   resolve: {
     alias: { '@': resolve(__dirname, 'src') },
   },
@@ -34,17 +40,24 @@ export default defineConfig(({ command }) => ({
         modboot: resolve(__dirname, 'src/mods/boot.ts'),
         // Prova de conexão do M20 (M20.0): página à parte, sem o jogo.
         rede: resolve(__dirname, 'rede.html'),
+        // O inglês (M25): o `index.html` só o baixa quando o idioma é inglês,
+        // em paralelo com o jogo (`data/strings/langpack.ts`).
+        lang_en: resolve(__dirname, 'src/data/strings/pack.en.ts'),
       },
       output: {
         // `a/` é o jogo; `m/` é o que só baixa com mod ligado. O relatório de
         // tamanho e o precache do service worker separam pela pasta.
         // `n/` é a página de rede (M20.0), que o jogo também não baixa.
+        // `l/` é o pacote do inglês (M25).
         entryFileNames: (chunk) => (chunk.name === 'modboot' ? 'm/[hash].js'
-          : chunk.name === 'rede' ? 'n/[hash].js' : 'a/[hash].js'),
+          : chunk.name === 'rede' ? 'n/[hash].js'
+            : chunk.name === 'lang_en' ? 'l/[hash].js' : 'a/[hash].js'),
         // Pedaço compartilhado não tem fachada: vale o que ele contém.
+        // `u/` é o pedaço "depois" (M25), baixado na primeira vez que se usa.
         chunkFileNames: (chunk) => (isModChunk(chunk.facadeModuleId) ? 'm/[hash].js'
           : isNetChunk(chunk.facadeModuleId) || chunk.moduleIds.every((id) => isNetChunk(id))
-            ? 'n/[hash].js' : 'a/[hash].js'),
+            ? 'n/[hash].js'
+            : chunk.facadeModuleId === LATER_ENTRY ? 'u/[hash].js' : 'a/[hash].js'),
         assetFileNames: 'a/[hash][extname]',
       },
     },
@@ -91,6 +104,22 @@ export default defineConfig(({ command }) => ({
       },
     },
     {
+      // O pedaço "depois" (M25), pelo mesmo caminho da sala: emitido como
+      // "carregado depois do `main`" e importado por URL em `ui/lategate.ts`.
+      name: 'craftlite-late-chunk',
+      apply: 'build',
+      buildStart() {
+        laterChunkRef = this.emitFile({
+          type: 'chunk', id: LATER_ENTRY, implicitlyLoadedAfterOneOf: [resolve(__dirname, 'src/main.ts')],
+          preserveSignature: 'exports-only',
+        });
+      },
+      transform(code, id) {
+        if (!id.endsWith('src/ui/lategate.ts')) return null;
+        return code.split('__CRAFTLITE_LATER_URL__').join(`import.meta.ROLLUP_FILE_URL_${laterChunkRef}`);
+      },
+    },
+    {
       /*
        * Mods (M21). O `index.html` não tem `<script type="module" src>`: um
        * script de poucas linhas lê a lista de mods no `localStorage` e sobe o
@@ -113,14 +142,16 @@ export default defineConfig(({ command }) => ({
           }
           const main = files.get('main');
           const modboot = files.get('modboot');
-          if (main === undefined || modboot === undefined) {
-            throw new Error('craftlite-mod-entry: faltou o pedaço main ou modboot no bundle');
+          const langEn = files.get('lang_en');
+          if (main === undefined || modboot === undefined || langEn === undefined) {
+            throw new Error('craftlite-mod-entry: faltou o pedaço main, modboot ou lang_en no bundle');
           }
           // O `main` aparece duas vezes: o caminho sem mod e a volta para ele
           // quando o ponto de entrada dos mods não carrega (offline, sem cache).
           return html
             .split("'/src/main.ts'").join(`'./${main}'`)
             .replace("'/src/mods/boot.ts'", `'./${modboot}'`)
+            .replace("'/src/data/strings/pack.en.ts'", `'./${langEn}'`)
             .replace('</title>', `</title>\n<link rel="modulepreload" crossorigin href="./${main}">`);
         },
       },

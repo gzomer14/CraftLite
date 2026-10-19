@@ -11,26 +11,16 @@
  * exigiria a janela em primeiro plano por duas horas.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { conectar } from './cdp.mjs';
+import { chromeBin, chromeFlags } from './chrome.mjs';
 
 /**
  * O Chrome instalado na máquina. `CHROME` no ambiente vence — em distro que
  * chama o binário de outro jeito, é a única coisa que precisa mudar.
  */
-function chromeBin() {
-  const env = process.env.CHROME;
-  if (env !== undefined && env !== '') return env;
-  for (const caminho of [
-    '/usr/bin/google-chrome-stable', '/usr/bin/google-chrome',
-    '/usr/bin/chromium', '/usr/bin/chromium-browser',
-  ]) {
-    if (existsSync(caminho)) return caminho;
-  }
-  throw new Error('Chrome não encontrado — aponte com a variável CHROME');
-}
 
 const URL_JOGO = process.env.SOAK_URL ?? 'https://craftlite.zomertech.com.br/';
 const MINUTOS = Number(process.env.SOAK_MIN ?? 120);
@@ -38,7 +28,7 @@ const PORTA = Number(process.env.SOAK_PORT ?? 9333);
 const SAIDA = process.env.SOAK_OUT ?? join(process.cwd(), 'soak.json');
 
 const perfil = mkdtempSync(join(tmpdir(), 'craftlite-soak-'));
-const chrome = spawn(chromeBin(), [
+const chrome = spawn(chromeBin(), [...chromeFlags(),
   '--headless=new',
   // GPU de verdade no headless: sem isto cai no SwiftShader e o FPS não vale nada.
   '--use-gl=angle', '--use-angle=gl-egl',

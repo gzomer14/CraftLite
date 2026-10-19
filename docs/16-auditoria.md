@@ -12,6 +12,60 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-10-19 18:41 · M24: casa em ordem, terceira volta
+
+**Pedido:** *"PR mesclado, pode seguir"* — o próximo marco de código, depois do PR #8 (M23)
+mesclado. A branch recomeçou da `main`.
+
+**Resultado:**
+- **Seis módulos abaixo de 700 linhas**, cortados por papel e re-exportados (nenhum importador
+  mudou): `shapes.ts` 919 → 543, `hud.ts` 738 → 565, `mobs.ts` 716 → 640, `session.ts` 715 → 671,
+  `pipeline.ts` 714 → 660, `itemsprites.ts` 713 → 644. **O teto virou teste.**
+- **Doc 15 de 3 453 para 362 linhas.** O de antes foi inteiro, sem edição, para
+  `docs/15-historico.md`. As pendências abertas foram conferidas uma a uma contra o §5 e o §6
+  antigos e, as de código, no código.
+- **CI em todo PR** (`portoes.yml`): os quatro portões e dois smokes. **Ainda não rodou**: roda no
+  primeiro PR.
+- **Smoke como root**: as oito cópias de `chromeBin()` viraram `scripts/chrome.mjs`, que acha o
+  Chromium do Playwright e põe `--no-sandbox` como root.
+- De passagem: `railSlopeDir` criava um array por chamada.
+
+Portões: 2424 testes (130 arquivos); lint, build e tamanho verdes (311,2 KB, +0,2 pelos limites de
+módulo novos). `smoke` 9, `smoke:mods` 6, `smoke:room` 20, `smoke:net` 7, `smoke:camera` 3 e
+`bench:ui` verdes depois dos cortes — `smoke`, `smoke:net` e `smoke:camera` como root, sem
+invólucro.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| ~ | `src/world/mesh/shapes.ts` | 919 → 543; re-exporta o que saiu |
+| + | `src/world/mesh/box.ts` | a caixa (`BOX_STRIDE`, `MAX_BOXES`, `one`) |
+| + | `src/world/mesh/stairshape.ts` | geometria e cantos da escada |
+| + | `src/world/mesh/railshape.ts` | formas de trilho; `railSlopeDir` sem alocar |
+| + | `src/world/mesh/machineshape.ts` | encaixe, alavanca, botão, repetidor, comparador, pistão, bigorna, funil |
+| ~ | `src/ui/hud.ts` | 738 → 565 |
+| + | `src/ui/hudstyle.ts` | CSS do HUD e o ícone da fome |
+| ~ | `src/entity/mobs.ts` | 716 → 640 |
+| + | `src/entity/mobtarget.ts` | alvo, hostilidade, linha de visão |
+| ~ | `src/game/session.ts` | 715 → 671 |
+| ~ | `src/game/spawnplacement.ts` | `respawnPlayer` |
+| ~ | `src/game/drops.ts` | `dropBlockLoot`, `dropBlockXp` |
+| ~ | `src/world/pipeline.ts` | 714 → 660 |
+| + | `src/world/pipelinetypes.ts` | os tipos do pipeline |
+| ~ | `src/render/itemsprites.ts` | 713 → 644 |
+| + | `src/render/dialsprite.ts` | mostrador da bússola e do relógio |
+| + | `scripts/chrome.mjs` | `chromeBin()` e `chromeFlags()` (root) |
+| ~ | `scripts/{smoke,smoke-mods,smoke-net,smoke-room,smoke-camera,soak,slow-network,bench-ui}.mjs` | usam `chrome.mjs` |
+| + | `.github/workflows/portoes.yml` | portões e smokes em todo PR |
+| + | `tests/modulesize.test.ts` | teto de 700 linhas |
+| ~ | `tests/uxpolish.test.ts` | lê o CSS do HUD em `hudstyle.ts` |
+| + | `docs/15-historico.md` | o doc 15 inteiro até 2026-10-19 |
+| ~ | `docs/15-status.md` | reescrito como foto |
+| ~ | `docs/14-roadmap.md` | M24 ✅ com desvio; nota sobre as referências antigas ao doc 15 |
+| ~ | `README.md` | M24, contagem de testes, `15-historico.md` na estrutura |
+| ~ | `docs/16-auditoria.md` | esta sessão |
+
+---
+
 ## 2026-10-19 17:47 · M23: correções verificadas
 
 **Pedido:** *"Pode seguir com o M23"*.

@@ -19,7 +19,8 @@ import { fortuneMultiplier, levelIn } from './enchanting';
 import { ITEM_BY_NAME, maxStackOf, type ItemStack } from '../data/items';
 import { canHarvest } from './interaction';
 import { hash3 } from '../core/rng';
-import type { ToolSpec } from '../data/items';
+import { stackTool, type ToolSpec } from '../data/items';
+import type { Session } from './session';
 
 /** Uma saída do sorteio, reusada para não alocar por bloco quebrado. */
 const OUT: ItemStack[] = [];
@@ -134,4 +135,23 @@ function rollOne(
     count = Math.min(maxStackOf(item.id), count * fortuneMultiplier(fortune, luck));
   }
   return { item: item.id, count, damage: 0 };
+}
+
+/**
+ * O que um bloco quebrado solta no chão, para quem quebrou (M24: saiu da
+ * `Session`). No Criativo, nada.
+ */
+export function dropBlockLoot(session: Session, x: number, y: number, z: number, state: number): void {
+  if (session.player.mode === 'creative') return;
+  const held = session.inventory.held;
+  const drops = rollDrops(state, stackTool(held), session.world.seed, x, y, z, held?.ench ?? 0);
+  for (const stack of drops) session.items.spawn(x + 0.5, y + 0.25, z + 0.5, stack);
+}
+
+/** Orbe de experiência do bloco quebrado (doc 04 §2.2). */
+export function dropBlockXp(session: Session, x: number, y: number, z: number, state: number): void {
+  if (session.player.mode === 'creative') return;
+  const held = session.inventory.held;
+  const amount = rollXp(state, stackTool(held), session.world.seed, x, y, z, held?.ench ?? 0);
+  if (amount > 0) session.orbs.spawn(x + 0.5, y + 0.5, z + 0.5, amount);
 }

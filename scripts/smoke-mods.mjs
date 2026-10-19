@@ -13,8 +13,7 @@
  * de verdade nos botões, e `window.__craftlite` com `?smoke`.
  *
  * Uso: `npm run build && npm run smoke:mods`. Sai com código 1 se algum passo
- * falhar. Como root (container), aponte `CHROME` para um invólucro com
- * `--no-sandbox`.
+ * falhar. Como root (container), o `--no-sandbox` entra sozinho (`chrome.mjs`).
  */
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -22,6 +21,7 @@ import { existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { extname, join, normalize } from 'node:path';
 import { conectar } from './cdp.mjs';
+import { chromeBin, chromeFlags } from './chrome.mjs';
 
 const DIST = join(process.cwd(), 'dist');
 const PORTA_CDP = Number(process.env.SMOKE_CDP_PORT ?? 9335);
@@ -29,17 +29,6 @@ const PORTA_CDP = Number(process.env.SMOKE_CDP_PORT ?? 9335);
 const CRISTAL = 768;
 const FRAGMENTO = 4096;
 
-function chromeBin() {
-  const env = process.env.CHROME;
-  if (env !== undefined && env !== '') return env;
-  for (const caminho of [
-    '/usr/bin/google-chrome-stable', '/usr/bin/google-chrome',
-    '/usr/bin/chromium', '/usr/bin/chromium-browser',
-  ]) {
-    if (existsSync(caminho)) return caminho;
-  }
-  throw new Error('Chrome não encontrado — aponte com a variável CHROME');
-}
 
 const TIPOS = {
   '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json',
@@ -120,7 +109,7 @@ if (!existsSync(join(DIST, 'index.html'))) {
 const server = await servir();
 const url = `http://127.0.0.1:${server.address().port}/?smoke`;
 const perfil = mkdtempSync(join(tmpdir(), 'craftlite-smoke-mods-'));
-const chrome = spawn(chromeBin(), [
+const chrome = spawn(chromeBin(), [...chromeFlags(),
   '--headless=new', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
   `--remote-debugging-port=${PORTA_CDP}`, `--user-data-dir=${perfil}`,
   '--no-first-run', '--no-default-browser-check', '--window-size=1280,720',

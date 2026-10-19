@@ -22,6 +22,7 @@ import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from '
 import { tmpdir } from 'node:os';
 import { extname, join, normalize } from 'node:path';
 import { conectar } from './cdp.mjs';
+import { chromeBin, chromeFlags } from './chrome.mjs';
 
 const DIST = join(process.cwd(), 'dist');
 const TIPOS = {
@@ -31,14 +32,6 @@ const TIPOS = {
 const OURO = 'gold_block';
 const DIAMANTE = 'diamond_block';
 
-function chromeBin() {
-  const env = process.env.CHROME;
-  if (env !== undefined && env !== '') return env;
-  for (const c of ['/usr/bin/google-chrome-stable', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser']) {
-    if (existsSync(c)) return c;
-  }
-  throw new Error('Chrome não encontrado — aponte com a variável CHROME');
-}
 
 function servir() {
   const server = createServer((req, res) => {
@@ -94,7 +87,7 @@ if (!existsSync(join(DIST, 'index.html'))) {
 
 const server = await servir();
 const url = `http://127.0.0.1:${server.address().port}/?smoke`;
-const chromes = [9351, 9352].map((porta) => spawn(chromeBin(), [
+const chromes = [9351, 9352].map((porta) => spawn(chromeBin(), [...chromeFlags(),
   '--headless=new', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
   `--remote-debugging-port=${porta}`, `--user-data-dir=${mkdtempSync(join(tmpdir(), 'craftlite-room-'))}`,
   '--no-first-run', '--no-default-browser-check', '--window-size=1024,640', '--lang=pt-BR',

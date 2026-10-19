@@ -16,19 +16,12 @@ import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from '
 import { tmpdir } from 'node:os';
 import { extname, join, normalize } from 'node:path';
 import { conectar } from './cdp.mjs';
+import { chromeBin, chromeFlags } from './chrome.mjs';
 
 const DIST = join(process.cwd(), 'dist');
 const W = 640;
 const H = 480;
 
-function chromeBin() {
-  const env = process.env.CHROME;
-  if (env !== undefined && env !== '') return env;
-  for (const c of ['/usr/bin/google-chrome-stable', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser']) {
-    if (existsSync(c)) return c;
-  }
-  throw new Error('Chrome não encontrado — aponte com a variável CHROME');
-}
 
 function servir() {
   const server = createServer((req, res) => {
@@ -60,7 +53,7 @@ const clicar = (texto) => `(() => {
 })()`;
 
 function abrirChrome(porta, url, extra) {
-  return spawn(chromeBin(), [
+  return spawn(chromeBin(), [...chromeFlags(),
     '--headless=new', `--remote-debugging-port=${porta}`, `--user-data-dir=${mkdtempSync(join(tmpdir(), 'craftlite-cam-'))}`,
     '--no-first-run', '--no-default-browser-check', '--lang=pt-BR', ...extra, url,
   ], { stdio: 'ignore', env: { ...process.env, LANG: 'pt_BR.UTF-8', LANGUAGE: 'pt_BR' } });

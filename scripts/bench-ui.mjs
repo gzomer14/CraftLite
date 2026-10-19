@@ -17,21 +17,11 @@ import { existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { extname, join, normalize } from 'node:path';
 import { conectar } from './cdp.mjs';
+import { chromeBin, chromeFlags } from './chrome.mjs';
 
 const DIST = join(process.cwd(), 'dist');
 const PORTA_CDP = Number(process.env.BENCH_CDP_PORT ?? 9336);
 
-function chromeBin() {
-  const env = process.env.CHROME;
-  if (env !== undefined && env !== '') return env;
-  for (const caminho of [
-    '/usr/bin/google-chrome-stable', '/usr/bin/google-chrome',
-    '/usr/bin/chromium', '/usr/bin/chromium-browser',
-  ]) {
-    if (existsSync(caminho)) return caminho;
-  }
-  throw new Error('Chrome não encontrado — aponte com a variável CHROME');
-}
 
 const TIPOS = {
   '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
@@ -82,7 +72,7 @@ const HELPERS = `(() => {
 
 const server = await servir();
 const url = `http://127.0.0.1:${server.address().port}/?smoke`;
-const chrome = spawn(chromeBin(), [
+const chrome = spawn(chromeBin(), [...chromeFlags(),
   '--headless=new', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
   `--remote-debugging-port=${PORTA_CDP}`, `--user-data-dir=${mkdtempSync(join(tmpdir(), 'bench-'))}`,
   '--no-first-run', '--window-size=1280,720', '--lang=pt-BR', url,

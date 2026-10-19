@@ -1,0 +1,60 @@
+# Os portões de qualidade em todo pull request (M24).
+#
+# O `pages.yml` só roda em push na `main`: um PR chegava à revisão sem ninguém
+# ter rodado teste, lint, build ou o orçamento de tamanho — e o defeito só
+# aparecia depois de mesclado, no deploy. Aqui rodam os mesmos quatro portões
+# do CLAUDE.md, mais os dois smokes de navegador que não dependem de rede: o
+# jogo (criar, andar, quebrar, cota cheia, salvar, recarregar) e o dos mods
+# (o jogo sem mod baixa um arquivo só).
+name: Portões
+
+on:
+  pull_request:
+  # Permite rodar pela aba Actions numa branch qualquer.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Um push novo no mesmo PR cancela a rodada anterior.
+concurrency:
+  group: portoes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portoes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Testes
+        run: npm test
+
+      - name: Lint
+        run: npm run lint
+
+      # `npm run build` já inclui `tsc --noEmit`.
+      - name: Build
+        run: npm run build
+
+      - name: Orçamento de tamanho
+        env:
+          SIZE_BUDGET_KB: '350'
+        run: node scripts/size-report.mjs
+
+      # O `ubuntu-latest` traz o Google Chrome em /usr/bin, que é o primeiro
+      # lugar onde `scripts/chrome.mjs` procura.
+      - name: Smoke do jogo
+        run: npm run smoke
+
+      - name: Smoke dos mods
+        run: npm run smoke:mods

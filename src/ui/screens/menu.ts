@@ -121,7 +121,9 @@ export function buildFields(
   for (const field of fields) {
     const segmented = field.kind === 'choice' && fitsSegment(field.options);
     const wrapper = document.createElement(segmented ? 'div' : 'label');
-    wrapper.className = 'menu-field';
+    // Segmento que não cabe ao lado do rótulo desce para a linha de baixo,
+    // inteiro, em vez de cortar as opções em "B…" (fonte larga, CI do M32).
+    wrapper.className = segmented ? 'menu-field has-segment' : 'menu-field';
     const span = document.createElement('span');
     span.textContent = field.label;
     wrapper.appendChild(span);
@@ -305,8 +307,10 @@ function injectMenuStyle(): void {
   const css = document.createElement('style');
   css.textContent = `
 /* M32: o painel azul-noite e os botões de bloco de \`ui/theme.ts\`. */
+/* A coluna da grade não cresce com o conteúdo (minmax(0,1fr)): com uma fonte larga, o painel
+   largo esticava a coluna e o próprio \`width:100%\` junto, e passava da borda (CI do M32). */
 .menu-screen{position:fixed;inset:0;z-index:16;background:rgba(8,13,24,.94);
-  display:grid;place-items:center;padding:12px;overflow:auto;box-sizing:border-box;
+  display:grid;grid-template-columns:minmax(0,1fr);place-items:center;padding:12px;overflow:auto;box-sizing:border-box;
   touch-action:pan-y;overscroll-behavior:contain;font:600 14px/1.3 var(--cl-font);color:var(--cl-ink)}
 .menu-panel{position:relative;margin-block:auto;width:min(620px,100%);box-sizing:border-box;background:var(--cl-panel);
   border-radius:20px;box-shadow:0 0 0 3px var(--cl-edge),0 18px 40px rgba(0,0,0,.55);padding:16px 20px 20px}
@@ -327,10 +331,11 @@ function injectMenuStyle(): void {
 .menu-screen button:hover,.menu-screen button:focus-visible{filter:brightness(1.12);outline:none}
 .menu-screen button:focus-visible{box-shadow:0 4px 0 var(--cl-raise-low),0 0 0 3px var(--cl-gold)}
 .menu-screen button[hidden]{display:none}
+.menu-screen button>.cl-icon{display:inline-block;vertical-align:-4px;margin-right:8px}
 .menu-screen button:disabled{opacity:.45;cursor:default}
 .menu-field{display:flex;align-items:center;gap:12px;min-height:46px;padding:0 12px;border-radius:12px;
   background:#1a2740;font:700 14px/1.2 var(--cl-font)}
-.menu-field>span{flex:1 1 auto}
+.menu-field>span{flex:1 1 auto;min-width:0}
 .menu-field input[type=range]{flex:0 0 40%;min-width:140px;accent-color:var(--cl-green)}
 .menu-field input[type=text]{flex:0 0 52%;min-height:38px;border:0;border-radius:10px;background:#0d1626;color:#fff;
   box-shadow:0 0 0 2px var(--cl-edge);padding:0 12px;font:700 15px/1 var(--cl-font)}
@@ -341,8 +346,10 @@ function injectMenuStyle(): void {
   background:#fff;box-shadow:0 2px 0 rgba(0,0,0,.3);transition:left .15s}
 .menu-screen button.switch[aria-checked=true]{background:var(--cl-green)}
 .menu-screen button.switch[aria-checked=true]::after{left:25px}
-.menu-field .segment{flex:none;display:flex;gap:3px;padding:3px;border-radius:11px;background:#0d1626}
-.menu-screen .segment button{flex:none;min-height:34px;padding:0 10px;border-radius:9px;background:transparent;
+.menu-field.has-segment{flex-wrap:wrap;row-gap:6px;padding-block:6px}
+.menu-field .segment{flex:0 1 auto;min-width:0;margin-left:auto;display:flex;gap:3px;padding:3px;border-radius:11px;background:#0d1626}
+.menu-screen .segment button{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  min-height:34px;padding:0 10px;border-radius:9px;background:transparent;
   color:var(--cl-muted);font:800 13px/1 var(--cl-font);box-shadow:none}
 .menu-screen .segment button.on{background:var(--cl-gold);color:#1a1406}
 .menu-field select{flex:0 0 42%;min-height:38px;border:0;border-radius:10px;background:#0d1626;color:#fff;

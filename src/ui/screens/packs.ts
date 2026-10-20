@@ -13,6 +13,7 @@
 
 import { closeOnBackdrop, menuButton, menuPanel, menuRoot, menuRow, messageOf } from './menu';
 import { t, tf } from '../../core/i18n';
+import { icon } from '../theme';
 
 /** "12 imagens e 3 sons", ou só a metade que existe. */
 function describeContents(summary: PackSummary): string {
@@ -59,8 +60,10 @@ export class PacksScreen {
     this.closeButton = close;
     closeOnBackdrop(this.root, () => callbacks.back());
 
+    // M32: o texto de apoio é dica miúda, não bloco centralizado — num T0
+    // deitado, com uma fonte larga, os dois blocos empurravam o botão para fora.
     const intro = document.createElement('p');
-    intro.className = 'menu-empty';
+    intro.className = 'menu-hint';
     intro.textContent = t('packs.intro');
 
     this.current = document.createElement('p');
@@ -77,6 +80,7 @@ export class PacksScreen {
      * do disco sem permissão — e é feio em toda plataforma.
      */
     const choose = menuButton(t('packs.choose'), () => this.fileInput.click(), 'primary');
+    choose.prepend(icon('upload', 'currentColor', 18));
     this.fileInput = document.createElement('input');
     this.fileInput.type = 'file';
     this.fileInput.accept = '.zip';
@@ -84,13 +88,15 @@ export class PacksScreen {
     this.fileInput.addEventListener('change', () => void this.installPicked());
 
     this.removeButton = menuButton(t('packs.remove'), () => void this.removePack(), 'danger');
+    this.removeButton.prepend(icon('trash', 'currentColor', 18));
     this.applyButton = menuButton(t('packs.apply'), () => this.callbacks.apply());
+    this.applyButton.prepend(icon('play', 'currentColor', 18));
     this.applyButton.hidden = true;
 
     body.append(
       intro, this.current, this.status,
-      menuRow(choose, this.removeButton),
-      menuRow(this.applyButton),
+      // Uma fileira só: "Aplicar" escondido não deixa uma linha vazia ocupando altura.
+      menuRow(choose, this.removeButton, this.applyButton),
       this.fileInput,
     );
     this.root.appendChild(panel);

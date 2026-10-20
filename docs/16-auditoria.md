@@ -12,6 +12,37 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-10-20 10:23 · M32: o encaixe falhava no CI (fonte larga)
+
+**Pedido:** *"Deu ruim nos testes, na etapa de encaixe das telas."* — o passo `npm run ui:fit` do
+CI do PR #12.
+
+**Resultado:**
+- Duas falhas, só em 640×360: **Opções › Vídeo** passava 13 px da borda direita, e **Texturas**
+  rolava 15 px. Aqui o mesmo teste passava. **Causa da diferença:** a fonte do sistema — Inter
+  aqui, DejaVu Sans (bem mais larga) no Chrome do runner do Ubuntu. Reproduzido com o
+  `FONTCONFIG_FILE` apontando para a DejaVu: as mesmas duas falhas, com os mesmos números.
+- **Causa no código:** `.menu-screen` é uma grade com coluna `auto`, que crescia com o conteúdo
+  mais largo que a tela, e o `width:100%` do painel ia junto. Agora `minmax(0,1fr)`.
+- Com a coluna presa, o segmento de Qualidade cortava em "B…", "M…": a linha de segmento passou a
+  quebrar, e o segmento desce inteiro para baixo do rótulo quando não cabe ao lado.
+- Texturas: o texto de apoio virou dica miúda, os três botões numa fileira (o "Aplicar" escondido
+  deixava uma linha vazia ocupando altura), e cada um com ícone (regra 5); o "Recarregar" de Mods
+  também ganhou ícone.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/ui/screens/menu.ts` | coluna da grade `minmax(0,1fr)`; linha de segmento que quebra; ícone dentro de botão de menu |
+| `~` | `src/ui/screens/packs.ts` | dica miúda, uma fileira de botões, ícones |
+| `~` | `src/ui/screens/mods.ts` | ícone no "Recarregar" |
+| `~` | `scripts/ui-fit.mjs` | como rodar com a fonte do CI na máquina local |
+| `~` | `docs/15-status.md` | M32 (§1 topo, §2 bundle, §3 detalhe da fonte larga) |
+
+Portões: 2535 testes; lint, build e tamanho verdes (313,5 KB em português, 326,8 em inglês).
+`ui:fit` 50 de 50 com a Inter **e** com a DejaVu; `smoke` 9 e `smoke:mods` 6 verdes.
+
+---
+
 ## 2026-10-20 03:56 · M32: interface nova
 
 **Pedido:** *"Queria agora que você desse uma revisada completa na UI/UX do jogo. Estou achando

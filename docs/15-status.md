@@ -9,13 +9,13 @@
 > Os documentos 00 a 14 são **normativos**: descrevem o que o jogo deve ser. Este é **descritivo**:
 > reflete o código de hoje e é atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-10-20 03:56 — **M32 fechado: interface nova** (§3). Pedido do usuário
+**Última atualização:** 2026-10-20 10:23 — **M32 fechado: interface nova** (§3). Pedido do usuário
 (menus carregados, "Fechar" em toda parte, janelas que rolam no celular), proposta num canvas
 aprovada, e as sete regras no doc 14. Um tema só (azul-noite, verde, dourado); mochila, bancada,
 baú e fornalha que encolhem até caber; JOGAR que continua o último mundo; mundos em cartões; pausa
 em ladrilhos; opções em abas; criativo sem rolar; o ✕ e o toque fora no lugar do "Fechar". **O
 aceite é um teste:** `npm run ui:fit` abre 25 telas em 640×360 e 844×390 e nenhuma rola — no CI.
-Custou 7,6 KB (313,3 de 350). Portões: 2535 testes; `smoke` 9, `smoke:mods` 6, `smoke:room` 20,
+Custou 7,8 KB (313,5 de 350). Portões: 2535 testes; `smoke` 9, `smoke:mods` 6, `smoke:room` 20,
 `bench:ui` ok. **Próximo passo de código: M27** (§6). Do usuário: **M22**, agora com as telas
 novas no celular.
 
@@ -79,12 +79,12 @@ O multijogador saiu do escopo do M7 por decisão do usuário (2026-09-13) e volt
 
 ## 2. Métricas atuais
 
-Medidas em 2026-10-20 03:56 (ao fechar o M32) com os quatro portões, `npm run smoke`, `smoke:mods`,
+Medidas em 2026-10-20 10:23 (ao fechar o M32) com os quatro portões, `npm run smoke`, `smoke:mods`,
 `smoke:room`, `bench:ui` e `ui:fit`; as de aparelho e de sessão longa são de setembro, com a data na linha.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, o jogo sem mod) | **313,3 KB em português** (folga 36,7) e **326,5 em inglês** (o jogo + o pacote `l/`, 13,2); o M32 somou 7,6 (o CSS das telas e os ícones). Eram 305,7 e 318,7 ao fechar o M26 (+6,1), 299,6 e 312,5 ao fechar o M25, e 311,2 nos dois antes dele (311,0 antes do M24; 308,3 antes do M23; a série completa está no [histórico](15-historico.md)). O orçamento cobra o inglês, o caminho mais pesado | < 350 KB | `npm run size` |
+| Bundle (gzip, o jogo sem mod) | **313,5 KB em português** (folga 36,5) e **326,8 em inglês** (o jogo + o pacote `l/`, 13,3); o M32 somou 7,8 (o CSS das telas e os ícones). Eram 305,7 e 318,7 ao fechar o M26 (+6,1), 299,6 e 312,5 ao fechar o M25, e 311,2 nos dois antes dele (311,0 antes do M24; 308,3 antes do M23; a série completa está no [histórico](15-historico.md)). O orçamento cobra o inglês, o caminho mais pesado | < 350 KB | `npm run size` |
 | Pedaço "depois" (`u/`) | **4,6 KB**: exportar e importar mundo, créditos, editor de placa, cota cheia; baixado na primeira vez que se usa uma delas, e no precache (abre offline) | fora do orçamento de abertura | `npm run size` |
 | Testes | **2535**, 135 arquivos (2524 antes do M32; 2436 antes do M26; 2424 antes do M25; 2423 antes do M24; 2404 antes do M23) | manter verde | `npm test` |
 | Smoke test de navegador | **9 passos verdes**: carregar, criar, andar 10 s, quebrar, **cota cheia: a tela abre com o banco recusando (desde o M25 vinda do pedaço `u/`), e com espaço de volta grava e fecha (M23)**, salvar, recarregar, conferir | verde | `npm run smoke` |
@@ -216,8 +216,13 @@ Aceite: **`npm run ui:fit`** — 25 telas em 640×360 e 844×390, nenhuma rola. 
   lugar de "Entrar numa sala"; o JOGAR do título continua). `ui-fit.mjs` mede, em cada tela,
   rolagem e **caixa cortada** (fora da tela é rolar sem barra); as quatro listas que rolam por
   dentro estão nomeadas no script.
-- Custou **7,6 KB** de bundle (305,7 → 313,3 em português): o CSS das telas e os ícones. A folga
-  que o M25 abriu (50) está em **36,7** — 44,3 antes do M32.
+- Custou **7,8 KB** de bundle (305,7 → 313,5 em português): o CSS das telas e os ícones. A folga
+  que o M25 abriu (50) está em **36,5** — 44,3 antes do M32.
+- **Fonte larga** (primeira rodada do CI, PR #12): o Chrome do CI cai na DejaVu Sans, bem mais
+  larga que a Inter da máquina de desenvolvimento e a Roboto do Android, e Opções › Vídeo e
+  Texturas passavam da borda em 640×360. Causa: a coluna `auto` da grade de `.menu-screen` crescia
+  com o conteúdo. Agora é `minmax(0,1fr)`; o segmento que não cabe desce para baixo do rótulo; a
+  tela de Texturas ficou mais enxuta. `ui-fit.mjs` diz como rodar com a DejaVu na máquina local.
 
 ### Como escrever um mod (a receita)
 
@@ -341,7 +346,7 @@ Estão nos comentários dos módulos; os que mudam o que o jogador vê:
 **De código: o M27** (bichos, doc 14): cavalo com sela pelo sistema de veículos, gato, coelho,
 peixes vivos, guia e etiqueta de nome. O aceite pede o tick de 20 mobs sem regressão e as vozes
 novas dentro do orçamento de áudio do M25 — que já as gera sob demanda. Folga hoje: 268 camadas,
-36,7 KB de bundle em português, 1,04 MB de áudio no pico. Tela nova (a do cavalo, por exemplo) segue as
+36,5 KB de bundle em português, 1,04 MB de áudio no pico. Tela nova (a do cavalo, por exemplo) segue as
 sete regras do M32 (doc 14) e entra no `scripts/ui-fit.mjs`.
 
 **Do usuário: o M22** (aparelho e MVP). O roteiro, numa sessão de celular, em ordem:

@@ -10,6 +10,7 @@
 
 import { closeOnBackdrop, menuButton, menuPanel, menuRoot, menuRow } from './menu';
 import { lang, t, tf } from '../../core/i18n';
+import { icon } from '../theme';
 import { ACTIVE_MODS } from '../../mods/active';
 import { MOD_CATALOG, readEnabledMods, writeEnabledMods, type ModInfo } from '../../mods/catalog';
 
@@ -62,6 +63,7 @@ export class ModsScreen {
       writeEnabledMods(this.checked());
       location.reload();
     }, 'primary');
+    this.applyButton.prepend(icon('play', 'currentColor', 18));
     body.appendChild(menuRow(this.applyButton));
     this.root.appendChild(panel);
     this.root.addEventListener('keydown', (e) => {

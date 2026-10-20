@@ -23,6 +23,11 @@
  * bancada) vai pelo gancho `?smoke`.
  *
  * Uso: `npm run build && npm run ui:fit`. Sai com código 1 se alguma tela não couber.
+ *
+ * **A fonte importa.** O Chrome do CI (Ubuntu) cai na DejaVu Sans, bem mais larga que a Inter
+ * ou a Roboto: a primeira rodada do PR #12 falhou lá e passava aqui. Para medir como o CI, aponte
+ * o `FONTCONFIG_FILE` para um `fonts.conf` que prefira a DejaVu Sans para `system-ui` e
+ * `sans-serif` (e rejeite a Inter) antes do `npm run ui:fit`.
  */
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';

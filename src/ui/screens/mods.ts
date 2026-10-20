@@ -8,8 +8,9 @@
  * jogador apertar *Recarregar*.
  */
 
-import { menuButton, menuPanel, menuRoot, menuRow } from './menu';
+import { closeOnBackdrop, menuButton, menuPanel, menuRoot, menuRow } from './menu';
 import { lang, t, tf } from '../../core/i18n';
+import { icon } from '../theme';
 import { ACTIVE_MODS } from '../../mods/active';
 import { MOD_CATALOG, readEnabledMods, writeEnabledMods, type ModInfo } from '../../mods/catalog';
 
@@ -22,11 +23,13 @@ export class ModsScreen {
   private readonly root: HTMLDivElement;
   private readonly boxes: HTMLInputElement[] = [];
   private readonly applyButton: HTMLButtonElement;
-  private readonly backButton: HTMLButtonElement;
+  private readonly closeButton: HTMLButtonElement | null;
 
   constructor(back: () => void) {
     this.root = menuRoot('mods-screen');
-    const { panel, body } = menuPanel(t('title.mods'));
+    const { panel, body, close } = menuPanel(t('title.mods'), back);
+    this.closeButton = close;
+    closeOnBackdrop(this.root, back);
 
     const intro = document.createElement('p');
     intro.className = 'menu-empty';
@@ -60,8 +63,8 @@ export class ModsScreen {
       writeEnabledMods(this.checked());
       location.reload();
     }, 'primary');
-    this.backButton = menuButton(t('opt.back'), back);
-    body.appendChild(menuRow(this.applyButton, this.backButton));
+    this.applyButton.prepend(icon('play', 'currentColor', 18));
+    body.appendChild(menuRow(this.applyButton));
     this.root.appendChild(panel);
     this.root.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') { e.stopPropagation(); back(); }
@@ -77,7 +80,7 @@ export class ModsScreen {
     for (const box of this.boxes) box.checked = enabled.includes(box.dataset.mod ?? '');
     this.refresh();
     this.root.hidden = false;
-    this.backButton.focus();
+    this.closeButton?.focus();
   }
 
   hide(): void {

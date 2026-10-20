@@ -101,6 +101,7 @@ function stubDom(): void {
   body = new FakeElement('body');
   vi.stubGlobal('document', {
     createElement: (tag: string) => new FakeElement(tag),
+    createElementNS: (_ns: string, tag: string) => new FakeElement(tag),
     body, head: new FakeElement('head'),
   });
   vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {} }));
@@ -162,7 +163,7 @@ function slotEl(root: FakeElement, source: string, index: number): FakeElement {
 describe('livro de receitas no toque', () => {
   it('mostra o nome da receita ao tocar, não só no title do HTML', () => {
     const h = harness();
-    h.root.find((e) => e.textContent === 'Receitas')!.click();
+    h.root.find((e) => e.className.includes('book-toggle'))!.click();
 
     const button = h.root.find((e) => e.className === 'recipe');
     expect(button, 'o livro precisa listar alguma receita').toBeDefined();
@@ -179,7 +180,7 @@ describe('livro de receitas no toque', () => {
 
   it('redesenha a tela depois de preencher a grade', () => {
     const h = harness();
-    h.root.find((e) => e.textContent === 'Receitas')!.click();
+    h.root.find((e) => e.className.includes('book-toggle'))!.click();
     const button = h.root.find((e) => e.className === 'recipe')!;
 
     // O callback escreve direto no modelo, como `autoFillRecipe` faz: sem o
@@ -293,7 +294,7 @@ describe('toque longo vale botão direito', () => {
 describe('prévia da grade da receita', () => {
   /** Abre o livro e devolve o primeiro botão de receita e a prévia. */
   function openBook(h: Harness): { button: FakeElement; preview: FakeElement } {
-    h.root.find((e) => e.textContent === 'Receitas')!.click();
+    h.root.find((e) => e.className.includes('book-toggle'))!.click();
     const button = h.root.find((e) => e.className === 'recipe');
     const preview = h.root.find((e) => e.className === 'preview');
     expect(button, 'o livro precisa listar alguma receita').toBeDefined();

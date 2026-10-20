@@ -135,7 +135,8 @@ pior ação, CPU 6× mais lenta: ${pior} ms (orçamento 600 ms) — ${pior <= 60
 
   /*
    * M23: a mochila inteira num T0 deitado (640×360), com o "Fechar" à vista.
-   * Antes ela ia a 410 px e o botão ficava fora da tela.
+   * Antes ela ia a 410 px e o botão ficava fora da tela. Desde o M32 o
+   * "Fechar" é o ✕ do canto (`.cl-close`), e o painel inteiro tem de caber.
    */
   await cdp.enviar('Emulation.setCPUThrottlingRate', { rate: 1 });
   await cdp.enviar('Emulation.setDeviceMetricsOverride', {
@@ -145,8 +146,12 @@ pior ação, CPU 6× mais lenta: ${pior} ms (orçamento 600 ms) — ${pior <= 60
   await esperar(600);
   const cabe = JSON.parse(await cdp.avaliar(`(() => {
     const tela = document.getElementById('container-screen');
-    const fechar = tela.querySelector('.close').getBoundingClientRect();
-    return JSON.stringify({ rola: tela.scrollHeight - tela.clientHeight, fechar: Math.round(fechar.bottom), altura: innerHeight });
+    const fechar = tela.querySelector('.cl-close').getBoundingClientRect();
+    const painel = tela.querySelector('.panel').getBoundingClientRect();
+    return JSON.stringify({
+      rola: Math.max(tela.scrollHeight - tela.clientHeight, Math.round(painel.bottom - innerHeight), Math.round(-painel.top)),
+      fechar: Math.round(fechar.bottom), altura: innerHeight,
+    });
   })()`));
   const ok = cabe.rola <= 0 && cabe.fechar <= cabe.altura;
   console.log(`mochila em 640×360: sobra ${-cabe.rola} px, "Fechar" termina em ${cabe.fechar} de ${cabe.altura} — ${ok ? 'ok' : 'NÃO CABE'}`);

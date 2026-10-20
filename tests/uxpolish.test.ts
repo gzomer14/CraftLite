@@ -224,14 +224,15 @@ describe('5. o HUD não passa por baixo dos botões de toque', () => {
 describe('painel não vaza, e a escala responde', () => {
   const screenSrc = (readFileSync('src/ui/containers/screen.ts', 'utf8') + readFileSync('src/ui/containers/screenstyle.ts', 'utf8'));
   const hudSrc = readFileSync('src/ui/hud.ts', 'utf8') + readFileSync('src/ui/hudstyle.ts', 'utf8');
-  const optionsSrc = readFileSync('src/ui/screens/options.ts', 'utf8');
+  const optionsSrc = readFileSync('src/ui/screens/optionfields.ts', 'utf8');
 
   it('as colunas do painel são contêineres, não multi-coluna do CSS', () => {
     // `columns:2` reparte a largura em partes iguais, e a fileira de 9 slots
     // da mochila é mais larga que metade do painel: ela vazava pela borda.
     expect(screenSrc).not.toContain('columns:2');
     expect(screenSrc).toContain('grid-col');
-    expect(screenSrc.replace(/\s+/g, '')).toContain('flex-flow:rowwrap');
+    // M32: sempre em linha; quem faz caber é a escala (`fit`), não a quebra.
+    expect(screenSrc.replace(/\s+/g, '')).toContain('#container-screen.grid{display:flex;flex-direction:row');
   });
 
   it('a coluna larga existe e recebe a mochila', () => {

@@ -149,7 +149,7 @@ try {
   await guest.enviar('Runtime.enable');
   await ate(guest, "document.querySelectorAll('button').length >= 2");
   const semDetector = await guest.avaliar("typeof BarcodeDetector === 'undefined'");
-  await guest.avaliar(clicar('Entrar numa sala'));
+  await guest.avaliar(clicar('Jogar junto'));
   const botao = await ate(guest, `[...document.querySelectorAll('button')].some((b) => b.textContent.startsWith('Ler com a câmera'))`, 10000);
   passo('o convidado tem o botão da câmera, sem BarcodeDetector', botao === true && semDetector === true);
 

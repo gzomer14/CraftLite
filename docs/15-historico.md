@@ -3531,3 +3531,36 @@ Pedido: *"Pode seguir com o M25"*. Aceite do doc 14: folga de ≥ 64 camadas, �
   `tests/voicecache.test.ts` e `tests/atlasroom.test.ts`; o smoke espera a tela de cota cheia vir
   do `u/`.
 
+## Acrescentado em 2026-10-20 03:56 — o detalhe do M26, que saiu da foto ao fechar o M32
+
+### M26 — Aconchego ✅ — 2026-10-19
+
+Pedido: *"Pode seguir com o M26"*. Aceite do doc 14: cada bloco é linha de tabela; a fogueira
+assa carne em ~30 s; 16 cores de concreto custam ≤ 2 camadas. **Cumprido** (`tests/cozy.test.ts`).
+
+- **44 blocos novos**, ids 245–288, todos linha de `data/blocks.ts` (`cozySpecs`): fogueira acesa e
+  apagada (dois ids, como a fornalha: a luz é coluna da tabela), caldeirão, lanterna, vaso,
+  moldura de item, cinco troncos descascados, terracota, dezesseis terracotas tingidas e dezesseis
+  concretos. Conteúdo é tabela em `data/cozy.ts`: as plantas do vaso (`POTTABLE`), o machado
+  (`STRIPPED`), o tempo da fogueira. Mais a pepita de ferro, que a lanterna pede.
+- **Formas** em `world/mesh/cozyshape.ts`, e um caminho de malha novo (`CPLX_DECOR` em
+  `mesh/complex.ts`): caixas com um **recheio** de outra textura — a chama entre as toras, a planta
+  no vaso, a água no caldeirão com o tint de bioma.
+- **Fogueira** (`game/campfire.ts`): tile entity de quatro casas; assa o que a fundição transforma
+  em comida, em 600 ticks, e solta o assado em cima. Apagada, o relógio para. Fere 1 a cada meio
+  segundo quem está em cima — jogador e mob, sem acender —, por um campo novo da tabela
+  (`contactDamage`). Fumaça: um floco que **sobe** (`emitSmoke`, partícula com empuxo).
+- **O clique** (`game/cozy.ts`): comida na fogueira; balde ou pá apagam, isqueiro acende; balde,
+  frasco e frasco d'água no caldeirão; planta no vaso e de volta; item na moldura e de volta. O
+  machado descasca pelo registro de usos de item (`strip_log`). O caldeirão com água apaga quem
+  pega fogo.
+- **Moldura e comida na tela** pelo passe dos itens do chão (`render/itemrender.ts`): o sprite
+  ganhou **pose** — colado na parede (moldura) ou deitado (fogueira) — num campo que já existia na
+  instância, sem draw call a mais. No inventário, a moldura é desenhada de frente.
+- **Desvios** (nos comentários dos módulos): o concreto sai da bancada, sem o pó; o clique na
+  moldura devolve o item em vez de girá-lo; o caldeirão apaga sem gastar água e não enche com
+  chuva; a terracota tingida usa o tint da lã sobre um cinza quente (sai terrosa, não a paleta
+  exata do gênero).
+- **Na sala** (M20): a moldura e a comida da fogueira são tile entity, que não viajam. O clique do
+  convidado nelas é **engolido** (`CozyBlocks.remoteTiles`) — o item fica na mão, em vez de sumir.
+  O resto (vaso, caldeirão, acender e apagar) é estado de bloco e viaja como sempre.

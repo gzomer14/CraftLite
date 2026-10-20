@@ -108,6 +108,7 @@ function stubDom(coarse: boolean): void {
   const head = new FakeElement('head');
   vi.stubGlobal('document', {
     createElement: (tag: string) => new FakeElement(tag),
+    createElementNS: (_ns: string, tag: string) => new FakeElement(tag),
     body,
     head,
   });
@@ -145,15 +146,20 @@ describe('busca não rouba o foco no celular', () => {
 });
 
 describe('ponte para a mochila', () => {
+  /** M32: o rótulo mora num `<span>` ao lado do ícone; o clique é no botão. */
+  const backpackOf = (root: FakeElement): FakeElement | undefined =>
+    root.all('button').find((b) => b.classList.contains('backpack'));
+
   it('existe um botão que leva ao inventário normal', () => {
     const root = open(false);
     expect(root.find('Mochila e armadura')).toBeDefined();
+    expect(backpackOf(root)?.find('Mochila e armadura')).toBeDefined();
   });
 
   it('o botão fecha a paleta e avisa quem abre a mochila', () => {
     let opened = 0;
     const root = open(false, () => { opened++; });
-    root.find('Mochila e armadura')!.click();
+    backpackOf(root)!.click();
     expect(opened).toBe(1);
     expect(root.hidden).toBe(true);
   });
@@ -182,24 +188,44 @@ describe('toda tela de container fecha sem teclado', () => {
     return { root: body.children[0], screen, closed: () => closed };
   };
 
+  /** O ✕ do canto (M32): sem texto, com o nome para o leitor de tela. */
+  const closeX = (root: FakeElement): FakeElement | undefined =>
+    root.all('button').find((b) => b.attributes['aria-label'] === 'Fechar');
+
   for (const kind of ['inventory', 'chest', 'furnace', 'crafting'] as const) {
-    it(`${kind} tem botão de fechar`, () => {
+    it(`${kind} tem o ✕ de fechar`, () => {
       const { root } = openScreen(kind);
-      expect(root.find('Fechar'), `${kind} sem botão de fechar`).toBeDefined();
+      expect(closeX(root), `${kind} sem ✕`).toBeDefined();
+      // A regra 2 do M32: nada de botão "Fechar" escrito.
+      expect(root.find('Fechar'), `${kind} ainda com botão "Fechar"`).toBeUndefined();
     });
   }
 
-  it('o botão fecha de verdade e avisa quem devolve o pointer lock', () => {
+  it('o ✕ fecha de verdade e avisa quem devolve o pointer lock', () => {
     const { root, screen, closed } = openScreen('chest');
     expect(screen.isOpen).toBe(true);
-    root.find('Fechar')!.click();
+    closeX(root)!.click();
     expect(screen.isOpen).toBe(false);
     expect(closed()).toBe(1);
   });
 
-  it('o botão é alvo de toque de 44 px, como manda o doc 09', () => {
-    const source = (readFileSync('src/ui/containers/screen.ts', 'utf8') + readFileSync('src/ui/containers/screenstyle.ts', 'utf8')).replace(/\s+/g, '');
-    expect(source).toContain('#container-screen.close{flex:1;min-height:44px');
+  it('tocar fora do painel fecha; com item no cursor, joga o item em vez de fechar', () => {
+    const { root, screen, closed } = openScreen('chest');
+    const inventory = (screen as unknown as { inventory: Inventory }).inventory;
+    inventory.cursor = makeStack(itemId('stone'), 3);
+    let dropped = 0;
+    inventory.dropCursor = () => { dropped++; inventory.cursor = null; return true; };
+    root.dispatch('pointerdown', { target: root });
+    expect(dropped).toBe(1);
+    expect(screen.isOpen).toBe(true);
+    root.dispatch('pointerdown', { target: root });
+    expect(screen.isOpen).toBe(false);
+    expect(closed()).toBe(1);
+  });
+
+  it('o ✕ é alvo de toque de 44 px, como manda o doc 09', () => {
+    const source = readFileSync('src/ui/theme.ts', 'utf8').replace(/\s+/g, '');
+    expect(source).toContain('.cl-close{width:44px;height:44px');
   });
 });
 
@@ -227,7 +253,6 @@ describe('a mochila mostra armadura e mão secundária', () => {
 
   it('desenha os 4 slots de armadura e o offhand', () => {
     const { root } = openInventory();
-    expect(root.find('Equipamento')).toBeDefined();
     for (const peca of ['Elmo', 'Peito', 'Calça', 'Bota', 'Mão']) {
       expect(root.find(peca), `slot ${peca} não desenhado`).toBeDefined();
     }
@@ -239,9 +264,14 @@ describe('a mochila mostra armadura e mão secundária', () => {
     const { root } = openInventory();
     const cols = root.all('div').filter((d) => d.className === 'grid-col');
     expect(cols.length).toBe(2);
-    expect(cols[0].find('Equipamento'), 'equipamento na coluna estreita').toBeDefined();
-    expect(cols[1].find('Inventário'), 'mochila na coluna larga').toBeDefined();
-    expect(cols[0].find('Inventário')).toBeUndefined();
+    expect(cols[0].find('Elmo'), 'equipamento na coluna estreita').toBeDefined();
+    // Barra (0..8) e mochila (9..35): os 36 do jogador, todos na coluna larga.
+    const bagSlots = (col: FakeElement): number => col.all('div').filter((d) => {
+      const m = /^inv:(\d+)$/.exec(d.dataset.slot ?? '');
+      return m !== null && Number(m[1]) < 36;
+    }).length;
+    expect(bagSlots(cols[1]), 'mochila e barra na coluna larga').toBe(36);
+    expect(bagSlots(cols[0])).toBe(0);
   });
 
   it('a tela tem os 46 slots do doc 08 §3.5', () => {
@@ -299,19 +329,32 @@ describe('CSS de rolagem das janelas', () => {
     return source.slice(start, source.indexOf('}', start)).replace(/\s+/g, '');
   };
 
-  it('a janela de inventário não bloqueia a rolagem por toque', () => {
+  /*
+   * M32 (regra 1): a janela de contêiner **não rola** — quem garante que ela
+   * cabe é `ContainerScreen.fit`, que encolhe a escala local. A rolagem por
+   * toque, que o relato de 2026-09-10 pedia para destravar, deixou de ter
+   * para onde ir; só a lista do livro rola, dentro da caixa dela.
+   */
+  it('a janela de contêiner não rola: a escala é que encaixa', () => {
     const rule = rootRule(screenSrc, 'container-screen');
-    expect(rule).not.toContain('touch-action:none');
-    expect(rule).toContain('touch-action:pan-y');
+    expect(rule).toContain('overflow:hidden');
+    expect(screenSrc).toContain('private fit(): void');
+    const bookSrc = readFileSync('src/ui/containers/recipebook.ts', 'utf8').replace(/\s+/g, '');
+    expect(bookSrc).toContain('overflow:auto');
   });
 
   it('o slot continua bloqueando, para arrastar pilha não rolar a janela', () => {
     expect(screenSrc.replace(/\s+/g, '')).toContain('#container-screen.slot{position:relative;touch-action:none');
   });
 
-  it('as duas janelas alinham no topo quando não cabem', () => {
-    expect(rootRule(screenSrc, 'container-screen')).toContain('place-items:safecenter');
-    expect(rootRule(creativeSrc, 'creative-screen')).toContain('place-items:safecenter');
+  /*
+   * Antes (2026-09-10) o criativo alinhava no topo quando não cabia. No M32
+   * ele passou a caber: a janela não rola, e só a grade de itens rola dentro
+   * da caixa dela.
+   */
+  it('o criativo não rola; a grade de itens rola por dentro', () => {
+    expect(rootRule(creativeSrc, 'creative-screen')).toContain('overflow:hidden');
+    expect(creativeSrc.replace(/\s+/g, '')).toMatch(/#creative-screen\.items\{[^}]*overflow:auto/);
   });
 
   it('a rolagem não vaza para a página atrás', () => {

@@ -368,6 +368,23 @@ export class SettingsStore {
     for (const fn of this.listeners) fn(this.values);
   }
 
+  /**
+   * Volta só estas chaves ao padrão (M32: "Restaurar o padrão desta aba").
+   * Um aviso só no fim, como em `reset`.
+   */
+  resetKeys(keys: readonly (keyof Settings)[]): void {
+    const defaults: Settings = { ...DEFAULTS, ...touchDefaults() };
+    let changed = false;
+    for (const key of keys) {
+      if (this.values[key] === defaults[key]) continue;
+      (this.values as unknown as Record<string, unknown>)[key] = defaults[key];
+      changed = true;
+    }
+    if (!changed) return;
+    this.save();
+    for (const fn of this.listeners) fn(this.values);
+  }
+
   onChange(fn: (settings: Settings) => void): () => void {
     this.listeners.push(fn);
     return () => {

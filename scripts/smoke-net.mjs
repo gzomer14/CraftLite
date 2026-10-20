@@ -4,7 +4,7 @@
  *
  * Sobe **dois** Chrome headless com perfis separados — dois "aparelhos" na
  * mesma máquina —, abre a página nos dois, clica em *Abrir a sala* num e em
- * *Entrar numa sala* no outro, copia o código de um para o campo do outro e
+ * *Jogar junto* no outro, copia o código de um para o campo do outro e
  * volta com a resposta. Passa se os dois disserem *Conectados!* e o anfitrião
  * terminar as medições.
  *
@@ -107,7 +107,7 @@ try {
   const oferta = await ate(anfitriao, "document.querySelector('.code')?.textContent ?? false");
   passo('o anfitrião mostra o código da sala', oferta.length > 40, `${oferta.replace(/-/g, '').length} caracteres`);
 
-  await convidado.avaliar(clicar('Entrar numa sala'));
+  await convidado.avaliar(clicar('Jogar junto'));
   await ate(convidado, "document.querySelector('textarea') !== null");
   await convidado.avaliar(colar(oferta, 'Continuar'));
   const resposta = await ate(convidado, "document.querySelector('.code')?.textContent ?? false");

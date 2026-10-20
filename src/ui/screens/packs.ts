@@ -11,8 +11,9 @@
  * não vira uma surpresa depois do boot.
  */
 
-import { menuButton, menuPanel, menuRoot, menuRow, messageOf } from './menu';
+import { closeOnBackdrop, menuButton, menuPanel, menuRoot, menuRow, messageOf } from './menu';
 import { t, tf } from '../../core/i18n';
+import { icon } from '../theme';
 
 /** "12 imagens e 3 sons", ou só a metade que existe. */
 function describeContents(summary: PackSummary): string {
@@ -49,16 +50,20 @@ export class PacksScreen {
   private readonly fileInput: HTMLInputElement;
   private readonly removeButton: HTMLButtonElement;
   private readonly applyButton: HTMLButtonElement;
-  private readonly backButton: HTMLButtonElement;
+  private readonly closeButton: HTMLButtonElement | null;
   private readonly callbacks: PacksCallbacks;
 
   constructor(callbacks: PacksCallbacks) {
     this.callbacks = callbacks;
     this.root = menuRoot('packs-screen');
-    const { panel, body } = menuPanel(t('packs.title'));
+    const { panel, body, close } = menuPanel(t('packs.title'), () => callbacks.back());
+    this.closeButton = close;
+    closeOnBackdrop(this.root, () => callbacks.back());
 
+    // M32: o texto de apoio é dica miúda, não bloco centralizado — num T0
+    // deitado, com uma fonte larga, os dois blocos empurravam o botão para fora.
     const intro = document.createElement('p');
-    intro.className = 'menu-empty';
+    intro.className = 'menu-hint';
     intro.textContent = t('packs.intro');
 
     this.current = document.createElement('p');
@@ -75,6 +80,7 @@ export class PacksScreen {
      * do disco sem permissão — e é feio em toda plataforma.
      */
     const choose = menuButton(t('packs.choose'), () => this.fileInput.click(), 'primary');
+    choose.prepend(icon('upload', 'currentColor', 18));
     this.fileInput = document.createElement('input');
     this.fileInput.type = 'file';
     this.fileInput.accept = '.zip';
@@ -82,14 +88,15 @@ export class PacksScreen {
     this.fileInput.addEventListener('change', () => void this.installPicked());
 
     this.removeButton = menuButton(t('packs.remove'), () => void this.removePack(), 'danger');
+    this.removeButton.prepend(icon('trash', 'currentColor', 18));
     this.applyButton = menuButton(t('packs.apply'), () => this.callbacks.apply());
+    this.applyButton.prepend(icon('play', 'currentColor', 18));
     this.applyButton.hidden = true;
-    this.backButton = menuButton(t('opt.back'), () => this.callbacks.back());
 
     body.append(
       intro, this.current, this.status,
-      menuRow(choose, this.removeButton),
-      menuRow(this.applyButton, this.backButton),
+      // Uma fileira só: "Aplicar" escondido não deixa uma linha vazia ocupando altura.
+      menuRow(choose, this.removeButton, this.applyButton),
       this.fileInput,
     );
     this.root.appendChild(panel);
@@ -106,7 +113,7 @@ export class PacksScreen {
     this.root.hidden = false;
     this.status.hidden = true;
     this.applyButton.hidden = true;
-    this.backButton.focus();
+    this.closeButton?.focus();
     await this.refresh();
   }
 

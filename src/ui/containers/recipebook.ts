@@ -174,6 +174,21 @@ export class RecipeBookPanel {
     this.element.hidden = true;
   }
 
+  /**
+   * Quantas receitas dá para fazer **agora** nesta grade (M32): o número da
+   * aba "Receitas", que diz ao jogador que vale abrir o livro.
+   */
+  craftableCount(entries: readonly RecipeEntry[], inventory: Inventory, gridSize: number): number {
+    this.inventory = inventory;
+    const counts = this.countInventory();
+    let n = 0;
+    for (const entry of entries) {
+      if (entry.width > gridSize || entry.height > gridSize) continue;
+      if (canCraft(entry, counts)) n++;
+    }
+    return n;
+  }
+
   /** Reapresenta com o inventário atual. */
   update(
     entries: readonly RecipeEntry[], inventory: Inventory, gridSize: number,
@@ -329,48 +344,39 @@ function injectStyle(): void {
   styleInjected = true;
   const css = document.createElement('style');
   css.textContent = `
-.recipe-book{margin-top:calc(2 * var(--px,3px));border-top:var(--px,3px) solid #555;
-  padding-top:calc(2 * var(--px,3px));display:flex;flex-direction:column;gap:6px}
-.recipe-book .header{display:flex;gap:8px;align-items:center}
-.recipe-book input[type=search]{flex:1 1 auto;min-height:32px;background:#8b8b8b;color:#fff;
-  border:var(--px,3px) solid #373737;padding:4px 6px;
-  font:calc(4.5 * var(--px,3px))/1 ui-monospace,monospace}
-.recipe-book .filter{display:flex;align-items:center;gap:4px;font-size:calc(4 * var(--px,3px));
-  color:#3f3f3f;white-space:nowrap}
-.recipe-book .filter input{width:20px;height:20px;accent-color:#3f7d3f}
-.recipe-book .list{display:flex;flex-wrap:wrap;gap:calc(1 * var(--px,3px));
-  max-height:calc(56 * var(--px,3px));overflow:auto}
-.recipe-book .empty{margin:6px 0;color:#3f3f3f;font-size:calc(4 * var(--px,3px))}
-.recipe-book .recipe{position:relative;width:calc(18 * var(--px,3px));
-  height:calc(18 * var(--px,3px));min-width:32px;min-height:32px;background:#8b8b8b;
-  border-top:var(--px,3px) solid #373737;border-left:var(--px,3px) solid #373737;
-  border-right:var(--px,3px) solid #fff;border-bottom:var(--px,3px) solid #fff;
-  color:#fff;cursor:pointer;display:grid;place-items:end;padding:0;
-  font:calc(4.5 * var(--px,3px))/1 ui-monospace,monospace;
-  text-shadow:0 0 2px #000,var(--px,3px) var(--px,3px) 0 #000}
-.recipe-book .recipe.sprite{background-image:var(--item-sheet);
-  background-size:var(--item-sheet-size);background-repeat:no-repeat;image-rendering:pixelated}
-.recipe-book .recipe.missing{filter:grayscale(1) brightness(.7)}
-.recipe-book .recipe:hover,.recipe-book .recipe:focus-visible{outline:2px solid #7b94c7}
-.recipe-book .recipe span{padding:0 var(--px,3px)}
-/* Prévia da grade: fica embaixo da lista, para não tapar as receitas. */
-.recipe-book .preview{display:flex;flex-direction:column;gap:calc(1 * var(--px,3px));
-  align-items:flex-start;border-top:var(--px,3px) solid #555;
-  padding-top:calc(2 * var(--px,3px));color:#3f3f3f}
-.recipe-book .preview .title{font:calc(4.5 * var(--px,3px))/1.2 ui-monospace,monospace}
-.recipe-book .preview .note{font:calc(4 * var(--px,3px))/1.2 ui-monospace,monospace;opacity:.7}
-.recipe-book .preview .grid{display:grid;gap:calc(1 * var(--px,3px))}
-.recipe-book .preview .cell{width:calc(16 * var(--px,3px));height:calc(16 * var(--px,3px));
-  min-width:26px;min-height:26px;background:#8b8b8b;
-  border-top:var(--px,3px) solid #373737;border-left:var(--px,3px) solid #373737;
-  border-right:var(--px,3px) solid #fff;border-bottom:var(--px,3px) solid #fff;
-  display:grid;place-items:center;color:#fff;
-  font:calc(4 * var(--px,3px))/1 ui-monospace,monospace;
-  text-shadow:0 0 2px #000}
-.recipe-book .preview .cell.sprite{background-image:var(--item-sheet);
-  background-size:var(--item-sheet-size);background-repeat:no-repeat;image-rendering:pixelated}
+.recipe-book{display:flex;flex-direction:column;gap:8px;font:700 13px/1.2 var(--cl-font,system-ui)}
+/* M32: busca e filtro numa linha só — a altura vai para a lista. */
+.recipe-book .header{display:flex;align-items:center;gap:6px;flex:none}
+.recipe-book input[type=search]{flex:1 1 0;min-width:0;height:34px;min-height:34px;box-sizing:border-box;border:0;
+  border-radius:10px;background:#0d1626;color:#fff;box-shadow:0 0 0 2px var(--cl-edge,#2a3c5e);padding:0 8px;
+  font:600 13px/1 var(--cl-font,system-ui)}
+.recipe-book .filter{flex:none;display:flex;align-items:center;gap:4px;height:34px;padding:0 8px;border-radius:10px;
+  background:#22324f;font-size:11px;color:#cfdbef;white-space:nowrap;cursor:pointer}
+.recipe-book .filter:has(input:checked){background:#3fbf4a;color:#fff}
+.recipe-book .filter input{width:16px;height:16px;margin:0;accent-color:#1f7a28}
+.recipe-book .list{flex:1 1 0;min-height:0;overflow:auto;display:flex;flex-wrap:wrap;align-content:flex-start;
+  gap:calc(1.2 * var(--px,3px));padding:4px;border-radius:10px;background:#101a2d;overscroll-behavior:contain;
+  touch-action:pan-y}
+.recipe-book .empty{margin:6px;color:var(--cl-muted,#a9b6cc);font-size:12px}
+.recipe-book .recipe{position:relative;box-sizing:border-box;width:calc(16 * var(--px,3px));height:calc(16 * var(--px,3px));
+  min-width:30px;min-height:30px;border:calc(1.4 * var(--px,3px)) solid #0c1524;border-radius:8px;
+  background-color:#0c1524;background-clip:padding-box;box-shadow:0 0 0 1px #2b3d5f;color:#fff;cursor:pointer;
+  display:grid;place-items:end;padding:0;font:900 12px/1 var(--cl-font,system-ui);text-shadow:1px 1px 0 #000}
+.recipe-book .recipe.sprite{background-image:var(--item-sheet);background-size:var(--item-sheet-size);
+  background-repeat:no-repeat;image-rendering:pixelated}
+.recipe-book .recipe.missing{filter:grayscale(1) brightness(.55)}
+.recipe-book .recipe:hover,.recipe-book .recipe:focus-visible{box-shadow:0 0 0 2px #ffc83d;outline:none}
+.recipe-book .preview{display:flex;align-items:center;gap:8px;color:var(--cl-ink,#f4f7fb);flex-wrap:wrap}
+.recipe-book .preview .title{flex:1 0 100%;font:800 12px/1.2 var(--cl-font,system-ui);color:#ffd75a}
+.recipe-book .preview .note{font:600 11px/1.2 var(--cl-font,system-ui);color:var(--cl-muted,#a9b6cc)}
+.recipe-book .preview .grid{display:grid;gap:3px}
+.recipe-book .preview .cell{box-sizing:border-box;width:26px;height:26px;border:2px solid #0c1524;border-radius:6px;
+  background-color:#0c1524;background-clip:padding-box;box-shadow:0 0 0 1px #2b3d5f;display:grid;place-items:center;
+  color:#fff;font:700 10px/1 var(--cl-font,system-ui)}
+.recipe-book .preview .cell.sprite{background-image:var(--item-sheet);background-size:var(--item-sheet-size);
+  background-repeat:no-repeat;image-rendering:pixelated}
 /* Falta na mochila: vermelho e apagado, que é o que o jogador precisa ver. */
-.recipe-book .preview .cell.missing{border-color:#a33;filter:grayscale(1) brightness(.75)}
+.recipe-book .preview .cell.missing{box-shadow:0 0 0 2px #e5484d;filter:grayscale(1) brightness(.7)}
 `;
   document.head.appendChild(css);
 }

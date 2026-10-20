@@ -209,7 +209,7 @@ describe('toda tela de container fecha sem teclado', () => {
     const inventory = (screen as unknown as { inventory: Inventory }).inventory;
     inventory.cursor = makeStack(itemId('stone'), 3);
     let dropped = 0;
-    inventory.dropCursor = () => { dropped++; inventory.cursor = null; };
+    inventory.dropCursor = () => { dropped++; inventory.cursor = null; return true; };
     root.dispatch('pointerdown', { target: root });
     expect(dropped).toBe(1);
     expect(screen.isOpen).toBe(true);

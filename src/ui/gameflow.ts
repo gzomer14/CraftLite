@@ -71,24 +71,34 @@ export class GameFlow {
       onToggleSpectator: () => this.setSpectator(!player.spectator),
       onNetwork: deps.onNetwork,
       networkLabel: deps.networkLabel,
-      onSaveAndQuit: () => {
-        this.pauseMenu.setStatus(t('pause.saving'));
-        void (async () => {
-          /*
-           * Com a gravação falhando (cota cheia, M23), recarregar jogaria fora
-           * o que não foi gravado — e a tela de cota cheia, que acabou de abrir.
-           */
-          if (!await deps.saveAll()) {
-            this.pauseMenu.setStatus(t('storefull.later'));
-            return;
-          }
-          await deps.leaveRoom();
-          // Recarregar é a saída honesta para voltar ao título: garante que nada
-          // do mundo antigo (workers, VBOs, listeners) sobreviva ao próximo.
-          location.reload();
-        })();
-      },
+      onSaveAndQuit: () => this.saveAndQuit(),
     });
+  }
+
+  /**
+   * Grava e volta ao título. Mora aqui, e não só no botão da pausa, porque a
+   * tela de morte também sai do mundo (M32: antes o "Sair do Mundo" dela só
+   * renascia o jogador). O estado "salvando…" aparece na pausa, que se abre
+   * se ainda não estiver aberta.
+   */
+  saveAndQuit(): void {
+    if (!this.paused) this.togglePause();
+    this.pauseMenu.setStatus(t('pause.saving'));
+    const deps = this.d;
+    void (async () => {
+      /*
+       * Com a gravação falhando (cota cheia, M23), recarregar jogaria fora
+       * o que não foi gravado — e a tela de cota cheia, que acabou de abrir.
+       */
+      if (!await deps.saveAll()) {
+        this.pauseMenu.setStatus(t('storefull.later'));
+        return;
+      }
+      await deps.leaveRoom();
+      // Recarregar é a saída honesta para voltar ao título: garante que nada
+      // do mundo antigo (workers, VBOs, listeners) sobreviva ao próximo.
+      location.reload();
+    })();
   }
 
   /** O mundo parado: pausado e sem sala na rede. */

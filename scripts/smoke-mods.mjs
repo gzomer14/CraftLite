@@ -153,10 +153,11 @@ try {
     await new Promise((r) => setTimeout(r, 400));
     const campos = [...mundos.querySelectorAll('input, select')].filter((c) => c.type !== 'file');
     const textos = campos.filter((c) => c.tagName === 'INPUT');
-    const modo = campos.find((c) => c.tagName === 'SELECT' && [...c.options].some((o) => o.value === 'creative'));
+    // M32: o modo é um cartão grande, não mais um <select>.
+    const modo = s.botao(mundos, 'Criativo');
     textos[0].value = 'Mods'; textos[0].dispatchEvent(new Event('input', { bubbles: true }));
     textos[1].value = 'smoke-mods'; textos[1].dispatchEvent(new Event('input', { bubbles: true }));
-    modo.value = 'creative'; modo.dispatchEvent(new Event('change', { bubbles: true }));
+    modo.click();
     s.botao(mundos, 'Criar e jogar').click();
     return true;
   })()`);
@@ -195,9 +196,8 @@ try {
   // 5. O mundo jogado com o mod pede o mod, e não abre sem ele.
   await cdp.avaliar("window.confirm = (m) => { __smoke.confirmou = m; return false; }; true");
   await cdp.avaliar(`(async () => {
+    // M32: o JOGAR do título continua o último mundo, sem passar pela lista.
     __smoke.botao(__smoke.tela('title-screen'), 'Jogar').click();
-    await new Promise((r) => setTimeout(r, 800));
-    __smoke.botao(__smoke.tela('worlds-screen'), 'Jogar').click();
     return true;
   })()`);
   await esperar(1500);

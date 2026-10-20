@@ -20,9 +20,13 @@ class FakeEl {
   readonly children: FakeEl[] = [];
   readonly attributes: Record<string, string> = {};
   private readonly handlers = new Map<string, (() => void)[]>();
+  readonly classList = {
+    add: (...names: string[]): void => { this.className = `${this.className} ${names.join(' ')}`.trim(); },
+  };
+  parent: FakeEl | null = null;
   constructor(readonly tag: string) {}
-  appendChild(child: FakeEl): FakeEl { this.children.push(child); return child; }
-  append(...kids: FakeEl[]): void { for (const kid of kids) this.children.push(kid); }
+  appendChild(child: FakeEl): FakeEl { child.parent = this; this.children.push(child); return child; }
+  append(...kids: FakeEl[]): void { for (const kid of kids) this.appendChild(kid); }
   setAttribute(name: string, value: string): void { this.attributes[name] = value; }
   focus(): void { this.focused = true; }
   addEventListener(type: string, fn: () => void): void {
@@ -45,15 +49,23 @@ beforeEach(() => {
   body = new FakeEl('body');
   vi.stubGlobal('document', {
     createElement: (tag: string) => new FakeEl(tag),
+    createElementNS: (_ns: string, tag: string) => new FakeEl(tag),
     body,
     head: new FakeEl('head'),
   });
 });
 afterEach(() => vi.unstubAllGlobals());
 
-/** O botão de modo, achado pelo texto — é como o jogador o acha também. */
+/**
+ * O rótulo do ladrilho de modo, achado pelo texto — é como o jogador o acha
+ * também. Desde o M32 o ladrilho tem ícone, rótulo e a linha "agora: …"; o
+ * que se testa é o rótulo, e o clique vai para o botão que o contém.
+ */
+function modeLabel(): FakeEl | undefined {
+  return body.all().find((el) => el.className === 'label' && el.textContent.startsWith('Mudar para'));
+}
 function modeButton(): FakeEl | undefined {
-  return body.all().find((el) => el.tag === 'button' && el.textContent.startsWith('Mudar para'));
+  return modeLabel()?.parent ?? undefined;
 }
 
 describe('o botão de modo', () => {
@@ -65,12 +77,14 @@ describe('o botão de modo', () => {
       onToggleMode: () => { mode = mode === 'creative' ? 'survival' : 'creative'; },
     });
     menu.show();
-    expect(modeButton()?.textContent, '"Modo: Criativo" deixa dúvida de qual é o atual')
+    expect(modeLabel()?.textContent, '"Modo: Criativo" deixa dúvida de qual é o atual')
       .toBe('Mudar para Criativo');
+    expect(modeButton()?.all().find((el) => el.className === 'sub')?.textContent,
+      'a linha de baixo confirma onde está').toBe('agora: Sobrevivência');
 
     modeButton()?.click();
     expect(mode).toBe('creative');
-    expect(modeButton()?.textContent, 'o rótulo acompanha a troca na hora')
+    expect(modeLabel()?.textContent, 'o rótulo acompanha a troca na hora')
       .toBe('Mudar para Sobrevivência');
   });
 
@@ -96,7 +110,7 @@ describe('o botão de modo', () => {
     mode = 'creative';
     menu.hide();
     menu.show();
-    expect(modeButton()?.textContent).toBe('Mudar para Sobrevivência');
+    expect(modeLabel()?.textContent).toBe('Mudar para Sobrevivência');
   });
 
   it('sem como trocar, o botão não existe', () => {

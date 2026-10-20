@@ -7,13 +7,21 @@
  * A lista de conquistas mora aqui, e não numa tela própria, porque é o que o
  * doc pede no menu e porque uma tela nova para 18 linhas de texto seria um
  * módulo a mais para manter sem nada de novo dentro.
+ *
+ * **M32 (interface nova):** eram até oito botões cinza iguais, em coluna, e o
+ * celular deitado precisava rolar. Agora são duas colunas que cabem em
+ * 640×360: à esquerda a decisão (CONTINUAR, verde, e Salvar e Sair, contornado
+ * de vermelho); à direita ladrilhos com ícone, palavra e uma linha que diz o
+ * que há dentro ("7 de 18", "agora: Sobrevivência"). Conquistas e
+ * estatísticas abrem **no lugar dos ladrilhos**, com "Voltar" — a lista rola
+ * dentro da caixa, a tela não. Tocar fora do painel também continua o jogo.
  */
 
 import { ACHIEVEMENTS, isUnlocked, objectiveFor } from '../../data/achievements';
-import { ITEM_BY_NAME } from '../../data/items';
-import { MOB_BY_NAME } from '../../data/mobs';
 import { STATS, formatStat } from '../../data/stats';
 import { t, tf } from '../../core/i18n';
+import { icon, injectTheme, themedButton } from '../theme';
+import { displayOfTarget } from '../objectiveline';
 
 export interface PauseMenuCallbacks {
   onResume: () => void;
@@ -38,41 +46,74 @@ export interface PauseMenuCallbacks {
   networkLabel?: () => string;
 }
 
+/** Ladrilho da direita: ícone, palavra e a linha que diz o que há dentro. */
+interface Tile {
+  readonly button: HTMLButtonElement;
+  readonly label: HTMLSpanElement;
+  readonly sub: HTMLSpanElement;
+}
+
 export class PauseMenu {
   private readonly root: HTMLDivElement;
   private readonly resumeButton: HTMLButtonElement;
   private readonly status: HTMLParagraphElement;
-  private readonly achievementList: HTMLDivElement;
-  private readonly modeButton: HTMLButtonElement | null;
-  private readonly statsList: HTMLDivElement;
-  private readonly spectatorButton: HTMLButtonElement | null;
-  private readonly networkButton: HTMLButtonElement | null;
+  private readonly tiles: HTMLDivElement;
+  private readonly sheet: HTMLDivElement;
+  private readonly sheetTitle: HTMLHeadingElement;
+  private readonly sheetList: HTMLDivElement;
+  private readonly achievementTile: Tile | null;
+  private readonly modeTile: Tile | null;
+  private readonly spectatorTile: Tile | null;
+  private readonly networkTile: Tile | null;
   private readonly callbacks: PauseMenuCallbacks;
 
   constructor(callbacks: PauseMenuCallbacks) {
     this.callbacks = callbacks;
+    injectTheme();
     injectStyle();
     this.root = document.createElement('div');
     this.root.id = 'pause-menu';
     this.root.hidden = true;
     this.root.setAttribute('role', 'dialog');
     this.root.setAttribute('aria-modal', 'true');
+    // Tocar no escuro em volta continua o jogo (regra 2 do M32).
+    this.root.addEventListener('pointerdown', (e) => {
+      if ((e as Event).target === this.root) callbacks.onResume();
+    });
 
+    const panel = document.createElement('div');
+    panel.className = 'pause-panel';
+
+    const left = document.createElement('div');
+    left.className = 'pause-left';
     const title = document.createElement('h1');
     title.textContent = t('pause.title');
-
     this.status = document.createElement('p');
+    this.status.className = 'status';
+    this.resumeButton = themedButton(t('pause.resume'), callbacks.onResume, 'primary', 'play');
+    this.resumeButton.classList.add('resume');
+    const quit = themedButton(t('pause.save_quit'), callbacks.onSaveAndQuit, 'danger', 'exit');
+    left.append(title, this.resumeButton, quit, this.status);
 
-    this.achievementList = document.createElement('div');
-    this.achievementList.className = 'achievements';
-    this.achievementList.hidden = true;
-    this.statsList = document.createElement('div');
-    this.statsList.className = 'achievements stats';
-    this.statsList.hidden = true;
-
-    this.resumeButton = button(t('pause.resume'), callbacks.onResume);
-    const options = button(t('opt.title'), callbacks.onOptions);
-    const quit = button(t('pause.save_quit'), callbacks.onSaveAndQuit);
+    this.tiles = document.createElement('div');
+    this.tiles.className = 'pause-tiles';
+    this.tiles.appendChild(
+      makeTile(t('opt.title'), 'gear', '#ffd75a', t('pause.options_hint'), callbacks.onOptions).button,
+    );
+    this.achievementTile = callbacks.achievements === undefined
+      ? null
+      : makeTile(t('pause.achievements'), 'trophy', '#ffc83d', '', () => this.openAchievements());
+    if (this.achievementTile !== null) this.tiles.appendChild(this.achievementTile.button);
+    if (callbacks.stats !== undefined) {
+      this.tiles.appendChild(
+        makeTile(t('pause.stats'), 'chart', '#7fc8ff', '', () => this.openStats()).button,
+      );
+    }
+    const network = callbacks.onNetwork;
+    this.networkTile = network === undefined
+      ? null
+      : makeTile(t('net.open_room'), 'people', '#9be38b', t('pause.room_hint'), network);
+    if (this.networkTile !== null) this.tiles.appendChild(this.networkTile.button);
 
     /*
      * Trocar de modo **no mesmo mundo** (pedido de campo 2026-09-14).
@@ -82,70 +123,67 @@ export class PauseMenu {
      * meta desde o M4 — o que faltava era como mudá-lo sem criar outro mundo.
      */
     const toggle = callbacks.onToggleMode;
-    this.modeButton = toggle === undefined || callbacks.gameMode === undefined
+    this.modeTile = toggle === undefined || callbacks.gameMode === undefined
       ? null
-      : button(t('pause.mode'), () => { toggle(); this.refreshMode(); });
-
-    const actions = document.createElement('div');
-    actions.className = 'actions';
-    actions.append(this.resumeButton);
-    if (callbacks.achievements !== undefined) {
-      actions.appendChild(button(t('pause.achievements'), () => this.toggleAchievements()));
-    }
-    if (callbacks.stats !== undefined) {
-      actions.appendChild(button(t('pause.stats'), () => this.toggleStats()));
-    }
-    if (this.modeButton !== null) actions.appendChild(this.modeButton);
+      : makeTile(t('pause.mode'), 'cube', '#c9a7ff', '', () => { toggle(); this.refreshMode(); });
+    if (this.modeTile !== null) this.tiles.appendChild(this.modeTile.button);
     const spectate = callbacks.onToggleSpectator;
-    this.spectatorButton = spectate === undefined || callbacks.spectator === undefined
+    this.spectatorTile = spectate === undefined || callbacks.spectator === undefined
       ? null
-      : button(t('mode.spectator'), () => { spectate(); this.refreshMode(); });
-    if (this.spectatorButton !== null) actions.appendChild(this.spectatorButton);
-    const network = callbacks.onNetwork;
-    this.networkButton = network === undefined ? null : button(t('net.open_room'), network);
-    if (this.networkButton !== null) actions.appendChild(this.networkButton);
-    actions.append(options, quit);
+      : makeTile(t('mode.spectator'), 'search', '#f59ad0', '', () => { spectate(); this.refreshMode(); });
+    if (this.spectatorTile !== null) this.tiles.appendChild(this.spectatorTile.button);
 
-    this.root.append(title, this.status, actions, this.achievementList, this.statsList);
+    // A folha que ocupa o lugar dos ladrilhos: conquistas ou estatísticas.
+    this.sheet = document.createElement('div');
+    this.sheet.className = 'pause-sheet';
+    this.sheet.hidden = true;
+    const sheetHead = document.createElement('div');
+    sheetHead.className = 'sheet-head';
+    const back = themedButton(t('common.back'), () => this.closeSheet(), 'secondary', 'back');
+    back.classList.add('back');
+    this.sheetTitle = document.createElement('h2');
+    sheetHead.append(back, this.sheetTitle);
+    this.sheetList = document.createElement('div');
+    this.sheetList.className = 'achievements';
+    this.sheet.append(sheetHead, this.sheetList);
+
+    const right = document.createElement('div');
+    right.className = 'pause-right';
+    right.append(this.tiles, this.sheet);
+    panel.append(left, right);
+    this.root.appendChild(panel);
     document.body.appendChild(this.root);
   }
 
-  /** Abre e fecha a tela de estatísticas (M10). */
-  private toggleStats(): void {
-    this.achievementList.hidden = true;
-    if (!this.statsList.hidden) {
-      this.statsList.hidden = true;
-      return;
-    }
-    const values = this.callbacks.stats?.() ?? [];
-    this.statsList.textContent = '';
-    for (let i = 0; i < STATS.length; i++) {
-      const def = STATS[i];
-      const row = document.createElement('div');
-      row.className = 'row unlocked';
-      const name = document.createElement('strong');
-      name.textContent = def.display;
-      const value = document.createElement('span');
-      value.textContent = formatStat(def.unit, values[i] ?? 0);
-      row.append(name, value);
-      this.statsList.appendChild(row);
-    }
-    this.statsList.hidden = false;
+  private openSheet(title: string): void {
+    this.sheetTitle.textContent = title;
+    this.sheetList.textContent = '';
+    this.tiles.hidden = true;
+    this.sheet.hidden = false;
   }
 
-  /** Abre e fecha a lista de conquistas (doc 08 §5). */
-  private toggleAchievements(): void {
-    this.statsList.hidden = true;
-    if (!this.achievementList.hidden) {
-      this.achievementList.hidden = true;
-      return;
+  private closeSheet(): void {
+    this.sheet.hidden = true;
+    this.tiles.hidden = false;
+  }
+
+  /** Estatísticas (M10), no lugar dos ladrilhos. */
+  private openStats(): void {
+    this.openSheet(t('pause.stats'));
+    this.sheetList.className = 'achievements stats';
+    const values = this.callbacks.stats?.() ?? [];
+    for (let i = 0; i < STATS.length; i++) {
+      const def = STATS[i];
+      this.sheetList.appendChild(row('row unlocked', def.display, formatStat(def.unit, values[i] ?? 0)));
     }
+  }
+
+  /** A lista de conquistas (doc 08 §5), no lugar dos ladrilhos. */
+  private openAchievements(): void {
+    this.openSheet(t('pause.achievements'));
+    this.sheetList.className = 'achievements';
     const mask = this.callbacks.achievements?.() ?? 0;
-    const displayOf = (target: string): string =>
-      ITEM_BY_NAME.get(target)?.display ?? MOB_BY_NAME.get(target)?.display ?? target;
-    this.achievementList.textContent = '';
     for (const def of ACHIEVEMENTS) {
-      const row = document.createElement('div');
       const unlocked = (mask & (1 << def.id)) !== 0;
       /*
        * O que aparece, e por quê.
@@ -159,18 +197,16 @@ export class PauseMenu {
        */
       const revealed = unlocked || def.parent === undefined
         || isUnlocked(mask, def.parent);
-      row.className = unlocked ? 'row unlocked' : revealed ? 'row next' : 'row';
-      const name = document.createElement('strong');
-      name.textContent = revealed ? def.display : '???';
-      const detail = document.createElement('span');
       // Obtida mostra o texto de vitória; à vista mostra o que fazer.
-      detail.textContent = unlocked
+      const detail = unlocked
         ? def.description
-        : revealed ? capitalize(objectiveFor(def, displayOf)) : hintFor(def.trigger);
-      row.append(name, detail);
-      this.achievementList.appendChild(row);
+        : revealed ? capitalize(objectiveFor(def, displayOfTarget)) : hintFor(def.trigger);
+      this.sheetList.appendChild(row(
+        unlocked ? 'row unlocked' : revealed ? 'row next' : 'row',
+        revealed ? def.display : '???',
+        detail,
+      ));
     }
-    this.achievementList.hidden = false;
   }
 
   get isOpen(): boolean {
@@ -179,40 +215,43 @@ export class PauseMenu {
 
   show(): void {
     this.root.hidden = false;
+    this.closeSheet();
     this.refreshMode();
     const label = this.callbacks.networkLabel;
-    if (this.networkButton !== null && label !== undefined) this.networkButton.textContent = label();
+    if (this.networkTile !== null && label !== undefined) this.networkTile.label.textContent = label();
+    const achievements = this.callbacks.achievements;
+    if (this.achievementTile !== null && achievements !== undefined) {
+      this.achievementTile.sub.textContent = tf('pause.of', countBits(achievements()), ACHIEVEMENTS.length);
+    }
     this.resumeButton.focus();
   }
 
   /**
    * O rótulo diz o que o botão **faz**, não onde o jogador está: "Mudar para
    * Criativo" não deixa dúvida de qual dos dois é o estado atual, e
-   * "Modo: Criativo" deixa.
+   * "Modo: Criativo" deixa. A linha de baixo ("agora: …") confirma o atual.
    */
   private refreshMode(): void {
-    const spectator = this.spectatorButton;
+    const spectator = this.spectatorTile;
     if (spectator !== null) {
-      spectator.hidden = this.callbacks.gameMode?.() !== 'creative';
+      spectator.button.hidden = this.callbacks.gameMode?.() !== 'creative';
       const on = this.callbacks.spectator?.() === true;
-      spectator.textContent = on ? t('pause.leave_spectator') : t('mode.spectator');
-      spectator.setAttribute('aria-pressed', on ? 'true' : 'false');
+      spectator.label.textContent = on ? t('pause.leave_spectator') : t('mode.spectator');
+      spectator.button.setAttribute('aria-pressed', on ? 'true' : 'false');
     }
-    const button = this.modeButton;
+    const tile = this.modeTile;
     const mode = this.callbacks.gameMode?.();
-    if (button === null || mode === undefined) return;
+    if (tile === null || mode === undefined) return;
+    const now = mode === 'creative' ? t('mode.creative') : t('mode.survival');
     const next = mode === 'creative' ? t('mode.survival') : t('mode.creative');
-    button.textContent = tf('pause.switch_to', next);
-    button.setAttribute(
-      'aria-label',
-      tf('pause.mode_aria', mode === 'creative' ? t('mode.creative') : t('mode.survival'), next),
-    );
+    tile.label.textContent = tf('pause.switch_to', next);
+    tile.sub.textContent = tf('pause.mode_now', now);
+    tile.button.setAttribute('aria-label', tf('pause.mode_aria', now, next));
   }
 
   hide(): void {
     this.root.hidden = true;
-    this.achievementList.hidden = true;
-    this.statsList.hidden = true;
+    this.closeSheet();
   }
 
   /** Mensagem de estado, como "salvando…". */
@@ -221,12 +260,46 @@ export class PauseMenu {
   }
 }
 
-/** Dica genérica da conquista trancada, sem entregar o alvo. */
+function makeTile(
+  label: string, iconName: string, color: string, sub: string, onClick: () => void,
+): Tile {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'tile';
+  const labelEl = document.createElement('span');
+  labelEl.className = 'label';
+  labelEl.textContent = label;
+  const subEl = document.createElement('span');
+  subEl.className = 'sub';
+  subEl.textContent = sub;
+  button.append(icon(iconName, color, 24), labelEl, subEl);
+  button.addEventListener('click', onClick);
+  return { button, label: labelEl, sub: subEl };
+}
+
+function row(className: string, title: string, detail: string): HTMLDivElement {
+  const el = document.createElement('div');
+  el.className = className;
+  const name = document.createElement('strong');
+  name.textContent = title;
+  const text = document.createElement('span');
+  text.textContent = detail;
+  el.append(name, text);
+  return el;
+}
+
+function countBits(mask: number): number {
+  let n = 0;
+  for (let m = mask >>> 0; m !== 0; m &= m - 1) n++;
+  return n;
+}
+
 /** A frase de objetivo vem em minúscula para caber depois de "Objetivo —". */
 function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+/** Dica genérica da conquista trancada, sem entregar o alvo. */
 function hintFor(trigger: string): string {
   if (trigger === 'obtain') return t('pause.hint_obtain');
   if (trigger === 'kill') return t('pause.hint_kill');
@@ -236,52 +309,66 @@ function hintFor(trigger: string): string {
   return t('pause.hint_event');
 }
 
-function button(label: string, onClick: () => void): HTMLButtonElement {
-  const el = document.createElement('button');
-  el.type = 'button';
-  el.textContent = label;
-  el.addEventListener('click', onClick);
-  return el;
-}
-
 let styleInjected = false;
 function injectStyle(): void {
   if (styleInjected) return;
   styleInjected = true;
   const css = document.createElement('style');
+  /*
+   * Celular deitado (campo, 2026-09-23): a página inteira tem
+   * touch-action:none (doc 09 §2.3), então nada aqui pode depender de rolar a
+   * tela. O painel é medido para 640×360; só a lista de conquistas rola, por
+   * dentro da própria caixa (pan-y nela).
+   */
   css.textContent = `
-#pause-menu{position:fixed;inset:0;z-index:15;background:#00000099;
-  display:grid;justify-content:center;align-content:center;align-content:safe center;
-  justify-items:center;gap:14px;overflow-y:auto;touch-action:pan-y;overscroll-behavior:contain;
-  font-family:ui-monospace,"Courier New",monospace;color:#fff;text-align:center;padding:24px}
-#pause-menu h1{margin:0;font-size:clamp(22px,5vw,36px);text-shadow:2px 2px 0 #000}
-#pause-menu p{margin:0;min-height:1.2em;opacity:.75;font-size:12px}
-#pause-menu .actions{display:flex;flex-direction:column;gap:8px}
-#pause-menu button{min-width:200px;min-height:44px;padding:10px 18px;
-  background:#6e6e6e;color:#fff;border:2px solid #000;
-  box-shadow:inset 2px 2px 0 #ffffff40,inset -2px -2px 0 #00000040;
-  font:14px/1 ui-monospace,monospace;cursor:pointer;
-  -webkit-tap-highlight-color:transparent}
-#pause-menu button:hover,#pause-menu button:focus-visible{background:#7b94c7;outline:2px solid #fff}
-#pause-menu .achievements{display:grid;gap:4px;max-height:min(50vh,340px);overflow:auto;
-  width:min(90vw,420px);padding:8px;background:#1c1420dd;border:2px solid #b46ee8;text-align:left}
-#pause-menu .achievements .row{display:grid;gap:2px;padding:4px 6px;opacity:.45}
-#pause-menu .achievements .row.unlocked{opacity:1;background:#00000055}
+#pause-menu{position:fixed;inset:0;z-index:15;background:var(--cl-dim);display:grid;place-items:center;
+  overflow:hidden;padding:8px;font-family:var(--cl-font);color:var(--cl-ink)}
+#pause-menu[hidden]{display:none}
+#pause-menu .pause-panel{display:flex;gap:16px;width:min(720px,100%);max-height:100%;padding:16px;
+  border-radius:20px;background:var(--cl-panel);box-shadow:0 0 0 2px var(--cl-edge),0 18px 40px rgba(0,0,0,.5)}
+#pause-menu .pause-left{flex:0 0 clamp(190px,34%,250px);display:flex;flex-direction:column;gap:10px;
+  justify-content:center}
+#pause-menu h1{margin:0 0 2px;font:900 13px/1 var(--cl-font);letter-spacing:3px;text-transform:uppercase;
+  color:var(--cl-gold)}
+#pause-menu .resume{min-height:clamp(60px,22vh,86px);font-size:22px;letter-spacing:1px;text-transform:uppercase;
+  border-radius:16px}
+#pause-menu .resume .cl-icon{width:26px;height:26px}
+#pause-menu .status{margin:0;min-height:1.2em;color:var(--cl-muted);font:600 12px/1.2 var(--cl-font)}
+#pause-menu .pause-right{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}
+#pause-menu .pause-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-content:center;
+  flex:1}
+#pause-menu .pause-tiles[hidden],#pause-menu .pause-sheet[hidden],#pause-menu .tile[hidden]{display:none}
+#pause-menu .tile{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:10px;
+  align-items:center;text-align:left;min-height:clamp(52px,17vh,64px);padding:8px 12px;border:0;border-radius:14px;
+  background:var(--cl-raise);color:var(--cl-ink);cursor:pointer;
+  box-shadow:0 4px 0 var(--cl-raise-low),inset 0 2px 0 rgba(255,255,255,.12)}
+#pause-menu .tile .cl-icon{grid-row:1 / span 2}
+#pause-menu .tile .label{font:800 14px/1.15 var(--cl-font)}
+#pause-menu .tile .sub{font:600 11px/1.2 var(--cl-font);color:var(--cl-muted)}
+#pause-menu .tile .sub:empty{display:none}
+#pause-menu .tile:hover,#pause-menu .tile:focus-visible{filter:brightness(1.12);outline:none}
+#pause-menu .tile:focus-visible{box-shadow:0 4px 0 var(--cl-raise-low),0 0 0 3px var(--cl-gold)}
+#pause-menu .tile:active{transform:translateY(3px);box-shadow:0 1px 0 var(--cl-raise-low)}
+#pause-menu .tile[aria-pressed=true]{background:#4a3a14;box-shadow:0 4px 0 var(--cl-gold-low)}
+#pause-menu .pause-sheet{display:flex;flex-direction:column;gap:8px;flex:1;min-height:0}
+#pause-menu .sheet-head{display:flex;align-items:center;gap:12px}
+#pause-menu .sheet-head .back{min-height:40px;padding:0 12px}
+#pause-menu h2{margin:0;font:800 16px/1 var(--cl-font)}
+#pause-menu .achievements{display:grid;gap:4px;align-content:start;flex:1;min-height:0;
+  max-height:calc(100vh - 128px);overflow:auto;touch-action:pan-y;overscroll-behavior:contain;
+  padding:6px;border-radius:12px;background:var(--cl-slot)}
+#pause-menu .achievements .row{display:grid;gap:2px;padding:6px 8px;border-radius:8px;opacity:.45}
+#pause-menu .achievements .row.unlocked{opacity:1;background:var(--cl-raise)}
 /* À vista mas não obtida: legível, sem competir com as que já são suas. */
-#pause-menu .achievements .row.next{opacity:.8}
+#pause-menu .achievements .row.next{opacity:.85}
 #pause-menu .achievements .row.next strong{color:#d9c27a}
-#pause-menu .achievements strong{color:#f7d94c;font-size:13px}
-#pause-menu .achievements span{color:#d8d0e0;font-size:11px}
-/*
- * Celular deitado (campo, 2026-09-23): sete botões em coluna passavam da
- * altura da tela, e o menu não rolava — a página inteira tem touch-action:none
- * (doc 09 §2.3), e o menu não era um contêiner de rolagem. Agora ele rola
- * (pan-y acima) e, com pouca altura, os botões vão em duas colunas.
- */
-@media (max-height:600px){
-  #pause-menu{gap:8px;padding:12px}
-  #pause-menu .actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
-  #pause-menu button{min-width:180px;min-height:40px;padding:8px 12px}
+#pause-menu .achievements strong{color:var(--cl-gold);font-size:13px}
+#pause-menu .achievements span{color:#cdd6e6;font-size:11px}
+#pause-menu .stats .row{grid-template-columns:1fr auto;align-items:center}
+#pause-menu .stats strong{color:var(--cl-ink)}
+@media (max-height:420px){
+  #pause-menu .pause-panel{padding:12px;gap:12px}
+  #pause-menu .pause-tiles{gap:8px}
 }
 `;
   document.head.appendChild(css);

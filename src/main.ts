@@ -276,7 +276,8 @@ async function boot(): Promise<void> {
     restored = session.respawn(meta.spawn[0], meta.spawn[2]);
     spawned = false;
   };
-  const deathScreen = new DeathScreen({ onRespawn: respawn, onQuit: respawn });
+  // Sair do Mundo renasce antes de gravar: o save não guarda um jogador morto.
+  const deathScreen = new DeathScreen({ onRespawn: respawn, onQuit: () => { respawn(); flow.saveAndQuit(); } });
   const creditsScreen = new LazyScreen((late) => new late.CreditsScreen(() => { /* o jogo segue de onde estava */ }));
 
   const session = new Session(world, player, {

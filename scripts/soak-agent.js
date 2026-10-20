@@ -96,8 +96,8 @@
     const textos = campos.filter((c) => c.tagName === 'INPUT');
     const nome = textos[0];
     const seed = textos[1];
-    const modo = campos.find((c) => c.tagName === 'SELECT'
-      && [...c.options].some((o) => o.value === 'creative'));
+    // M32: o modo é um cartão grande, não mais um <select>.
+    const modo = botao(mundos, 'Criativo');
     if (nome === undefined || seed === undefined || modo === undefined) {
       throw new Error('formulário de criar mundo mudou de forma');
     }
@@ -105,8 +105,7 @@
     nome.dispatchEvent(new Event('input', { bubbles: true }));
     seed.value = 'soak-' + Date.now();
     seed.dispatchEvent(new Event('input', { bubbles: true }));
-    modo.value = 'creative';
-    modo.dispatchEvent(new Event('change', { bubbles: true }));
+    modo.click();
     botao(mundos, 'Criar e jogar').click();
 
     soak.fase = 'carregando';

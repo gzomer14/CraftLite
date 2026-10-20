@@ -123,10 +123,11 @@ try {
     await new Promise((r) => setTimeout(r, 400));
     const campos = [...mundos.querySelectorAll('input, select')].filter((c) => c.type !== 'file');
     const textos = campos.filter((c) => c.tagName === 'INPUT');
-    const modo = campos.find((c) => c.tagName === 'SELECT' && [...c.options].some((o) => o.value === 'creative'));
+    // M32: o modo é um cartão grande, não mais um <select>.
+    const modo = s.botao(mundos, 'Criativo');
     textos[0].value = 'Smoke'; textos[0].dispatchEvent(new Event('input', { bubbles: true }));
     textos[1].value = 'smoke-2026'; textos[1].dispatchEvent(new Event('input', { bubbles: true }));
-    modo.value = 'creative'; modo.dispatchEvent(new Event('change', { bubbles: true }));
+    modo.click();
     s.botao(mundos, 'Criar e jogar').click();
     return true;
   })()`);
@@ -216,9 +217,8 @@ try {
   await cdp.avaliar(HELPERS);
   await cdp.avaliar(`(async () => {
     const s = window.__smoke;
+    // M32: o JOGAR do título continua o último mundo, sem passar pela lista.
     s.botao(document.getElementById('title-screen'), 'Jogar').click();
-    await new Promise((r) => setTimeout(r, 800));
-    s.botao(document.getElementById('worlds-screen'), 'Jogar').click();
     return true;
   })()`);
   const [x, y, z] = alvo.pos;

@@ -43,12 +43,14 @@ export class MenuFlow {
   private readonly mods: ModsScreen;
   /** Mundos em memória, quando não há banco. */
   private readonly transient: WorldMeta[] = [];
+  private readonly start: (meta: WorldMeta) => void;
 
   constructor(
     db: SaveDatabase | null, settings: SettingsStore, keybinds: Keybinds,
     gamepads: Gamepads | null, callbacks: MenuFlowCallbacks,
   ) {
     this.db = db;
+    this.start = callbacks.start;
     this.options = new OptionsScreen(settings, keybinds, gamepads);
 
     this.worlds = new WorldsScreen({
@@ -65,7 +67,7 @@ export class MenuFlow {
       thumbnail: (worldId) => this.db?.loadThumbnail(worldId) ?? Promise.resolve(undefined),
       back: () => {
         this.worlds.hide();
-        this.title.show();
+        this.showTitle();
       },
     });
 
@@ -77,23 +79,24 @@ export class MenuFlow {
       apply: () => location.reload(),
       back: () => {
         this.packs.hide();
-        this.title.show();
+        this.showTitle();
       },
     });
 
     this.mods = new ModsScreen(() => {
       this.mods.hide();
-      this.title.show();
+      this.showTitle();
     });
 
     this.title = new TitleScreen({
-      onPlay: () => {
+      onPlay: () => void this.playLatest(),
+      onWorlds: () => {
         this.title.hide();
         void this.worlds.show();
       },
       onOptions: () => {
         this.title.hide();
-        this.options.show(() => this.title.show());
+        this.options.show(() => this.showTitle());
       },
       onPacks: () => {
         this.title.hide();
@@ -105,7 +108,7 @@ export class MenuFlow {
       },
       onJoin: () => {
         this.title.hide();
-        callbacks.join(() => this.title.show());
+        callbacks.join(() => this.showTitle());
       },
     });
   }
@@ -115,8 +118,30 @@ export class MenuFlow {
       || this.packs.isOpen || this.mods.isOpen;
   }
 
+  /** Mostra o título e escreve nele o mundo que o JOGAR continua (M32). */
   showTitle(): void {
     this.title.show();
+    void this.listWorlds().then((worlds) => {
+      this.title.setContinue(latestOf(worlds)?.name ?? null);
+    }, () => this.title.setContinue(null));
+  }
+
+  /**
+   * JOGAR do título (M32): entra no mundo jogado por último. Sem nenhum, abre
+   * a lista — onde o cartão "Criar novo" é a única coisa a tocar.
+   */
+  private async playLatest(): Promise<void> {
+    let worlds: WorldMeta[] = [];
+    try { worlds = await this.listWorlds(); } catch { /* sem banco: lista vazia */ }
+    const latest = latestOf(worlds);
+    if (latest === null) {
+      this.title.hide();
+      void this.worlds.show();
+      return;
+    }
+    if (!this.modsReady(latest)) return;
+    this.hideAll();
+    this.start(latest);
   }
 
   /** Abre as opções de dentro do jogo (menu de pausa). */
@@ -281,4 +306,11 @@ export function newWorldMeta(
     lastPlayed: Date.now(),
     sizeBytes: 0,
   };
+}
+
+/** O mundo jogado por último, ou `null` sem nenhum. */
+function latestOf(worlds: readonly WorldMeta[]): WorldMeta | null {
+  let best: WorldMeta | null = null;
+  for (const world of worlds) if (best === null || world.lastPlayed > best.lastPlayed) best = world;
+  return best;
 }

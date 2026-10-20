@@ -115,10 +115,11 @@ try {
     await new Promise((r) => setTimeout(r, 400));
     const campos = [...m.querySelectorAll('input, select')].filter((c) => c.type !== 'file');
     const textos = campos.filter((c) => c.tagName === 'INPUT');
-    const modo = campos.find((c) => c.tagName === 'SELECT' && [...c.options].some((o) => o.value === 'creative'));
+    // M32: o modo é um cartão grande, não mais um <select>.
+    const modo = s.botao(m, 'Criativo');
     textos[0].value = 'Sala'; textos[0].dispatchEvent(new Event('input', { bubbles: true }));
     textos[1].value = 'sala-2026'; textos[1].dispatchEvent(new Event('input', { bubbles: true }));
-    modo.value = 'creative'; modo.dispatchEvent(new Event('change', { bubbles: true }));
+    modo.click();
     s.botao(m, 'Criar e jogar').click();
     return true;
   })()`);
@@ -138,8 +139,8 @@ try {
   const oferta = await ate(host, "__smoke.visivel('room-screen') && document.querySelector('#room-screen .net-code')?.textContent", 20000);
   passo('a pausa abre a sala e mostra o código', oferta.length > 40, `${oferta.replace(/-/g, '').length} caracteres`);
 
-  // 3. O convidado: título → Entrar numa sala → cola o código → Continuar.
-  await guest.avaliar("__smoke.botao(__smoke.tela('title-screen'), 'Entrar numa sala').click(), true");
+  // 3. O convidado: título → Jogar junto → cola o código → Continuar.
+  await guest.avaliar("__smoke.botao(__smoke.tela('title-screen'), 'Jogar junto').click(), true");
   await ate(guest, "__smoke.visivel('join-screen') && document.querySelector('#join-screen textarea') !== null", 20000);
   await guest.avaliar(`(() => {
     const tela = __smoke.tela('join-screen');

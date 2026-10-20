@@ -12,6 +12,38 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-10-20 10:48 · Em pé, o jogo não abre
+
+**Pedido:** *"O jogo me permite abrir ele, acessar os menus iniciais, opções, criar mundo, tudo com
+o celular na vertical. Somente ao entrar no mundo […] exibe o aviso […]. Na vertical varios dos
+menus quebraram bastante […] acho que seria legal adicionarmos essa exigência na horizontal
+diretamente ao abrir o site/app."* Depois do merge do PR #12; a branch recomeçou da `main`.
+
+**Resultado:**
+- `ScreenMode` (o aviso "gire o aparelho") passou de dentro do `startGame` para o começo do `boot`:
+  cobre a tela de carregamento, o título e todos os menus com o celular em pé. Só vale para toque;
+  janela estreita no computador continua livre.
+- O primeiro toque em **qualquer** tela pede tela cheia e a trava de paisagem
+  (`enterOnFirstTouch`); antes, só o primeiro toque dentro do mundo. No Android, gira sozinho.
+- O aviso ganhou o visual do M32: um celular desenhado (ícone `phone` do tema) que deita, o texto
+  em duas linhas na fonte do sistema.
+- Visto no Chromium com toque: em pé, o aviso já aparece durante o carregamento e fica por cima do
+  título; deitado, some. **Não visto em aparelho.**
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| `~` | `src/ui/screenmode.ts` | `enterOnFirstTouch`; aviso montado com o ícone do tema, acima de tudo (z 40) |
+| `~` | `src/main.ts` | `ScreenMode` nasce no começo do `boot`, não mais no `startGame` |
+| `~` | `src/ui/theme.ts` | ícone `phone` |
+| `~` | `src/data/strings/pt.ts`, `en.ts` | `hud.rotate_hint` |
+| `~` | `tests/m32ui.test.ts` | em pé cobre, deitado não, computador não; primeiro toque pede paisagem; o aviso nasce antes do carregamento e dos menus |
+| `~` | `docs/15-status.md`, `README.md` | o pedido no M32, métricas, pendência de aparelho |
+
+Portões: 2539 testes (135 arquivos); lint, build e tamanho verdes (313,8 KB em português, 327,1 em
+inglês). `ui:fit` 50 de 50 e `smoke` 9 verdes.
+
+---
+
 ## 2026-10-20 10:23 · M32: o encaixe falhava no CI (fonte larga)
 
 **Pedido:** *"Deu ruim nos testes, na etapa de encaixe das telas."* — o passo `npm run ui:fit` do

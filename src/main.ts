@@ -94,6 +94,9 @@ async function boot(): Promise<void> {
   document.documentElement.lang = htmlLang();
   canvas.setAttribute('aria-label', t('boot.canvas'));
   progress(0.05, t('boot.starting'));
+  // Em pé, nada: o aviso nasce antes do carregamento e dos menus (ver `ui/screenmode.ts`).
+  const screenMode = new ScreenMode();
+  screenMode.enterOnFirstTouch();
 
   const settings = new SettingsStore();
   /*
@@ -256,7 +259,6 @@ async function boot(): Promise<void> {
    * construção é tarde demais.
    */
   warnStorage(db, hud);
-  const screenMode = new ScreenMode();
   const isTouchDevice = matchMedia('(pointer: coarse)').matches;
 
   const { containerScreen, creativeScreen } = createGameScreens({

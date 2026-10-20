@@ -301,6 +301,7 @@ export const PT = {
   'hud.spectator_on': 'Espectador: atravessa blocos',
   'hud.spectator_off': 'Espectador desligado',
   'hud.rotate': 'Gire o aparelho para jogar',
+  'hud.rotate_hint': 'O CraftLite é jogado com o celular deitado.',
   'hud.hotbar': 'Barra rápida',
   'hud.slot_empty': 'Espaço {0}: vazio',
   'hud.slot': 'Espaço {0}: {1} ×{2}',

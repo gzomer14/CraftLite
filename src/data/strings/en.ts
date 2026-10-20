@@ -299,6 +299,7 @@ export const EN: Readonly<Record<StringKey, string>> = {
   'hud.spectator_on': 'Spectator: pass through blocks',
   'hud.spectator_off': 'Spectator off',
   'hud.rotate': 'Turn your device to play',
+  'hud.rotate_hint': 'CraftLite is played with the phone sideways.',
   'hud.hotbar': 'Hotbar',
   'hud.slot_empty': 'Slot {0}: empty',
   'hud.slot': 'Slot {0}: {1} ×{2}',

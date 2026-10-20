@@ -13,7 +13,9 @@
 import { defOf, stateBitsOf, texOf } from '../data/blocks';
 import { mobDef } from '../data/mobs';
 import { modelOf } from '../data/mobmodels';
-import { SHAPE_BY_NAME, boundsFor } from '../world/mesh/shapes';
+import { FACING_STEP, SHAPE_BY_NAME, boundsFor } from '../world/mesh/shapes';
+import { FRAME_DEPTH } from '../world/mesh/cozyshape';
+import { POSE_FLAT } from './itemrender';
 import { FLAG_DYING, FLAG_SLEEPING } from '../entity/mobstore';
 import { BREATH_RADIUS } from '../game/dragonfight';
 import {
@@ -22,6 +24,12 @@ import {
 import { SIGN_TEXT_DISTANCE, type SignTextPass } from './signtext';
 import { LINE_FLYING } from '../game/fishing';
 
+/** Folga entre a chapa da moldura e o sprite do item, contra briga de profundidade. */
+const FRAME_GAP = 0.02;
+/** Onde cada uma das quatro casas da fogueira deita o item, em (x, z) do bloco. */
+const CAMPFIRE_SPOTS = new Float32Array([0.3, 0.3, 0.7, 0.3, 0.3, 0.7, 0.7, 0.7]);
+/** Altura da comida: logo acima das toras de cima (7/16). */
+const CAMPFIRE_ITEM_Y = 7.5 / 16;
 /** Teto de trechos da linha de pesca: o batcher de entidades é finito. */
 const LINE_SEGMENTS = 32;
 /** Onde a ponta da vara aparece na tela, em NDC (medido na captura, M14). */
@@ -91,6 +99,7 @@ export class SceneFeed {
     itemRenderer.begin();
     session.items.forEach(this.addItem, alpha);
     session.projectiles.forEach(this.addThrown, alpha);
+    this.addShown();
     this.extraItems?.(itemRenderer, alpha);
     renderer.itemRenderer = itemRenderer;
 
@@ -107,6 +116,39 @@ export class SceneFeed {
     renderer.handLight = Math.max(
       world.getBlockLight(ex, ey, ez), world.getSkyLight(ex, ey, ez) * dayFactor,
     ) / 15;
+  }
+
+  /**
+   * O item da moldura e a comida na fogueira (M26), parados, no mesmo passe dos
+   * itens do chão. A moldura cola o sprite na frente da chapa; a fogueira
+   * deita um item por casa em cima das toras.
+   */
+  private addShown(): void {
+    const { session, itemRenderer, world } = this.d;
+    const shown = session.tiles.shown;
+    for (let i = 0; i < shown.length; i++) {
+      const tile = shown[i];
+      if (tile.kind === 'item_frame') {
+        const stack = tile.get(0);
+        if (stack === null) continue;
+        const wall = stateBitsOf(world.getBlock(tile.x, tile.y, tile.z)) & 3;
+        const step = FACING_STEP[wall];
+        const reach = 0.5 - FRAME_DEPTH - FRAME_GAP;
+        itemRenderer.addStill(
+          tile.x + 0.5 + step[0] * reach, tile.y + 0.5, tile.z + 0.5 + step[1] * reach,
+          stack.item, wall + 1,
+        );
+        continue;
+      }
+      for (let slot = 0; slot < tile.size; slot++) {
+        const stack = tile.get(slot);
+        if (stack === null) continue;
+        itemRenderer.addStill(
+          tile.x + CAMPFIRE_SPOTS[slot * 2], tile.y + CAMPFIRE_ITEM_Y, tile.z + CAMPFIRE_SPOTS[slot * 2 + 1],
+          stack.item, POSE_FLAT,
+        );
+      }
+    }
   }
 
   private highlight(paused: boolean): void {

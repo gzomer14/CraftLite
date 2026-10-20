@@ -11,6 +11,7 @@
 
 import { ACTIVE_MODS } from '../mods/active';
 import { DYES } from './dyes';
+import { POTTABLE } from './cozy';
 
 export type Face = 'top' | 'bottom' | 'north' | 'south' | 'east' | 'west';
 
@@ -19,7 +20,9 @@ export type BlockShape =
   | 'torch' | 'carpet' | 'flat' | 'liquid' | 'pane' | 'ladder' | 'sign' | 'painting'
   | 'lever' | 'button' | 'plate' | 'repeater' | 'piston' | 'piston_head' | 'rail' | 'bed'
   | 'chest' | 'cake' | 'bell' | 'anvil' | 'hopper' | 'comparator' | 'brewing_stand'
-  | 'portal_frame' | 'portal_frame_eye' | 'portal_plane' | 'egg' | 'none';
+  | 'portal_frame' | 'portal_frame_eye' | 'portal_plane' | 'egg'
+  // M26: aconchego.
+  | 'campfire' | 'cauldron' | 'lantern' | 'flower_pot' | 'item_frame' | 'none';
 
 /**
  * De que o bloco precisa para continuar existindo (M7).
@@ -135,6 +138,12 @@ export interface BlockDef {
    * seria o começo de uma lista — daí o campo.
    */
   translucent: boolean;
+  /**
+   * Dano a cada meio segundo a quem está dentro do bloco ou em pé nele (M26:
+   * a fogueira). 0 = não fere. O fogo de `world/fire.ts` tem regra própria —
+   * acende quem passa —, e por isso não usa este campo.
+   */
+  contactDamage: number;
 }
 
 /** Campos com valor padrão — a tabela só declara o que foge do comum. */
@@ -166,6 +175,7 @@ const DEFAULTS: Omit<BlockDef, 'id' | 'name' | 'display'> = {
   fuel: 0,
   dye: null,
   translucent: false,
+  contactDamage: 0,
 };
 
 /**
@@ -886,6 +896,99 @@ function dyedSpecs(): BlockSpec[] {
   }
   return out;
 }
+
+/**
+ * Aconchego (M26): fogueira, caldeirão, lanterna, vaso, moldura de item,
+ * tronco descascado, terracota e concreto. Ids a partir de 245, depois das
+ * cores do M8 — id vai para o save, então só se acrescenta no fim.
+ *
+ * Bits de estado:
+ * - fogueira: nenhum. Acesa e apagada são dois ids, como a fornalha: a luz é
+ *   coluna da tabela por id. A comida em cima é tile entity (`game/campfire.ts`).
+ * - caldeirão: 0..1 o nível da água, 0..3.
+ * - lanterna: 0..2 o encaixe (`MOUNT_FLOOR` no chão, `MOUNT_CEILING` pendurada).
+ * - vaso: 0..3 a planta, `POTTABLE` + 1 (`data/cozy.ts`); 0 = vazio.
+ * - moldura: 0..1 a parede (`FACING_STEP`). O item é tile entity.
+ * - tronco descascado: 0..1 o eixo, como o tronco.
+ *
+ * **Terracota e concreto custam uma camada de atlas cada**, as dezesseis
+ * cores: um desenho cinza tingido pelo corante, como a lã do M13. A terracota
+ * é um cinza quente e escuro, e a cor do corante sai nela mais terrosa.
+ *
+ * **Desvio consciente** (doc 14 — M26): não há pó de concreto. No gênero, o
+ * pó cai como areia e endurece na água; aqui a bancada já dá o concreto
+ * (`data/recipes.ts`). Seriam mais dezesseis ids e uma regra de fluido para
+ * um passo que não muda o que o jogador constrói.
+ */
+function cozySpecs(): BlockSpec[] {
+  const campfire = (id: number, name: string, lit: boolean): BlockSpec => ({
+    id, name, display: 'Fogueira', shape: 'campfire', tex: 'block/campfire_log',
+    opaque: false, lightAttenuation: 0, hardness: 2, tool: 'axe', sound: 'wood',
+    ...(lit
+      // A chama é a textura do fogo, desenhada em cruz entre as toras.
+      ? { emission: 15, contactDamage: 1, stages: ['block/fire'] }
+      : { itemless: true }),
+  });
+  const out: BlockSpec[] = [
+    campfire(245, 'campfire', true),
+    campfire(246, 'campfire_off', false),
+    { id: 247, name: 'cauldron', display: 'Caldeirão', shape: 'cauldron', hardness: 2,
+      ...rock('pickaxe', 1), sound: 'metal', opaque: false, lightAttenuation: 0,
+      tex: { top: 'block/cauldron_top', side: 'block/cauldron', bottom: 'block/cauldron' } },
+    { id: 248, name: 'lantern', display: 'Lanterna', shape: 'lantern', solid: false,
+      opaque: false, lightAttenuation: 0, emission: 15, hardness: 3.5, tool: 'pickaxe',
+      sound: 'metal', support: 'mount',
+      tex: { top: 'block/lantern_top', side: 'block/lantern', bottom: 'block/lantern_top' } },
+    { id: 249, name: 'flower_pot', display: 'Vaso de Flor', shape: 'flower_pot',
+      opaque: false, lightAttenuation: 0, hardness: 0, support: 'below', stages: potStages(),
+      tex: { top: 'block/flower_pot_top', side: 'block/flower_pot', bottom: 'block/flower_pot' } },
+    { id: 250, name: 'item_frame', display: 'Moldura de Item', shape: 'item_frame',
+      tex: 'block/item_frame', solid: false, opaque: false, lightAttenuation: 0, hardness: 0,
+      sound: 'wood' },
+  ];
+  let id = 251;
+  for (const log of STRIPPABLE) {
+    const name = `stripped_${log.name}_log`;
+    out.push({
+      id: id++, name, display: log.display, hardness: 2, ...wood(), fuel: 300,
+      tex: { top: `block/${name}_top`, side: `block/${name}_side`, bottom: `block/${name}_top` },
+    });
+  }
+  out.push({ id: id++, name: 'terracotta', display: 'Terracota', tex: 'block/terracotta',
+    hardness: 1.25, ...rock() });
+  for (const dye of DYES) {
+    out.push({ id: id++, name: `${dye.name}_terracotta`, display: `Terracota ${dye.feminine}`,
+      tex: 'block/terracotta_dyed', dye: dye.name, hardness: 1.25, ...rock() });
+  }
+  for (const dye of DYES) {
+    out.push({ id: id++, name: `${dye.name}_concrete`, display: `Concreto ${dye.display}`,
+      tex: 'block/concrete', dye: dye.name, hardness: 1.8, ...rock() });
+  }
+  return out;
+}
+
+/** As cinco madeiras que o machado descasca (M26), na ordem dos ids. */
+const STRIPPABLE: readonly { name: string; display: string }[] = [
+  { name: 'oak', display: 'Tronco Descascado de Carvalho' },
+  { name: 'birch', display: 'Tronco Descascado de Bétula' },
+  { name: 'spruce', display: 'Tronco Descascado de Pinheiro' },
+  { name: 'acacia', display: 'Tronco Descascado de Acácia' },
+  { name: 'jungle', display: 'Tronco Descascado da Selva' },
+];
+
+/**
+ * Textura da planta do vaso por estado (M26): a posição em `POTTABLE` + 1. O
+ * estado 0 é o vaso vazio, e a entrada dele nunca é desenhada.
+ */
+function potStages(): readonly string[] {
+  return ['block/flower_pot', ...POTTABLE.map((name) => {
+    const tex = SPECS.find((spec) => spec.name === name)?.tex;
+    return typeof tex === 'string' ? tex : 'block/missing';
+  })];
+}
+
+// Depois das declarações acima: `cozySpecs` lê `STRIPPABLE`.
+SPECS.push(...cozySpecs());
 
 /** Tabela final, indexada por id. Buracos ficam como `undefined`. */
 export const BLOCKS: readonly BlockDef[] = buildTable();

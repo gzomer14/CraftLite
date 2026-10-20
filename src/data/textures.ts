@@ -13,6 +13,7 @@ import {
 } from '../render/texgen';
 import { ACTIVE_MODS } from '../mods/active';
 import type { DyeDef } from './dyes';
+import { COZY_TEXTURES } from './texturescozy';
 import type { TexOps } from '../mods/types';
 
 const STONE_DARK: [number, number, number] = [86, 86, 86];
@@ -1872,6 +1873,9 @@ function bedSideRecipe(dye: DyeDef): TexRecipe {
 TEXTURES['block/bed_top'] = bedHeadRecipe(GREY);
 TEXTURES['block/bed_foot_top'] = bedFootRecipe(GREY);
 TEXTURES['block/bed_side'] = bedSideRecipe(GREY);
+
+// Aconchego (M26): no fim das do jogo, antes das de mod.
+Object.assign(TEXTURES, COZY_TEXTURES);
 
 // Texturas de mod (M21), depois de todas as do jogo: as camadas do jogo não
 // mudam de número com mod ligado. Os operadores chegam por parâmetro — ver a

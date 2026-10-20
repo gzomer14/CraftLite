@@ -20,7 +20,7 @@ import { BIOMES } from '../data/biomes';
 import { defOf, hasFrontTex, makeState, texOf } from '../data/blocks';
 import {
   BOX_STRIDE, MAX_BOXES, MOUNT_FLOOR, SHAPE_BUTTON, SHAPE_BY_NAME, SHAPE_CROSS, SHAPE_LEVER,
-  SHAPE_NONE, SHAPE_RAIL, SHAPE_STAIRS, SHAPE_TORCH, SHAPE_HOPPER, boxesFor,
+  SHAPE_NONE, SHAPE_RAIL, SHAPE_STAIRS, SHAPE_TORCH, SHAPE_HOPPER, SHAPE_ITEM_FRAME, boxesFor,
 } from '../world/mesh/shapes';
 import { ITEMS, type ItemDef } from '../data/items';
 import { DIAL_FRAMES, ITEM_ART, SHAPES, type ItemArt } from '../data/itemart';
@@ -276,8 +276,11 @@ export function drawBlockIsometric(
    *
    * Em isométrica eles viravam um cubo de flor — e uma muda, uma samambaia e
    * uma cana davam três cubos verdes iguais no inventário.
+   *
+   * A moldura de item (M26) também: chapa colada na parede, em isométrica ela
+   * vira uma lasca de lado. De frente, é a moldura.
    */
-  if (shape === SHAPE_CROSS || shape === SHAPE_RAIL) {
+  if (shape === SHAPE_CROSS || shape === SHAPE_RAIL || shape === SHAPE_ITEM_FRAME) {
     drawFlat(out, size, sidePixels, sideTint);
     if (outlined && strokeThickness(out, size) > 2.6) outlineOpaque(out, size);
     return;

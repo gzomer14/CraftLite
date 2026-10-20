@@ -3492,3 +3492,42 @@ Pedido: *"PR mesclado, pode seguir"* — o próximo de código depois do M23.
   é `scripts/chrome.mjs`, que acha também o Chromium do Playwright e põe `--no-sandbox` sozinho como
   root. `smoke`, `smoke:net` e `smoke:camera` rodaram como root sem invólucro.
 
+
+---
+
+## Acrescentado em 2026-10-19 23:14 — o detalhe do M25, que saiu da foto ao fechar o M26
+
+### M25 — Folga para crescer ✅ — 2026-10-19
+
+Pedido: *"Pode seguir com o M25"*. Aceite do doc 14: folga de ≥ 64 camadas, ≥ 50 KB de bundle e
+≥ 1 MB de áudio, sem regressão na abertura. **Cumprido, menos o T0** (que é do M22).
+
+- **Bundle — o inglês e as telas raras saíram do pedaço do jogo.**
+  - O inglês (textos e nomes de conteúdo) é o pacote `l/`, entrada própria do build
+    (`data/strings/pack.en.ts`), que se registra em `globalThis.__CRAFTLITE_LANGS__`. O script do
+    `index.html` decide o idioma como `core/i18n.ts` (opção salva, senão `navigator.language`) e,
+    em inglês, baixa o pacote **junto** com o jogo e antes dele (`async = false`). O português
+    segue embutido. `localize.ts` lê as tabelas de nomes na hora (`nameTables()`), não no import.
+  - O pedaço "depois" (`u/`, `ui/later.ts`) leva exportar e importar mundo, créditos, editor de
+    placa e a tela de cota cheia. `ui/lategate.ts` o importa **por URL**, como a sala do M20 (sem o
+    `__vitePreload`), e `LazyScreen` faz a tela parecer fechada até chegar. Está no precache.
+  - *Medido e descartado:* tirar os **dois** idiomas do jogo. O gzip comprime melhor junto, e o
+    pacote do português sozinho (~10,2 KB) comia quase tudo o que economizava (~10,5).
+  - **Desvio:** quem joga em inglês baixa 1,3 KB a mais que antes (312,5), em dois arquivos
+    paralelos. O `size-report` cobra o orçamento nesse caminho, o pior.
+- **Áudio — voz de mob sob demanda** (`audio/voicecache.ts`, `audio/engine.ts`). Cada mob é um
+  grupo (`mob/zombie`); o grupo é gerado na primeira vez que um som dele toca, e as vozes ficam num
+  orçamento de 1,5 MB que despeja o mob ouvido há mais tempo (nunca o que acabou de entrar). Se a
+  geração passar de 400 ms, aquele primeiro som não toca (atrasado soaria errado); o próximo, sim.
+  Um resource pack que troca uma voz segue valendo. Com os 21 mobs tocados, 1,46 MB residente.
+- **Atlas — 512 camadas.** O tint cedeu um bit (6 → 5, `MAX_TINTS` 32; usa 20) para o 9º bit da
+  camada, no bit 31 da palavra 0 do vértice (`render/vertex.ts`). Quando a GPU aceita menos camadas
+  por array do que o atlas tem, ele vira duas páginas (`ATLAS_PAGES`, `render/shaders/atlaspages.ts`):
+  o shader escolhe a página pela camada, com `textureGrad` e as derivadas fora do `if`. Hoje (223
+  camadas) nenhum aparelho paga nada. `?atlasLayers=N` força o limite para teste: com 128, o
+  Chromium desenhou igual (0,35% de pixel diferente, de chunk distante chegando em outro tempo). O
+  WebGL1 já crescia o atlas 2D sozinho.
+- **Testes novos:** `tests/langpack.test.ts` (o script do `index.html` decide igual ao `i18n`),
+  `tests/voicecache.test.ts` e `tests/atlasroom.test.ts`; o smoke espera a tela de cota cheia vir
+  do `u/`.
+

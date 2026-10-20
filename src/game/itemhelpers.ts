@@ -13,11 +13,14 @@ export function itemIdOf(name: string): number {
   return ITEM_BY_NAME.get(name)?.id ?? -1;
 }
 
+/** O pedaço do contexto de uso que mexe na mão: o clique no bloco (M26) também troca. */
+export type HandContext = Pick<ItemUseContext, 'player' | 'inventory' | 'drop'>;
+
 /**
  * Troca uma unidade do item na mão por outro item (balde vazio ↔ cheio).
  * No criativo a mão não muda — é a regra de "não gasta item" do doc 06 §9.
  */
-export function swapHeld(ctx: ItemUseContext, held: ItemStack, next: string): void {
+export function swapHeld(ctx: HandContext, held: ItemStack, next: string): void {
   if (ctx.player.mode === 'creative') return;
   const id = itemIdOf(next);
   if (id < 0) return;

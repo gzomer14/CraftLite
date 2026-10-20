@@ -41,6 +41,8 @@ export const SMELTING: readonly SmeltingRecipe[] = [
   { input: 'netherrack', output: 'nether_brick', xp: 0.1 },
   // Corante verde (M8): é o único que sai da fornalha, como no gênero.
   { input: 'cactus', output: 'green_dye', xp: 0.2 },
+  // M26: o bloco de argila vira terracota.
+  { input: 'clay', output: 'terracotta', xp: 0.35 },
   // Fundição de mod (M21).
   ...modRows((mod) => mod.smelting),
 ];

@@ -29,7 +29,9 @@ export type ContainerKind =
   // M15: a bigorna (tela, sem posição) e os três que movem item no mundo.
   | 'anvil' | 'hopper' | 'dispenser' | 'dropper'
   // M16: o suporte de preparo (`game/brewing.ts`).
-  | 'brewing';
+  | 'brewing'
+  // M26: sem tela — a comida na fogueira e o item na moldura.
+  | 'campfire' | 'item_frame';
 
 /** Slots da bigorna (M15): 0 peça, 1 material ou segunda peça, 2 resultado. */
 export const ANVIL_LEFT = 0;

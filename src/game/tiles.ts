@@ -12,6 +12,7 @@ import { ITEM_BY_NAME, type ItemStack } from '../data/items';
 import { rollChestLoot } from '../world/gen/structures';
 import { CHEST_SLOTS, Container, DoubleChestView, Furnace } from './container';
 import { BrewingStand } from './brewing';
+import { Campfire } from './campfire';
 import type { World } from '../world/world';
 
 const FURNACE = BLOCK_BY_NAME.get('furnace')?.id ?? -1;
@@ -21,6 +22,9 @@ export const HOPPER = BLOCK_BY_NAME.get('hopper')?.id ?? -1;
 const DISPENSER = BLOCK_BY_NAME.get('dispenser')?.id ?? -1;
 const DROPPER = BLOCK_BY_NAME.get('dropper')?.id ?? -1;
 export const BREWING_STAND = BLOCK_BY_NAME.get('brewing_stand')?.id ?? -1;
+export const CAMPFIRE = BLOCK_BY_NAME.get('campfire')?.id ?? -1;
+export const CAMPFIRE_OFF = BLOCK_BY_NAME.get('campfire_off')?.id ?? -1;
+export const ITEM_FRAME = BLOCK_BY_NAME.get('item_frame')?.id ?? -1;
 
 /** Slots de funil, dispensador e liberador (M15). */
 export const HOPPER_SLOTS = 5;
@@ -45,6 +49,16 @@ export function isContainerBlock(id: number): boolean {
     || id === HOPPER || id === DISPENSER || id === DROPPER || id === BREWING_STAND;
 }
 
+/**
+ * Guarda itens sem ser contêiner (M26): a fogueira e a moldura. Não abrem
+ * tela, não conversam com funil nem comparador — por isso não entram em
+ * `isContainerBlock` —, mas têm tile entity, vão para o save e soltam o que
+ * guardam ao quebrar.
+ */
+export function isHolderBlock(id: number): boolean {
+  return id === CAMPFIRE || id === CAMPFIRE_OFF || id === ITEM_FRAME;
+}
+
 /** true se o contêiner abre na grade simples (baú, funil, dispensador, liberador). */
 export function isGridContainer(id: number): boolean {
   return id === HOPPER || id === DISPENSER || id === DROPPER;
@@ -54,6 +68,8 @@ export function isGridContainer(id: number): boolean {
 function containerFor(id: number, x: number, y: number, z: number): Container {
   if (isFurnaceBlock(id)) return new Furnace(x, y, z);
   if (id === BREWING_STAND) return new BrewingStand(x, y, z);
+  if (id === CAMPFIRE || id === CAMPFIRE_OFF) return new Campfire(x, y, z);
+  if (id === ITEM_FRAME) return new Container('item_frame', 1, x, y, z);
   if (id === HOPPER) {
     const hopper = new Container('hopper', HOPPER_SLOTS, x, y, z);
     // Vai para o save mesmo vazio: é assim que o funil volta a sugar depois de
@@ -98,6 +114,11 @@ export class Tiles {
   private readonly openLids: number[] = [];
   /** Os funis, para quem move item não varrer todo contêiner (M15). */
   readonly hoppers = new Set<Container>();
+  /**
+   * Fogueiras e molduras (M26), num array para o quadro percorrer por índice
+   * sem alocar: é delas o item parado que o render desenha e a fumaça.
+   */
+  readonly shown: Container[] = [];
 
   constructor(world: World, events: TileEvents) {
     this.world = world;
@@ -106,7 +127,7 @@ export class Tiles {
 
   /** Cria o tile entity quando um baú ou fornalha é colocado. */
   create(x: number, y: number, z: number, blockId: number): void {
-    if (!isContainerBlock(blockId)) return;
+    if (!isContainerBlock(blockId) && !isHolderBlock(blockId)) return;
     this.track(containerFor(blockId, x, y, z));
   }
 
@@ -115,6 +136,7 @@ export class Tiles {
     const { x, y, z } = container;
     this.containers.set(positionKey(x, y, z), container);
     if (container.kind === 'hopper') this.hoppers.add(container);
+    if (container.kind === 'campfire' || container.kind === 'item_frame') this.shown.push(container);
     container.onChange = () => { this.events.onContents?.(x, y, z); };
   }
 
@@ -125,6 +147,8 @@ export class Tiles {
     if (container === undefined) return undefined;
     this.containers.delete(key);
     this.hoppers.delete(container);
+    const shown = this.shown.indexOf(container);
+    if (shown >= 0) this.shown.splice(shown, 1);
     container.onChange = null;
     for (const stack of container.slots) {
       if (stack !== null) this.events.onDrop(stack, x + 0.5, y + 0.5, z + 0.5);
@@ -205,6 +229,13 @@ export class Tiles {
   tick(): void {
     for (const container of this.containers.values()) {
       if (container instanceof BrewingStand) { container.tick(); continue; }
+      if (container instanceof Campfire) {
+        const lit = blockIdOf(this.world.getBlock(container.x, container.y, container.z)) === CAMPFIRE;
+        container.tick(lit, (stack) => {
+          this.events.onDrop(stack, container.x + 0.5, container.y + 0.6, container.z + 0.5);
+        });
+        continue;
+      }
       if (!(container instanceof Furnace)) continue;
       container.tick();
       this.syncFurnaceBlock(container);
@@ -271,6 +302,7 @@ export class Tiles {
   clear(): void {
     this.containers.clear();
     this.hoppers.clear();
+    this.shown.length = 0;
     this.openLids.length = 0;
   }
 }

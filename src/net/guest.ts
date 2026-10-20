@@ -280,6 +280,8 @@ export class GuestClient {
     };
     makeFollower(session);
     this.containers = new GuestContainers(session, (bytes) => this.link.send(bytes, true));
+    // A moldura e a comida da fogueira (M26) não viajam: o clique é engolido.
+    session.cozy.remoteTiles = true;
     this.dimension = new GuestDimension(game);
     this.signText = new SignSync(session.signs, (bytes) => this.link.send(bytes, true));
     this.sleep = new GuestSleep(game, (bytes) => this.link.send(bytes, true), (totalTicks) => this.onTime(totalTicks));

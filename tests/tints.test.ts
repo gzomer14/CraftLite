@@ -47,6 +47,9 @@ describe('tints de corante', () => {
     const layers = new Set<string>();
     for (const def of BLOCKS) {
       if (def === undefined || def.dye === null) continue;
+      // Terracota e concreto (M26) também tingem; a conta deles está em
+      // `tests/cozy.test.ts`.
+      if (!def.name.endsWith('_wool') && !def.name.startsWith('bed')) continue;
       const tex = def.tex;
       if (typeof tex === 'string') layers.add(tex);
       else for (const t of [tex.top, tex.side, tex.bottom]) if (t !== undefined) layers.add(t);

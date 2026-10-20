@@ -334,7 +334,7 @@ export class Interaction {
       const upperHalf = hit.ny < 0 || (hit.ny === 0 && hit.py - Math.floor(hit.py) > 0.5);
       return shape === 'slab' ? (upperHalf ? 1 : 0) : facingFromYaw(this.player.yaw) | (upperHalf ? 4 : 0);
     }
-    if (shape === 'ladder' || shape === 'painting') {
+    if (shape === 'ladder' || shape === 'painting' || shape === 'item_frame') {
       // Gruda na parede clicada: a face oposta à normal do acerto.
       let facing = facingFromYaw(this.player.yaw);
       if (hit.nx > 0) facing = 1;
@@ -371,6 +371,9 @@ export class Interaction {
       const mount = mountFromNormal(hit.nx, hit.ny, hit.nz);
       return mount === MOUNT_CEILING ? -1 : mount;
     }
+    // Lanterna (M26): pendurada quando o clique veio por baixo; no resto, no
+    // chão — de pé ao lado de uma parede, nunca presa nela.
+    if (shape === 'lantern') return hit.ny < 0 ? MOUNT_CEILING : MOUNT_FLOOR;
     // --- redstone (M7) ---------------------------------------------------
     if (shape === 'lever' || shape === 'button') {
       // Encaixa na superfície clicada: o apoio fica do lado oposto à normal.

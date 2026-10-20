@@ -19,6 +19,7 @@ import { ChunkColumn } from '../world/chunk';
 import { computeChunkLight } from '../world/gen/terrain';
 import { Container, Furnace, type ContainerKind } from './container';
 import { BrewingStand } from './brewing';
+import { Campfire } from './campfire';
 import type { SignRecord } from './signs';
 import { TICKS_PER_DAY } from './daynight';
 import { AUTOSAVE_TICKS, isQuotaError, type SaveManager } from '../save/savemanager';
@@ -57,6 +58,8 @@ export interface ContainerRecord {
   burn?: [number, number, number];
   /** Suporte de preparo (M16): [preparos pagos, ticks que faltam]. */
   brew?: [number, number];
+  /** Fogueira (M26): ticks assando de cada casa. */
+  cook?: number[];
 }
 
 export interface SaveGameOptions {
@@ -368,6 +371,7 @@ export function tileFrom(container: Container): ContainerRecord {
     record.burn = [container.burnTicks, container.burnTotal, container.cookTicks];
   }
   if (container instanceof BrewingStand) record.brew = [container.fuel, container.brewTicks];
+  if (container instanceof Campfire) record.cook = Array.from(container.cookTicks);
   return record;
 }
 
@@ -378,7 +382,9 @@ export function containerFrom(record: ContainerRecord): Container {
     ? new Furnace(record.x, record.y, record.z)
     : record.kind === 'brewing'
       ? new BrewingStand(record.x, record.y, record.z)
-      : new Container(record.kind, size, record.x, record.y, record.z);
+      : record.kind === 'campfire'
+        ? new Campfire(record.x, record.y, record.z)
+        : new Container(record.kind, size, record.x, record.y, record.z);
 
   for (let i = 0; i < size && i < container.size; i++) {
     const item = record.slots[i * 3];
@@ -400,6 +406,9 @@ export function containerFrom(record: ContainerRecord): Container {
   if (container instanceof BrewingStand && record.brew !== undefined) {
     container.fuel = record.brew[0];
     container.brewTicks = record.brew[1];
+  }
+  if (container instanceof Campfire && record.cook !== undefined) {
+    container.cookTicks.set(record.cook.slice(0, container.cookTicks.length));
   }
   return container;
 }

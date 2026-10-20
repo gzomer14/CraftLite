@@ -33,7 +33,12 @@ export type Recipe = ShapedRecipe | ShapelessRecipe;
 /** Grupos de itens intercambiáveis. */
 export const TAGS: Record<string, readonly string[]> = {
   planks: ['oak_planks', 'birch_planks', 'spruce_planks', 'acacia_planks', 'jungle_planks'],
-  logs: ['oak_log', 'birch_log', 'spruce_log', 'acacia_log', 'jungle_log'],
+  // O tronco descascado (M26) é tronco para tudo: tábua, carvão e fogueira.
+  logs: [
+    'oak_log', 'birch_log', 'spruce_log', 'acacia_log', 'jungle_log',
+    'stripped_oak_log', 'stripped_birch_log', 'stripped_spruce_log', 'stripped_acacia_log',
+    'stripped_jungle_log',
+  ],
   coals: ['coal', 'charcoal'],
   // Toda lã serve onde a receita pede lã: linha, quadro e cama (M8).
   wool: DYES.map((dye) => (dye.name === 'white' ? 'white_wool' : `${dye.name}_wool`)),
@@ -256,6 +261,7 @@ export const RECIPES: readonly Recipe[] = [
   { type: 'shaped', pattern: ['I.I', 'III'], key: { I: 'iron_ingot' },
     result: { item: 'minecart', count: 1 } },
   ...dyeRecipes(),
+  ...cozyRecipes(),
   // Receitas de mod (M21), no fim: o livro de receitas as lista por último.
   ...modRows((mod) => mod.recipes),
 ];
@@ -300,6 +306,42 @@ function dyeRecipes(): Recipe[] {
       type: 'shaped', pattern: ['WWW', 'PPP'], key: { W: wool, P: '#planks' },
       result: { item: dye.name === 'red' ? 'bed' : `bed_${dye.name}`, count: 1 },
     });
+  }
+  return out;
+}
+
+/**
+ * Aconchego (M26). A terracota tingida e o concreto saem por cor da mesma
+ * tabela de corantes, como a lã.
+ *
+ * **Desvio consciente:** o concreto sai direto da bancada (corante, quatro
+ * areias e quatro cascalhos), sem o pó que endurece na água — ver o comentário
+ * de `cozySpecs` em `data/blocks.ts`.
+ */
+function cozyRecipes(): Recipe[] {
+  const out: Recipe[] = [
+    { type: 'shaped', pattern: ['.S.', 'SCS', 'LLL'], key: { S: 'stick', C: '#coals', L: '#logs' },
+      result: { item: 'campfire', count: 1 } },
+    { type: 'shaped', pattern: ['I.I', 'I.I', 'III'], key: { I: 'iron_ingot' },
+      result: { item: 'cauldron', count: 1 } },
+    { type: 'shaped', pattern: ['NNN', 'NTN', 'NNN'], key: { N: 'iron_nugget', T: 'torch' },
+      result: { item: 'lantern', count: 1 } },
+    { type: 'shaped', pattern: ['B.B', '.B.'], key: { B: 'brick' },
+      result: { item: 'flower_pot', count: 1 } },
+    { type: 'shaped', pattern: ['SSS', 'SLS', 'SSS'], key: { S: 'stick', L: 'leather' },
+      result: { item: 'item_frame', count: 1 } },
+    { type: 'shapeless', ingredients: ['iron_ingot'], result: { item: 'iron_nugget', count: 9 } },
+    { type: 'shaped', pattern: ['NNN', 'NNN', 'NNN'], key: { N: 'iron_nugget' },
+      result: { item: 'iron_ingot', count: 1 } },
+  ];
+  for (const dye of DYES) {
+    out.push(
+      { type: 'shaped', pattern: ['TTT', 'TDT', 'TTT'], key: { T: 'terracotta', D: `${dye.name}_dye` },
+        result: { item: `${dye.name}_terracotta`, count: 8 } },
+      { type: 'shapeless',
+        ingredients: [`${dye.name}_dye`, 'sand', 'sand', 'sand', 'sand', 'gravel', 'gravel', 'gravel', 'gravel'],
+        result: { item: `${dye.name}_concrete`, count: 8 } },
+    );
   }
   return out;
 }

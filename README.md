@@ -69,7 +69,9 @@ em ordem: nenhum módulo de código passa de 700 linhas (e um teste cobra), o do
 uma foto curta, e todo pull request passa pelos testes e pelos smokes no CI. O **M25** abriu a
 folga: o inglês e as telas raras saíram do arquivo principal (em português o jogo abre com 50 KB
 de sobra no orçamento), as vozes dos mobs são geradas na primeira vez que o mob faz som, e o atlas
-passou a caber 512 texturas.
+passou a caber 512 texturas. O **M26** trouxe o aconchego: fogueira que assa sem combustível e
+solta fumaça, caldeirão, lanterna, vaso de flor, moldura de item, tronco descascado, e terracota e
+concreto nas dezesseis cores.
 
 - **M0 — esqueleto:** Vite + TypeScript strict, renderer WebGL2 próprio com fallback WebGL1,
   detecção de tier, loop de 20 Hz com interpolação, gerador procedural de texturas alimentando um
@@ -190,7 +192,7 @@ Abre em **2,8 s em 3G rápido** (critério: < 5 s) e aguentou **92 min de voo co
 erro**, com o heap estável e o anel de chunks fixo em 489 colunas ao longo de 67 mil blocos — os
 dois medidos por `npm run slow-network` e `npm run soak`, que dirigem um Chrome de verdade.
 
-**300 KB gzip** no total em português e 313 KB em inglês (código + worker + HTML + service worker; o pacote do inglês só baixa para quem joga em inglês, e o que só baixa com mod ligado, com sala aberta ou numa tela rara fica à parte), zero assets baixados
+**306 KB gzip** no total em português e 319 KB em inglês (código + worker + HTML + service worker; o pacote do inglês só baixa para quem joga em inglês, e o que só baixa com mod ligado, com sala aberta ou numa tela rara fica à parte), zero assets baixados
 além de dois ícones de PWA de 6,7 KB, gerados por código.
 
 Validado em aparelho alvo (**Galaxy J7 Metal**, Android 7, 2 GB, Mali-T830) em 2026-09-12:
@@ -203,7 +205,7 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 2436 testes (vitest)
+npm test           # 2524 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
 npm run smoke      # abre o jogo num Chrome headless e joga o roteiro do doc 14 (precisa do build)
@@ -291,7 +293,7 @@ src/
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      2436 testes, incluindo orçamento de performance e de luz
+tests/                      2524 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios

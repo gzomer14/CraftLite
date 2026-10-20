@@ -64,6 +64,8 @@ const CORNERS = new Float32Array([
 ]);
 
 const GRAVITY = -0.04;
+/** Empuxo da fumaça por tick: vence o arrasto e a faz subir a ~0,1 bloco/tick. */
+const SMOKE_LIFT = 0.006;
 const DRAG = 0.94;
 
 export class Particles {
@@ -81,6 +83,8 @@ export class Particles {
   private readonly vy: Float32Array;
   private readonly vz: Float32Array;
   private readonly life: Int16Array;
+  /** 1 = sobe em vez de cair (M26: a fumaça da fogueira). */
+  private readonly buoyant: Uint8Array;
   /** Dados enviados à GPU: cx, cy, cz, r, g, b, size. */
   private readonly instanceData: Float32Array;
 
@@ -110,6 +114,7 @@ export class Particles {
     this.vy = new Float32Array(this.capacity);
     this.vz = new Float32Array(this.capacity);
     this.life = new Int16Array(this.capacity);
+    this.buoyant = new Uint8Array(this.capacity);
     this.instanceData = new Float32Array(this.capacity * 7);
 
     const gl = ctx.gl;
@@ -155,6 +160,7 @@ export class Particles {
       this.vy[s] = Math.random() * 0.2;
       this.vz[s] = (Math.random() - 0.5) * 0.15;
       this.life[s] = 12 + ((Math.random() * 10) | 0);
+      this.buoyant[s] = 0;
       const o = s * 7;
       this.instanceData[o + 3] = r;
       this.instanceData[o + 4] = g;
@@ -181,6 +187,7 @@ export class Particles {
     this.vz[s] = 0;
     // Duas vidas: some antes de a gravidade puxar o brilho para longe do orbe.
     this.life[s] = 2;
+    this.buoyant[s] = 0;
     const o = s * 7;
     this.instanceData[o + 3] = r;
     this.instanceData[o + 4] = g;
@@ -208,6 +215,7 @@ export class Particles {
     this.vy[s] = 0.055;
     this.vz[s] = 0;
     this.life[s] = 6 + Math.floor(Math.random() * 5);
+    this.buoyant[s] = 0;
     const o = s * 7;
     // Da brasa ao amarelo claro: duas fagulhas seguidas não saem iguais.
     const heat = 0.7 + Math.random() * 0.3;
@@ -215,6 +223,30 @@ export class Particles {
     this.instanceData[o + 4] = 0.55 * heat + 0.2;
     this.instanceData[o + 5] = 0.16 * heat;
     this.instanceData[o + 6] = 0.045;
+  }
+
+  /**
+   * Fumaça da fogueira (M26): um floco cinza que sobe devagar e se espalha,
+   * vivendo uns três segundos. Uma por tick por fogueira forma a coluna que o
+   * gênero usa para achar o acampamento de longe.
+   */
+  emitSmoke(x: number, y: number, z: number): void {
+    if (this.count >= this.limit) return;
+    const s = this.count++;
+    this.px[s] = x + (Math.random() - 0.5) * 0.3;
+    this.py[s] = y;
+    this.pz[s] = z + (Math.random() - 0.5) * 0.3;
+    this.vx[s] = (Math.random() - 0.5) * 0.01;
+    this.vy[s] = 0.02;
+    this.vz[s] = (Math.random() - 0.5) * 0.01;
+    this.life[s] = 50 + Math.floor(Math.random() * 20);
+    this.buoyant[s] = 1;
+    const o = s * 7;
+    const grey = 0.42 + Math.random() * 0.16;
+    this.instanceData[o + 3] = grey;
+    this.instanceData[o + 4] = grey;
+    this.instanceData[o + 5] = grey;
+    this.instanceData[o + 6] = 0.16 + Math.random() * 0.08;
   }
 
   /**
@@ -235,6 +267,7 @@ export class Particles {
       this.vy[s] = -0.55;
       this.vz[s] = 0;
       this.life[s] = 14;
+      this.buoyant[s] = 0;
       const o = s * 7;
       this.instanceData[o + 3] = 0.55;
       this.instanceData[o + 4] = 0.62;
@@ -252,7 +285,7 @@ export class Particles {
         i--;
         continue;
       }
-      this.vy[i] += GRAVITY;
+      this.vy[i] += this.buoyant[i] === 1 ? SMOKE_LIFT : GRAVITY;
       this.vx[i] *= DRAG;
       this.vy[i] *= DRAG;
       this.vz[i] *= DRAG;
@@ -273,6 +306,7 @@ export class Particles {
     this.vy[i] = this.vy[last];
     this.vz[i] = this.vz[last];
     this.life[i] = this.life[last];
+    this.buoyant[i] = this.buoyant[last];
     const to = i * 7;
     const from = last * 7;
     for (let k = 3; k < 7; k++) this.instanceData[to + k] = this.instanceData[from + k];

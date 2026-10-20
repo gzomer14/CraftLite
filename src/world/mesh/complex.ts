@@ -28,13 +28,19 @@
  */
 
 import {
-  CPLX_BOXES, CPLX_CHEST, CPLX_CROSS, CPLX_RAIL, CPLX_TORCH,
+  CPLX_BOXES, CPLX_CHEST, CPLX_CROSS, CPLX_DECOR, CPLX_RAIL, CPLX_TORCH,
   stageTexOf, shapeIdOf, type BlockTables,
 } from './blockinfo';
+import {
+  CAMPFIRE_FLAME_INSET, CAMPFIRE_FLAME_Y, CAULDRON_INNER, CAULDRON_WATER_Y, POT_PLANT_INSET,
+  POT_PLANT_Y, cauldronLevel,
+} from './cozyshape';
+import { WATER } from '../../data/blocks';
 import { nbIndex } from './greedy';
 import {
   BOX_STRIDE, CHEST_BODY_TOP, CHEST_LID_ANGLE, CHEST_MARGIN, CHEST_TOP,
-  FACING_STEP, MAX_BOXES, NOT_STAIRS, SHAPE_FENCE, SHAPE_FENCE_GATE,
+  FACING_STEP, MAX_BOXES, NOT_STAIRS, SHAPE_CAMPFIRE, SHAPE_CAULDRON, SHAPE_FENCE, SHAPE_FENCE_GATE,
+  SHAPE_FLOWER_POT,
   SHAPE_PANE, SHAPE_STAIRS, TORCH_FLOOR_TOP, TORCH_HALF, TORCH_WALL_BASE, TORCH_WALL_TOP,
   TORCH_WALL_Y0, TORCH_WALL_Y1, boxesFor, stairCornerFrom,
   railSlopeDir,
@@ -116,6 +122,15 @@ export function meshComplex(
               blocks, tables, out, x, y, z, b, count, id, tex, blockLight, skyLight, tint,
             );
           }
+        } else if (kind === CPLX_DECOR) {
+          const shape = shapeIdOf(tables, id);
+          const count = boxesFor(shape, bits, 0, BOXES);
+          for (let b = 0; b < count; b++) {
+            quads += emitBox(
+              blocks, tables, out, x, y, z, b, count, id, tex, blockLight, skyLight, tint, false,
+            );
+          }
+          quads += emitFilling(out, tables, x, y, z, shape, id, bits, blockLight, skyLight);
         }
       }
     }
@@ -396,6 +411,7 @@ function emitBox(
   blocks: Uint16Array, tables: BlockTables, out: MeshBuilder,
   x: number, y: number, z: number, boxIndex: number, boxCount: number,
   id: number, tex: number, blockLight: number, skyLight: number, tint: number,
+  stagesPaint = true,
 ): number {
   const o = boxIndex * BOX_STRIDE;
   const x0 = BOXES[o]; const y0 = BOXES[o + 1]; const z0 = BOXES[o + 2];
@@ -416,9 +432,9 @@ function emitBox(
       CORNERS[k * 3 + 1] = y + y0 + corners[k * 3 + 1] * size[1];
       CORNERS[k * 3 + 2] = z + z0 + corners[k * 3 + 2] * size[2];
     }
-    out.addPolyQuad(
-      CORNERS, face, faceTexOf(tables, id, tex, face), blockLight, skyLight, tint, false,
-    );
+    const faceTex = stagesPaint ? faceTexOf(tables, id, tex, face)
+      : face === 2 ? tables.texTop[id] : face === 3 ? tables.texBottom[id] : tables.texSide[id];
+    out.addPolyQuad(CORNERS, face, faceTex, blockLight, skyLight, tint, false);
     quads++;
   }
   return quads;
@@ -438,6 +454,66 @@ function faceTexOf(tables: BlockTables, id: number, tex: number, face: number): 
   if (face === 2) return tables.texTop[id];
   if (face === 3) return tables.texBottom[id];
   return tables.texSide[id];
+}
+
+/**
+ * O recheio de `CPLX_DECOR` (M26): a chama da fogueira acesa, a planta do vaso
+ * e a água do caldeirão. As medidas vêm de `cozyshape.ts`, que é onde as
+ * caixas em volta estão.
+ */
+function emitFilling(
+  out: MeshBuilder, tables: BlockTables, x: number, y: number, z: number,
+  shape: number, id: number, bits: number, blockLight: number, skyLight: number,
+): number {
+  if (shape === SHAPE_CAMPFIRE) {
+    // A apagada não tem textura por estado: é a falta da chama.
+    if (tables.hasStages[id] === 0) return 0;
+    return emitInsetCross(out, x, y, z, CAMPFIRE_FLAME_INSET, CAMPFIRE_FLAME_Y, 1,
+      stageTexOf(tables, id, 0), blockLight, skyLight);
+  }
+  if (shape === SHAPE_FLOWER_POT) {
+    const plant = bits & 15;
+    if (plant === 0) return 0;
+    // Planta quadrada: tão alta quanto larga, saindo da terra do vaso.
+    const top = POT_PLANT_Y + 1 - 2 * POT_PLANT_INSET;
+    return emitInsetCross(out, x, y, z, POT_PLANT_INSET, POT_PLANT_Y, top,
+      stageTexOf(tables, id, plant), blockLight, skyLight);
+  }
+  if (shape === SHAPE_CAULDRON) {
+    const level = cauldronLevel(bits);
+    if (level === 0) return 0;
+    const wy = y + CAULDRON_WATER_Y[level];
+    const a = CAULDRON_INNER;
+    const b = 1 - CAULDRON_INNER;
+    CORNERS[0] = x + a; CORNERS[1] = wy; CORNERS[2] = z + b;
+    CORNERS[3] = x + b; CORNERS[4] = wy; CORNERS[5] = z + b;
+    CORNERS[6] = x + b; CORNERS[7] = wy; CORNERS[8] = z + a;
+    CORNERS[9] = x + a; CORNERS[10] = wy; CORNERS[11] = z + a;
+    // A água leva o tint de bioma, como a do rio ao lado.
+    out.addPolyQuad(CORNERS, FACE_POS_Y, tables.texTop[WATER], blockLight, skyLight,
+      tables.tint[WATER], false);
+    return 1;
+  }
+  return 0;
+}
+
+/** Cruz menor que o bloco: recua `inset` das bordas e vai de `y0` a `y1`. */
+function emitInsetCross(
+  out: MeshBuilder, x: number, y: number, z: number, inset: number, y0: number, y1: number,
+  tex: number, blockLight: number, skyLight: number,
+): number {
+  const a = inset;
+  const b = 1 - inset;
+  for (let diagonal = 0; diagonal < 2; diagonal++) {
+    const az = diagonal === 0 ? a : b;
+    const bz = diagonal === 0 ? b : a;
+    CORNERS[0] = x + a; CORNERS[1] = y + y0; CORNERS[2] = z + az;
+    CORNERS[3] = x + b; CORNERS[4] = y + y0; CORNERS[5] = z + bz;
+    CORNERS[6] = x + b; CORNERS[7] = y + y1; CORNERS[8] = z + bz;
+    CORNERS[9] = x + a; CORNERS[10] = y + y1; CORNERS[11] = z + az;
+    out.addPolyQuad(CORNERS, FACE_POS_Y, tex, blockLight, skyLight, 0, true, true);
+  }
+  return 2;
 }
 
 /** true se a face da caixa coincide com a borda do bloco naquele eixo. */

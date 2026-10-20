@@ -107,6 +107,7 @@ export const EN: Readonly<Record<StringKey, string>> = {
   // comuns
   'common.cancel': 'Cancel',
   'common.close': 'Close',
+  'common.got_it': 'Got it',
   'common.done': 'Done',
   'common.continue': 'Continue',
   'mode.survival': 'Survival',

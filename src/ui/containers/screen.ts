@@ -13,7 +13,7 @@ import type { ItemStack } from '../../data/items';
 import type { EnchantOffer } from '../../game/enchanting';
 import {
   ARMOR_START, CRAFT_RESULT, CRAFT_START, HOTBAR_END, HOTBAR_START, MAIN_END, MAIN_START,
-  OFFHAND, type ClickButton, type Inventory,
+  type ClickButton, type Inventory,
 } from '../../game/inventory';
 import { ENCHANT_ITEM, ENCHANT_LAPIS, Furnace, type ContainerView } from '../../game/container';
 import { RecipeBookPanel } from './recipebook';
@@ -28,6 +28,10 @@ import { AnvilPanel, type AnvilStatus } from './anvilpanel';
 import { EnchantPanel, type EnchantResult, type EnchantStatus } from './enchantpanel';
 import { BrewPanel } from './brewpanel';
 import { BREW_FUEL, BREW_INGREDIENT, BrewingStand } from '../../game/brewing';
+import { closeButton, coachOnce, icon } from '../theme';
+import {
+  buildCraft, buildFurnace, buildLoadout, buildSection, buildStation, type SlotMaker,
+} from './screenparts';
 import type { TradeOfferView, TradeResult } from '../../game/trading';
 import type { RecipeEntry } from '../../game/crafting';
 
@@ -112,13 +116,17 @@ export class ContainerScreen {
    */
   private doll: PaperDoll | null = null;
   private readonly book: RecipeBookPanel | null;
+  /** Aba "Receitas" do cabeçalho (M32): abre o livro em coluna, com o número do que dá. */
   private readonly bookToggle: HTMLButtonElement;
+  private readonly bookBadge: HTMLSpanElement;
+  /** Coluna do livro: só dá largura, a altura é a da mochila (o livro rola dentro). */
+  private readonly bookSlot: HTMLDivElement;
+  /** Balão de dica do toque, que aparece uma vez (regra 6 do M32). */
+  private coach: HTMLElement | null = null;
   /** Ofertas do aldeão (M9), criadas na primeira tela de troca. */
   private trades: TradePanel | null = null;
   /** Campo do nome e custo da bigorna (M15). */
   private anvilPanel: AnvilPanel | null = null;
-  /** Rodapé com o botão de fechar — a única saída sem teclado. */
-  private readonly footer: HTMLDivElement;
   /** Colunas do painel; `column` é onde `addSection` escreve agora. */
   private sideColumn!: HTMLDivElement;
   private mainColumn!: HTMLDivElement;
@@ -199,81 +207,66 @@ export class ContainerScreen {
 
     const bookToggle = document.createElement('button');
     bookToggle.type = 'button';
-    bookToggle.className = 'book-toggle';
-    bookToggle.textContent = t('screen.recipes');
+    bookToggle.className = 'cl-tab book-toggle';
+    const bookLabel = document.createElement('span');
+    bookLabel.textContent = t('screen.recipes');
+    this.bookBadge = document.createElement('span');
+    this.bookBadge.className = 'badge';
+    bookToggle.append(icon('book'), bookLabel, this.bookBadge);
     bookToggle.addEventListener('click', () => {
       this.book?.toggle();
       this.syncBookLayout();
       this.refresh();
+      this.fit();
     });
     this.bookToggle = bookToggle;
 
     /*
-     * Botão de fechar.
+     * Cabeçalho (M32): título, a aba "Receitas" e o ✕ no canto.
      *
-     * O overlay da tela é `z-index:12` e o HUD de toque é `z-index:6`: com uma
-     * tela aberta, o botão de inventário e o de pausa ficam **cobertos**. Sem
-     * teclado — ou seja, no celular, que é o aparelho alvo — não havia como
-     * sair de baú, fornalha, bancada ou mochila. `Esc` e `E` continuam valendo.
-     */
-    const closeButton = document.createElement('button');
-    closeButton.type = 'button';
-    closeButton.className = 'close';
-    closeButton.textContent = t('common.close');
-    closeButton.addEventListener('click', () => this.close());
-    this.footer = document.createElement('div');
-    this.footer.className = 'footer';
-    this.footer.appendChild(closeButton);
-
-    /*
-     * Cabeçalho: título à esquerda, "Receitas" à direita.
-     *
-     * O botão era `float:right` com margem negativa, e em tela estreita ele
-     * caía por cima do primeiro slot do inventário. Uma linha flex resolve sem
-     * depender de o que vem depois no fluxo.
+     * O botão "Fechar" grande do rodapé saiu (regra 2): fecha-se no ✕, tocando
+     * fora do painel, no mesmo botão que abriu (`E`, a mochila do HUD) ou no
+     * `Esc`. O ✕ continua sendo a saída garantida sem teclado — o overlay
+     * cobre o HUD de toque, e era por isso que o rodapé existia.
      */
     const header = document.createElement('div');
     header.className = 'panel-header';
-    header.append(this.title, bookToggle);
+    const tabs = document.createElement('div');
+    tabs.className = 'tabs';
+    tabs.appendChild(bookToggle);
+    const spacer = document.createElement('div');
+    spacer.className = 'spacer';
+    header.append(this.title, tabs, spacer, closeButton(() => this.close()));
 
-    /*
-     * Corpo em duas faixas: conteúdo à esquerda, livro de receitas à direita.
-     *
-     * Empilhado, o livro empurrava o painel para além da altura da tela no
-     * desktop — a bancada aberta ficava com a lista de receitas cortada em
-     * baixo — enquanto sobrava um vazio largo à direita da grade 3×3, que é
-     * mais estreita que a fileira de 9 slots da mochila. Em tela larga o livro
-     * ocupa exatamente esse vazio (relato de campo 2026-09-12). Em tela
-     * estreita o CSS volta a empilhar, que é o certo no celular.
-     */
     this.body = document.createElement('div');
     this.body.className = 'panel-body';
     const main = document.createElement('div');
     main.className = 'panel-main';
     main.appendChild(this.grid);
-    this.body.appendChild(main);
-    if (this.book !== null) this.body.appendChild(this.book.element);
+    this.bookSlot = document.createElement('div');
+    this.bookSlot.className = 'book-slot';
+    this.bookSlot.hidden = true;
+    if (this.book !== null) this.bookSlot.appendChild(this.book.element);
+    this.body.append(this.bookSlot, main);
 
-    /*
-     * Dica do toque longo, só no ponteiro grosso.
-     *
-     * O gesto não tem como ser descoberto sozinho: no mouse o botão direito é
-     * convenção de trinta anos, no dedo não há convenção nenhuma. Uma linha de
-     * texto é mais barata que um jogador que nunca consegue montar uma receita.
-     */
-    const touchHint = document.createElement('div');
-    touchHint.className = 'touch-hint';
-    touchHint.textContent = t('screen.touch_hint');
-    touchHint.hidden = !coarsePointer();
-
-    this.panel.append(header, this.body, touchHint, this.footer);
+    this.panel.append(header, this.body);
     this.root.append(this.panel, this.cursorEl, this.tooltip.element);
     document.body.appendChild(this.root);
 
-    // Clicar fora do painel com o cursor cheio joga no chão (doc 08 §3.5).
+    /*
+     * Tocar fora do painel: com item no cursor, joga no chão (doc 08 §3.5);
+     * de mão vazia, fecha (M32, regra 2).
+     */
     this.root.addEventListener('pointerdown', (e) => {
-      if (e.target === this.root) this.inventory?.dropCursor();
+      if (e.target !== this.root) return;
+      if (this.inventory?.cursor !== null && this.inventory?.cursor !== undefined) {
+        this.inventory.dropCursor();
+        this.refresh();
+      } else {
+        this.close();
+      }
     });
+    window.addEventListener('resize', () => { if (this.kind !== 'none') this.fit(); });
     this.root.addEventListener('pointermove', (e) => this.moveCursor(e.clientX, e.clientY));
     window.addEventListener('pointerup', () => this.gestures.endDrag());
     this.root.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -311,8 +304,37 @@ export class ContainerScreen {
     this.build();
     this.root.hidden = false;
     this.refresh();
+    this.fit();
+    // O gesto de dividir pilha não se descobre sozinho no dedo: um balão, uma vez.
+    if (this.coach === null && coarsePointer()) {
+      this.coach = coachOnce('slots', t('screen.touch_hint'), this.panel, () => this.fit());
+      this.coach?.classList.add('inline');
+      this.fit();
+    }
     // O foco vai para o painel para o Tab circular dentro dele.
     this.panel.focus();
+  }
+
+  /**
+   * Escala que faz o painel caber na janela (M32, regra 1: nada rola).
+   *
+   * Parte da escala da interface (`--gui-scale`) e encolhe o `--px` local até
+   * o painel caber, com uma folga. São no máximo quatro medições, e só ao
+   * abrir, ao abrir o livro e ao girar a tela — nunca por quadro.
+   */
+  private fit(): void {
+    const root = this.root;
+    if (typeof getComputedStyle !== 'function' || document.documentElement === undefined) return;
+    const scale = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gui-scale')) || 2;
+    let px = Math.max(2, scale);
+    const availW = window.innerWidth - 16;
+    const availH = window.innerHeight - 16;
+    for (let i = 0; i < 4; i++) {
+      root.style.setProperty('--px', `${px.toFixed(2)}px`);
+      const ratio = Math.min(availW / this.panel.offsetWidth, availH / this.panel.offsetHeight);
+      if (!(ratio < 1)) break;
+      px = Math.max(1.1, px * ratio * 0.99);
+    }
   }
 
   close(): void {
@@ -345,6 +367,8 @@ export class ContainerScreen {
     this.mainColumn = document.createElement('div');
     this.mainColumn.className = 'grid-col';
     this.grid.append(this.sideColumn, this.mainColumn);
+    // Mochila (M32): armadura e criação lado a lado, não empilhadas.
+    this.sideColumn.classList.toggle('side-row', this.kind === 'inventory');
     this.column = this.sideColumn;
 
     const titles: Record<ScreenKind, string> = {
@@ -357,32 +381,18 @@ export class ContainerScreen {
 
     if (this.kind === 'inventory') {
       /*
-       * Equipamento: 4 peças de armadura mais a mão secundária (doc 08 §3.5).
-       *
-       * Os slots existiam no modelo desde o M5 — `canPlaceIn` valida a peça e
-       * shift+clique equipa — mas **nenhuma tela os desenhava**, então não havia
-       * como vestir armadura à mão em nenhum modo. O slot vazio mostra o nome da
-       * peça: sem ícone fantasma, é o que diz ao jogador o que vai ali.
+       * Equipamento: 4 peças de armadura mais a mão secundária (doc 08 §3.5),
+       * agora em coluna ao lado do boneco (M32), com o contorno da peça na
+       * casa vazia — o nome escrito dentro não cabia nem se lia no celular.
        */
-      this.addSection(
-        t('screen.equipment'), 5,
-        [ARMOR_START, ARMOR_START + 1, ARMOR_START + 2, ARMOR_START + 3, OFFHAND],
-        'inv', undefined,
-        [t('screen.helmet'), t('screen.chest_armor'), t('screen.legs'), t('screen.boots'), t('screen.offhand')],
-      );
-      this.addPaperDoll();
-      this.addSection(t('screen.crafting_grid'), 2, [CRAFT_START, CRAFT_START + 1, CRAFT_START + 2, CRAFT_START + 3], 'inv');
-      this.addResultSlot();
+      this.addLoadout();
+      this.addCraft(2, [CRAFT_START, CRAFT_START + 1, CRAFT_START + 2, CRAFT_START + 3], 'inv');
     } else if (this.kind === 'crafting') {
       const indices: number[] = [];
       for (let i = 0; i < 9; i++) indices.push(i);
-      this.addSection(t('screen.crafting_grid'), 3, indices, 'cont');
-      this.addResultSlot();
+      this.addCraft(3, indices, 'cont');
     } else if (this.kind === 'furnace') {
-      this.addSection(t('screen.furnace'), 1, [0], 'cont', t('screen.input'));
-      this.addSection('', 1, [1], 'cont', t('screen.fuel'));
-      this.addSection('', 1, [2], 'cont', t('screen.output'));
-      this.addFurnaceProgress();
+      this.addFurnace();
     } else if (this.kind === 'enchanting') {
       this.addStation([[ENCHANT_ITEM, t('screen.slot_item')], [ENCHANT_LAPIS, t('screen.slot_lapis')]]);
       this.enchantPanel ??= new EnchantPanel({
@@ -438,105 +448,53 @@ export class ContainerScreen {
       this.addSection(title, columns, indices, 'cont');
     }
 
-    // Inventário do jogador aparece em todas as telas — e é a coluna larga.
+    /*
+     * A mochila aparece em todas as telas — e é a coluna da direita. Só ganha
+     * título onde há outra grade para confundir com ela (baú, funil); na
+     * própria mochila o cabeçalho já diz o que é.
+     */
     this.column = this.mainColumn;
     const main: number[] = [];
     for (let i = MAIN_START; i < MAIN_END; i++) main.push(i);
-    this.addSection(t('touch.inventory'), 9, main, 'inv');
+    this.addSection(this.kind === 'chest' ? t('touch.inventory') : '', 9, main, 'inv');
 
     const hotbar: number[] = [];
     for (let i = HOTBAR_START; i < HOTBAR_END; i++) hotbar.push(i);
-    this.addSection('', 9, hotbar, 'inv');
+    this.addSection('', 9, hotbar, 'inv').classList.add('hotbar');
+  }
+
+  /** Monta um bloco de `screenparts.ts` na coluna atual. */
+  private add<T extends HTMLElement>(part: T): T {
+    this.column.appendChild(part);
+    return part;
+  }
+
+  private addLoadout(): void {
+    if (this.doll === null) this.doll = new PaperDoll();
+    this.add(buildLoadout(this.make, this.doll.element));
+  }
+
+  private addCraft(columns: number, indices: readonly number[], source: 'inv' | 'cont'): void {
+    this.add(buildCraft(this.make, columns, indices, source));
+  }
+
+  private addFurnace(): void {
+    this.add(buildFurnace(this.make));
   }
 
   private addSection(
     label: string, columns: number, indices: readonly number[], source: 'inv' | 'cont',
     hint?: string, placeholders?: readonly string[],
-  ): void {
-    /*
-     * Título e fileira vão juntos num bloco.
-     *
-     * Não é enfeite: numa tela deitada de celular o painel inteiro em coluna
-     * dava 755 px de altura contra 360 de tela. Com as seções em blocos, o CSS
-     * as distribui em duas colunas quando a altura é curta — e aí sobra largura,
-     * que é o que um celular deitado tem de sobra.
-     */
-    const section = document.createElement('div');
-    section.className = 'section';
-    if (label !== '') {
-      const heading = document.createElement('div');
-      heading.className = 'section-title';
-      heading.textContent = label;
-      section.appendChild(heading);
-    }
-    const row = document.createElement('div');
-    row.className = 'slots';
-    row.style.setProperty('--cols', String(columns));
-
-    for (let i = 0; i < indices.length; i++) {
-      row.appendChild(this.makeSlot(source, indices[i], placeholders?.[i]));
-    }
-    section.appendChild(row);
-    /*
-     * O rótulo do slot único ("Entrada", "Combustível") vai escrito embaixo.
-     * Até 2026-09-24 ele ia para um `data-hint` que nenhum CSS lia: existia no
-     * DOM e não aparecia na tela (relato de campo da mesa de encantamento).
-     */
-    if (hint !== undefined) {
-      const caption = document.createElement('div');
-      caption.className = 'slot-caption';
-      caption.textContent = hint;
-      section.appendChild(caption);
-    }
-    this.column.appendChild(section);
+  ): HTMLDivElement {
+    return this.add(buildSection(this.make, label, columns, indices, source, hint, placeholders));
   }
 
-  /**
-   * Os slots de uma estação de trabalho numa fileira, cada um com o rótulo
-   * embaixo, e sinais entre eles: `Item + Material → Resultado`.
-   *
-   * O slot vazio não serve de rótulo para si mesmo — com 18 unidades de
-   * largura, "Material" não cabe dentro dele num celular. Por isso o nome
-   * fica embaixo, legível, e dentro do slot só vale para o leitor de tela.
-   */
   private addStation(parts: readonly (readonly [number, string] | string)[]): void {
-    const row = document.createElement('div');
-    row.className = 'section station';
-    for (const part of parts) {
-      if (typeof part === 'string') {
-        const sign = document.createElement('span');
-        sign.className = 'station-sign';
-        sign.textContent = part;
-        sign.setAttribute('aria-hidden', 'true');
-        row.appendChild(sign);
-        continue;
-      }
-      const cell = document.createElement('div');
-      cell.className = 'station-cell';
-      const caption = document.createElement('div');
-      caption.className = 'slot-caption';
-      caption.textContent = part[1];
-      cell.append(this.makeSlot('cont', part[0], part[1]), caption);
-      row.appendChild(cell);
-    }
-    this.column.appendChild(row);
+    this.add(buildStation(this.make, parts));
   }
 
-  /**
-   * O boneco do jogador ao lado dos slots de armadura (doc 08 §3.5).
-   *
-   * Ele não é enfeite: a fileira de slots diz o que está **guardado** ali, e o
-   * boneco diz o que está **vestido**. Com quatro peças de materiais parecidos,
-   * a diferença entre "tenho o peitoral" e "estou com o peitoral" só aparecia
-   * na linha de armadura do HUD, que é um número.
-   */
-  private addPaperDoll(): void {
-    if (this.doll === null) this.doll = new PaperDoll();
-    const section = document.createElement('div');
-    section.className = 'section doll';
-    section.appendChild(this.doll.element);
-    this.column.appendChild(section);
-  }
+  /** `makeSlot` como função solta, para os montadores de `screenparts.ts`. */
+  private readonly make: SlotMaker = (source, index, placeholder) => this.makeSlot(source, index, placeholder);
 
   /** Redesenha o boneco com as peças vestidas agora. */
   private refreshPaperDoll(): void {
@@ -548,30 +506,6 @@ export class ContainerScreen {
       DOLL_ARMOR[i] = stack === null ? null : (this.callbacks.colorOf?.(stack.item) ?? null);
     }
     doll.draw(DOLL_ARMOR);
-  }
-
-  private addResultSlot(): void {
-    const section = document.createElement('div');
-    section.className = 'section';
-    const row = document.createElement('div');
-    row.className = 'slots result';
-    row.style.setProperty('--cols', '1');
-    const arrow = document.createElement('span');
-    arrow.className = 'arrow';
-    arrow.textContent = '→';
-    row.append(arrow, this.makeSlot('inv', CRAFT_RESULT));
-    section.appendChild(row);
-    this.column.appendChild(section);
-  }
-
-  private addFurnaceProgress(): void {
-    const section = document.createElement('div');
-    section.className = 'section';
-    const row = document.createElement('div');
-    row.className = 'furnace-progress';
-    row.innerHTML = '<div class="flame"><i></i></div><div class="arrow-bar"><i></i></div>';
-    section.appendChild(row);
-    this.column.appendChild(section);
   }
 
   /** Um slot novo na tela atual, com os gestos ligados. */
@@ -603,7 +537,9 @@ export class ContainerScreen {
    * ele aparece — fechado, a tela continua do tamanho de antes.
    */
   private syncBookLayout(): void {
-    this.panel.classList.toggle('with-book', this.book?.isOpen === true);
+    const open = this.book?.isOpen === true;
+    this.bookSlot.hidden = !open;
+    this.bookToggle.classList.toggle('on', open);
   }
 
   private handleClick(
@@ -636,10 +572,13 @@ export class ContainerScreen {
       renderSlot(view, stack, this.callbacks.spriteOf, this.callbacks.colorOf);
     }
 
-    if (this.book !== null && this.book.isOpen && this.callbacks.recipes !== undefined) {
-      this.book.update(
-        this.callbacks.recipes(), this.inventory, this.kind === 'crafting' ? 3 : 2,
-      );
+    if (this.book !== null && this.callbacks.recipes !== undefined && !this.bookToggle.hidden) {
+      const recipes = this.callbacks.recipes();
+      const gridSize = this.kind === 'crafting' ? 3 : 2;
+      if (this.book.isOpen) this.book.update(recipes, this.inventory, gridSize);
+      const can = this.book.craftableCount(recipes, this.inventory, gridSize);
+      this.bookBadge.textContent = String(can);
+      this.bookBadge.hidden = can === 0;
     }
 
     this.refreshPaperDoll();

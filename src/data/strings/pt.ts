@@ -109,6 +109,7 @@ export const PT = {
   // comuns
   'common.cancel': 'Cancelar',
   'common.close': 'Fechar',
+  'common.got_it': 'Entendi',
   'common.done': 'Pronto',
   'common.continue': 'Continuar',
   'mode.survival': 'Sobrevivência',

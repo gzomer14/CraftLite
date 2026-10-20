@@ -224,7 +224,7 @@ describe('5. o HUD não passa por baixo dos botões de toque', () => {
 describe('painel não vaza, e a escala responde', () => {
   const screenSrc = (readFileSync('src/ui/containers/screen.ts', 'utf8') + readFileSync('src/ui/containers/screenstyle.ts', 'utf8'));
   const hudSrc = readFileSync('src/ui/hud.ts', 'utf8') + readFileSync('src/ui/hudstyle.ts', 'utf8');
-  const optionsSrc = readFileSync('src/ui/screens/options.ts', 'utf8');
+  const optionsSrc = readFileSync('src/ui/screens/optionfields.ts', 'utf8');
 
   it('as colunas do painel são contêineres, não multi-coluna do CSS', () => {
     // `columns:2` reparte a largura em partes iguais, e a fileira de 9 slots

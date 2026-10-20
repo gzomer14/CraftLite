@@ -135,7 +135,7 @@ try {
     __smoke.botao(__smoke.tela('title-screen'), 'Mods').click();
     await new Promise((r) => setTimeout(r, 300));
     const t = __smoke.tela('mods-screen').innerText;
-    __smoke.botao(__smoke.tela('mods-screen'), 'Voltar').click();
+    __smoke.tela('mods-screen').querySelector('.cl-close').click();
     return t;
   })()`);
   passo('ligado, sobe pelo ponto de entrada dos mods: o mesmo main, o boot e o mod',

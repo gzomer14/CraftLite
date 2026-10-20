@@ -14,7 +14,7 @@ import type { Settings, SettingsStore } from '../../game/settings';
 import { KEYBINDS, keyLabel, type ActionId } from '../../data/keybinds';
 import type { Keybinds } from '../../input/keybinds';
 import { t } from '../../core/i18n';
-import { injectTheme } from '../theme';
+import { closeButton, injectTheme } from '../theme';
 
 /** Um campo de opção ligado a uma chave de `Settings`. */
 export type Field =
@@ -42,7 +42,14 @@ export function menuRoot(id: string): HTMLDivElement {
   return root;
 }
 
-export function menuPanel(title: string): { panel: HTMLDivElement; body: HTMLDivElement } {
+/**
+ * O painel com título. Com `onClose` (M32), ganha o ✕ do canto — e tocar no
+ * escuro em volta do painel faz o mesmo: o jogador não procura um "Voltar"
+ * no fim da lista.
+ */
+export function menuPanel(title: string, onClose?: () => void): {
+  panel: HTMLDivElement; body: HTMLDivElement; close: HTMLButtonElement | null;
+} {
   const panel = document.createElement('div');
   panel.className = 'menu-panel';
   const heading = document.createElement('h1');
@@ -50,7 +57,16 @@ export function menuPanel(title: string): { panel: HTMLDivElement; body: HTMLDiv
   const body = document.createElement('div');
   body.className = 'menu-body';
   panel.append(heading, body);
-  return { panel, body };
+  const close = onClose === undefined ? null : closeButton(onClose);
+  if (close !== null) panel.appendChild(close);
+  return { panel, body, close };
+}
+
+/** Tocar no fundo da tela (fora do painel) chama `onClose` (regra 2 do M32). */
+export function closeOnBackdrop(root: HTMLElement, onClose: () => void): void {
+  root.addEventListener('pointerdown', (e) => {
+    if ((e as Event).target === root) onClose();
+  });
 }
 
 export function menuButton(
@@ -91,12 +107,20 @@ export function textField(label: string, value: string, placeholder = ''): {
  *
  * A escrita é imediata: não existe botão "aplicar", porque o jogador precisa
  * ouvir o volume e ver a distância de render enquanto mexe no controle.
+ *
+ * **M32:** liga/desliga é um interruptor e escolha curta é um segmento com
+ * todas as opções à vista (o `<select>` escondia as alternativas atrás de um
+ * toque). Só a escolha de rótulos longos continua `<select>`. Devolve, para
+ * cada campo, como reler o valor — "Restaurar esta aba" e o atalho de
+ * gráficos (que escreve nuvens e partículas juntas) mudam valores por fora.
  */
 export function buildFields(
   target: HTMLElement, settings: SettingsStore, fields: readonly Field[],
-): void {
+): (() => void)[] {
+  const syncs: (() => void)[] = [];
   for (const field of fields) {
-    const wrapper = document.createElement('label');
+    const segmented = field.kind === 'choice' && fitsSegment(field.options);
+    const wrapper = document.createElement(segmented ? 'div' : 'label');
     wrapper.className = 'menu-field';
     const span = document.createElement('span');
     span.textContent = field.label;
@@ -109,25 +133,54 @@ export function buildFields(
       input.min = String(field.min);
       input.max = String(field.max);
       input.step = String(field.step);
-      input.value = String(settings.get(field.key) as number);
       const show = (): void => {
         const current = Number(input.value);
         value.textContent = field.format?.(current) ?? String(current);
       };
-      show();
       input.addEventListener('input', () => {
         settings.set(field.key, Number(input.value) as never);
         show();
       });
+      syncs.push(() => { input.value = String(settings.get(field.key) as number); show(); });
       wrapper.append(input, value);
     } else if (field.kind === 'toggle') {
-      const input = document.createElement('input');
-      input.type = 'checkbox';
-      input.checked = settings.get(field.key) === true;
-      input.addEventListener('change', () => {
-        settings.set(field.key, input.checked as never);
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'switch';
+      toggle.setAttribute('role', 'switch');
+      toggle.setAttribute('aria-label', field.label);
+      const sync = (): void => toggle.setAttribute('aria-checked', String(settings.get(field.key) === true));
+      toggle.addEventListener('click', () => {
+        settings.set(field.key, (settings.get(field.key) !== true) as never);
+        sync();
       });
-      wrapper.appendChild(input);
+      syncs.push(sync);
+      wrapper.appendChild(toggle);
+    } else if (segmented) {
+      const segment = document.createElement('div');
+      segment.className = 'segment';
+      segment.setAttribute('role', 'radiogroup');
+      segment.setAttribute('aria-label', field.label);
+      const buttons: HTMLButtonElement[] = [];
+      for (const option of field.options) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = option.label;
+        button.setAttribute('role', 'radio');
+        button.addEventListener('click', () => { settings.set(field.key, option.value as never); sync(); });
+        buttons.push(button);
+        segment.appendChild(button);
+      }
+      const sync = (): void => {
+        const current = String(settings.get(field.key));
+        for (let i = 0; i < buttons.length; i++) {
+          const on = String(field.options[i].value) === current;
+          buttons[i].classList.toggle('on', on);
+          buttons[i].setAttribute('aria-checked', String(on));
+        }
+      };
+      syncs.push(sync);
+      wrapper.appendChild(segment);
     } else {
       const select = document.createElement('select');
       for (const option of field.options) {
@@ -136,17 +189,30 @@ export function buildFields(
         el.textContent = option.label;
         select.appendChild(el);
       }
-      select.value = String(settings.get(field.key));
       select.addEventListener('change', () => {
         const current = field.options.find((o) => String(o.value) === select.value);
         if (current === undefined) return;
         settings.set(field.key, current.value as never);
       });
+      syncs.push(() => { select.value = String(settings.get(field.key)); });
       wrapper.appendChild(select);
     }
 
     target.appendChild(wrapper);
   }
+  for (const sync of syncs) sync();
+  return syncs;
+}
+
+/**
+ * Segmento só quando cabe ao lado do rótulo num celular deitado: até quatro
+ * opções e rótulos curtos. O resto ("DualSense (PS5)"…) fica no `<select>`.
+ */
+function fitsSegment(options: readonly { label: string }[]): boolean {
+  if (options.length > 4) return false;
+  let chars = 0;
+  for (const option of options) chars += option.label.length;
+  return chars <= 30;
 }
 
 /**
@@ -248,6 +314,7 @@ function injectMenuStyle(): void {
 .menu-panel h2{margin:12px 0 6px;font:800 12px/1.2 var(--cl-font);color:#9fb4d6;text-transform:uppercase;
   letter-spacing:.08em}
 .menu-panel>.cl-close{position:absolute;top:12px;right:12px}
+.menu-screen button.cl-close{flex:none;width:44px;min-height:44px;padding:0}
 .menu-body{display:flex;flex-direction:column;gap:10px}
 .menu-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 .menu-screen button{min-height:44px;padding:0 18px;flex:1 1 auto;border:0;border-radius:12px;
@@ -268,6 +335,16 @@ function injectMenuStyle(): void {
 .menu-field input[type=text]{flex:0 0 52%;min-height:38px;border:0;border-radius:10px;background:#0d1626;color:#fff;
   box-shadow:0 0 0 2px var(--cl-edge);padding:0 12px;font:700 15px/1 var(--cl-font)}
 .menu-field input[type=checkbox]{width:26px;height:26px;accent-color:var(--cl-green)}
+.menu-screen button.switch{flex:none;position:relative;width:52px;min-height:30px;height:30px;padding:0;border-radius:15px;
+  background:#33415c;box-shadow:inset 0 2px 4px rgba(0,0,0,.35)}
+.menu-screen button.switch::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:12px;
+  background:#fff;box-shadow:0 2px 0 rgba(0,0,0,.3);transition:left .15s}
+.menu-screen button.switch[aria-checked=true]{background:var(--cl-green)}
+.menu-screen button.switch[aria-checked=true]::after{left:25px}
+.menu-field .segment{flex:none;display:flex;gap:3px;padding:3px;border-radius:11px;background:#0d1626}
+.menu-screen .segment button{flex:none;min-height:34px;padding:0 10px;border-radius:9px;background:transparent;
+  color:var(--cl-muted);font:800 13px/1 var(--cl-font);box-shadow:none}
+.menu-screen .segment button.on{background:var(--cl-gold);color:#1a1406}
 .menu-field select{flex:0 0 42%;min-height:38px;border:0;border-radius:10px;background:#0d1626;color:#fff;
   box-shadow:0 0 0 2px var(--cl-edge);padding:0 10px;font:700 14px/1 var(--cl-font)}
 .menu-field output{flex:0 0 64px;text-align:right;color:#ffd75a;font-weight:800}

@@ -324,7 +324,7 @@ function injectStyle(): void {
 #pause-menu{position:fixed;inset:0;z-index:15;background:var(--cl-dim);display:grid;place-items:center;
   overflow:hidden;padding:8px;font-family:var(--cl-font);color:var(--cl-ink)}
 #pause-menu[hidden]{display:none}
-#pause-menu .pause-panel{display:flex;gap:16px;width:min(720px,100%);max-height:100%;padding:16px;
+#pause-menu .pause-panel{display:flex;gap:16px;box-sizing:border-box;width:min(720px,100%);max-height:100%;padding:16px;
   border-radius:20px;background:var(--cl-panel);box-shadow:0 0 0 2px var(--cl-edge),0 18px 40px rgba(0,0,0,.5)}
 #pause-menu .pause-left{flex:0 0 clamp(190px,34%,250px);display:flex;flex-direction:column;gap:10px;
   justify-content:center}
@@ -355,7 +355,7 @@ function injectStyle(): void {
 #pause-menu .sheet-head .back{min-height:40px;padding:0 12px}
 #pause-menu h2{margin:0;font:800 16px/1 var(--cl-font)}
 #pause-menu .achievements{display:grid;gap:4px;align-content:start;flex:1;min-height:0;
-  max-height:calc(100vh - 128px);overflow:auto;touch-action:pan-y;overscroll-behavior:contain;
+  max-height:min(440px,calc(100vh - 128px));overflow:auto;touch-action:pan-y;overscroll-behavior:contain;
   padding:6px;border-radius:12px;background:var(--cl-slot)}
 #pause-menu .achievements .row{display:grid;gap:2px;padding:6px 8px;border-radius:8px;opacity:.45}
 #pause-menu .achievements .row.unlocked{opacity:1;background:var(--cl-raise)}

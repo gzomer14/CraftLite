@@ -146,15 +146,20 @@ describe('busca não rouba o foco no celular', () => {
 });
 
 describe('ponte para a mochila', () => {
+  /** M32: o rótulo mora num `<span>` ao lado do ícone; o clique é no botão. */
+  const backpackOf = (root: FakeElement): FakeElement | undefined =>
+    root.all('button').find((b) => b.classList.contains('backpack'));
+
   it('existe um botão que leva ao inventário normal', () => {
     const root = open(false);
     expect(root.find('Mochila e armadura')).toBeDefined();
+    expect(backpackOf(root)?.find('Mochila e armadura')).toBeDefined();
   });
 
   it('o botão fecha a paleta e avisa quem abre a mochila', () => {
     let opened = 0;
     const root = open(false, () => { opened++; });
-    root.find('Mochila e armadura')!.click();
+    backpackOf(root)!.click();
     expect(opened).toBe(1);
     expect(root.hidden).toBe(true);
   });
@@ -342,8 +347,14 @@ describe('CSS de rolagem das janelas', () => {
     expect(screenSrc.replace(/\s+/g, '')).toContain('#container-screen.slot{position:relative;touch-action:none');
   });
 
-  it('o criativo alinha no topo quando não cabe', () => {
-    expect(rootRule(creativeSrc, 'creative-screen')).toContain('place-items:safecenter');
+  /*
+   * Antes (2026-09-10) o criativo alinhava no topo quando não cabia. No M32
+   * ele passou a caber: a janela não rola, e só a grade de itens rola dentro
+   * da caixa dela.
+   */
+  it('o criativo não rola; a grade de itens rola por dentro', () => {
+    expect(rootRule(creativeSrc, 'creative-screen')).toContain('overflow:hidden');
+    expect(creativeSrc.replace(/\s+/g, '')).toMatch(/#creative-screen\.items\{[^}]*overflow:auto/);
   });
 
   it('a rolagem não vaza para a página atrás', () => {

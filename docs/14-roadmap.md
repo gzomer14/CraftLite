@@ -1064,6 +1064,59 @@ M20, agora com três aparelhos.
 
 ---
 
+## M32 — Interface nova ✅
+
+> **Pedido de 2026-10-20:** *"Estou achando todos os menus extremamente carregados, vários botões,
+> sempre botão para fechar, todas as janelas no celular precisam de scroll para descer e subir
+> para ver as janelas completas (inventário, crafting) ou menus. […] Queria algo bonito,
+> extremamente chamativo e intuitivo, zero dúvidas sobre nada."* A proposta foi um canvas de
+> desenho aprovado pelo usuário no mesmo dia, com sete regras. **Fechado em 2026-10-20** —
+> detalhe no doc 15 §3.
+
+**As sete regras** (valem para toda tela nova daqui em diante):
+
+1. **Nada rola em 640×360 nem em 844×390.** Só uma lista longa rola, dentro da própria caixa, com
+   a moldura parada em volta.
+2. **Não existe botão "Fechar".** Fecha pelo ✕ do canto, tocando fora do painel, pelo mesmo botão
+   que abriu ou pelo voltar.
+3. **Uma ação principal verde por tela.**
+4. **Nada desabilitado à vista:** o que não serve agora não aparece.
+5. **Ícone e palavra em todo botão.**
+6. **Dica uma vez só, num balão** ("Entendi"), e não um parágrafo fixo.
+7. **Um visual só:** azul-noite, verde e dourado, e só a fonte do sistema (sem fonte de terceiros).
+
+**Fase 1 — base visual e contêineres**
+
+- [x] **Tema** (`ui/theme.ts`): cores como variáveis, o ✕, os botões de bloco, as abas, os ícones
+      desenhados em SVG por código, o balão de dica.
+- [x] **Mochila, bancada, baú e fornalha** sem rolar: a escala encolhe até o painel caber
+      (`ContainerScreen.fit`); armadura e criação lado a lado; o livro de receitas numa coluna à
+      esquerda, aberto pela aba "Receitas" com o número do que dá para fazer.
+
+**Fase 2 — título, mundos, criar, pausa**
+
+- [x] **Título:** um JOGAR verde que continua o último mundo, e cinco atalhos com ícone (Mundos,
+      Jogar junto, Opções, Texturas, Mods).
+- [x] **Mundos:** cartões na horizontal; o ⋯ guarda copiar seed, exportar e apagar.
+      **Criar:** nome, dois cartões grandes de modo, e seed e dificuldade em "Mais opções".
+- [x] **Pausa:** CONTINUAR e Salvar e Sair à esquerda, ladrilhos à direita (com "7 de 29",
+      "agora: Sobrevivência"); conquistas e estatísticas abrem no lugar dos ladrilhos.
+      **Morte:** REAPARECER verde.
+
+**Fase 3 — opções, criativo, receitas**
+
+- [x] **Opções em abas** (Vídeo, Som, Controles, Jogo, Acessibilidade, Idioma), com interruptor e
+      segmento no lugar de caixa e lista, e "Restaurar esta aba".
+- [x] **Criativo** sem rolar a janela; **livro de receitas** com busca e filtro numa linha.
+- [x] **Mods e Texturas** com o ✕.
+
+**Critério de aceite:** um teste automático abre todas as telas em 640×360 e em 844×390 e falha se
+alguma rolar. **Cumprido:** `npm run ui:fit` (25 telas × 2 tamanhos), no CI dos PRs.
+*Desvio consciente da regra 1:* a lista da aba de opções rola por dentro (Vídeo tem 19 campos;
+em 360 px cabem cinco linhas), como a de receitas, a de conquistas e a grade do criativo.
+
+---
+
 ## Testes obrigatórios (a manter verde desde M1)
 
 | Tipo | O que cobrir |

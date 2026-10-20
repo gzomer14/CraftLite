@@ -360,7 +360,7 @@ async function boot(): Promise<void> {
    * jogo de todo dia não expõe nada.
    */
   if (/[?&]smoke\b/.test(location.search)) {
-    (window as unknown as { __craftlite?: unknown }).__craftlite = { world, player, session, items: ITEM_BY_NAME, renderer, pipeline, audio, get save() { return save; } };
+    (window as unknown as { __craftlite?: unknown }).__craftlite = { world, player, session, items: ITEM_BY_NAME, renderer, pipeline, audio, get save() { return save; }, get flow() { return flow; } };
   }
   renderer.blockLightAt = (x, y, z) => (world.getSkyLight(x, y, z) << 4) | world.getBlockLight(x, y, z);
   // Item na mão (doc 01 §191). O passe é uma draw call e limpa a profundidade,

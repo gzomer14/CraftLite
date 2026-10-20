@@ -58,7 +58,7 @@ describe('dicionários', () => {
   });
 
   it('nenhum texto do inglês tem cara de português', () => {
-    // Os nomes de idioma vão cada um no seu (`ui/screens/options.ts`).
+    // Os nomes de idioma vão cada um no seu (`ui/screens/optionfields.ts`).
     const allowed = new Set(['opt.language']);
     const leaks = Object.entries(EN).filter(([key, text]) => !allowed.has(key) && looksPortuguese(text));
     expect(leaks).toEqual([]);
@@ -170,7 +170,7 @@ describe('varredura do código', () => {
   const EXEMPT: readonly [string, RegExp][] = [
     ['src/data/strings/pt.ts', /./],
     // O nome do idioma vai nele mesmo.
-    ['src/ui/screens/options.ts', /'Português'/],
+    ['src/ui/screens/optionfields.ts', /'Português'/],
     // Caracteres do alfabeto da fonte, não texto.
     ['src/data/font.ts', /./],
     // Conferência de mod (M21): a lista vai para o `console.warn` do

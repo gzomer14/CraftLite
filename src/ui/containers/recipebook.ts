@@ -345,11 +345,15 @@ function injectStyle(): void {
   const css = document.createElement('style');
   css.textContent = `
 .recipe-book{display:flex;flex-direction:column;gap:8px;font:700 13px/1.2 var(--cl-font,system-ui)}
-.recipe-book .header{display:flex;flex-direction:column;gap:6px}
-.recipe-book input[type=search]{min-height:38px;border:0;border-radius:10px;background:#0d1626;color:#fff;
-  box-shadow:0 0 0 2px var(--cl-edge,#2a3c5e);padding:0 10px;font:600 14px/1 var(--cl-font,system-ui)}
-.recipe-book .filter{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--cl-muted,#a9b6cc);white-space:nowrap}
-.recipe-book .filter input{width:20px;height:20px;accent-color:#3fbf4a}
+/* M32: busca e filtro numa linha só — a altura vai para a lista. */
+.recipe-book .header{display:flex;align-items:center;gap:6px;flex:none}
+.recipe-book input[type=search]{flex:1 1 0;min-width:0;height:34px;min-height:34px;box-sizing:border-box;border:0;
+  border-radius:10px;background:#0d1626;color:#fff;box-shadow:0 0 0 2px var(--cl-edge,#2a3c5e);padding:0 8px;
+  font:600 13px/1 var(--cl-font,system-ui)}
+.recipe-book .filter{flex:none;display:flex;align-items:center;gap:4px;height:34px;padding:0 8px;border-radius:10px;
+  background:#22324f;font-size:11px;color:#cfdbef;white-space:nowrap;cursor:pointer}
+.recipe-book .filter:has(input:checked){background:#3fbf4a;color:#fff}
+.recipe-book .filter input{width:16px;height:16px;margin:0;accent-color:#1f7a28}
 .recipe-book .list{flex:1 1 0;min-height:0;overflow:auto;display:flex;flex-wrap:wrap;align-content:flex-start;
   gap:calc(1.2 * var(--px,3px));padding:4px;border-radius:10px;background:#101a2d;overscroll-behavior:contain;
   touch-action:pan-y}

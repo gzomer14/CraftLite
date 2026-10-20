@@ -12,6 +12,75 @@ e do README — elas não têm grid por arquivo porque o registro não existia a
 
 ---
 
+## 2026-10-20 03:56 · M32: interface nova
+
+**Pedido:** *"Queria agora que você desse uma revisada completa na UI/UX do jogo. Estou achando
+todos os menus extremamente carregados, varios botões, sempre botão para fechar, todas as janelas
+no celular precisam de scroll […] Queria algo bonito, extremamente chamativo e intuitivo, zero
+dúvidas sobre nada."* Depois da auditoria com capturas e do canvas de proposta (aprovado: *"Gostei
+muito do layout"*), o desenvolvimento foi agendado pelo próprio usuário para quando o limite dele
+renovasse, em três fases.
+
+**Resultado:**
+- **Sete regras** registradas no doc 14 (M32): nada rola em 640×360 nem 844×390; sem "Fechar"
+  (✕, toque fora, o botão que abriu, voltar); uma ação verde por tela; nada desabilitado à vista;
+  ícone e palavra; dica uma vez num balão; um visual só, com a fonte do sistema.
+- **Fase 1** (commit `a45233c`): tema (`ui/theme.ts`); mochila, bancada, baú e fornalha com a
+  escala que encolhe até caber, armadura e criação lado a lado, livro numa coluna com a contagem
+  do que dá para fazer, o ✕ e o toque fora.
+- **Fase 2** (commit `18d2d7c`): título com JOGAR que continua o último mundo; mundos em cartões
+  com ⋯; criar com cartões de modo e "Mais opções"; pausa em ladrilhos com conquistas e
+  estatísticas no lugar; morte com REAPARECER verde — e o **"Sair do Mundo" que não saía** (só
+  renascia, desde o M4) agora grava e sai.
+- **Fase 3:** opções em seis abas, com interruptor, segmento e "Restaurar esta aba"; criativo sem
+  rolar; livro com busca e filtro numa linha; Mods e Texturas com o ✕; a lista de conquistas
+  mostrava "Consiga #logs" e agora diz "um tronco qualquer".
+- **Aceite:** `npm run ui:fit` (novo) — 25 telas × 2 tamanhos, nenhuma rola nem corta caixa; no
+  CI dos PRs. Conferido que ele falha de verdade: com o painel de opções forçado a 600 px, acusa
+  as quatro caixas cortadas; e o primeiro run achou o painel da pausa 8 px mais largo que um 640.
+- Os scripts de smoke seguem o fluxo novo. Visto no Chromium em 640×360, 844×390 (toque) e
+  1280×720. O detalhe do M26 desceu da foto para o `15-historico.md`.
+
+| Ação | Arquivo | O que mudou |
+|---|---|---|
+| **Tema e contêineres** | | |
+| `+` | `src/ui/theme.ts` | cores como variáveis, ✕, `cl-btn`, `cl-tab`, ícones SVG por código, `coachOnce` |
+| `~` | `src/ui/containers/screen.ts` | sem rodapé nem "Fechar"; ✕ e aba "Receitas" no cabeçalho; toque fora; `fit()` |
+| `+` | `src/ui/containers/screenparts.ts` | os construtores de seção (armadura, criação, fornalha, baú), saídos do `screen.ts` |
+| `~` | `src/ui/containers/screenstyle.ts` | o visual escuro, fantasmas de armadura, slot grande dourado, sem rolagem |
+| `~` | `src/ui/containers/recipebook.ts` | `craftableCount`; visual escuro; busca e filtro numa linha |
+| `~` | `src/ui/containers/creative.ts` | cabeçalho com busca, Mochila e ✕; abas com ícone; só a grade rola; toque fora |
+| **Telas de menu** | | |
+| `~` | `src/ui/screens/menu.ts` | CSS no tema; interruptor e segmento em `buildFields` (devolve como reler); `menuPanel` com ✕; `closeOnBackdrop` |
+| `~` | `src/ui/screens/title.ts` | JOGAR que continua (`setContinue`) e cinco atalhos com ícone |
+| `~` | `src/ui/menuflow.ts` | `playLatest`, `showTitle` com o nome do último mundo |
+| `~` | `src/ui/screens/worlds.ts` | cartões, ⋯, painel de criar com cartões de modo e "Mais opções" |
+| `~` | `src/ui/screens/pause.ts` | duas colunas, ladrilhos, folha de conquistas e estatísticas, toque fora continua; alvo por tag legível |
+| `~` | `src/ui/screens/death.ts` | REAPARECER verde e saída contornada, no tema |
+| `~` | `src/ui/gameflow.ts` | `saveAndQuit()` público, usado pela pausa e pela morte |
+| `~` | `src/main.ts` | "Sair do Mundo" renasce e grava e sai; `flow` no gancho `?smoke` |
+| `~` | `src/ui/screens/options.ts` | seis abas, ✕, "Restaurar esta aba", só a lista da aba rola |
+| `+` | `src/ui/screens/optionfields.ts` | as tabelas de campos (saídas do `options.ts`) e a tabela de abas |
+| `~` | `src/ui/screens/mods.ts`, `packs.ts` | o ✕ e o toque fora no lugar do "Voltar" |
+| `~` | `src/game/settings.ts` | `resetKeys` |
+| `~` | `src/data/strings/pt.ts`, `en.ts` | textos novos (título, mundos, pausa, opções, `common.back`, `common.got_it`); `title.join` e `opt.reset` saíram |
+| **Testes e scripts** | | |
+| `+` | `tests/m32ui.test.ts` | `resetKeys`, interruptor e segmento, folhas da pausa, contagem de conquistas, tag legível, saída da morte |
+| `~` | `tests/creativeui.test.ts`, `recipebookui.test.ts`, `gamemode.test.ts`, `uxpolish.test.ts`, `i18n.test.ts` | seguem o ✕, os ladrilhos, a mochila do criativo e os campos em `optionfields.ts` |
+| `+` | `scripts/ui-fit.mjs` | o aceite: 25 telas × 2 tamanhos, falha em rolagem ou caixa cortada |
+| `~` | `package.json`, `.github/workflows/portoes.yml` | `npm run ui:fit`, e o passo no CI |
+| `~` | `scripts/smoke.mjs`, `smoke-mods.mjs`, `smoke-room.mjs`, `smoke-net.mjs`, `smoke-camera.mjs`, `soak-agent.js`, `bench-ui.mjs` | modo em cartão, "Jogar junto", JOGAR que continua, o ✕ |
+| **Docs** | | |
+| `~` | `docs/14-roadmap.md` | M32 com as sete regras, as três fases e o aceite |
+| `~` | `docs/15-status.md`, `docs/15-historico.md` | M32 (§1, §2, §3, §4, §5, §6); o detalhe do M26 desceu |
+| `~` | `README.md` | o M32, a contagem de testes, `ui:fit` |
+
+Portões: 2535 testes (135 arquivos); lint, build e tamanho verdes (313,3 KB em português, 326,5 em
+inglês). `smoke` 9, `smoke:mods` 6, `smoke:room` 20, `bench:ui` (pior ação 335 ms) e `ui:fit`
+(50 de 50) verdes.
+
+---
+
 ## 2026-10-19 23:14 · M26: aconchego
 
 **Pedido:** *"Pode seguir com o M26"* — depois do PR #10 (M25 e a correção do enderman) mesclado.

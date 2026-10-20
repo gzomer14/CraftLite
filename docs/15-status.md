@@ -9,13 +9,15 @@
 > Os documentos 00 a 14 são **normativos**: descrevem o que o jogo deve ser. Este é **descritivo**:
 > reflete o código de hoje e é atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-10-19 23:14 — **M26 fechado: aconchego** (§3). Fogueira que ilumina,
-solta fumaça, assa quatro comidas em 30 s sem combustível, fere quem pisa e apaga com água;
-caldeirão com três níveis de água; lanterna no chão e pendurada; vaso com onze plantas; moldura
-que mostra o item na parede; troncos descascados pelo machado; terracota e concreto nas dezesseis
-cores, **uma camada de atlas cada família**. São 44 blocos novos, todos linha de tabela. Custou
-21 camadas (244 de 512) e 6,1 KB (305,7 de 350). Portões: 2524 testes; `smoke` 9, `smoke:mods` 6,
-`smoke:room` 20, `bench:ui` ok. **Próximo passo de código: M27** (§6). Do usuário: **M22**.
+**Última atualização:** 2026-10-20 03:56 — **M32 fechado: interface nova** (§3). Pedido do usuário
+(menus carregados, "Fechar" em toda parte, janelas que rolam no celular), proposta num canvas
+aprovada, e as sete regras no doc 14. Um tema só (azul-noite, verde, dourado); mochila, bancada,
+baú e fornalha que encolhem até caber; JOGAR que continua o último mundo; mundos em cartões; pausa
+em ladrilhos; opções em abas; criativo sem rolar; o ✕ e o toque fora no lugar do "Fechar". **O
+aceite é um teste:** `npm run ui:fit` abre 25 telas em 640×360 e 844×390 e nenhuma rola — no CI.
+Custou 7,6 KB (313,3 de 350). Portões: 2535 testes; `smoke` 9, `smoke:mods` 6, `smoke:room` 20,
+`bench:ui` ok. **Próximo passo de código: M27** (§6). Do usuário: **M22**, agora com as telas
+novas no celular.
 
 ---
 
@@ -66,6 +68,7 @@ cores, **uma camada de atlas cada família**. São 44 blocos novos, todos linha 
 | **M29** Ameaça | invasão de saqueadores, besta, tridente, fantasma noturno | ⬜ proposto em 2026-10-19 | — |
 | **M30** Sala, 2ª volta | golpe no boneco, inventário conferido, mods da sala sem tela, PvP opcional, teto de mobs por jogador | ⬜ proposto em 2026-10-19 | depende do aceite do M20 |
 | **M31** Horizonte | terreno distante, folhas e água que se mexem — só T1+ | ⬜ proposto em 2026-10-19 | — |
+| **M32** Interface nova | um tema só, nenhuma tela rola num celular deitado, ✕ e toque fora no lugar do "Fechar", JOGAR que continua, pausa em ladrilhos, opções em abas — pedido do usuário | ✅ concluído em 2026-10-20 | **não visto em aparelho** (visto no Chromium, em 640×360, 844×390 e 1280×720) |
 
 Legenda: ✅ pronto · 🚧 em andamento · ⬜ não iniciado
 
@@ -76,18 +79,19 @@ O multijogador saiu do escopo do M7 por decisão do usuário (2026-09-13) e volt
 
 ## 2. Métricas atuais
 
-Medidas em 2026-10-19 23:14 (ao fechar o M26) com os quatro portões, `npm run smoke`, `smoke:mods`,
-`smoke:room` e `bench:ui`; as de aparelho e de sessão longa são de setembro, com a data na linha.
+Medidas em 2026-10-20 03:56 (ao fechar o M32) com os quatro portões, `npm run smoke`, `smoke:mods`,
+`smoke:room`, `bench:ui` e `ui:fit`; as de aparelho e de sessão longa são de setembro, com a data na linha.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, o jogo sem mod) | **305,7 KB em português** (folga 44,3) e **318,7 em inglês** (o jogo + o pacote `l/`, 13,0); o M26 somou 6,1 (4,3 no pedaço do jogo, 1,9 no worker, que repete a tabela de blocos). Eram 299,6 e 312,5 ao fechar o M25, e 311,2 nos dois antes dele (311,0 antes do M24; 308,3 antes do M23; a série completa está no [histórico](15-historico.md)). O orçamento cobra o inglês, o caminho mais pesado | < 350 KB | `npm run size` |
+| Bundle (gzip, o jogo sem mod) | **313,3 KB em português** (folga 36,7) e **326,5 em inglês** (o jogo + o pacote `l/`, 13,2); o M32 somou 7,6 (o CSS das telas e os ícones). Eram 305,7 e 318,7 ao fechar o M26 (+6,1), 299,6 e 312,5 ao fechar o M25, e 311,2 nos dois antes dele (311,0 antes do M24; 308,3 antes do M23; a série completa está no [histórico](15-historico.md)). O orçamento cobra o inglês, o caminho mais pesado | < 350 KB | `npm run size` |
 | Pedaço "depois" (`u/`) | **4,6 KB**: exportar e importar mundo, créditos, editor de placa, cota cheia; baixado na primeira vez que se usa uma delas, e no precache (abre offline) | fora do orçamento de abertura | `npm run size` |
-| Testes | **2524**, 134 arquivos (2436 antes do M26; 2424 antes do M25; 2423 antes do M24; 2404 antes do M23) | manter verde | `npm test` |
+| Testes | **2535**, 135 arquivos (2524 antes do M32; 2436 antes do M26; 2424 antes do M25; 2423 antes do M24; 2404 antes do M23) | manter verde | `npm test` |
 | Smoke test de navegador | **9 passos verdes**: carregar, criar, andar 10 s, quebrar, **cota cheia: a tela abre com o banco recusando (desde o M25 vinda do pedaço `u/`), e com espaço de volta grava e fecha (M23)**, salvar, recarregar, conferir | verde | `npm run smoke` |
 | Smoke test da rede (M20.0) | **7 passos verdes**: dois Chrome, anfitrião e convidado pela página `rede.html`, trocando os códigos como uma pessoa; ligados em candidato `host` dos dois lados; ida e volta ~0,3 ms, perda 0/300, 6–18 MB/s. Com e sem mDNS (`SMOKE_NET_MDNS=1`). **Na mesma máquina — não prova a rede Wi-Fi** | verde | `npm run smoke:net` |
-| Toque nas telas de inventário, CPU 6× mais lenta | **91–268 ms** por ação (abrir o livro de receitas, tocar numa receita, tocar num slot; varia entre rodadas; 233 no pior ao fechar o M25, 142 ao fechar o M26); eram **~3 000 ms** com a folha de sprites como `data:` URL — no J7, 5–10 s | ≤ 600 ms | `npm run bench:ui` |
-| Mochila num T0 deitado (640×360) | **cabe sem rolar**, *Fechar* à vista (M23; antes o painel ia a 410 px e o botão ficava em 354) | sem rolagem | `npm run bench:ui` |
+| Toque nas telas de inventário, CPU 6× mais lenta | **91–268 ms** por ação (abrir o livro de receitas, tocar numa receita, tocar num slot; varia entre rodadas; 233 no pior ao fechar o M25, 142 ao fechar o M26, 335 ao fechar o M32); eram **~3 000 ms** com a folha de sprites como `data:` URL — no J7, 5–10 s | ≤ 600 ms | `npm run bench:ui` |
+| Mochila num T0 deitado (640×360) | **cabe sem rolar**, o ✕ à vista (M23; antes o painel ia a 410 px e o botão ficava em 354) | sem rolagem | `npm run bench:ui` |
+| Telas num celular deitado (M32) | **25 telas × 2 tamanhos (640×360 e 844×390), nenhuma rola nem corta caixa**: título, as seis abas de opções, mods, texturas, mundos, criar, mochila, receitas, bancada, fornalha, baú, encantamento, bigorna, preparo, pausa, conquistas, estatísticas, criativo, morte. Só quatro listas rolam por dentro | nenhuma rola | `npm run ui:fit` |
 | Smoke test da sala (M20) | **20 passos verdes**: dois Chrome; o convidado entra pelo título trocando os códigos; blocos nos dois sentidos; bonecos, nome e chat; **trocar o modo de jogo pela pausa não fecha a sala** (M23); baú do anfitrião; luz do poço; bloco além do anel do anfitrião; a sala segue o anfitrião ao Nether e de volta; o convidado sai salvo no anfitrião; **0 mundo e 0 chunk no banco do convidado** | verde | `npm run smoke:room` |
 | Bloco do anfitrião no convidado | **0–15 ms** por viagem, mediana 1–4 ms (5 viagens por rodada; eram até 214 ms antes de o lote sair na microtarefa, sem esperar o tick) | < 150 ms (aceite do M20) | `npm run smoke:room` |
 | Smoke test da câmera (M20) | **3 passos verdes**: a webcam falsa do Chrome filma o QR do anfitrião inclinado, borrado e com ruído; o leitor próprio lê em **205–410 ms** | verde | `npm run smoke:camera` |
@@ -180,39 +184,40 @@ relatos de campo estão no [histórico](15-historico.md)** — `grep` pelo marco
 | M23 | save que não perde coluna, tela de cota cheia, quarentena de coluna corrompida, fogo nos mobs com chama à vista, mochila no T0 deitado, cadência do save do convidado, canto de escada certo | `save/savemanager.ts`, `ui/screens/storagefull.ts`, `entity/mobrules.ts`, `world/mesh/stairshape.ts` |
 | M24 | seis módulos cortados por papel e o teto de 700 linhas como teste, este documento de volta a foto, CI nos PRs com smoke, smoke como root | `tests/modulesize.test.ts`, `.github/workflows/portoes.yml`, `scripts/chrome.mjs` |
 | M25 | inglês num pacote à parte, telas raras num pedaço "depois", vozes de mob sob demanda, atlas de 512 camadas com duas páginas quando a GPU pede | `data/strings/pack.en.ts`, `ui/lategate.ts`, `audio/voicecache.ts`, `render/shaders/atlaspages.ts` |
-| M26 | ver abaixo | — |
+| M26 | fogueira, caldeirão, lanterna, vaso, moldura de item, tronco descascado, terracota e concreto nas 16 cores — 44 blocos, todos linha de tabela | `data/cozy.ts`, `game/campfire.ts`, `game/cozy.ts`, `world/mesh/cozyshape.ts` |
+| M32 | ver abaixo | — |
 
-### M26 — Aconchego ✅ — 2026-10-19
+### M32 — Interface nova ✅ — 2026-10-20
 
-Pedido: *"Pode seguir com o M26"*. Aceite do doc 14: cada bloco é linha de tabela; a fogueira
-assa carne em ~30 s; 16 cores de concreto custam ≤ 2 camadas. **Cumprido** (`tests/cozy.test.ts`).
+Pedido: *"Estou achando todos os menus extremamente carregados […] todas as janelas no celular
+precisam de scroll […] Queria algo bonito, extremamente chamativo e intuitivo, zero dúvidas sobre
+nada"*. Proposta num canvas de desenho, aprovada; as sete regras e as três fases estão no doc 14.
+Aceite: **`npm run ui:fit`** — 25 telas em 640×360 e 844×390, nenhuma rola. **Cumprido**, e no CI.
 
-- **44 blocos novos**, ids 245–288, todos linha de `data/blocks.ts` (`cozySpecs`): fogueira acesa e
-  apagada (dois ids, como a fornalha: a luz é coluna da tabela), caldeirão, lanterna, vaso,
-  moldura de item, cinco troncos descascados, terracota, dezesseis terracotas tingidas e dezesseis
-  concretos. Conteúdo é tabela em `data/cozy.ts`: as plantas do vaso (`POTTABLE`), o machado
-  (`STRIPPED`), o tempo da fogueira. Mais a pepita de ferro, que a lanterna pede.
-- **Formas** em `world/mesh/cozyshape.ts`, e um caminho de malha novo (`CPLX_DECOR` em
-  `mesh/complex.ts`): caixas com um **recheio** de outra textura — a chama entre as toras, a planta
-  no vaso, a água no caldeirão com o tint de bioma.
-- **Fogueira** (`game/campfire.ts`): tile entity de quatro casas; assa o que a fundição transforma
-  em comida, em 600 ticks, e solta o assado em cima. Apagada, o relógio para. Fere 1 a cada meio
-  segundo quem está em cima — jogador e mob, sem acender —, por um campo novo da tabela
-  (`contactDamage`). Fumaça: um floco que **sobe** (`emitSmoke`, partícula com empuxo).
-- **O clique** (`game/cozy.ts`): comida na fogueira; balde ou pá apagam, isqueiro acende; balde,
-  frasco e frasco d'água no caldeirão; planta no vaso e de volta; item na moldura e de volta. O
-  machado descasca pelo registro de usos de item (`strip_log`). O caldeirão com água apaga quem
-  pega fogo.
-- **Moldura e comida na tela** pelo passe dos itens do chão (`render/itemrender.ts`): o sprite
-  ganhou **pose** — colado na parede (moldura) ou deitado (fogueira) — num campo que já existia na
-  instância, sem draw call a mais. No inventário, a moldura é desenhada de frente.
-- **Desvios** (nos comentários dos módulos): o concreto sai da bancada, sem o pó; o clique na
-  moldura devolve o item em vez de girá-lo; o caldeirão apaga sem gastar água e não enche com
-  chuva; a terracota tingida usa o tint da lã sobre um cinza quente (sai terrosa, não a paleta
-  exata do gênero).
-- **Na sala** (M20): a moldura e a comida da fogueira são tile entity, que não viajam. O clique do
-  convidado nelas é **engolido** (`CozyBlocks.remoteTiles`) — o item fica na mão, em vez de sumir.
-  O resto (vaso, caldeirão, acender e apagar) é estado de bloco e viaja como sempre.
+- **Tema** (`ui/theme.ts`): as cores como variáveis CSS, o ✕ de 44 px, `cl-btn` (verde, contorno
+  vermelho, neutro), `cl-tab`, ícones em SVG desenhados por código (uma tabela de caminhos), e
+  `coachOnce` — o balão de dica que some no "Entendi" e não volta (`localStorage`).
+- **Contêineres** (`ui/containers/screen.ts`, `screenparts.ts`, `screenstyle.ts`): sem rodapé nem
+  "Fechar"; o ✕ no cabeçalho, tocar fora fecha (ou solta o item do cursor), `fit()` encolhe a
+  escala local até o painel caber; armadura e criação lado a lado; o livro numa coluna à esquerda,
+  aberto pela aba "Receitas" com o número do que dá para fazer agora.
+- **Título** (`ui/screens/title.ts`): o JOGAR continua o último mundo (`menuflow.playLatest`) e diz
+  qual; sem mundo, abre a lista. **Mundos** (`worlds.ts`): cartões, ⋯ com copiar seed, exportar e
+  apagar; **criar** com dois cartões de modo e "Mais opções" (seed, dificuldade).
+- **Pausa** (`pause.ts`): CONTINUAR e Salvar e Sair à esquerda; ladrilhos à direita com uma linha
+  do que há dentro; conquistas e estatísticas abrem no lugar dos ladrilhos, com "Voltar".
+  **Morte** (`death.ts`): REAPARECER verde, e **"Sair do Mundo" agora sai** (§4).
+- **Opções** (`options.ts`, campos em `optionfields.ts`): seis abas à esquerda; interruptor no
+  lugar da caixa e segmento no lugar da lista curta (`menu.ts`, `buildFields`); "Restaurar esta
+  aba" (`SettingsStore.resetKeys`); a lista da aba rola por dentro — **desvio da regra 1**, no
+  comentário do módulo. **Criativo** (`creative.ts`): busca, Mochila e ✕ numa linha, abas com
+  ícone, só a grade rola. **Mods** e **Texturas** com o ✕ (`menuPanel(título, onClose)`).
+- **Scripts de smoke** seguem o fluxo novo (o modo é cartão, não `<select>`; "Jogar junto" no
+  lugar de "Entrar numa sala"; o JOGAR do título continua). `ui-fit.mjs` mede, em cada tela,
+  rolagem e **caixa cortada** (fora da tela é rolar sem barra); as quatro listas que rolam por
+  dentro estão nomeadas no script.
+- Custou **7,6 KB** de bundle (305,7 → 313,3 em português): o CSS das telas e os ícones. A folga
+  que o M25 abriu (50) está em **36,7** — 44,3 antes do M32.
 
 ### Como escrever um mod (a receita)
 
@@ -247,6 +252,8 @@ Bugs de marcos fechados corrigidos depois, desde 2026-09-27. **Os de antes (≈1
 
 | Data | Onde | O que era |
 |---|---|---|
+| 2026-10-20 | `main.ts`, `ui/gameflow.ts` | **"Sair do Mundo" da tela de morte não saía** (desde o M4): o botão chamava o mesmo `respawn` do "Reaparecer". Agora renasce (o save não guarda jogador morto) e grava e sai pelo mesmo caminho do *Salvar e Sair* da pausa (`GameFlow.saveAndQuit`). Achado no M32. Regressão em `tests/m32ui.test.ts`. |
+| 2026-10-20 | `ui/screens/pause.ts` | **A lista de conquistas mostrava "Consiga #logs"** (M17): o alvo por tag não passava pelo nome legível que a linha de objetivo já usava (`displayOfTarget`). Agora sai "um tronco qualquer". Achado no M32, na captura da pausa. Regressão em `tests/m32ui.test.ts`. |
 | 2026-10-19 | `data/mobs.ts`, `entity/spawn.ts`, `tests/theend.test.ts` | **O enderman às vezes nascia no alto de uma coluna de obsidiana do End** (M19), fora de alcance e ocupando a vaga dos hostis da ilha: a regra aceitava qualquer chão sólido. Ninguém viu no jogo; quem viu foi o teste, que deixava o spawner no `Math.random` e falhava em ~1 de 27 rodadas — e assim **derrubou o deploy do GitHub Pages** depois do merge do PR #9 (o CI do PR tinha passado por sorte). Agora a regra tem chão por dimensão (`groundIn`: no End, só pedra do End), e o teste roda 100 sementes fixas; sem a correção, 7 delas falham com o mesmo erro do deploy. |
 | 2026-10-19 | `world/mesh/shapes.ts` | **A regra de canto de escada estava trocada** desde o acabamento pós-M7 (2026-09-14). Um vizinho perpendicular do lado alto fazia canto **interno**, e no gênero (e pela geometria) é **externo**; com o vizinho do lado aberto, o contrário. Numa pirâmide de escadas, a quina saía com o degrau cheio. O teste antigo olhava só um lado da face compartilhada; o novo compara os dois. Mundo salvo não muda, porque o canto é derivado dos vizinhos e não fica no save: a escada já construída passa a mostrar o canto certo. Achado no M23. |
 | 2026-10-19 | `ui/gameflow.ts`, `main.ts` | **Trocar Criativo/Sobrevivência pela pausa fechava a sala da rede local** (M20 × modo de jogo). O fluxo tinha um `saveAll` só, que gravava **e** saía da sala (`leaveRoom`), e a troca de modo grava o mundo: o anfitrião fechava a sala, e o convidado era derrubado. Agora são duas peças, e só *Salvar e Sair* sai. Regressão no `npm run smoke:room`, que falha com o código antigo. Achado na revisão do M23. |
@@ -288,6 +295,7 @@ registro de campo). O que fechou está no histórico.
 | As duas páginas de atlas só rodaram com o limite forçado (`?atlasLayers`), nunca numa GPU que diz 256; e o caminho do WebGL1 não foi exercitado no M25 | `render/atlas.ts` | quando o atlas passar de 256 |
 | A primeira voz de um mob não toca se gerá-la passar de 400 ms (no Chromium: 43 ms; no T0, não medido) | `audio/engine.ts` (`LATE_PLAY_MS`) | M22 (medir) |
 | A prova do CI vermelho (um PR com teste quebrado de propósito) | `.github/workflows/portoes.yml` | quando o usuário quiser |
+| *Tamanho do texto* e *alto contraste* (Acessibilidade) só valem no HUD: nenhuma tela de menu os lê — nem as de antes, nem as do M32 —, e o `ui:fit` mede só com o texto em 100% | `ui/hud.ts` (`--hud-text`, `.high-contrast`) | — |
 
 ### De aparelho — não vistos, ou não medidos
 
@@ -304,6 +312,7 @@ registro de campo). O que fechou está no histórico.
 | M23: a tela de cota cheia, a borda de fogo e a fagulha no mob, escadas em L e em pirâmide, a mochila deitada | 2026-10-19 | M22 |
 | M25: o jogo em inglês e **offline** (o pacote `l/` e o pedaço `u/` vêm do precache), exportar e importar mundo, a placa, o primeiro som de cada mob no T0 | 2026-10-19 | M22 |
 | M26: a fogueira (fumaça e luz) e a moldura no T0, e o FPS com uma vila de fogueiras e lanternas | 2026-10-19 | M22 |
+| M32: as telas novas no celular de verdade — a barra do navegador come altura que o Chromium emulado não come; o balão de dica; arrastar pilha na mochila encolhida; o teclado virtual na busca do criativo e no nome do mundo | 2026-10-20 | M22 |
 | No T0: a cor de grama por bioma (duas leituras de textura por vértice) e se o RD 5 cabe | 2026-09-23/24 | M22 |
 | Firefox (computador e Android) e **Safari no iPhone**: nunca rodaram | — | M22 |
 | Do acabamento de setembro, nunca olhados com atenção em aparelho: nuvens (custo de preenchimento), fogo que se espalha, contorno em alto contraste e modo daltônico, o boneco do inventário com as quatro peças de armadura, o Modo A de toque, `.clw` exportado e reimportado de verdade, `.ogg` real num resource pack | 2026-09-14 | M22 |
@@ -322,6 +331,8 @@ Estão nos comentários dos módulos; os que mudam o que o jogador vê:
   não abre.
 - **Concreto sem pó** (M26): sai direto da bancada; e o clique na moldura devolve o item em vez de
   girá-lo.
+- **A lista de uma aba de opções rola** (M32): é a exceção à regra "nada rola", junto com a lista de
+  receitas, a de conquistas e a grade do criativo. A moldura em volta fica parada.
 
 ---
 
@@ -330,7 +341,8 @@ Estão nos comentários dos módulos; os que mudam o que o jogador vê:
 **De código: o M27** (bichos, doc 14): cavalo com sela pelo sistema de veículos, gato, coelho,
 peixes vivos, guia e etiqueta de nome. O aceite pede o tick de 20 mobs sem regressão e as vozes
 novas dentro do orçamento de áudio do M25 — que já as gera sob demanda. Folga hoje: 268 camadas,
-44,3 KB de bundle em português, 1,04 MB de áudio no pico.
+36,7 KB de bundle em português, 1,04 MB de áudio no pico. Tela nova (a do cavalo, por exemplo) segue as
+sete regras do M32 (doc 14) e entra no `scripts/ui-fit.mjs`.
 
 **Do usuário: o M22** (aparelho e MVP). O roteiro, numa sessão de celular, em ordem:
 
@@ -353,12 +365,14 @@ novas dentro do orçamento de áudio do M25 — que já as gera sob demanda. Fol
    o End com os endermen, os cristais, o dragão (sem piscar branco, com o sopro), o portal de
    passagem e as ilhas de fora, os créditos. **FPS no T0** com o dragão.
 6. **M23:** fogo num campo com vacas (pegam fogo e soltam fagulha); entrar no fogo (borda laranja
-   embaixo, some na água); a mochila deitada inteira, com *Fechar* ao lado de *Receitas*; um L de
+   embaixo, some na água); a mochila deitada inteira, com o ✕ ao lado de *Receitas*; um L de
    escadas e um telhado em pirâmide; na sala, o convidado pega um item e desliga o Wi-Fi — ao voltar,
    o item está lá.
    **M26:** uma fogueira com carne em cima (pronta em 30 s, a fumaça subindo), de noite com
    lanternas em volta — o FPS no F3 do T0; uma espada numa moldura na parede; uma flor num vaso; o
    machado num tronco.
+   **M32:** abrir cada tela deitado — mochila, bancada, pausa, opções, criativo, criar mundo — e
+   conferir que nada fica cortado com a barra do navegador à vista; fechar tocando fora.
 7. **Navegadores:** o jogo no Firefox (computador e Android) e no Safari do iPhone. Anotar o que
    funciona, o que degrada e o que quebra.
 8. **Declarar o MVP** com os critérios de "pronto" do doc 14 — três já estão medidos (3G, sessão

@@ -11,7 +11,7 @@
  * não vira uma surpresa depois do boot.
  */
 
-import { menuButton, menuPanel, menuRoot, menuRow, messageOf } from './menu';
+import { closeOnBackdrop, menuButton, menuPanel, menuRoot, menuRow, messageOf } from './menu';
 import { t, tf } from '../../core/i18n';
 
 /** "12 imagens e 3 sons", ou só a metade que existe. */
@@ -49,13 +49,15 @@ export class PacksScreen {
   private readonly fileInput: HTMLInputElement;
   private readonly removeButton: HTMLButtonElement;
   private readonly applyButton: HTMLButtonElement;
-  private readonly backButton: HTMLButtonElement;
+  private readonly closeButton: HTMLButtonElement | null;
   private readonly callbacks: PacksCallbacks;
 
   constructor(callbacks: PacksCallbacks) {
     this.callbacks = callbacks;
     this.root = menuRoot('packs-screen');
-    const { panel, body } = menuPanel(t('packs.title'));
+    const { panel, body, close } = menuPanel(t('packs.title'), () => callbacks.back());
+    this.closeButton = close;
+    closeOnBackdrop(this.root, () => callbacks.back());
 
     const intro = document.createElement('p');
     intro.className = 'menu-empty';
@@ -84,12 +86,11 @@ export class PacksScreen {
     this.removeButton = menuButton(t('packs.remove'), () => void this.removePack(), 'danger');
     this.applyButton = menuButton(t('packs.apply'), () => this.callbacks.apply());
     this.applyButton.hidden = true;
-    this.backButton = menuButton(t('opt.back'), () => this.callbacks.back());
 
     body.append(
       intro, this.current, this.status,
       menuRow(choose, this.removeButton),
-      menuRow(this.applyButton, this.backButton),
+      menuRow(this.applyButton),
       this.fileInput,
     );
     this.root.appendChild(panel);
@@ -106,7 +107,7 @@ export class PacksScreen {
     this.root.hidden = false;
     this.status.hidden = true;
     this.applyButton.hidden = true;
-    this.backButton.focus();
+    this.closeButton?.focus();
     await this.refresh();
   }
 

@@ -5,7 +5,8 @@
 # aparecia depois de mesclado, no deploy. Aqui rodam os mesmos quatro portões
 # do CLAUDE.md, mais os dois smokes de navegador que não dependem de rede: o
 # jogo (criar, andar, quebrar, cota cheia, salvar, recarregar) e o dos mods
-# (o jogo sem mod baixa um arquivo só).
+# (o jogo sem mod baixa um arquivo só). Desde o M32, também o encaixe: nenhuma
+# tela rola num celular deitado (640×360 e 844×390).
 name: Portões
 
 on:
@@ -58,3 +59,6 @@ jobs:
 
       - name: Smoke dos mods
         run: npm run smoke:mods
+
+      - name: Encaixe das telas (M32)
+        run: npm run ui:fit

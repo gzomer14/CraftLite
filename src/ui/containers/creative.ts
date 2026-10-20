@@ -8,12 +8,17 @@
  * As abas não vêm de uma tabela nova: saem dos campos que o item já declara
  * (`placesBlock`, `tool`, `armor`, `food`). Classificar de novo à mão só criaria
  * uma segunda verdade para manter em dia.
+ *
+ * **M32 (interface nova):** título, busca, Mochila e ✕ numa linha só; abas
+ * com ícone; só a grade de itens rola, dentro da própria caixa — a janela
+ * cabe inteira num celular deitado. Tocar fora do painel fecha.
  */
 
 import { t, tf } from '../../core/i18n';
 import { ITEMS, itemDef, maxStackOf, type ItemDef } from '../../data/items';
 import { HOTBAR_END, HOTBAR_START, type Inventory } from '../../game/inventory';
 import { ItemTooltip } from './tooltip';
+import { closeButton, icon, injectTheme, themedButton } from '../theme';
 
 export interface CreativeCallbacks {
   onClose: () => void;
@@ -27,12 +32,12 @@ export interface CreativeCallbacks {
 
 type TabId = 'blocks' | 'tools' | 'combat' | 'food' | 'materials';
 
-const TABS: readonly { id: TabId; label: string }[] = [
-  { id: 'blocks', label: t('creative.blocks') },
-  { id: 'tools', label: t('creative.tools') },
-  { id: 'combat', label: t('creative.combat') },
-  { id: 'food', label: t('creative.food') },
-  { id: 'materials', label: t('creative.materials') },
+const TABS: readonly { id: TabId; label: string; icon: string }[] = [
+  { id: 'blocks', label: t('creative.blocks'), icon: 'cube' },
+  { id: 'tools', label: t('creative.tools'), icon: 'pick' },
+  { id: 'combat', label: t('creative.combat'), icon: 'sword' },
+  { id: 'food', label: t('creative.food'), icon: 'apple' },
+  { id: 'materials', label: t('creative.materials'), icon: 'gem' },
 ];
 
 /** Em qual aba o item cai. */
@@ -62,6 +67,7 @@ export class CreativeScreen {
   constructor(callbacks: CreativeCallbacks) {
     this.callbacks = callbacks;
     this.longPressMs = callbacks.longPressMs ?? ((): number => 300);
+    injectTheme();
     injectStyle();
 
     for (const item of ITEMS) {
@@ -91,13 +97,33 @@ export class CreativeScreen {
     this.search.setAttribute('aria-label', t('creative.search_aria'));
     this.search.addEventListener('input', () => this.render());
 
+    /*
+     * Atalho para a mochila normal.
+     *
+     * No criativo o `E` abre esta paleta, e até agora era só isso: os slots de
+     * armadura, o offhand e a grade 2×2 ficavam inalcançáveis, então não dava
+     * para vestir nada. A paleta escolhe o item; a mochila é quem equipa.
+     */
+    const backpack = themedButton(t('creative.backpack'), () => {
+      this.close();
+      this.callbacks.onOpenInventory?.();
+    }, 'secondary', 'bag');
+    backpack.classList.add('backpack');
+
+    const head = document.createElement('div');
+    head.className = 'head';
+    head.append(title, this.search, backpack, closeButton(() => this.close()));
+
     this.tabRow = document.createElement('div');
     this.tabRow.className = 'tabs';
     this.tabRow.setAttribute('role', 'tablist');
     for (const tab of TABS) {
       const button = document.createElement('button');
       button.type = 'button';
-      button.textContent = tab.label;
+      button.className = 'cl-tab';
+      const label = document.createElement('span');
+      label.textContent = tab.label;
+      button.append(icon(tab.icon, 'currentColor', 18), label);
       button.setAttribute('role', 'tab');
       button.dataset.tab = tab.id;
       button.addEventListener('click', () => {
@@ -116,39 +142,20 @@ export class CreativeScreen {
     hotbarLabel.textContent = t('creative.hotbar');
     this.hotbarRow = document.createElement('div');
     this.hotbarRow.className = 'hotbar';
+    const bottom = document.createElement('div');
+    bottom.className = 'bottom';
+    bottom.append(hotbarLabel, this.hotbarRow);
 
-    const close = document.createElement('button');
-    close.type = 'button';
-    close.className = 'close';
-    close.textContent = t('common.close');
-    close.addEventListener('click', () => this.close());
-
-    /*
-     * Atalho para a mochila normal.
-     *
-     * No criativo o `E` abre esta paleta, e até agora era só isso: os slots de
-     * armadura, o offhand e a grade 2×2 ficavam inalcançáveis, então não dava
-     * para vestir nada. A paleta escolhe o item; a mochila é quem equipa.
-     */
-    const backpack = document.createElement('button');
-    backpack.type = 'button';
-    backpack.className = 'close backpack';
-    backpack.textContent = t('creative.backpack');
-    backpack.addEventListener('click', () => {
-      this.close();
-      this.callbacks.onOpenInventory?.();
-    });
-
-    const footer = document.createElement('div');
-    footer.className = 'footer';
-    footer.append(backpack, close);
-
-    panel.append(title, this.search, this.tabRow, this.grid, hotbarLabel, this.hotbarRow, footer);
+    panel.append(head, this.tabRow, this.grid, bottom);
     this.root.appendChild(panel);
     this.root.appendChild(this.tooltip.element);
     document.body.appendChild(this.root);
 
     this.root.addEventListener('contextmenu', (e) => e.preventDefault());
+    // Tocar no escuro em volta fecha (regra 2 do M32).
+    this.root.addEventListener('pointerdown', (e) => {
+      if ((e as Event).target === this.root) this.close();
+    });
   }
 
   get isOpen(): boolean {
@@ -186,7 +193,7 @@ export class CreativeScreen {
 
     for (const button of Array.from(this.tabRow.children)) {
       const el = button as HTMLButtonElement;
-      el.classList.toggle('active', query === '' && el.dataset.tab === this.tab);
+      el.classList.toggle('on', query === '' && el.dataset.tab === this.tab);
     }
 
     this.grid.textContent = '';
@@ -292,51 +299,46 @@ function injectStyle(): void {
   styleInjected = true;
   const css = document.createElement('style');
   css.textContent = `
-/* safe center: quando o painel passa da altura da tela, alinhar no topo em
-   vez de centralizar — centralizado, o começo dele fica fora de alcance. */
 /* Rótulo do toque longo: acima do painel, e nunca roubando o toque. */
 #creative-screen .tooltip{position:fixed;left:0;top:0;pointer-events:none;z-index:14;
-  max-width:60vw;padding:4px 8px;background:#101014ee;color:#fff;
-  border:1px solid #5a5a66;font:13px/1.3 ui-monospace,monospace;white-space:pre-line}
-#creative-screen{position:fixed;inset:0;z-index:12;background:#00000080;display:grid;
-  place-items:safe center;padding:8px;overflow:auto;overscroll-behavior:contain;
-  font:calc(4.5 * var(--px,3px))/1.2 ui-monospace,monospace;color:#fff;image-rendering:pixelated}
-#creative-screen .panel{background:#c6c6c6;color:#3f3f3f;padding:calc(4 * var(--px,3px));
-  border-top:calc(2 * var(--px,3px)) solid #fff;border-left:calc(2 * var(--px,3px)) solid #fff;
-  border-right:calc(2 * var(--px,3px)) solid #555;border-bottom:calc(2 * var(--px,3px)) solid #555;
-  max-width:min(96vw,640px);display:flex;flex-direction:column;gap:calc(2 * var(--px,3px))}
-#creative-screen .title{font-weight:700}
-#creative-screen .section-title{font-size:calc(4 * var(--px,3px))}
-#creative-screen input[type=search]{min-height:36px;background:#8b8b8b;color:#fff;
-  border:var(--px,3px) solid #373737;padding:4px 6px;
-  font:calc(4.5 * var(--px,3px))/1 ui-monospace,monospace}
-#creative-screen .tabs{display:flex;flex-wrap:wrap;gap:calc(1 * var(--px,3px))}
-#creative-screen .tabs button{min-height:36px;padding:4px 10px;background:#8b8b8b;color:#fff;
-  border:2px solid #373737;font:calc(4 * var(--px,3px))/1 ui-monospace,monospace;cursor:pointer}
-#creative-screen .tabs button.active{background:#7b94c7}
-#creative-screen .tabs button:focus-visible{outline:2px solid #fff}
-#creative-screen .items{display:grid;grid-template-columns:repeat(auto-fill,
-  minmax(calc(18 * var(--px,3px)),1fr));gap:calc(1 * var(--px,3px));
-  max-height:46vh;overflow:auto}
-#creative-screen .hotbar{display:flex;gap:calc(1 * var(--px,3px))}
-#creative-screen .slot{position:relative;width:calc(18 * var(--px,3px));
-  height:calc(18 * var(--px,3px));min-width:32px;min-height:32px;background:#8b8b8b;
-  border-top:var(--px,3px) solid #373737;border-left:var(--px,3px) solid #373737;
-  border-right:var(--px,3px) solid #fff;border-bottom:var(--px,3px) solid #fff;
-  color:#fff;cursor:pointer;padding:0;display:grid;place-items:center;
-  font:calc(4.5 * var(--px,3px))/1 ui-monospace,monospace;
-  text-shadow:0 0 2px #000,var(--px,3px) var(--px,3px) 0 #000}
+  max-width:60vw;padding:6px 10px;border-radius:8px;background:#0b1220f0;color:#fff;
+  box-shadow:0 0 0 2px var(--cl-edge);font:700 13px/1.3 var(--cl-font);white-space:pre-line}
+/* M32: a janela não rola; quem rola é a grade, dentro da caixa dela. */
+#creative-screen{position:fixed;inset:0;z-index:12;background:var(--cl-dim);display:grid;
+  place-items:center;padding:8px;overflow:hidden;overscroll-behavior:contain;touch-action:none;
+  font:700 14px/1.2 var(--cl-font);color:var(--cl-ink)}
+#creative-screen[hidden]{display:none}
+#creative-screen .panel{display:flex;flex-direction:column;gap:8px;width:min(760px,100%);
+  height:min(600px,calc(100vh - 16px));height:min(600px,calc(100dvh - 16px));
+  box-sizing:border-box;padding:12px;border-radius:20px;background:var(--cl-panel);
+  box-shadow:0 0 0 2px var(--cl-edge),0 18px 40px rgba(0,0,0,.5)}
+#creative-screen .head{display:flex;align-items:center;gap:10px;flex:none}
+#creative-screen .title{font:900 18px/1 var(--cl-font)}
+#creative-screen input[type=search]{flex:1;min-width:0;min-height:40px;box-sizing:border-box;border:0;border-radius:12px;
+  background:#0d1626;color:#fff;box-shadow:0 0 0 2px var(--cl-edge);padding:0 12px;font:700 15px/1 var(--cl-font)}
+#creative-screen .backpack{flex:none;min-height:44px}
+#creative-screen .tabs{display:flex;gap:6px;flex:none;overflow:hidden}
+#creative-screen .tabs .cl-tab{flex:1 1 0;min-width:0;justify-content:center;padding:0 8px}
+#creative-screen .tabs .cl-tab span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#creative-screen .items{flex:1;min-height:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--cslot),1fr));
+  grid-auto-rows:var(--cslot);gap:4px;align-content:start;overflow:auto;touch-action:pan-y;padding:6px;border-radius:12px;
+  background:var(--cl-slot);--cslot:clamp(36px,10.5vh,52px)}
+#creative-screen .bottom{display:flex;align-items:center;gap:10px;flex:none;--cslot:clamp(34px,10vh,48px)}
+#creative-screen .section-title{flex:0 1 auto;color:var(--cl-muted);font:700 12px/1.2 var(--cl-font)}
+#creative-screen .hotbar{display:flex;gap:4px;margin-left:auto}
+#creative-screen .slot{position:relative;width:var(--cslot);height:var(--cslot);min-width:32px;min-height:32px;box-sizing:border-box;
+  background-color:#1a2740;border:0;border-radius:6px;box-shadow:inset 0 0 0 2px var(--cl-slot-edge);
+  color:#fff;cursor:pointer;padding:0;display:grid;place-items:center;image-rendering:pixelated;
+  font:800 13px/1 var(--cl-font);text-shadow:0 1px 2px #000}
+#creative-screen .items .slot{width:100%;height:100%}
 #creative-screen .slot.sprite{background-image:var(--item-sheet);
   background-size:var(--item-sheet-size);background-repeat:no-repeat}
-#creative-screen .slot.selected{outline:calc(2 * var(--px,3px)) solid #fff;
-  outline-offset:calc(-1 * var(--px,3px))}
-#creative-screen .slot:hover,#creative-screen .slot:focus-visible{outline:2px solid #7b94c7}
-#creative-screen .close{min-height:44px;background:#6e6e6e;color:#fff;border:2px solid #000;
-  font:14px/1 ui-monospace,monospace;cursor:pointer}
-#creative-screen .close:hover,#creative-screen .close:focus-visible{background:#7b94c7}
-#creative-screen .footer{display:flex;gap:8px}
-#creative-screen .footer .close{flex:1}
-#creative-screen .backpack{background:#4a6b3f}
+#creative-screen .slot.selected{box-shadow:inset 0 0 0 3px var(--cl-gold)}
+#creative-screen .slot:hover,#creative-screen .slot:focus-visible{outline:none;box-shadow:inset 0 0 0 3px #7fc8ff}
+@media (max-height:420px){
+  #creative-screen .panel{padding:10px;gap:6px}
+  #creative-screen .title{display:none}
+}
 `;
   document.head.appendChild(css);
 }

@@ -13,6 +13,7 @@ import { SettingsStore } from '../src/game/settings';
 import { buildFields, type Field } from '../src/ui/screens/menu';
 import { PauseMenu } from '../src/ui/screens/pause';
 import { ACHIEVEMENTS } from '../src/data/achievements';
+import { ScreenMode } from '../src/ui/screenmode';
 
 class FakeEl {
   hidden = false;
@@ -226,5 +227,50 @@ describe('tela de morte', () => {
     expect(main).toMatch(/onQuit: \(\) => \{ respawn\(\); flow\.saveAndQuit\(\); \}/);
     const flow = readFileSync('src/ui/gameflow.ts', 'utf8');
     expect(flow).toContain('onSaveAndQuit: () => this.saveAndQuit()');
+  });
+});
+
+/*
+ * Em pé, nada (pedido de 2026-10-20): o aviso de retrato só nascia ao entrar
+ * no mundo, e título, opções e criar mundo abriam em pé, com texto cortado.
+ */
+describe('celular em pé', () => {
+  function screenMode(w: number, h: number, coarse: boolean): { warning: FakeEl; firstTouch: number } {
+    const docHandlers: ((e: { pointerType: string }) => void)[] = [];
+    vi.stubGlobal('window', { innerWidth: w, innerHeight: h, addEventListener: () => {} });
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: coarse && q.includes('coarse') }));
+    const doc = (globalThis as unknown as { document: Record<string, unknown> }).document;
+    doc.addEventListener = (_t: string, fn: (e: { pointerType: string }) => void) => { docHandlers.push(fn); };
+    doc.removeEventListener = () => {};
+    const mode = new ScreenMode();
+    let entered = 0;
+    mode.enter = () => { entered++; };
+    mode.enterOnFirstTouch();
+    for (const fn of docHandlers) fn({ pointerType: 'touch' });
+    // Cada chamada pendura um aviso novo no mesmo corpo: o desta é o último.
+    const alerts = body.all().filter((el) => el.attributes.role === 'alert');
+    return { warning: alerts[alerts.length - 1], firstTouch: entered };
+  }
+
+  it('toque em pé cobre a tela com o aviso; deitado, não', () => {
+    expect(screenMode(360, 640, true).warning.hidden).toBe(false);
+    expect(screenMode(640, 360, true).warning.hidden).toBe(true);
+  });
+
+  it('no computador, janela estreita não é celular em pé', () => {
+    expect(screenMode(360, 640, false).warning.hidden).toBe(true);
+  });
+
+  it('o primeiro toque em qualquer tela pede a paisagem', () => {
+    expect(screenMode(360, 640, true).firstTouch).toBe(1);
+  });
+
+  it('o aviso nasce no boot, antes da tela de carregamento e dos menus', () => {
+    const main = readFileSync('src/main.ts', 'utf8');
+    const created = main.indexOf('new ScreenMode()');
+    expect(created).toBeGreaterThan(-1);
+    expect(main.indexOf('new ScreenMode()', created + 1), 'uma vez só').toBe(-1);
+    expect(created).toBeLessThan(main.indexOf("progress(0.1, t('boot.context'))"));
+    expect(created).toBeLessThan(main.indexOf('new MenuFlow('));
   });
 });

@@ -78,7 +78,8 @@ parte, janelas que rolavam no celular —, todas as telas foram refeitas num vis
 verde e dourado): nenhuma rola num celular deitado, o ✕ e o toque fora fecham, cada tela tem uma
 ação principal verde, todo botão tem ícone e palavra. O JOGAR do título continua o último mundo,
 a pausa virou ladrilhos e as opções, abas. Um teste (`npm run ui:fit`) abre as 25 telas em
-640×360 e 844×390 e falha se alguma rolar.
+640×360 e 844×390 e falha se alguma rolar. Com o celular em pé, o jogo não abre: um aviso pede
+para girar o aparelho desde o carregamento.
 
 - **M0 — esqueleto:** Vite + TypeScript strict, renderer WebGL2 próprio com fallback WebGL1,
   detecção de tier, loop de 20 Hz com interpolação, gerador procedural de texturas alimentando um
@@ -212,7 +213,7 @@ sem queda de quadro; heap estável em 20 MB.
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # 2535 testes (vitest)
+npm test           # 2539 testes (vitest)
 npm run build      # build de produção com typecheck
 npm run size       # relatório de tamanho; falha se estourar o orçamento
 npm run smoke      # abre o jogo num Chrome headless e joga o roteiro do doc 14 (precisa do build)
@@ -301,7 +302,7 @@ src/
     containers/             inventário, bancada, fornalha, baú, mesa de encantamento,
                             livro de receitas, criativo
 public/                     manifest, service worker, ícones do PWA
-tests/                      2535 testes, incluindo orçamento de performance e de luz
+tests/                      2539 testes, incluindo orçamento de performance e de luz
 scripts/size-report.mjs     orçamento de bundle (falha o build se estourar)
 docs/
   00-visao-geral.md         escopo, tiers de hardware, princípios

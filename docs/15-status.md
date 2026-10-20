@@ -9,13 +9,14 @@
 > Os documentos 00 a 14 são **normativos**: descrevem o que o jogo deve ser. Este é **descritivo**:
 > reflete o código de hoje e é atualizado ao fim de cada entrega.
 
-**Última atualização:** 2026-10-20 10:23 — **M32 fechado: interface nova** (§3). Pedido do usuário
+**Última atualização:** 2026-10-20 10:48 — **M32 fechado: interface nova** (§3). Pedido do usuário
 (menus carregados, "Fechar" em toda parte, janelas que rolam no celular), proposta num canvas
 aprovada, e as sete regras no doc 14. Um tema só (azul-noite, verde, dourado); mochila, bancada,
 baú e fornalha que encolhem até caber; JOGAR que continua o último mundo; mundos em cartões; pausa
 em ladrilhos; opções em abas; criativo sem rolar; o ✕ e o toque fora no lugar do "Fechar". **O
 aceite é um teste:** `npm run ui:fit` abre 25 telas em 640×360 e 844×390 e nenhuma rola — no CI.
-Custou 7,8 KB (313,5 de 350). Portões: 2535 testes; `smoke` 9, `smoke:mods` 6, `smoke:room` 20,
+Custou 8,1 KB (313,8 de 350). **Em pé, o jogo não abre:** o aviso de girar o aparelho cobre a
+tela desde o carregamento, não só dentro do mundo. Portões: 2539 testes; `smoke` 9, `smoke:mods` 6, `smoke:room` 20,
 `bench:ui` ok. **Próximo passo de código: M27** (§6). Do usuário: **M22**, agora com as telas
 novas no celular.
 
@@ -79,14 +80,14 @@ O multijogador saiu do escopo do M7 por decisão do usuário (2026-09-13) e volt
 
 ## 2. Métricas atuais
 
-Medidas em 2026-10-20 10:23 (ao fechar o M32) com os quatro portões, `npm run smoke`, `smoke:mods`,
+Medidas em 2026-10-20 10:48 (ao fechar o M32) com os quatro portões, `npm run smoke`, `smoke:mods`,
 `smoke:room`, `bench:ui` e `ui:fit`; as de aparelho e de sessão longa são de setembro, com a data na linha.
 
 | | Valor | Orçamento | Fonte |
 |---|---|---|---|
-| Bundle (gzip, o jogo sem mod) | **313,5 KB em português** (folga 36,5) e **326,8 em inglês** (o jogo + o pacote `l/`, 13,3); o M32 somou 7,8 (o CSS das telas e os ícones). Eram 305,7 e 318,7 ao fechar o M26 (+6,1), 299,6 e 312,5 ao fechar o M25, e 311,2 nos dois antes dele (311,0 antes do M24; 308,3 antes do M23; a série completa está no [histórico](15-historico.md)). O orçamento cobra o inglês, o caminho mais pesado | < 350 KB | `npm run size` |
+| Bundle (gzip, o jogo sem mod) | **313,8 KB em português** (folga 36,2) e **327,1 em inglês** (o jogo + o pacote `l/`, 13,3); o M32 somou 8,1 (o CSS das telas e os ícones). Eram 305,7 e 318,7 ao fechar o M26 (+6,1), 299,6 e 312,5 ao fechar o M25, e 311,2 nos dois antes dele (311,0 antes do M24; 308,3 antes do M23; a série completa está no [histórico](15-historico.md)). O orçamento cobra o inglês, o caminho mais pesado | < 350 KB | `npm run size` |
 | Pedaço "depois" (`u/`) | **4,6 KB**: exportar e importar mundo, créditos, editor de placa, cota cheia; baixado na primeira vez que se usa uma delas, e no precache (abre offline) | fora do orçamento de abertura | `npm run size` |
-| Testes | **2535**, 135 arquivos (2524 antes do M32; 2436 antes do M26; 2424 antes do M25; 2423 antes do M24; 2404 antes do M23) | manter verde | `npm test` |
+| Testes | **2539**, 135 arquivos (2524 antes do M32; 2436 antes do M26; 2424 antes do M25; 2423 antes do M24; 2404 antes do M23) | manter verde | `npm test` |
 | Smoke test de navegador | **9 passos verdes**: carregar, criar, andar 10 s, quebrar, **cota cheia: a tela abre com o banco recusando (desde o M25 vinda do pedaço `u/`), e com espaço de volta grava e fecha (M23)**, salvar, recarregar, conferir | verde | `npm run smoke` |
 | Smoke test da rede (M20.0) | **7 passos verdes**: dois Chrome, anfitrião e convidado pela página `rede.html`, trocando os códigos como uma pessoa; ligados em candidato `host` dos dois lados; ida e volta ~0,3 ms, perda 0/300, 6–18 MB/s. Com e sem mDNS (`SMOKE_NET_MDNS=1`). **Na mesma máquina — não prova a rede Wi-Fi** | verde | `npm run smoke:net` |
 | Toque nas telas de inventário, CPU 6× mais lenta | **91–268 ms** por ação (abrir o livro de receitas, tocar numa receita, tocar num slot; varia entre rodadas; 233 no pior ao fechar o M25, 142 ao fechar o M26, 335 ao fechar o M32); eram **~3 000 ms** com a folha de sprites como `data:` URL — no J7, 5–10 s | ≤ 600 ms | `npm run bench:ui` |
@@ -216,8 +217,14 @@ Aceite: **`npm run ui:fit`** — 25 telas em 640×360 e 844×390, nenhuma rola. 
   lugar de "Entrar numa sala"; o JOGAR do título continua). `ui-fit.mjs` mede, em cada tela,
   rolagem e **caixa cortada** (fora da tela é rolar sem barra); as quatro listas que rolam por
   dentro estão nomeadas no script.
-- Custou **7,8 KB** de bundle (305,7 → 313,5 em português): o CSS das telas e os ícones. A folga
-  que o M25 abriu (50) está em **36,5** — 44,3 antes do M32.
+- Custou **8,1 KB** de bundle (305,7 → 313,8 em português): o CSS das telas e os ícones. A folga
+  que o M25 abriu (50) está em **36,2** — 44,3 antes do M32.
+- **Em pé, nada** (pedido de 2026-10-20, depois do merge do PR #12): o aviso "gire o aparelho"
+  nascia só ao entrar no mundo, e título, opções e criar mundo abriam em pé, com texto cortado.
+  Agora `ScreenMode` nasce no começo do `boot`, antes da tela de carregamento, e cobre tudo com o
+  celular em pé (só toque: janela estreita no computador não conta). O primeiro toque em qualquer
+  tela já pede tela cheia e a trava de paisagem — no Android, gira sozinho. O aviso ganhou o
+  visual do M32 (um celular desenhado que deita).
 - **Fonte larga** (primeira rodada do CI, PR #12): o Chrome do CI cai na DejaVu Sans, bem mais
   larga que a Inter da máquina de desenvolvimento e a Roboto do Android, e Opções › Vídeo e
   Texturas passavam da borda em 640×360. Causa: a coluna `auto` da grade de `.menu-screen` crescia
@@ -317,7 +324,7 @@ registro de campo). O que fechou está no histórico.
 | M23: a tela de cota cheia, a borda de fogo e a fagulha no mob, escadas em L e em pirâmide, a mochila deitada | 2026-10-19 | M22 |
 | M25: o jogo em inglês e **offline** (o pacote `l/` e o pedaço `u/` vêm do precache), exportar e importar mundo, a placa, o primeiro som de cada mob no T0 | 2026-10-19 | M22 |
 | M26: a fogueira (fumaça e luz) e a moldura no T0, e o FPS com uma vila de fogueiras e lanternas | 2026-10-19 | M22 |
-| M32: as telas novas no celular de verdade — a barra do navegador come altura que o Chromium emulado não come; o balão de dica; arrastar pilha na mochila encolhida; o teclado virtual na busca do criativo e no nome do mundo | 2026-10-20 | M22 |
+| M32: as telas novas no celular de verdade — a barra do navegador come altura que o Chromium emulado não come; **abrir o jogo em pé** (o aviso desde o carregamento, e o primeiro toque no título girando a tela para paisagem; no app instalado do J7, a trava); o balão de dica; arrastar pilha na mochila encolhida; o teclado virtual na busca do criativo e no nome do mundo | 2026-10-20 | M22 |
 | No T0: a cor de grama por bioma (duas leituras de textura por vértice) e se o RD 5 cabe | 2026-09-23/24 | M22 |
 | Firefox (computador e Android) e **Safari no iPhone**: nunca rodaram | — | M22 |
 | Do acabamento de setembro, nunca olhados com atenção em aparelho: nuvens (custo de preenchimento), fogo que se espalha, contorno em alto contraste e modo daltônico, o boneco do inventário com as quatro peças de armadura, o Modo A de toque, `.clw` exportado e reimportado de verdade, `.ogg` real num resource pack | 2026-09-14 | M22 |
@@ -346,7 +353,7 @@ Estão nos comentários dos módulos; os que mudam o que o jogador vê:
 **De código: o M27** (bichos, doc 14): cavalo com sela pelo sistema de veículos, gato, coelho,
 peixes vivos, guia e etiqueta de nome. O aceite pede o tick de 20 mobs sem regressão e as vozes
 novas dentro do orçamento de áudio do M25 — que já as gera sob demanda. Folga hoje: 268 camadas,
-36,5 KB de bundle em português, 1,04 MB de áudio no pico. Tela nova (a do cavalo, por exemplo) segue as
+36,2 KB de bundle em português, 1,04 MB de áudio no pico. Tela nova (a do cavalo, por exemplo) segue as
 sete regras do M32 (doc 14) e entra no `scripts/ui-fit.mjs`.
 
 **Do usuário: o M22** (aparelho e MVP). O roteiro, numa sessão de celular, em ordem:
